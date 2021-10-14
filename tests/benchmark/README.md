@@ -10,7 +10,7 @@ docker pull ${ImageName}
 
 run_cmd="set -xe;
         cd /workspace ;
-        bash -x benchmark/run_all.sh"
+        bash -x tests/benchmark/run_all.sh"
 
 nvidia-docker run --name test_paddle_gpt -it  \
     --net=host \

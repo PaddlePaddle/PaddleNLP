@@ -5,7 +5,7 @@
 # Usage:
 #   git clone https://github.com/PaddlePaddle/PaddleNLP.git
 #   cd PaddleNLP
-#   bash benchmark/run_all.sh
+#   bash tests/benchmark/run_all.sh
 
 
 export BENCHMARK_ROOT=/workspace
@@ -59,15 +59,15 @@ max_iters=200 # control the test time
 SP_CARDNUM='0'
 MP_CARDNUM='0,1,2,3,4,5,6,7'
 for mod_item in ${mode_list[@]}; do
-    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item}
-    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item}
+    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item}
+    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item}
     if [ $mod_item == 'dygraph' ]; then
         # now, in dygraph mod, the bs=16 will out of mem in 32G V100
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item}
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item}
     else
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item}
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item}
     fi
 done
 
@@ -77,14 +77,14 @@ python3 -m pip install paddlepaddle_gpu-0.0.0.post102-cp37-cp37m-linux_x86_64.wh
 rm paddlepaddle_gpu-0.0.0.post102-cp37-cp37m-linux_x86_64.whl 
 
 for mod_item in ${mode_list[@]}; do
-    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item} gpt3
-    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item} gpt3
+    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item} gpt3
+    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item} gpt3
     if [ $mod_item == 'dygraph' ]; then
         # now, in dygraph mod, the bs=16 will out of mem in 32G V100
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
     else
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
     fi
 done
