@@ -31,7 +31,7 @@ DOC_FORMAT = r"""
 DOWNLOAD_CHECK = False
 
 
-def download_file(save_dir, filename, url, md5=None, task=None):
+def download_file(save_dir, filename, url, md5=None):
     """
     Download the file from the url to specified directory. 
     Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use 
@@ -44,12 +44,6 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
     logger.disable()
-    global DOWNLOAD_CHECK
-    if not DOWNLOAD_CHECK:
-        DOWNLOAD_CHECK = True
-        checker = DownloaderCheck(task)
-        checker.start()
-        checker.join()
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
@@ -58,6 +52,23 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         get_path_from_url(url, save_dir, md5)
     logger.enable()
     return fullname
+
+
+def download_check(task):
+    """
+    Check the resource statuc in the specified task.
+
+    Args:
+        task(string): The name of specified task. 
+    """
+    logger.disable()
+    global DOWNLOAD_CHECK
+    if not DOWNLOAD_CHECK:
+        DOWNLOAD_CHECK = True
+        checker = DownloaderCheck(task)
+        checker.start()
+        checker.join()
+    logger.enable()
 
 
 def add_docstrings(*docstr):
