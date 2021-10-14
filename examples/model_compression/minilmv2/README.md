@@ -10,11 +10,11 @@
 ## 简介
 本目录下的实验主要参考论文[《MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers》](https://arxiv.org/abs/2012.15828)实现。
 
-MiniLMV2也是从层数深的Transformer类模型到层数较浅的Transformer类模型的蒸馏策略。它的优势是只需要取教师模型和学生模型中的各一层进行蒸馏训练，而不像其他方法需要蒸馏更多的层，避免面对更加复杂的layer mapping问题，并且效果优于TinyBert的蒸馏策略。
+MiniLMv2也是从层数深的Transformer类模型到层数较浅的Transformer类模型的蒸馏策略。它的优势是只需要取教师模型和学生模型中的各一层进行蒸馏训练，而不像其他方法需要蒸馏更多的层，避免面对更加复杂的layer mapping问题，并且效果优于TinyBert的蒸馏策略。
 
-MiniLMV2蒸馏的目标是教师模型某层的q与q, k与k, v与v的矩阵乘结果和学生模型最后一层的q与q, k与k, v与v的矩阵乘之间的kl散度loss。其中教师模型是large size时，选择实验并选取倒数某一层，当教师模型是base size时，选择最后一层进行蒸馏即可。
+MiniLMv2蒸馏的目标是教师模型某层的q与q, k与k, v与v的矩阵乘结果和学生模型最后一层的q与q, k与k, v与v的矩阵乘之间的kl散度loss。其中教师模型是large size时，选择实验并选取倒数某一层，当教师模型是base size时，选择最后一层进行蒸馏即可。
 
-为了防止教师模型是large size时，head size与学生模型不同，蒸馏目标的shape无法匹配，MiniLMV2还需要对head进行重组，先合并再按relation_head_num重新分割head_num和head_size。
+为了防止教师模型是large size时，head size与学生模型不同，蒸馏目标的shape无法匹配，MiniLMv2还需要对head进行重组，先合并再按relation_head_num重新分割head_num和head_size。
 
 ## 数据、预训练模型介绍及获取
 
@@ -112,7 +112,7 @@ python -u ./run_clue.py \
 
 ### 蒸馏实验结果
 
-本示例选择的是CLUE中的分类任务，以`bert-base-chinese`作教师模型，利用MiniLMV2策略对6层模型进行蒸馏，可以得到的通用模型在CLUE上的指标为：
+本示例选择的是CLUE中的分类任务，以`bert-base-chinese`作教师模型，利用MiniLMv2策略对6层模型进行蒸馏，可以得到的通用模型在CLUE上的指标为：
 
 | CLUE    | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   |
 | ------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- |

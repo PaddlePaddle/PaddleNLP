@@ -210,7 +210,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
   // NOTE: the data type of the embedding bias for logits is different
   // between decoding with beam search and top-k/top-p sampling in
-  // Faster Transformer when using float16.
+  // FasterTransformer when using float16.
   if ("beam_search" == decoding_strategy) {
     // for matmul bias
     decoding_params.embedding_bias = embedding_bias.data<float>();
@@ -292,7 +292,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   } else {
     PD_THROW(
         "Only beam_search, topk_sampling and topp_sampling are supported for "
-        "Faster Transformer. ");
+        "FasterTransformer. ");
   }
   delete[] params;
 
