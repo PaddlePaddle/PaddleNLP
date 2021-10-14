@@ -62,7 +62,7 @@ bash run.sh
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-./build/bin/transformer_e2e -batch_size 8 -device gpu -gpu_id 0 -model_dir ./infer_model/ -vocab_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./build/bin/transformer_e2e -batch_size 8 -device gpu -gpu_id 0 -model_dir ./infer_model/ -vocab_file /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_file /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 各个参数解释如下：
@@ -72,8 +72,8 @@ export CUDA_VISIBLE_DEVICES=0
 * `-use_mkl`: 是否使用 mkl，设置代表使用 mkl，不设置则不使用 mkl。仅在使用 cpu 进行预测的时候有效。
 * `-threads`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
 * `-model_dir`: 导出的模型的位置。
-* `-vocab_dir`: 词表的位置。
-* `-data_dir`: 推理用的数据的位置。
+* `-vocab_file`: 词表文件的位置。
+* `-data_file`: 推理用的数据的位置。
 
 英德翻译的结果会保存到 `predict.txt` 文件中。
 
