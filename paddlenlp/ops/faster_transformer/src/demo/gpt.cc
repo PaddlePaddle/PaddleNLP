@@ -31,7 +31,7 @@ DEFINE_string(model_dir,
               "The directory to the inference model. ");
 DEFINE_string(vocab_file,
               "./infer_model/vocab.txt",
-              "The directory to the vocabulary file. ");
+              "The path to the vocabulary file. ");
 DEFINE_string(start_token, "<|endoftext|>", "The start token of GPT.");
 DEFINE_string(end_token, "<|endoftext|>", "The end token of GPT.");
 
