@@ -35,7 +35,7 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.2rc
+- paddlepaddle >= 2.1
 
 ### pip安装
 
