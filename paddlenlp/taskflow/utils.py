@@ -44,8 +44,6 @@ def download_file(save_dir, filename, url, md5=None):
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
     logger.disable()
-    if save_dir is None:
-        return None
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
