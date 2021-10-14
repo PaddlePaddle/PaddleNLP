@@ -58,31 +58,6 @@ class WordSegmentationTask(LacTask):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = False
-        self._usage = usage
-        word_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "word.dic",
-            URLS['word_segmentation_params'][0],
-            URLS['word_segmentation_params'][1], 'word_segmentation')
-        tag_dict_path = download_file(self._task_path,
-                                      "lac_params" + os.path.sep + "tag.dic",
-                                      URLS['word_segmentation_params'][0],
-                                      URLS['word_segmentation_params'][1])
-        q2b_dict_path = download_file(self._task_path,
-                                      "lac_params" + os.path.sep + "q2b.dic",
-                                      URLS['word_segmentation_params'][0],
-                                      URLS['word_segmentation_params'][1])
-        self._word_vocab = load_vocab(word_dict_path)
-        self._tag_vocab = load_vocab(tag_dict_path)
-        self._q2b_vocab = load_vocab(q2b_dict_path)
-        self._id2word_dict = dict(
-            zip(self._word_vocab.values(), self._word_vocab.keys()))
-        self._id2tag_dict = dict(
-            zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-        if self._static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
 
     def _postprocess(self, inputs):
         """
