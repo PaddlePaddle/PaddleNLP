@@ -74,7 +74,7 @@ class TextGenerationTask(Task):
         if self._static_mode:
             download_file(self._task_path,
                           "static" + os.path.sep + "inference.pdiparams",
-                          URLS[self.model][0], URLS[self.model][1])
+                          URLS[self.model][0], URLS[self.model][1], model)
             self._get_inference_model()
         else:
             self._construct_model(model)
