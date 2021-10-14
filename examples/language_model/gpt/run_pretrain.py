@@ -29,6 +29,7 @@ from paddlenlp.ops import Topology
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
+from paddle.distributed import fleet
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -183,6 +184,9 @@ def do_train(args):
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_params)
 
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
         opt_path = os.path.join(args.model_name_or_path, "model_state.pdopt")
@@ -218,9 +222,27 @@ def do_train(args):
                 tokens, loss_mask, attention_mask, position_ids, labels = batch
                 loss_mask.stop_gradient = True
                 attention_mask.stop_gradient = True
+                with paddle.amp.auto_cast(
+                        args.use_amp,
+                        custom_white_list=["layer_norm", "softmax", "gelu"],
+                        custom_black_list=[
+                            "reduce_sum", "c_softmax_with_cross_entropy",
+                            "c_embedding"
+                        ]):
 
-                preds = model(tokens, position_ids, attention_mask)
-                loss = criterion(preds, labels, loss_mask)
+                    preds = model(tokens, position_ids, attention_mask)
+                    loss = criterion(preds, labels, loss_mask)
+
+                if args.use_amp:
+                    scaler.scale(loss).backward()
+                    scaler.minimize(optimizer, loss)
+                else:
+                    loss.backward()
+                    optimizer.step()
+
+                if lr_scheduler is not None:
+                    lr_scheduler.step()
+                optimizer.clear_grad()
 
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
@@ -233,11 +255,6 @@ def do_train(args):
                                           optimizer.get_lr(), global_step)
 
                     tic_train = time.time()
-                loss.backward()
-                optimizer.step()
-                if lr_scheduler is not None:
-                    lr_scheduler.step()
-                optimizer.clear_grad()
 
                 if args.check_accuracy:
                     if global_step >= args.max_steps:
