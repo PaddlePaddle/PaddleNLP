@@ -1133,8 +1133,8 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
 
 class BigBirdForMultipleChoice(BigBirdPretrainedModel):
     """
-    BigBird Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    BigBird Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
 
     Args:
         bigbird (:class:`BigBirdModel`):
