@@ -1,3 +1,5 @@
+export PYTHONPATH=$PYTHONPATH:../../../../
+
 log_dir=dp2_pp2_mp2
 rm -rf $log_dir
 
@@ -23,4 +25,4 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --sharding_degree 1\
     --use_pure_fp16 True\
     --use_recompute False
-    
+
