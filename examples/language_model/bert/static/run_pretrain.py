@@ -19,6 +19,7 @@ import os
 import random
 import time
 import h5py
+import yaml
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -154,6 +155,11 @@ def parse_args():
         default=1,
         help="Number of merge steps before gradient update."
         "global_batch_size = gradient_merge_steps * batch_size.")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="./bert.yaml",
+        help="The config file which store the default value")
     args = parser.parse_args()
     return args
 
@@ -419,5 +425,12 @@ def do_train(args):
 
 
 if __name__ == "__main__":
+    # Args -> Yaml
     args = parse_args()
+    config_path = args.config
+    with open(config_path, "r") as fp:
+        yaml_config = yaml.load(fp)
+    for key, val in yaml_config.items(): 
+        setattr(args, key, val)
+    print (args)
     do_train(args)

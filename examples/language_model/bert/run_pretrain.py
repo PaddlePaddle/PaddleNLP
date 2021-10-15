@@ -20,6 +20,7 @@ import os
 import random
 import time
 import h5py
+import yaml
 import distutils.util
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
@@ -161,6 +162,11 @@ def parse_args():
         type=distutils.util.strtobool,
         default=False,
         help="Enable training under @to_static.")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="./bert.yaml",
+        help="The config file which store the default value")
     args = parser.parse_args()
     return args
 
@@ -324,7 +330,16 @@ def do_train(args):
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = create_input_specs()
-        model = paddle.jit.to_static(model, input_spec=specs)
+        is_pass = args.enable_pass if hasattr(args, 'enable_pass') else False
+        if is_pass:
+            build_strategy = paddle.static.BuildStrategy()
+            build_strategy.fuse_elewise_add_act_ops = True
+            build_strategy.fuse_bn_act_ops = True
+            build_strategy.fuse_bn_add_act_ops = True
+            build_strategy.enable_addto = True
+        else: 
+            build_strategy = None
+        model = paddle.jit.to_static(model, input_spec=specs, build_strategy=build_strategy)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
     if paddle.distributed.get_world_size() > 1:
@@ -474,5 +489,12 @@ def do_train(args):
 
 
 if __name__ == "__main__":
+    # Args -> Yaml
     args = parse_args()
+    config_path = args.config
+    with open(config_path, "r") as fp:
+        yaml_config = yaml.load(fp)
+    for key, val in yaml_config.items(): 
+        setattr(args, key, val)
+    print (args)
     do_train(args)
