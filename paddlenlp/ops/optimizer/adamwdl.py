@@ -48,13 +48,13 @@ def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
 class AdamWDL(AdamW):
     r"""
     The AdamWDL optimizer is implemented based on the AdamW Optimization with dynamic lr setting.
-    Generally it's used for transfomer model.
+    Generally it's used for transformer model.
 
     We use "layerwise_lr_decay" as default dynamic lr setting method of AdamWDL.
     “Layer-wise decay” means exponentially decaying the learning rates of individual 
     layers in a top-down manner. For example, suppose the 24-th layer uses a learning
     rate l, and the Layer-wise decay rate is α, then the learning rate of layer m 
-    is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237
+    is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237.
 
     .. math::
         t & = t + 1
