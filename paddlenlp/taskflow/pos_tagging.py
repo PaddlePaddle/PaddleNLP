@@ -24,13 +24,6 @@ import numpy as np
 from .utils import download_file
 from .lexical_analysis import load_vocab, LacTask
 
-URLS = {
-    "pos_tagging_params": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/lexical_analysis/lac/lac_params.tar.gz",
-        'ee9a3eaba5f74105410410e3c5b28fbc'
-    ],
-}
-
 usage = r"""
            from paddlenlp import Taskflow 
 
@@ -58,29 +51,6 @@ class POSTaggingTask(LacTask):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = False
-        self._usage = usage
-        word_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "word.dic",
-            URLS['pos_tagging_params'][0], URLS['pos_tagging_params'][1],
-            'pos_tagging')
-        tag_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "tag.dic",
-            URLS['pos_tagging_params'][0], URLS['pos_tagging_params'][1])
-        q2b_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "q2b.dic",
-            URLS['pos_tagging_params'][0], URLS['pos_tagging_params'][1])
-        self._word_vocab = load_vocab(word_dict_path)
-        self._tag_vocab = load_vocab(tag_dict_path)
-        self._q2b_vocab = load_vocab(q2b_dict_path)
-        self._id2word_dict = dict(
-            zip(self._word_vocab.values(), self._word_vocab.keys()))
-        self._id2tag_dict = dict(
-            zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-        if self._static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
 
     def _postprocess(self, inputs):
         """

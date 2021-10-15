@@ -9,8 +9,8 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **83** 种预训练的参数权重供用户使用，
-其中包含了 **42** 种中文语言模型的预训练权重。
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了**21**种网络结构， **91** 种预训练的参数权重供用户使用，
+其中包含了 **45** 种中文语言模型的预训练权重。
 
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
 | Model              | Pretrained Weight                       | Language     | Details of the model                    |
@@ -124,6 +124,16 @@ Transformer预训练模型汇总
 |                    |                                         |              | and Traditional text using              |
 |                    |                                         |              | Whole-Word-Masking with extented data.  |
 |                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 102M parameters.              |
+|                    |                                         |              | Trained with novel MLM as correction    |
+|                    |                                         |              | pre-training task.                      |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-large-chinese``                | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                         |              | 16-heads, 326M parameters.              |
+|                    |                                         |              | Trained with novel MLM as correction    |
+|                    |                                         |              | pre-training task.                      |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
 |                    |``simbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, 108M parameters.              |
 |                    |                                         |              | Trained on 22 million pairs of similar  |
@@ -132,6 +142,18 @@ Transformer预训练模型汇总
 |BigBird_            |``bigbird-base-uncased``                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, _M parameters.                |
 |                    |                                         |              | Trained on lower-cased English text.    |
++--------------------+-----------------------------------------+--------------+-----------------------------------------+
+|ConvBert_           |``convbert-base``                        | English      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 106M parameters.              |
+|                    |                                         |              | The ConvBERT base model.                |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``convbert-medium-small``                | English      | 12-layer, 384-hidden,                   |
+|                    |                                         |              | 8-heads, 17M parameters.                |
+|                    |                                         |              | The ConvBERT medium small model.        |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``convbert-small``                       | English      | 12-layer, 128-hidden,                   |
+|                    |                                         |              | 4-heads, 13M parameters.                |
+|                    |                                         |              | The ConvBERT small model.               |
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
 |DistilBert_         |``distilbert-base-uncased``              | English      | 6-layer, 768-hidden,                    |
 |                    |                                         |              | 12-heads, 66M parameters.               |
@@ -220,6 +242,10 @@ Transformer预训练模型汇总
 |                    |``gpt2-medium-en``                       | English      | 24-layer, 1024-hidden,                  |
 |                    |                                         |              | 16-heads, 345M parameters.              |
 |                    |                                         |              | Trained on English text.                |
++--------------------+-----------------------------------------+--------------+-----------------------------------------+
+|MPNet_              |``mpnet-base``                           | English      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 109M parameters.              |
+|                    |                                         |              | MPNet Base Model.                       |
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
 |NeZha_              |``nezha-base-chinese``                   | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, 108M parameters.              |
@@ -396,6 +422,8 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
 |BigBird_            | ✅                      | ❌                   | ❌                 | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
+|ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+
 |DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
 |ELECTRA_            | ✅                      | ✅                   | ❌                 | ❌              |
@@ -409,6 +437,8 @@ Transformer预训练模型适用任务汇总
 |ERNIE-GRAM_         | ✅                      | ✅                   | ✅                 | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
 |GPT_                | ❌                      | ❌                   | ❌                 | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+
+|MPNet_              | ✅                      | ✅                   | ✅                 | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
 |NeZha_              | ✅                      | ✅                   | ✅                 | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
@@ -429,6 +459,7 @@ Transformer预训练模型适用任务汇总
 .. _BART: https://arxiv.org/abs/1910.13461
 .. _BERT: https://arxiv.org/abs/1810.04805
 .. _BigBird: https://arxiv.org/abs/2007.14062
+.. _ConvBert: https://arxiv.org/abs/2008.02496
 .. _DistilBert: https://arxiv.org/abs/1910.01108
 .. _ELECTRA: https://arxiv.org/abs/2003.10555
 .. _ERNIE: https://arxiv.org/abs/1904.09223
@@ -436,6 +467,7 @@ Transformer预训练模型适用任务汇总
 .. _ERNIE-GEN: https://arxiv.org/abs/2001.11314
 .. _ERNIE-GRAM: https://arxiv.org/abs/2010.12148
 .. _GPT: https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf
+.. _MPNet: https://arxiv.org/abs/2004.09297
 .. _NeZha: https://arxiv.org/abs/1909.00204
 .. _RoBERTa: https://arxiv.org/abs/1907.11692
 .. _RoFormer: https://arxiv.org/abs/2104.09864
@@ -512,16 +544,20 @@ Reference
   `huawei-noah/Pretrained-Language-Model/NEZHA-PyTorch/ <https://github.com/huawei-noah/Pretrained-Language-Model/tree/master/NEZHA-PyTorch>`_
   `ZhuiyiTechnology/simbert <https://github.com/ZhuiyiTechnology/simbert>`_
 - Lan, Zhenzhong, et al. "Albert: A lite bert for self-supervised learning of language representations." arXiv preprint arXiv:1909.11942 (2019).
+- Lewis, Mike, et al. "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension." arXiv preprint arXiv:1910.13461 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Zaheer, Manzil, et al. "Big bird: Transformers for longer sequences." arXiv preprint arXiv:2007.14062 (2020).
+- Jiang, Zihang, et al. "ConvBERT: Improving BERT with Span-based Dynamic Convolution." arXiv preprint arXiv:2008.02496 (2020).
 - Sanh, Victor, et al. "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter." arXiv preprint arXiv:1910.01108 (2019).
 - Clark, Kevin, et al. "Electra: Pre-training text encoders as discriminators rather than generators." arXiv preprint arXiv:2003.10555 (2020).
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
 - Xiao, Dongling, et al. "Ernie-gen: An enhanced multi-flow pre-training and fine-tuning framework for natural language generation." arXiv preprint arXiv:2001.11314 (2020).
 - Xiao, Dongling, et al. "ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding." arXiv preprint arXiv:2010.12148 (2020).
 - Radford, Alec, et al. "Language models are unsupervised multitask learners." OpenAI blog 1.8 (2019): 9.
+- Song, Kaitao, et al. "MPNet: Masked and Permuted Pre-training for Language Understanding." arXiv preprint arXiv:2004.09297 (2020).
 - Wei, Junqiu, et al. "NEZHA: Neural contextualized representation for chinese language understanding." arXiv preprint arXiv:1909.00204 (2019).
 - Liu, Yinhan, et al. "Roberta: A robustly optimized bert pretraining approach." arXiv preprint arXiv:1907.11692 (2019).
+- Su Jianlin, et al. "RoFormer: Enhanced Transformer with Rotary Position Embedding." arXiv preprint arXiv:2104.09864 (2021).
 - Tian, Hao, et al. "SKEP: Sentiment knowledge enhanced pre-training for sentiment analysis." arXiv preprint arXiv:2005.05635 (2020).
 - Vaswani, Ashish, et al. "Attention is all you need." arXiv preprint arXiv:1706.03762 (2017).
 - Jiao, Xiaoqi, et al. "Tinybert: Distilling bert for natural language understanding." arXiv preprint arXiv:1909.10351 (2019).

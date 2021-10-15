@@ -43,8 +43,7 @@ JIT 自动编译
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 `UNIMOText 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo>`_。
-* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_。
-
+* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_，`BART 预测加速使用示例-文本摘要 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_。
 具体使用方法可以参考 API 文档或是使用示例。
 
 编译自定义OP
@@ -81,14 +80,14 @@ PaddleNLP 准备
 
     mkdir build
     cd build/
-    cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
     make -j
     cd ../
 
 可以使用的编译选项包括：
 
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * `-DPY_CMD`: 指定当前装有 PaddlePaddle 版本的 python 环境，比如 `-DPY_CMD=python3.7`。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
+* `-DSM`: 是指的所用 GPU 的 compute capability，建议不使用该选项设置，未设置时将自动检测。如要设置，需根据 [compute capability](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 进行设置，如 V100 时设置 `-DSM=70` 或 T4 时设置 `-DSM=75`。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
@@ -255,13 +254,12 @@ PaddleNLP 准备
 
     mkdir build
     cd build/
-    cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
     make -j
     cd ../
 
-注意：
+可以使用的编译选项包括：
 
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，需要使用的 PaddlePaddle 的 lib 可以选择自行编译或者直接从官网下载 `paddle_inference_linux_lib <https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#linux>`_。需要注意的是，在该路径下，预测库的组织结构满足：
   .. code-block::
 
@@ -277,6 +275,7 @@ PaddleNLP 准备
       └── version.txt
 
 * `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
+* `-DSM`: 是指的所用 GPU 的 compute capability，建议不使用该选项设置，未设置时将自动检测。如要设置，需根据 [compute capability](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 进行设置，如 V100 时设置 `-DSM=70` 或 T4 时设置 `-DSM=75`。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
@@ -293,7 +292,7 @@ PaddleNLP 准备
 .. code-block::
 
     cd bin/
-    ./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
+    ./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_file <dict_file> -data_file <input_data>
 
 举例说明：
 
@@ -302,7 +301,7 @@ PaddleNLP 准备
     cd bin/
     # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
     ../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-    ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+    ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_file DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_file DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 
 其中：
 
@@ -345,4 +344,4 @@ PaddleNLP 准备
 .. code-block::
 
     cd bin/
-    ./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_dir path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"
+    ./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_file path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"

@@ -30,4 +30,4 @@ cmake .. -DPADDLE_LIB=${LIB_DIR} \
 
 make -j
 
-./${DEMO_NAME} -batch_size 8 -device ${DEVICE} -gpu_id 0 -model_dir ${MODEL_FILE_DIR} -vocab_dir ${VOCAB_DIR} -data_dir ${DATA_DIR}
+./${DEMO_NAME} -batch_size 8 -device ${DEVICE} -gpu_id 0 -model_dir ${MODEL_FILE_DIR} -vocab_file ${VOCAB_DIR} -data_file ${DATA_DIR}
