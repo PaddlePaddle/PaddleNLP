@@ -45,7 +45,7 @@ def guard(device):
 
 class ParallelEmbedding(nn.Layer):
     """
-    Parallel Embedding
+    Parallel Embedding.
     """
 
     def __init__(self,
