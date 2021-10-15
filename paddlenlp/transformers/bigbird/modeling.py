@@ -1230,7 +1230,7 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
     def __init__(self, bigbird):
         super(BigBirdForMaskedLM, self).__init__()
         self.bigbird = bigbird
-        self.lm_head = BigBirdLMHead(
+        self.lm_head = BigBirdLMPredictionHead(
             self.bigbird.config["hidden_size"],
             self.bigbird.config["vocab_size"],
             self.bigbird.config["activation"],
@@ -1303,7 +1303,7 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
     def __init__(self, bigbird):
         super(BigBirdForCausalLM, self).__init__()
         self.bigbird = bigbird
-        self.lm_head = BigBirdLMHead(
+        self.lm_head = BigBirdLMPredictionHead(
             self.bigbird.config["hidden_size"],
             self.bigbird.config["vocab_size"],
             self.bigbird.config["activation"],
