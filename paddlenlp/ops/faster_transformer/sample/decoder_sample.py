@@ -33,9 +33,9 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoder_lib",
-        default="../../build/lib/libdecoder_op.so",
+        default="../../build/lib/libdecoding_op.so",
         type=str,
-        help="Path of libdecoder_op.so. ")
+        help="Path of libdecoding_op.so. ")
     parser.add_argument(
         "--use_fp16_decoder",
         action="store_true",
