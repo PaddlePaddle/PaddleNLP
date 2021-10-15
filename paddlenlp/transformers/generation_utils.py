@@ -346,6 +346,9 @@ class GenerationMixin(object):
                                      expand_size,
                                      attention_mask=None,
                                      **model_kwargs):
+        if expand_size == 1:
+            return input_ids, model_kwargs
+
         index = paddle.tile(
             paddle.arange(input_ids.shape[0]).unsqueeze(-1),
             [1, expand_size]).reshape([-1])
@@ -496,6 +499,7 @@ class GenerationMixin(object):
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
+                 use_fast=True,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -653,7 +657,7 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-        if getattr(self, '_faster_entry', None) is not False:
+        if getattr(self, '_faster_entry', None) is not False and use_fast:
             args = locals()
             args.pop('self')
             args.pop("__class__", None)

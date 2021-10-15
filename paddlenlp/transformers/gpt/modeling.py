@@ -762,11 +762,10 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.arange(
                 past_length,
                 paddle.shape(input_ids)[-1] + past_length,
-                dtype='int64')
+                dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.fluid.layers.expand_as(position_ids,
-                                                         input_ids)
+            position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
@@ -1085,6 +1084,16 @@ class GPTLMHeadModel(GPTPretrainedModel):
             return logits, cached_kvs
         else:
             return logits
+
+    def get_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterGPT
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decoding_strategy = kwargs.get('decode_strategy')
+        if decoding_strategy == "beam_search":
+            return False
+        self._faster_entry = FasterGPT(
+            self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def prepare_inputs_for_generation(self,
                                       input_ids,

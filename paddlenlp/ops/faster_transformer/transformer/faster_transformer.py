@@ -646,31 +646,36 @@ class TransformerGenerator(paddle.nn.Layer):
 
 
 class FasterGPT(nn.Layer):
-    def __init__(self,
-                 model,
-                 topk=4,
-                 topp=0.0,
-                 max_out_len=256,
-                 bos_id=50256,
-                 eos_id=50256,
-                 temperature=0,
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(
             model=model,
-            topk=topk,
-            topp=topp,
-            max_out_len=max_out_len,
-            bos_id=bos_id,
-            eos_id=eos_id,
-            temperature=temperature,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
-    def forward(self, input_ids):
-        return self.decoding(input_ids)
+    def forward(self,
+                input_ids,
+                top_k=4,
+                top_p=0.0,
+                max_length=256,
+                temperature=0,
+                decode_strategy="sample",
+                **model_kwargs):
+        if input_ids.dtype == "int64":
+            paddle.cast(input_ids, "int32")
+        # change top_p to zero if not using top_p sampling for FT
+        if top_p == 1.0:
+            top_p = 0.0
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        return self.decoding(
+            input_ids,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            temperature=temperature)
 
     def export_params(self, state_to_load, place):
         for item in state_to_load:
@@ -702,12 +707,12 @@ class FasterGPT(nn.Layer):
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self,
                  model,
-                 decoding_strategy="sampling",
+                 decode_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
-        self._decoding_strategy = decoding_strategy
+        self._decode_strategy = decode_strategy
         self.bos_token_id = model.bos_token_id
         self.pad_token_id = model.pad_token_id
         self.eos_token_id = model.eos_token_id
@@ -725,7 +730,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decoding_strategy,
+            decoding_strategy=self._decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -773,7 +778,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decoding_strategy == "sampling":
+        if use_fp16_decoding and self._decode_strategy == "sampling":
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -793,11 +798,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
 
-        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
-                                                      top_k > 0):
+        if self._decode_strategy == "sampling" and (top_p == 1.0 and top_k > 0):
             top_p = 0.0
-        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
-                                                        top_k == 0):
+        elif self._decode_strategy == "sampling" and (top_p != 1.0 and
+                                                      top_k == 0):
             top_k = 0
         else:
             raise ValueError(
@@ -827,7 +831,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
     def forward(self,
                 max_length,
-                decoding_strategy="sampling",
+                decode_strategy="sampling",
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
@@ -865,12 +869,12 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 class FasterUNIMOText(UNIMOPretrainedModel):
     def __init__(self,
                  model,
-                 decoding_strategy="sampling",
+                 decode_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
-        self._decoding_strategy = decoding_strategy
+        self._decode_strategy = decode_strategy
         self.bos_token_id = model.bos_token_id
         self.pad_token_id = model.pad_token_id
         self.eos_token_id = model.eos_token_id
@@ -888,7 +892,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decoding_strategy,
+            decoding_strategy=self._decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -936,7 +940,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decoding_strategy == "sampling":
+        if use_fp16_decoding and self._decode_strategy == "sampling":
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -956,11 +960,10 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
 
-        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
-                                                      top_k > 0):
+        if self._decode_strategy == "sampling" and (top_p == 1.0 and top_k > 0):
             top_p = 0.0
-        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
-                                                        top_k == 0):
+        elif self._decode_strategy == "sampling" and (top_p != 1.0 and
+                                                      top_k == 0):
             top_k = 0
         else:
             raise ValueError(
@@ -990,7 +993,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
     def forward(self,
                 max_length,
-                decoding_strategy="sampling",
+                decode_strategy="sampling",
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
@@ -1015,8 +1018,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             memory_seq_lens=seq_len,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
-            topk=top_k,
-            topp=top_p,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_length,
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,
@@ -1028,7 +1031,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 class FasterBART(BartPretrainedModel):
     def __init__(self,
                  model,
-                 decoding_strategy="beam_search_v2",
+                 decode_strategy="beam_search_v2",
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterBART, self).__init__()
@@ -1041,13 +1044,11 @@ class FasterBART(BartPretrainedModel):
                 weight_attr=weight_attr)
         self.encoder = model.bart.get_encoder()
         self.decoder = model.bart.get_decoder()
-        self.bos_token_id = model.bart.config['bos_token_id']
-        self.eos_token_id = model.bart.config['eos_token_id']
         self.pad_token_id = model.bart.config['pad_token_id']
-        self._decoding_strategy = decoding_strategy
+        self._decode_strategy = decode_strategy
         self.decoding = InferBartDecoding(
             model=model,
-            decoding_strategy=decoding_strategy,
+            decoding_strategy=decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
@@ -1060,36 +1061,47 @@ class FasterBART(BartPretrainedModel):
     def forward(self,
                 input_ids=None,
                 encoder_output=None,
-                mem_seq_lens=None,
+                seq_len=None,
                 num_beams=4,
                 top_k=1,
                 top_p=0.0,
                 max_length=256,
                 diversity_rate=0.0,
                 length_penalty=0.6,
+                num_return_sequences=1,
                 **model_kwargs):
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.encoder(input_ids)
-        if mem_seq_lens is None:
-            assert input_ids is not None, "You have to specify either input_ids when generating mem_seq_lens."
-            mem_seq_lens = paddle.sum(paddle.cast(
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
                 input_ids != self.pad_token_id, dtype="int32"),
-                                      axis=-1,
-                                      keepdim=True,
-                                      dtype="int32")
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
-
+        if self._decode_strategy.startswith("beam_search"):
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len)
+        elif self._decode_strategy == "sampling":
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output,
+                expand_size=num_return_sequences,
+                seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        print(seq_len)
         # change top_p to zero if not using top_p sampling for FT
         if top_p == 1.0:
             top_p = 0.0
         return self.decoding(
             enc_output=encoder_output,
-            memory_seq_lens=mem_seq_lens,
+            memory_seq_lens=seq_len,
             beam_size=num_beams,
             top_k=top_k,
             top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,
-            alpha=length_penalty)
+            alpha=length_penalty,
+            num_return_sequences=num_return_sequences)

@@ -346,14 +346,20 @@ def finalize(beam_size,
              parent_ids,
              out_seq_lens,
              max_seq_len=None,
+             num_return_sequences=1,
              decoding_strategy="beam_search"):
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
     ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
+
     if decoding_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
             beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
-        ids = paddle.nn.functional.gather_tree(ids, parent_ids)
+        ids = paddle.nn.functional.gather_tree(ids, parent_ids).transpose(
+            [1, 2, 0])
+        ids = ids[:, :num_return_sequences, :].reshape([-1, ids.shape[-1]])
+    else:
+        ids = ids.transpose([1, 0])
     return ids
 
 
@@ -584,17 +590,8 @@ class InferTransformerDecoding(nn.Layer):
 
 
 class InferGptDecoding(nn.Layer):
-    def __init__(self,
-                 model,
-                 topk=4,
-                 topp=0.0,
-                 max_out_len=256,
-                 bos_id=50256,
-                 eos_id=50256,
-                 temperature=1,
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
-        if os.path.exists(decoding_lib):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
         else:
@@ -605,19 +602,15 @@ class InferGptDecoding(nn.Layer):
             load("FasterTransformer", verbose=True)
 
         super(InferGptDecoding, self).__init__()
-        self.topk = topk
-        self.topp = topp
-        self.max_out_len = max_out_len
-        self.temperature = temperature
+
         self.use_fp16_decoding = use_fp16_decoding
         self.model = model
         self.head_num = self.model.gpt.config['num_attention_heads']
         self.size_per_head = int(self.model.gpt.config['hidden_size'] /
                                  self.head_num)
         self.num_layer = self.model.gpt.config['num_hidden_layers']
-        self.bos_id = bos_id
-        self.eos_id = eos_id
-
+        self.bos_id = model.gpt.config['bos_token_id']
+        self.eos_id = model.gpt.config['eos_token_id']
         data_type = "float32"
         if self.use_fp16_decoding:
             data_type = "float16"
@@ -714,7 +707,17 @@ class InferGptDecoding(nn.Layer):
         self.pos_emb = [self.model.gpt.embeddings.position_embeddings.weight]
         self.word_emb = [self.model.gpt.embeddings.word_embeddings.weight]
 
-    def forward(self, input_ids):
+    def forward(self,
+                input_ids,
+                topk=4,
+                topp=0.0,
+                max_out_len=256,
+                temperature=1):
+        self.topk = topk
+        self.topp = topp
+        self.max_out_len = max_out_len
+        self.temperature = temperature
+        print(topk, topp)
         output_ids = infer_gpt_decoding(
             input=[input_ids],
             word_emb=self.word_emb,
@@ -749,7 +752,7 @@ class InferGptDecoding(nn.Layer):
             temperature=self.temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
-        return output_ids
+        return output_ids.transpose([1, 0])
 
 
 class InferUnifiedDecoding(nn.Layer):
@@ -1315,6 +1318,7 @@ class InferBartDecoding(nn.Layer):
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
+                num_return_sequences=1,
                 alpha=0.6):
         # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
         if self._decoding_strategy.startswith("beam_search"):
@@ -1328,6 +1332,10 @@ class InferBartDecoding(nn.Layer):
                 self._decoding_strategy = "topk_sampling"
             elif top_p != 1.0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"
+            else:
+                raise ValueError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied. ")
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
@@ -1351,5 +1359,6 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
+            num_return_sequences=num_return_sequences,
             decoding_strategy=self._decoding_strategy)
         return ids

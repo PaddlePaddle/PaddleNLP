@@ -442,7 +442,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
         outputs = self.unimo(input_ids, token_type_ids, position_ids,
                              attention_mask, use_cache, cache)
+
         sequence_output = outputs[0] if use_cache else outputs
+
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
             cache = outputs[1]
