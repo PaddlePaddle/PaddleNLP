@@ -19,16 +19,23 @@ import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Tuple, Pad
+from paddlenlp.datasets import load_dataset
 
 from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, default="checkpoints/model_900/model_state.pdparams", help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--params_path", type=str, required=True,
+    default="checkpoints/model_900/model_state.pdparams",
+    help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", type=int, default=128,
+    help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
+    help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--accelerate_mode', default=False, type=eval,
+    help="If true, it will use the FasterTokenizer to tokenize texts.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -85,18 +92,15 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu:6")
+    paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese', num_classes=2, accelerate_mode=True)
+        'bert-base-chinese',
+        num_classes=2,
+        accelerate_mode=args.accelerate_mode)
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     data = [example["text"] for example in train_ds]
-    # data = [
-    #     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-    #     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-    #     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
-    # ]
     label_map = {0: 'negative', 1: 'positive'}
 
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
@@ -106,12 +110,7 @@ if __name__ == "__main__":
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-
-    import time
-
-    start_time = time.time()
     results = predict(
         model, data, tokenizer, label_map, batch_size=args.batch_size)
-    end_time = time.time()
     for idx, text in enumerate(data):
         print('Data: {} \t Lable: {}'.format(text, results[idx]))

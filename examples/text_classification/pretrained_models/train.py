@@ -40,6 +40,8 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
+parser.add_argument('--accelerate_mode', default=False, type=eval,
+    help="If true, it will use the FasterTokenizer to tokenize texts.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -102,7 +104,7 @@ def create_dataloader(dataset,
 
 
 def do_train():
-    paddle.set_device("gpu:3")
+    paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -113,12 +115,14 @@ def do_train():
 
     # If you wanna use bert/roberta/electra pretrained model,
     model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese', num_classes=2, accelerate_mode=True)
+        'bert-base-chinese',
+        num_classes=2,
+        accelerate_mode=args.accelerate_mode)
     print("model.accelerate_mode ", model.accelerate_mode)
 
     # If you wanna use bert/roberta/electra pretrained model,
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese', accelerate_mode=True)
+        'bert-base-chinese', accelerate_mode=args.accelerate_mode)
     print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
 
     trans_func = partial(

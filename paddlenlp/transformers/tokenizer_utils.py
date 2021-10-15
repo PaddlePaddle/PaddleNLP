@@ -352,7 +352,7 @@ class PretrainedTokenizer(object):
 
             text_pair = paddlenlp.ops.to_string_tensor(
                 text_pair, "text_pair") if text_pair else None
-            input_ids, seg_ids = core.ops.tokenizer(
+            input_ids, seg_ids = core.ops.bert_tokenizer(
                 self.vocab_tensor, text_tensor, text_pair, "max_seq_len",
                 max_seq_len, "pad_to_max_seq_len", pad_to_max_seq_len,
                 "is_split_into_words", is_split_into_words)

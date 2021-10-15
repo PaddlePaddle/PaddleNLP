@@ -150,12 +150,5 @@ if __name__ == "__main__":
 
     results = []
     for batch_data in batches:
-        predictor.predict(batch_data, label_map)
-    import time
-    start_time = time.time()
-    for _ in range(10):
-        for batch_data in batches:
-            predictor.predict(batch_data, label_map)
-    end_time = time.time()
-    print("#sample %d, cost time: %.5f" % (len(data) * 10,
-                                           (end_time - start_time)))
+        batch_res = predictor.predict(batch_data, label_map)
+        results.extend(batch_res)
