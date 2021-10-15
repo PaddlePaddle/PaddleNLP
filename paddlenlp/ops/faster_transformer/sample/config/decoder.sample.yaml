@@ -36,5 +36,4 @@ dropout: 0.1
 weight_sharing: True
 
 # Path of trained parameter, to make prediction
-# You can download here: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_translation/transformer/faster_transformer/README.md#%E6%A8%A1%E5%9E%8B%E6%8E%A8%E6%96%AD
-init_from_params: /home/models/base_trained_models/step_final
+init_from_params: base_trained_models/step_final
