@@ -1217,37 +1217,6 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
         return reshaped_logits
 
 
-class BigBirdLMHead(nn.Layer):
-    """
-    BigBird Model with a `language modeling` head on top.
-    """
-
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation="gelu",
-                 embedding_weights=None):
-        super(BigBirdLMHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.activation = ACT2FN[activation]
-        self.layer_norm = nn.LayerNorm(hidden_size)
-
-        self.decoder_weight = embedding_weights
-        self.decoder_bias = self.create_parameter(
-            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
-
-    def forward(self, hidden_states):
-        hidden_states = self.dense(hidden_states)
-        hidden_states = self.activation(hidden_states)
-        hidden_states = self.layer_norm(hidden_states)
-
-        hidden_states = (paddle.matmul(
-            hidden_states, self.decoder_weight, transpose_y=True) +
-                         self.decoder_bias)
-
-        return hidden_states
-
-
 class BigBirdForMaskedLM(BigBirdPretrainedModel):
     """
     BigBird Model with pretraining tasks on top.
@@ -1261,7 +1230,7 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
     def __init__(self, bigbird):
         super(BigBirdForMaskedLM, self).__init__()
         self.bigbird = bigbird
-        self.lm_head = BigBirdLMHead(
+        self.lm_head = BigBirdLMPredictionHead(
             self.bigbird.config["hidden_size"],
             self.bigbird.config["vocab_size"],
             self.bigbird.config["activation"],
@@ -1334,7 +1303,7 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
     def __init__(self, bigbird):
         super(BigBirdForCausalLM, self).__init__()
         self.bigbird = bigbird
-        self.lm_head = BigBirdLMHead(
+        self.lm_head = BigBirdLMPredictionHead(
             self.bigbird.config["hidden_size"],
             self.bigbird.config["vocab_size"],
             self.bigbird.config["activation"],
