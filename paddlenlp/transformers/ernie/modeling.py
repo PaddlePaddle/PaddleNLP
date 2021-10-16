@@ -113,6 +113,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18000,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "ernie-tiny": {
             "attention_probs_dropout_prob": 0.1,
@@ -127,6 +128,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 50006,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "ernie-2.0-en": {
             "attention_probs_dropout_prob": 0.1,
@@ -140,6 +142,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 4,
             "vocab_size": 30522,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "ernie-2.0-en-finetuned-squad": {
             "attention_probs_dropout_prob": 0.1,
@@ -153,6 +156,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 4,
             "vocab_size": 30522,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "ernie-2.0-large-en": {
             "attention_probs_dropout_prob": 0.1,
@@ -167,6 +171,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 4,
             "vocab_size": 30522,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -268,7 +273,14 @@ class ErnieModel(ErniePretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=2,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 accelerate_mode=False,
+                 vocab_file=None):
+
+        self.accelerate_mode = accelerate_mode
+        if self.accelerate_mode and vocab_file is not None:
+            self.tokenizer = FasterTokenizer(vocab_file)
+
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range

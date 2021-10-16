@@ -106,7 +106,8 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "roberta-wwm-ext-large": {
             "attention_probs_dropout_prob": 0.1,
@@ -120,7 +121,8 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 24,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "rbt3": {
             "attention_probs_dropout_prob": 0.1,
@@ -135,6 +137,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
             "pad_token_id": 0,
+            "accelerate_mode": True,
         },
         "rbtl3": {
             "attention_probs_dropout_prob": 0.1,
@@ -148,7 +151,8 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 3,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
+            "accelerate_mode": True,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}

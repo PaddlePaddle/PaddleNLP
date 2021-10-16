@@ -20,7 +20,7 @@ import os
 import six
 import unicodedata
 
-import paddlenlp
+from paddlenlp.ops import to_vocab_tensor
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
@@ -335,27 +335,27 @@ class BertTokenizer(PretrainedTokenizer):
     pretrained_init_configuration = {
         "bert-base-uncased": {
             "do_lower_case": True,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-large-uncased": {
             "do_lower_case": True,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-base-cased": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-large-cased": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-base-multilingual-uncased": {
             "do_lower_case": True,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-base-multilingual-cased": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-base-chinese": {
             "do_lower_case": False,
@@ -363,23 +363,23 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "bert-wwm-chinese": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "bert-wwm-ext-chinese": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "macbert-large-chinese": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "macbert-base-chinese": {
             "do_lower_case": False,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
         "simbert-base-chinese": {
             "do_lower_case": True,
-            "accelerate_mode": False
+            "accelerate_mode": True
         },
     }
     padding_side = 'right'
@@ -394,6 +394,7 @@ class BertTokenizer(PretrainedTokenizer):
                  mask_token="[MASK]",
                  accelerate_mode=False):
         self.accelerate_mode = accelerate_mode
+        self.do_lower_case = do_lower_case
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -406,8 +407,8 @@ class BertTokenizer(PretrainedTokenizer):
         self.wordpiece_tokenizer = WordpieceTokenizer(
             vocab=self.vocab, unk_token=unk_token)
         if self.accelerate_mode:
-            self.vocab_tensor = paddlenlp.ops.to_map_tensor(
-                self.vocab.token_to_idx, "vocab")
+            self.vocab_tensor = to_vocab_tensor(self.vocab.token_to_idx,
+                                                "vocab")
 
     @property
     def vocab_size(self):

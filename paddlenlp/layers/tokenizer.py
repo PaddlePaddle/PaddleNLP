@@ -16,10 +16,10 @@ import io
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
-import paddlenlp
 
 from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
+from paddlenlp.ops import to_vocab_tensor
 
 __all__ = ["FastTokenizer"]
 
@@ -40,7 +40,7 @@ class FasterTokenizer(nn.Layer):
     def __init__(self, vocab_path):
         super(FasterTokenizer, self).__init__()
         vocab_dict = load_vocabulary(vocab_path)
-        vocab_tensor = paddlenlp.ops.to_map_tensor(vocab_dict, "vocab")
+        vocab_tensor = to_vocab_tensor(vocab_dict, "vocab")
         self.register_buffer("vocab", vocab_tensor, persistable=True)
 
     def forward(self,

@@ -20,6 +20,7 @@ import shutil
 
 from paddle.utils import try_import
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.ops import to_vocab_tensor
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
@@ -72,8 +73,6 @@ class ErnieTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "ernie-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/vocab.txt",
-            "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/vocab.txt",
             "ernie-2.0-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-en-finetuned-squad":
@@ -90,28 +89,32 @@ class ErnieTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-1.0": {
-            "do_lower_case": True
-        },
-        "ernie-tiny": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-2.0-en": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-2.0-en-finetuned-squad": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-2.0-large-en": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-gen-base-en": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-gen-large-en": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
         "ernie-gen-large-430g-en": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": True
         },
     }
 
@@ -122,7 +125,10 @@ class ErnieTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 accelerate_mode=False):
+        self.accelerate_mode = accelerate_mode
+        self.do_lower_case = do_lower_case
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -134,6 +140,9 @@ class ErnieTokenizer(PretrainedTokenizer):
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
             vocab=self.vocab, unk_token=unk_token)
+        if self.accelerate_mode:
+            self.vocab_tensor = to_vocab_tensor(self.vocab.token_to_idx,
+                                                "vocab")
 
     @property
     def vocab_size(self):

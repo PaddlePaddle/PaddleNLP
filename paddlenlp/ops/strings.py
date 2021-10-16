@@ -15,7 +15,7 @@
 import paddle
 import paddle.fluid.core as core
 
-__all__ = ['to_string_tensor', 'to_map_tensor']
+__all__ = ['to_string_tensor', 'to_vocab_tensor']
 
 
 def to_string_tensor(string_values, name):
@@ -33,7 +33,7 @@ def to_string_tensor(string_values, name):
     return tensor
 
 
-def to_map_tensor(string_dict, name):
+def to_vocab_tensor(string_dict, name):
     """
     Create the tensor that the value holds the map, the type of key is the string.
     NOTICE: The value will be holded in the cpu place. 

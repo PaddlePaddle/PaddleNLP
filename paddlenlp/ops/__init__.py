@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .strings import to_string_tensor, to_vocab_tensor
 from .faster_transformer.transformer.decoding import *
 from .faster_transformer.transformer.faster_transformer import *
 from .faster_transformer.transformer.decoder import *
@@ -19,7 +20,6 @@ from .faster_transformer.transformer.encoder import *
 from .einsum import *
 from .distributed import *
 from . import optimizer
-from .strings import *
 
 paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward
 paddle.nn.TransformerEncoder._ft_forward = encoder_forward

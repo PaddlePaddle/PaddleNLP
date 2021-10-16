@@ -24,13 +24,13 @@ import unicodedata
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
+import paddle
+import paddle.fluid.core as core
 from paddle.utils import try_import
+from paddlenlp.ops import to_string_tensor
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
-import paddle
-import paddle.fluid.core as core
-import paddlenlp
 
 try:
     from functools import lru_cache
@@ -348,14 +348,15 @@ class PretrainedTokenizer(object):
                 raise ValueError(
                     "text input must be of type `str` (single example), "
                     ", `List[str]` (batch or single pretokenized example) ")
-            text_tensor = paddlenlp.ops.to_string_tensor(text, "text")
+            text_tensor = to_string_tensor(text, "text")
 
-            text_pair = paddlenlp.ops.to_string_tensor(
-                text_pair, "text_pair") if text_pair else None
+            text_pair = to_string_tensor(text_pair,
+                                         "text_pair") if text_pair else None
             input_ids, seg_ids = core.ops.bert_tokenizer(
-                self.vocab_tensor, text_tensor, text_pair, "max_seq_len",
-                max_seq_len, "pad_to_max_seq_len", pad_to_max_seq_len,
-                "is_split_into_words", is_split_into_words)
+                self.vocab_tensor, text_tensor, text_pair, "do_lower_case",
+                self.do_lower_case, "max_seq_len", max_seq_len,
+                "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",
+                is_split_into_words)
             if is_batched:
                 res = {
                     "input_ids": input_ids.numpy(),
