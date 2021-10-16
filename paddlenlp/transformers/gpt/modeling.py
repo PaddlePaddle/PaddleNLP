@@ -540,48 +540,6 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "uer-gpt2-chinese-poem": {
-            "vocab_size": 22557,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,
-            "initializer_range": 0.02,
-            "eos_token_id": 102,
-        },
-        "microsoft-DialoGPT-small": {
-            "vocab_size": 50257,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-        },
-        "distilgpt2": {
-            "vocab_size": 50257,
-            "hidden_size": 768,
-            "num_hidden_layers": 6,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -592,12 +550,6 @@ class GPTPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
-            "uer-gpt2-chinese-poem":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/uer-gpt2-chinese-poem/model_state.pdparams",
-            "microsoft-DialoGPT-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/model_state.pdparams",
-            "distilgpt2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/model_state.pdparams",
         }
     }
     base_model_prefix = "gpt"

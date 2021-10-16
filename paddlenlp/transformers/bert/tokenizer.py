@@ -327,8 +327,6 @@ class BertTokenizer(PretrainedTokenizer):
             "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
-            "uer-gpt2-chinese-poem":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/uer-gpt2-chinese-poem/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -366,9 +364,6 @@ class BertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
         "simbert-base-chinese": {
-            "do_lower_case": True
-        },
-        "uer-gpt2-chinese-poem": {
             "do_lower_case": True
         },
     }

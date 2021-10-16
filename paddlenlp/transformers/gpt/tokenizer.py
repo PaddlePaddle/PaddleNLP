@@ -340,10 +340,6 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
             "gpt2-small-en": gpt_vocab_link,
-            "distilgpt2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/vocab.json",
-            "microsoft-DialoGPT-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/vocab.json",
         },
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
@@ -351,10 +347,6 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
             "gpt2-small-en": gpt_merges_link,
-            "distilgpt2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/merges.txt",
-            "microsoft-DialoGPT-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/merges.txt",
         }
     }
     pretrained_init_configuration = {
@@ -363,8 +355,6 @@ class GPTTokenizer(PretrainedTokenizer):
         "gpt2-medium-en": {},
         "gpt2-en": {},
         "gpt2-small-en": {},
-        "distilgpt2": {},
-        "microsoft-DialoGPT-small": {},
     }
 
     def __init__(
