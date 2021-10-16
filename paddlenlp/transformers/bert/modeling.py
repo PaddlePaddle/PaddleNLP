@@ -705,7 +705,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 position_ids=None,
                 attention_mask=None):
         r"""
-        The BertForSequenceClassification forward method, overrides the __call__() special method.
+        The BertForTokenClassification forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
