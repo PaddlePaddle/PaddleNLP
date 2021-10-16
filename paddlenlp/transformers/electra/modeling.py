@@ -223,36 +223,6 @@ class ElectraPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
         },
-        "hfl-chinese-electra-180g-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "hfl-chinese-electra-180g-small-ex": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 256,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -267,10 +237,6 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
             "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
-            "hfl-chinese-electra-180g-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-base-discriminator/model_state.pdparams",
-            "hfl-chinese-electra-180g-small-ex":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex/model_state.pdparams",
         }
     }
 
@@ -481,10 +447,11 @@ class ElectraModel(ElectraPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(paddle.get_default_dtype()) * -1e9,
                 axis=[1, 2])
-
-        if attention_mask.ndim == 2:
-            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-            attention_mask = (1.0 - attention_mask) * -1e9
+        else:
+            if attention_mask.ndim == 2:
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+                attention_mask = (1.0 - attention_mask
+                                  ).astype(paddle.get_default_dtype()) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -939,51 +906,6 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 30522
         },
-        "hfl-chinese-electra-180g-base-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "hfl-chinese-electra-180g-small-ex-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 256,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
-        "hfl-chinese-legal-electra-small-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 64,
-            "initializer_range": 0.02,
-            "intermediate_size": 256,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-        },
     }
 
     def __init__(self, generator, discriminator):
@@ -1197,13 +1119,52 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
 
                 import paddle
                 from paddlenlp.transformers import ElectraForMultipleChoice, ElectraTokenizer
+                from paddlenlp.data import Pad, Dict
 
-                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
-                model = ElectraForMultipleChoice.from_pretrained('electra-base')
+                tokenizer = ElectraTokenizer.from_pretrained('electra-small')
+                model = ElectraForMultipleChoice.from_pretrained('electra-small', num_choices=2)
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                logits = model(**inputs)
+                data = [
+                    {
+                        "question": "how do you turn on an ipad screen?",
+                        "answer1": "press the volume button.",
+                        "answer2": "press the lock button.",
+                        "label": 1,
+                    },
+                    {
+                        "question": "how do you indent something?",
+                        "answer1": "leave a space before starting the writing",
+                        "answer2": "press the spacebar",
+                        "label": 0,
+                    },
+                ]
+
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+
+                inputs = tokenizer(text, text_pair)
+                batchify_fn = lambda samples, fn=Dict(
+                    {
+                        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+                        "token_type_ids": Pad(
+                            axis=0, pad_val=tokenizer.pad_token_type_id
+                        ),  # token_type_ids
+                    }
+                ): fn(samples)
+                inputs = batchify_fn(inputs)
+
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
+                    token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+                # [2, 2]
+
         """
         input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]

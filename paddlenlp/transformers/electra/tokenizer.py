@@ -76,10 +76,6 @@ class ElectraTokenizer(PretrainedTokenizer):
             "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/vocab.txt",
             "chinese-electra-small":
             "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/vocab.txt",
-            "hfl-chinese-electra-180g-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-base-discriminator/vocab.txt",
-            "hfl-chinese-electra-180g-small-ex":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex-discriminator/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -98,12 +94,6 @@ class ElectraTokenizer(PretrainedTokenizer):
         "chinese-electra-small": {
             "do_lower_case": True
         },
-        "hfl-chinese-electra-180g-base": {
-            "do_lower_case": True
-        },
-        "hfl-chinese-electra-180g-small-ex": {
-            "do_lower_case": True
-        }
     }
 
     def __init__(self,
