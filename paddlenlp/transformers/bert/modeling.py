@@ -265,76 +265,6 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
-        "tbs17-MathBERT": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "nlptown-bert-base-multilingual-uncased-sentiment": {
-            "vocab_size": 105879,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "ckiplab-bert-base-chinese-ws": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "ckiplab-bert-base-chinese-pos": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "ckiplab-bert-base-chinese-ner": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -363,16 +293,6 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-            "tbs17-MathBERT":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/tbs17-MathBERT/model_state.pdparams",
-            "nlptown-bert-base-multilingual-uncased-sentiment":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/model_state.pdparams",
-            "ckiplab-bert-base-chinese-ws":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-ws/model_state.pdparams",
-            "ckiplab-bert-base-chinese-pos":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-pos/model_state.pdparams",
-            "ckiplab-bert-base-chinese-ner":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-ner/model_state.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -569,10 +489,12 @@ class BertModel(BertPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
-
-        if attention_mask.ndim == 2:
-            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-            attention_mask = (1.0 - attention_mask) * -1e9
+        else:
+            if attention_mask.ndim == 2:
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+                attention_mask = (
+                    1.0 - attention_mask
+                ).astype(self.pooler.dense.weight.dtype) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -649,15 +571,15 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForQuestionAnswering
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForQuestionAnswering.from_pretrained('bert-base-uncased')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
-                end_logits  =outputs[1]
+                end_logits  = outputs[1]
         """
 
         sequence_output, _ = self.bert(
@@ -728,14 +650,16 @@ class BertForSequenceClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForSequenceClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForSequenceClassification.from_pretrained('bert-base-cased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_classes=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
 
-                logits = outputs[0]
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 2]
+
         """
 
         _, pooled_output = self.bert(
@@ -804,14 +728,16 @@ class BertForTokenClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForTokenClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForTokenClassification.from_pretrained('bert-base-cased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForTokenClassification.from_pretrained('bert-base-uncased', num_classes=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 13, 2]
 
-                logits = outputs[0]
         """
         sequence_output, _ = self.bert(
             input_ids,
@@ -1074,12 +1000,18 @@ class BertForMultipleChoice(BertPretrainedModel):
         self.classifier = nn.Linear(self.bert.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
+                See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
             position_ids(Tensor, optional):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
@@ -1092,16 +1024,54 @@ class BertForMultipleChoice(BertPretrainedModel):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import BertForMultipleChoice, BertTokenizer
+                from paddlenlp.data import Pad, Dict
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                model = BertForMultipleChoice.from_pretrained('bert-base-uncased')
-                
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                
-                logits = model(**inputs)
+                model = BertForMultipleChoice.from_pretrained('bert-base-uncased', num_choices=2)
+
+                data = [
+                    {
+                        "question": "how do you turn on an ipad screen?",
+                        "answer1": "press the volume button.",
+                        "answer2": "press the lock button.",
+                        "label": 1,
+                    },
+                    {
+                        "question": "how do you indent something?",
+                        "answer1": "leave a space before starting the writing",
+                        "answer2": "press the spacebar",
+                        "label": 0,
+                    },
+                ]
+
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+
+                inputs = tokenizer(text, text_pair)
+                batchify_fn = lambda samples, fn=Dict(
+                    {
+                        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+                        "token_type_ids": Pad(
+                            axis=0, pad_val=tokenizer.pad_token_type_id
+                        ),  # token_type_ids
+                    }
+                ): fn(samples)
+                inputs = batchify_fn(inputs)
+
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
+                    token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+                # [2, 2]
 
         """
         # input_ids: [bs, num_choice, seq_l]
@@ -1111,13 +1081,19 @@ class BertForMultipleChoice(BertPretrainedModel):
         if position_ids is not None:
             position_ids = position_ids.reshape(shape=(-1,
                                                        position_ids.shape[-1]))
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
         _, pooled_output = self.bert(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
@@ -1166,8 +1142,7 @@ class BertForMaskedLM(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None,
-                masked_positions=None):
+                attention_mask=None):
         r"""
 
         Args:
@@ -1179,25 +1154,34 @@ class BertForMaskedLM(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (Tensor, optional):
                 See :class:`BertModel`.
-            masked_positions(Tensor, optional):
-                See :class:`BertPretrainingHeads`.
-
-        Returns:
-            tuple: Returns ``prediction_scores``.
 
         Returns:
             Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
-            Its data type should be float32.
-            If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
-            Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BertForMaskedLM, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 13, 30522]
 
         """
-        with paddle.static.amp.fp16_guard():
-            outputs = self.bert(
-                input_ids,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                attention_mask=attention_mask)
-            sequence_output = outputs[0]
-            prediction_scores = self.cls(sequence_output, masked_positions)
-            return prediction_scores
+
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        sequence_output = outputs[0]
+        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        return prediction_scores
