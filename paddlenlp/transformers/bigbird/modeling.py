@@ -942,27 +942,6 @@ class BigBirdOutput(Layer):
         return hidden_states
 
 
-class BigBirdForQuestionAnsweringHead(Layer):
-    """Head for question answering tasks."""
-
-    def __init__(self, hidden_size, dim_feedforward, activation,
-                 hidden_dropout_prob, num_labels):
-        super().__init__()
-        self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.intermediate = BigBirdIntermediate(hidden_size, dim_feedforward,
-                                                activation)
-        self.output = BigBirdOutput(hidden_size, dim_feedforward,
-                                    hidden_dropout_prob)
-        self.qa_outputs = nn.Linear(hidden_size, num_labels)
-
-    def forward(self, encoder_output):
-        hidden_states = self.dropout(encoder_output)
-        hidden_states = self.intermediate(hidden_states)
-        hidden_states = self.output(hidden_states, encoder_output)
-        hidden_states = self.qa_outputs(hidden_states)
-        return hidden_states
-
-
 class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
     """
     BigBird Model with a span classification head on top for extractive question-answering tasks like
@@ -981,12 +960,9 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
     def __init__(self, bigbird, dropout=None):
         super(BigBirdForQuestionAnswering, self).__init__()
         self.bigbird = bigbird  # allow bigbird to be config
-        self.qa_classifier = BigBirdForQuestionAnsweringHead(
-            hidden_size=self.bigbird.config["hidden_size"],
-            dim_feedforward=self.bigbird.config["dim_feedforward"],
-            activation=self.bigbird.config["activation"],
-            hidden_dropout_prob=self.bigbird.config["hidden_dropout_prob"],
-            num_labels=self.bigbird.config["num_labels"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bigbird.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -1043,7 +1019,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
             attention_mask_list=attention_mask_list,
             rand_mask_idx_list=rand_mask_idx_list)
 
-        logits = self.qa_classifier(sequence_output)
+        logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
