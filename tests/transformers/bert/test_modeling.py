@@ -153,7 +153,8 @@ class TestBertForMaskedLM(TestBertForSequenceClassification):
         self.TEST_MODEL_CLASS = BertForMaskedLM
 
     def set_output(self):
-        self.expected_seq_shape = (self.masked_lm_positions.shape[0],
+        self.expected_seq_shape = (self.config['batch_size'],
+                                   self.config['seq_len'],
                                    self.config['vocab_size'])
 
     def test_forward(self):
@@ -164,9 +165,8 @@ class TestBertForMaskedLM(TestBertForSequenceClassification):
         bert = BertModel(**config)
         model = self.TEST_MODEL_CLASS(bert)
         input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        masked_lm_positions = paddle.to_tensor(
-            self.masked_lm_positions, dtype="int64")
-        self.output = model(input_ids, masked_positions=masked_lm_positions)
+
+        self.output = model(input_ids)
         self.check_testcase()
 
     def check_testcase(self):
