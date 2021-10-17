@@ -16,6 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from paddlenlp.layers import FasterTokenizer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -187,6 +188,22 @@ class ErniePretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+        },
+        "vocab_file": {
+            "ernie-1.0":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/vocab.txt",
+            "ernie-2.0-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-2.0-en-finetuned-squad":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-2.0-large-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/vocab.txt",
+            "ernie-gen-base-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-base-en/vocab.txt",
+            "ernie-gen-large-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large/vocab.txt",
+            "ernie-gen-large-430g-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large-430g/vocab.txt",
         }
     }
     base_model_prefix = "ernie"
@@ -276,12 +293,12 @@ class ErnieModel(ErniePretrainedModel):
                  pad_token_id=0,
                  accelerate_mode=False,
                  vocab_file=None):
+        super(ErnieModel, self).__init__()
 
         self.accelerate_mode = accelerate_mode
         if self.accelerate_mode and vocab_file is not None:
             self.tokenizer = FasterTokenizer(vocab_file)
 
-        super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(

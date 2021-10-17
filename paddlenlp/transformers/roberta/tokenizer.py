@@ -15,6 +15,8 @@
 
 import os
 
+from paddlenlp.ops import to_vocab_tensor
+
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ['RobertaTokenizer', ]

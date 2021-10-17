@@ -15,6 +15,7 @@
 import paddle
 import paddle.nn as nn
 
+from paddlenlp.layers import FasterTokenizer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -166,6 +167,16 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+        },
+        "vocab_file": {
+            "roberta-wwm-ext":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_base/vocab.txt",
+            "roberta-wwm-ext-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_large/vocab.txt",
+            "rbt3":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/vocab.txt",
+            "rbtl3":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/vocab.txt",
         }
     }
     base_model_prefix = "roberta"
@@ -251,8 +262,15 @@ class RobertaModel(RobertaPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 accelerate_mode=False,
+                 vocab_file=None):
         super(RobertaModel, self).__init__()
+
+        self.accelerate_mode = accelerate_mode
+        if self.accelerate_mode and vocab_file is not None:
+            self.tokenizer = FasterTokenizer(vocab_file)
+
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.embeddings = RobertaEmbeddings(
