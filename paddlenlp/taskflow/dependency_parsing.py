@@ -63,6 +63,7 @@ usage = r"""
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
+
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
            ddp("百度是一家高科技公司")
            '''

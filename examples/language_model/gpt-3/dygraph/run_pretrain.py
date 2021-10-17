@@ -17,6 +17,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -25,11 +26,16 @@ from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTFo
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
 
+# to import data_tools
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
+
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -37,16 +43,16 @@ MODEL_CLASSES = {
 }
 
 
-def set_hyrbid_parallel_seed(basic_seed, dp_rank, mp_rank, pp_rank):
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
-    random.seed(basic_seed + dp_rank)
-    np.random.seed(basic_seed + dp_rank)
-    paddle.seed(basic_seed + dp_rank)
+    random.seed(basic_seed + data_world_rank)
+    np.random.seed(basic_seed + data_world_rank)
+    paddle.seed(basic_seed + data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + dp_rank
+    global_seed = basic_seed + data_world_rank
     tracker = get_rng_state_tracker()
     tracker.add('global_seed', global_seed)
     tracker.add('local_seed', local_seed)
@@ -86,19 +92,47 @@ def run_evaluate(args,
     model.train()
 
 
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
+
+
 def do_train(args):
     paddle.set_device(args.device)
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
         "mp_degree": args.mp_degree,
-        "pp_degree": args.pp_degree
+        "pp_degree": args.pp_degree,
+        "sharding_degree": args.sharding_degree
     }
 
     strategy.pipeline_configs = {
         "accumulate_steps": args.local_batch_size // args.micro_batch_size,
         "micro_batch_size": args.micro_batch_size
     }
+
+    # set control in tensor parallel
+    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
     fleet.init(is_collective=True, strategy=strategy)
 
@@ -108,10 +142,15 @@ def do_train(args):
     mp_rank = hcg.get_model_parallel_rank()
     pp_rank = hcg.get_stage_id()
     dp_rank = hcg.get_data_parallel_rank()
+    sharding_rank = hcg.get_sharding_parallel_rank()
+
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+    data_world_size = args.dp_degree * args.sharding_degree
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank, pp_rank)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
@@ -183,15 +222,31 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-        beta1=args.adam_beta1,
-        beta2=args.adam_beta2,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params)
+    if args.sharding_degree > 1:
+        optimizer = DygraphShardingOptimizer(
+            hcg=fleet.get_hybrid_communicate_group(),
+            user_defined_strategy=strategy,
+            params=model.parameters(),
+            inner_optimizer_class=paddle.optimizer.AdamW,
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params)
+    else:
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params)
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -214,21 +269,16 @@ def do_train(args):
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
                 local_rank=local_rank,
-                data_world_size=args.dp_degree,
-                data_world_rank=dp_rank,
+                data_world_size=data_world_size,
+                data_world_rank=data_world_rank,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -309,6 +359,7 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
+                # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
                 # only dp_rank = 0 save model
                 if (global_step % args.save_steps == 0 or
                         global_step >= args.max_steps) and dp_rank == 0:
@@ -322,24 +373,25 @@ def do_train(args):
                     logger.info("Save model to %s" % output_dir)
 
                     if args.pp_degree > 1:
-                        model_to_save.save_state_dict(output_dir)
-                        if mp_rank * pp_rank == 1:
+                        if mp_rank == 0 and sharding_rank == 0 and pp_rank == 0:
                             tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_state_dict(output_dir)
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(
                                 output_dir,
-                                "model_state_mp_{:0>2d}_pp_{:0>2d}.pdopt".
-                                format(mp_rank, pp_rank)))
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank, pp_rank)))
                     else:
-                        path = os.path.join(output_dir,
-                                            'model_{:0>2d}'.format(mp_rank))
-                        os.makedirs(path, exist_ok=True)
-                        model_to_save.save_pretrained(path)
-
-                        paddle.save(optimizer.state_dict(),
-                                    os.path.join(path, "model_state.pdopt"))
-                        tokenizer.save_pretrained(path)
+                        if mp_rank == 0 and sharding_rank == 0:
+                            tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_pretrained(output_dir)
+                        paddle.save(
+                            optimizer.state_dict(),
+                            os.path.join(
+                                output_dir,
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank)))
 
                 if global_step >= args.max_steps:
                     run_evaluate(args, test_data_loader, model, criterion,

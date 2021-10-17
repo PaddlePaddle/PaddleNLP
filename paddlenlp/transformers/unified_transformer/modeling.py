@@ -195,7 +195,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             Defaults to 0.1.
         normalize_before (bool, optional): 
             Indicate whether to put layer normalization into preprocessing of 
-            MHA and FFN sub-layers. If True, pre-process is layer ormalization 
+            MHA and FFN sub-layers. If True, pre-process is layer normalization 
             and post-precess includes dropout, residual connection. Otherwise, 
             no pre-process and post-precess includes dropout, residual 
             connection, layer normalization. Defaults to True.
