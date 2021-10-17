@@ -180,6 +180,7 @@ class TransformerEncoder(Layer):
 
 class BigBirdPooler(Layer):
     """
+    Pool the result of BigBird Encoder
     """
 
     def __init__(self, hidden_size):
