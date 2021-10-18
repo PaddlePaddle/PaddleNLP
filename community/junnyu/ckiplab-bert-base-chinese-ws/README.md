@@ -1,5 +1,5 @@
 # 详细介绍
-**介绍**：这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
+**介绍**：ckiplab-bert-base-chinese-ws 是一个带有token分类头的BERT模型，该模型已经在**分词任务**上进行了微调。
 
 关于完整使用方法及其他信息，请参考 https://github.com/ckiplab/ckip-transformers 。
 
@@ -81,3 +81,4 @@ for t, s in zip(tokenized_text, score[0][1:-1]):
 # 权重来源
 
 https://huggingface.co/ckiplab/bert-base-chinese-ws
+这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
