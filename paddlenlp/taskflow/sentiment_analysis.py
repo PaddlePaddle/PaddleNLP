@@ -115,7 +115,7 @@ class SentaTask(Task):
             padding_idx=pad_token_id,
             pooling_type='max')
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1])
+                                   URLS[model][0], URLS[model][1], model)
 
         # Load the model parameter for the predict
         state_dict = paddle.load(model_path)
