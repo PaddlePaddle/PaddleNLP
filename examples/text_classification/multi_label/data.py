@@ -16,7 +16,7 @@ import re
 import numpy as np
 import pandas as pd
 import paddle
-from paddlenlp.datasets import load_dataset
+
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
@@ -59,6 +59,7 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         return input_ids, token_type_ids, label
     return input_ids, token_type_ids
 
+
 def create_dataloader(dataset,
                       mode='train',
                       batch_size=1,
@@ -81,6 +82,7 @@ def create_dataloader(dataset,
         collate_fn=batchify_fn,
         return_list=True)
 
+
 def read_custom_data(filename, is_test=False):
     """Reads data."""
     data = pd.read_csv(filename)
@@ -90,12 +92,14 @@ def read_custom_data(filename, is_test=False):
             yield {"text": clean_text(text), "label": ""}
         else:
             text, label = line[1], line[2:]
-            yield {"text": clean_text(text), "label": label}     
+            yield {"text": clean_text(text), "label": label}
+
 
 def clean_text(text):
     text = text.replace("\r", "").replace("\n", "")
     text = re.sub(r"\\n\n", ".", text)
     return text
+
 
 def write_test_results(filename, results, label_info):
     """write test results"""

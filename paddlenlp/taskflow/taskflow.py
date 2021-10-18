@@ -17,43 +17,162 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import WordTagTask
-from .sentiment_analysis import SentaTask
+from .knowledge_mining import WordTagTask
+from .named_entity_recognition import NERTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .lexical_analysis import LacTask
+from .word_segmentation import WordSegmentationTask
+from .pos_tagging import POSTaggingTask
+from .text_generation import TextGenerationTask
+from .poetry_generation import PoetryGenerationTask
+from .question_answering import QuestionAnsweringTask
+from .dependency_parsing import DDParserTask
+from .text_correction import CSCTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
-    "text2knowledge": {
+    "knowledge_mining": {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,
+                "task_flag": 'knowledge_mining-wordtag',
+                "linking": True,
             }
         },
         "default": {
             "model": "wordtag"
         }
     },
-    'sentiment_analysis': {
+    "ner": {
         "models": {
-            "senta": {
-                "task_class": SentaTask
+            "wordtag": {
+                "task_class": NERTask,
+                "task_flag": 'ner-wordtag',
+                "linking": False,
+            }
+        },
+        "default": {
+            "model": "wordtag"
+        }
+    },
+    "poetry_generation": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": PoetryGenerationTask,
+                "task_flag": 'poetry_generation-gpt-cpm-large-cn',
             },
         },
         "default": {
-            "model": "senta"
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
+                "task_flag": 'question_answering-gpt-cpm-large-cn',
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "lexical_analysis": {
+        "models": {
+            "lac": {
+                "task_class": LacTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'lexical_analysis-gru_crf',
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "word_segmentation": {
+        "models": {
+            "lac": {
+                "task_class": WordSegmentationTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'word_segmentation-gru_crf',
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "pos_tagging": {
+        "models": {
+            "lac": {
+                "task_class": POSTaggingTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'pos_tagging-gru_crf',
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    'sentiment_analysis': {
+        "models": {
+            "bilstm": {
+                "task_class": SentaTask,
+                "task_flag": 'sentiment_analysis-bilstm',
+            },
+            "skep_ernie_1.0_large_ch": {
+                "task_class": SkepTask,
+                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
+            }
+        },
+        "default": {
+            "model": "bilstm"
+        }
+    },
+    'dependency_parsing': {
+        "models": {
+            "ddparser": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-biaffine',
+            },
+            "ddparser-ernie-1.0": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-1.0',
+            },
+            "ddparser-ernie-gram-zh": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-gram-zh',
+            },
+        },
+        "default": {
+            "model": "ddparser"
+        }
+    },
+    'text_correction': {
+        "models": {
+            "csc-ernie-1.0": {
+                "task_class": CSCTask,
+                "task_flag": "text_correction-csc-ernie-1.0"
+            },
+        },
+        "default": {
+            "model": "csc-ernie-1.0"
         }
     }
 }
 
 
-class TaskFlow(object):
+class Taskflow(object):
     """
-    The TaskFlow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.
     Args:
-        task (str): The task name for the TaskFlow, and get the task class from the name.
+        task (str): The task name for the Taskflow, and get the task class from the name.
         model (str, optional): The model name in the task, if set None, will use the default model.  
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
@@ -61,12 +180,12 @@ class TaskFlow(object):
     """
 
     def __init__(self, task, model=None, device_id=0, **kwargs):
-        assert task in TASKS, "The task name:{} is not in TaskFlow list, please check your task name.".format(
+        assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
             task)
         self.task = task
         if model is not None:
             assert model in set(TASKS[task]['models'].keys(
-            )), "The model name:{} is not in task:[{}]".format(model)
+            )), "The model name:{} is not in task:[{}]".format(model, task)
         else:
             model = TASKS[task]['default']['model']
         # Set the device for the task
@@ -79,13 +198,14 @@ class TaskFlow(object):
         self.model = model
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
+        kwargs['device_id'] = device_id
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task]['models'][self.model]['task_class']
         self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
         task_list = TASKS.keys()
-        TaskFlow.task_list = task_list
+        Taskflow.task_list = task_list
 
     def __call__(self, *inputs):
         """

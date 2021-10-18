@@ -15,11 +15,14 @@
 import sys
 import math
 
-from paddle.optimizer.lr import LambdaDecay
+from paddle.optimizer.lr import LambdaDecay, LRScheduler
 
 __all__ = [
-    'LinearDecayWithWarmup', 'ConstScheduleWithWarmup', 'CosineDecayWithWarmup',
-    'PolyDecayWithWarmup'
+    'LinearDecayWithWarmup',
+    'ConstScheduleWithWarmup',
+    'CosineDecayWithWarmup',
+    'PolyDecayWithWarmup',
+    'CosineAnnealingWithWarmupDecay',
 ]
 
 
@@ -27,6 +30,36 @@ def is_integer(number):
     if sys.version > '3':
         return isinstance(number, int)
     return isinstance(number, (int, long))
+
+
+class CosineAnnealingWithWarmupDecay(LRScheduler):
+    def __init__(self,
+                 max_lr,
+                 min_lr,
+                 warmup_step,
+                 decay_step,
+                 last_epoch=0,
+                 verbose=False):
+
+        self.decay_step = decay_step
+        self.warmup_step = warmup_step
+        self.max_lr = max_lr
+        self.min_lr = min_lr
+        super(CosineAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch,
+                                                             verbose)
+
+    def get_lr(self):
+        if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:
+            return float(self.max_lr) * (self.last_epoch) / self.warmup_step
+
+        if self.last_epoch > self.decay_step:
+            return self.min_lr
+
+        num_step_ = self.last_epoch - self.warmup_step
+        decay_step_ = self.decay_step - self.warmup_step
+        decay_ratio = float(num_step_) / float(decay_step_)
+        coeff = 0.5 * (math.cos(math.pi * decay_ratio) + 1.0)
+        return self.min_lr + coeff * (self.max_lr - self.min_lr)
 
 
 class LinearDecayWithWarmup(LambdaDecay):

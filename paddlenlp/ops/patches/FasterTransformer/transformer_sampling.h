@@ -79,14 +79,14 @@ public:
                       const int memory_max_seq_len,
                       const int start_id,
                       const int end_id,
-                      const int type_id,
                       const int candidate_num = 0,
                       const float probability_threshold = 0.0,
                       const bool normalization_before = true,
+                      const bool pos_bias = true,
+                      const ActivationType act = ActivationType::GELU,
                       const int unk_id = -1,
                       const int mask_id = -1,
                       const float temperature = 1.0,
-                      const float len_penalty = 1.0,
                       const float repeat_penalty = 1.0)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
@@ -105,8 +105,8 @@ public:
     args_.mask_id_ = mask_id;
     args_.temperature_ = temperature;
     args_.normalization_before_ = normalization_before;
-    args_.type_id_ = type_id;
-    args_.len_penalty = len_penalty;
+    args_.pos_bias_ = pos_bias;
+    args_.act_ = act;
     args_.repeat_penalty = repeat_penalty;
 
     if (args_.candidate_num_ == 0 && args_.probability_threshold_ == 0.0) {
@@ -132,7 +132,8 @@ public:
                                                    head_num,
                                                    size_per_head,
                                                    memory_hidden_units,
-                                                   normalization_before);
+                                                   normalization_before,
+                                                   args_.act_);
 
     int from_tensor_size = args_.batch_size_ * args_.hidden_units_;  // type T
     int decoder_workspace_size = decoder_->getWorkspaceSize();       // type T
@@ -157,7 +158,6 @@ public:
 
     topp_id_vals_buf_size = (int)(ceil(topp_id_vals_buf_size / 4.)) * 4;
     topp_offset_buf_size = (int)(ceil(topp_offset_buf_size / 4.)) * 4;
-
     topP_sampling_kernel_kernelLauncher(topp_workspace_,
                                         topp_workspace_size_,
                                         logits_buf_,
@@ -294,7 +294,6 @@ public:
     cudaDeviceSynchronize();
     check_cuda_error(cudaGetLastError());
 #endif
-
     int cache_size = args_.batch_size_ * (args_.seq_len_ + args_.start_len_) *
                      args_.hidden_units_;  // type T
 
@@ -323,11 +322,12 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    args_.batch_size_,
                                    args_.hidden_units_,
+                                   args_.pos_bias_,
                                    decoding_params.stream);
       } else {
         embeddings_kernel_launcher(embedding_buf_,
@@ -335,11 +335,12 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    args_.batch_size_,
                                    args_.hidden_units_,
+                                   args_.pos_bias_,
                                    decoding_params.stream);
 
 #ifndef NDEBUG
@@ -347,6 +348,7 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
+        decoder_->initialize_stream(decoding_params.stream);
         decoder_->decoder_norm1(embedding_buf_,
                                 decoding_params.layernorm.gamma,
                                 decoding_params.layernorm.beta,
@@ -472,7 +474,7 @@ public:
                              m,
                              k,
                              decoding_params.stream,
-                             ActivationType::GELU);
+                             args_.act_);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -515,25 +517,6 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (decoding_params.logits_mask_T || args_.temperature_ != 1.0 ||
-          args_.len_penalty != 1.0 || args_.repeat_penalty != 1.0) {
-        // TODO(): repeat penalty vertification.
-        apply_penalties_Launcher(step,
-                                 logits_buf_,
-                                 nullptr, /*current_ids*/
-                                 nullptr, /*previous_ids*/
-                                 nullptr, /*parent_ids*/
-                                 args_.batch_size_,
-                                 1,
-                                 args_.vocab_size_,
-                                 args_.end_id_,
-                                 args_.temperature_,
-                                 args_.len_penalty,
-                                 args_.repeat_penalty,
-                                 decoding_params.stream,
-                                 decoding_params.logits_mask_T);
-      }
-
       if (args_.candidate_num_ != 0) {
         // top k sampling
         update_logits_without_softmax(logits_buf_,
@@ -543,6 +526,23 @@ public:
                                       m,
                                       n,
                                       decoding_params.stream);
+
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 finished_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 1.0,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 decoding_params.logits_mask_T);
 
         topK_sampling_kernel_kernelLauncher(
             topk_workspace_,
@@ -563,6 +563,23 @@ public:
                                m,
                                n,
                                decoding_params.stream);
+
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 finished_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 1.0,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 decoding_params.logits_mask_T);
 
         topP_sampling_kernel_kernelLauncher(
             topp_workspace_,

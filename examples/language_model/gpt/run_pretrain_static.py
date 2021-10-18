@@ -31,6 +31,7 @@ from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCr
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
@@ -92,7 +93,7 @@ def dist_optimizer(args, topo):
                 'gelu',
             ],
             "custom_black_list": ['c_softmax_with_cross_entropy'],
-            "init_loss_scaling": 32768,
+            "init_loss_scaling": args.scale_loss,
             "use_dynamic_loss_scaling": True,
         }
     if args.use_sharding:
@@ -121,12 +122,25 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_" not in
-            str(f))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
     ]
 
-    data_file = files[0]
-    return data_file
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
 
 
 def init_static_with_params(model, dygraph_params, topo, prog=None):
@@ -160,7 +174,7 @@ def run_evaluate(data_loader,
                 break
             average_loss = sum(all_loss) / len(all_loss)
             logger.info(
-                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.0f tokens/s"
+                "%s step %d, epoch: %d, batch: %d, loss: %f, eval_ips: %.0f tokens/s"
                 % (task_name, global_step, epoch, eval_step, average_loss,
                    iter_steps * args.micro_batch_size * args.max_seq_len /
                    (time.time() - local_time)))
@@ -189,6 +203,7 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+    local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
 
     assert args.pp_degree == 1, "Please use gpt-3 example to train GPT with pipline prallelism."
     assert args.mp_degree == 1, "Please use gpt-3 example to train GPT with model prallelism."
@@ -240,6 +255,7 @@ def do_train(args):
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,
                     data_file,
+                    local_rank=local_rank,
                     data_world_size=topo.data_info.size,
                     data_world_rank=topo.data_info.rank,
                     eos_id=eos_id,
@@ -294,33 +310,18 @@ def do_train(args):
                 p.name for n, p in model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
-            # TODO @ZHUI Use paddle.optimizer.AdamW
-            if ops.optimizer._jit_compile():
-                logger.info("Using paddlenlp custom AdamW optimizer.")
-                optimizer = ops.optimizer.AdamwOptimizer(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-            else:
-                if args.sharding_degree > 1:
-                    raise ValueError(
-                        "The paddle.optimizer.AdamW not compatible with Sharding!"
-                    )
-                logger.info("Using paddle.optimizer.AdamW.")
-                optimizer = paddle.optimizer.AdamW(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-                # alias
-                optimizer.apply_optimize = optimizer._apply_optimize
+
+            optimizer = paddle.optimizer.AdamW(
+                learning_rate=lr_scheduler,
+                beta1=args.adam_beta1,
+                beta2=args.adam_beta2,
+                epsilon=args.adam_epsilon,
+                grad_clip=clip,
+                weight_decay=args.weight_decay,
+                apply_decay_param_fun=lambda x: x in decay_param)
+
+            # alias
+            optimizer.apply_optimize = optimizer._apply_optimize
 
             if args.use_recompute:
                 dist_strategy.recompute = True
@@ -341,12 +342,12 @@ def do_train(args):
     if not os.path.isdir(program_desc_dir):
         os.mkdir(program_desc_dir)
 
-    with open(program_desc_dir + "/main_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/main_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(main_program))
 
-    with open(program_desc_dir + "/startup_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/startup_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(startup_program))
 
     # Define the Executor for running the static model
@@ -407,6 +408,7 @@ def do_train(args):
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
@@ -446,7 +448,8 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
-                if global_step == args.save_steps:
+
+                if global_step <= args.save_steps:
                     model.init_config["init_args"][0].init_config.pop("topo",
                                                                       None)
                 model.save_pretrained(output_dir)

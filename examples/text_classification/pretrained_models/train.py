@@ -21,11 +21,12 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+
+from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -78,43 +79,6 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    """
-    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
-    to be used in a sequence-pair classification task.
-        
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-
-    It returns the first portion of the mask (0's).
-
-
-    Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
-    """
-    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    if not is_test:
-        label = np.array([example["label"]], dtype="int64")
-        return input_ids, token_type_ids, label
-    else:
-        return input_ids, token_type_ids
-
-
 def create_dataloader(dataset,
                       mode='train',
                       batch_size=1,
@@ -149,8 +113,8 @@ def do_train():
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # If you wanna use bert/roberta/electra pretrained model,
-    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
+    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_classes=2)
+    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_classes=2)
     # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-tiny', num_classes=len(train_ds.label_list))

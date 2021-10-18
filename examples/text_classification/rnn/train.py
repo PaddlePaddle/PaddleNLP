@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    # Constructs the newtork.
+    # Constructs the network.
     network = args.network.lower()
     vocab_size = len(vocab)
     num_classes = len(train_ds.label_list)
@@ -117,7 +117,7 @@ if __name__ == "__main__":
             padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
-        attention = SelfInteractiveAttention(hidden_size=2 * stm_hidden_size)
+        attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
         model = BiLSTMAttentionModel(
             attention_layer=attention,
             vocab_size=vocab_size,

@@ -73,10 +73,36 @@ def get_pairs(word):
 
 class GPTChineseTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT Chinese tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
+    Constructs a GPT Chinese tokenizerbased on `SentencePiece <https://github.com/google/sentencepiece>`__.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            The vocabulary file required to instantiate
+            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+        max_len (int):
+            The maximum value of the input sequence length.
+            Defaults to `512`.
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            Defaults to "[UNK]".
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import GPTChineseTokenizer
+
+            tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
+            print(tokenizer('欢迎使用百度飞桨！'))
+            '''
+            {'input_ids': [2092, 260, 1014, 1596, 17620, 45], 'token_type_ids': [0, 0, 0, 0, 0, 0]}
+            '''
     """
+
     resource_files_names = {
         "model_file": "sentencepiece.model"
     }  # for save_pretrained
@@ -116,20 +142,24 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         """
-        End-to-end tokenization for GPT models.
+        Converts a string to a list of tokens.
+
         Args:
-            text (str):
-                The text to be tokenized.
+            text (str): The text to be tokenized.
 
         Returns:
-            list[str]: A list of string representing converted tokens.
+            List[str]: A list of string representing converted tokens.
+
         Example:
             .. code-block::
+
                 from paddlenlp.transformers import GPTChineseTokenizer
+
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.tokenize('我爱祖国'))
-                # ['▁我', '▁爱', '祖国']
+                print(tokenizer.tokenize('欢迎使用百度飞桨！'))
+                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
         """
+
         return self._tokenize(text)
 
     def _tokenize(self, text):
@@ -146,15 +176,58 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
-        return self.sp_model.IdToPiece(index)
+        return self.sp.IdToPiece(index)
 
     def convert_tokens_to_ids(self, tokens):
+        """
+        Converts a single token or a sequence of tokens to an index or a
+        sequence of indices.
+
+        Args:
+            tokens (str|List[str]|tuple(str)):
+                A single token or a sequence of tokens.
+
+        Returns:
+            int|List[int]: The converted token id or token ids.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTChineseTokenizer
+
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
+                print(tokenizer.convert_tokens_to_ids(['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']))
+                # [2092, 260, 1014, 1596, 17620, 45]
+        """
+
         if not isinstance(tokens, (list, tuple)):
             return self._convert_token_to_id(tokens)
         else:
             return [self._convert_token_to_id(token) for token in tokens]
 
     def convert_ids_to_tokens(self, ids):
+        """
+        Converts a single index or a sequence of indices to a token or a
+        sequence of tokens.
+
+        Args:
+            ids (int|List[int]|tuple(int)):
+                The token id (or token ids) to be converted to token(s).
+
+        Returns:
+            str|List[str]: The converted token or sequence of tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTChineseTokenizer
+
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
+                print(tokenizer.convert_ids_to_tokens([2092, 260, 1014, 1596, 17620, 45]))
+                #['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
+
+        """
+
         if not isinstance(ids, (list, tuple)):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
@@ -164,25 +237,42 @@ class GPTChineseTokenizer(PretrainedTokenizer):
     def vocab_size(self):
         """
         Returns the size of vocabulary.
+
+        Returns:
+            int: The size of vocabulary.
+
         Example:
             .. code-block::
+
                 from paddlenlp.transformers import GPTChineseTokenizer
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.vocab_size)
                 # 50257
+
         """
         return len(self.sp)
 
     def convert_ids_to_string(self, ids):
         """
-        Converts a single index or a sequence of indices to a token or a
-        sequence of tokens.
+        Converts a single index or a sequence of indices to texts.
+
         Args:
-            ids (int|list[int]):
-                The token id (or token ids) to be converted to token(s).
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
+
         Returns:
-            str|list[str]: The decoded token(s).
+            str: The decoded text.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTChineseTokenizer
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
+                print(tokenizer.convert_ids_to_string([2092, 260, 1014, 1596, 17620, 45]))
+                # '欢迎使用百度飞桨!'
+
         """
+
         text = self.sp.decode(ids)
         text = text.replace(' ', '').replace('\u2582', ' ').replace('\u2583',
                                                                     '\n')
@@ -191,6 +281,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         """
         Save tokenizer related resources to files under `save_directory`.
+
         Args:
             save_directory (str): Directory to save files into.
         """
@@ -200,6 +291,45 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
 
 class GPTTokenizer(PretrainedTokenizer):
+    """
+    Constructs a GPT tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            Path to the vocab file.
+            The vocab file contains a mapping from vocabulary strings to indices.
+        merges_file (str):
+            Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
+        errors (str):
+            Paradigm to follow when decoding bytes to UTF-8.
+            Defaults to `'replace'`.
+        max_len (int, optional):
+            The maximum value of the input sequence length.
+            Defaults to `None`.
+        special_tokens (list, optional):
+            A list of special tokens not in the vocabulary.
+            Defaults to `None`.
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import GPTTokenizer
+
+            tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+            print(tokenizer('Welcome to use PaddlePaddle and PaddleNLP'))
+
+            '''
+            {'input_ids': [14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930],
+            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            '''
+
+    """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
@@ -271,10 +401,24 @@ class GPTTokenizer(PretrainedTokenizer):
     def __len__(self):
         return len(self.encoder) + len(self.special_tokens)
 
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of vocabulary.
+
+        Returns:
+            int: The sum of size of vocabulary and the size of speical tokens.
+
+        """
+
+        return len(self.encoder) + len(self.special_tokens)
+
     def set_special_tokens(self, special_tokens):
-        """ Add a list of additional tokens to the encoder.
-            The additional tokens are indexed starting from the last index of the
-            current vocabulary in the order of the `special_tokens` list.
+        """
+        Add a list of additional tokens to the encoder.
+        The additional tokens are indexed starting from the last index of the
+        current vocabulary in the order of the `special_tokens` list.
+
         """
         if not special_tokens:
             self.special_tokens = {}
@@ -332,7 +476,25 @@ class GPTTokenizer(PretrainedTokenizer):
         return word
 
     def tokenize(self, text):
-        """ Tokenize a string. """
+        """
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            List[str]: A list of string representing converted tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                print(tokenizer.tokenize('Welcome to use PaddlePaddle and PaddleNLP'))
+                # ['Welcome', 'Ġto', 'Ġuse', 'ĠP', 'addle', 'P', 'addle', 'Ġand', 'ĠP', 'addle', 'N', 'LP']
+        """
+
         return self._tokenize(text)
 
     def _tokenize(self, text):
@@ -346,7 +508,27 @@ class GPTTokenizer(PretrainedTokenizer):
         return bpe_tokens
 
     def convert_tokens_to_ids(self, tokens):
-        """ Converts a sequence of tokens into ids using the vocab. """
+        """
+        Converts a single token or a sequence of tokens to an index or a
+        sequence of indices using the vocab.
+
+        Args:
+            tokens (str|List[str]|tuple(str)):
+                A single token or a sequence of tokens.
+
+        Returns:
+            int|List[int]: The converted token id or token ids.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                print(tokenizer.convert_tokens_to_ids(['Welcome', 'Ġto', 'Ġuse', 'ĠP', 'addle', 'P', 'addle', 'Ġand', 'ĠP', 'addle', 'N', 'LP']))
+                # [14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930]
+        """
+
         ids = []
         if isinstance(tokens, str):
             if tokens in self.special_tokens:
@@ -367,6 +549,31 @@ class GPTTokenizer(PretrainedTokenizer):
         return ids
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        """
+        Converts an index or a sequence indices to a single
+        token or a sequence of tokens.
+
+        Args:
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
+            skip_special_tokens (bool, optional):
+                Whether or not to skip the special tokens.
+                Defaults to `False`, which means we don't skip the special tokens.
+
+        Returns:
+            str|List[str]: The converted token or the sequence of tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                print(tokenizer.convert_ids_to_tokens([14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930]))
+                # ['Welcome', 'Ġto', 'Ġuse', 'ĠP', 'addle', 'P', 'addle', 'Ġand', 'ĠP', 'addle', 'N', 'LP']
+
+        """
+
         tokens = []
         for i in ids:
             if i in self.special_tokens_decoder:
@@ -377,6 +584,26 @@ class GPTTokenizer(PretrainedTokenizer):
         return tokens
 
     def convert_ids_to_string(self, ids):
+        """
+        Converts a single index or a sequence of indices to texts.
+
+        Args:
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
+
+        Returns:
+            str: The decoded text.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import GPTTokenizer
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                print(tokenizer.convert_ids_to_string(tokenizer.convert_ids_to_string([14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930]))
+                # 'Welcome to use PaddlePaddle and PaddleNLP'
+
+        """
+
         text = ''.join([self.decoder[id] for id in ids])
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
             'utf-8', errors=self.errors)
@@ -384,7 +611,9 @@ class GPTTokenizer(PretrainedTokenizer):
 
     def save_resources(self, save_directory):
         """
-        Save tokenizer related resources to files under `save_directory`.
+        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
+        (ends with '.spm') under `save_directory`.
+
         Args:
             save_directory (str): Directory to save files into.
         """
