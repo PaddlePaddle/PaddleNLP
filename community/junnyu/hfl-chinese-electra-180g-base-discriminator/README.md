@@ -6,6 +6,7 @@
 # 使用示例
 
 ```python
+import paddle
 from paddlenlp.transformers import ElectraDiscriminator, ElectraTokenizer
 
 path = "junnyu/hfl-chinese-electra-180g-base-discriminator"
