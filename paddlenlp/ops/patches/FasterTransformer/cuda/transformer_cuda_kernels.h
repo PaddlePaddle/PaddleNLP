@@ -68,20 +68,6 @@ void apply_penalties_Launcher(int step,
                               cudaStream_t stream,
                               const T* logits_mask);
 
-// For is_fuse_topk_softMax_
-void update_with_force_deocding_Launcher_v2(bool* finished,
-                                            int* parent_ids,
-                                            int* sequence_length,
-                                            int* word_ids,
-                                            int* output_ids,
-                                            int* finished_count,
-                                            int step,
-                                            DecodingBeamsearchArguments args,
-                                            cudaStream_t stream,
-                                            float* cum_log = nullptr,
-                                            const int* trg_word = nullptr,
-                                            const int* trg_length = nullptr);
-
 template <typename T>
 void update_KV_cache_kernelLauncher(T** key_cache,
                                     T** value_cache,
