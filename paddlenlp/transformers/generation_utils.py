@@ -621,11 +621,21 @@ class GenerationMixin(object):
                 args = locals()
                 args.pop('self')
                 args.pop("__class__", None)
-                if not hasattr(self, '_faster_entry'):
-                    self._build_faster(args)
-                if self._faster_entry:
-                    model_kwargs = args.pop('model_kwargs')
-                    return self._faster_entry(**args, **model_kwargs)
+                try:
+                    if not hasattr(self, '_faster_entry'):
+                        self._build_faster(args)
+                    if self._faster_entry:
+                        model_kwargs = args.pop('model_kwargs')
+                        # transpose to batch major to be consistent with original results
+                        output_ids = paddle.transpose(
+                            self._faster_entry(**args, **model_kwargs), [1, 0])
+                        # append dummy scores to be consistent with original results
+                        scores = None
+                        return output_ids, scores
+                except Exception:
+                    logger.warning(
+                        "FasterTransformer is not available, "
+                        "and the original version would be used instead.")
 
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
