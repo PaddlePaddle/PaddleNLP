@@ -38,7 +38,7 @@ if(NOT WITH_GPU)
 endif()
 
 if(WITH_TRANSFORMER)
-  list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+  list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
 endif()
 
 if(WITH_GPT)
