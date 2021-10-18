@@ -274,7 +274,7 @@ def enable_faster_encoder(self):
             load("FasterTransformer", verbose=True)
         except Exception:
             logger.warning(
-                "Exception occurs when using Faster Transformer. " \
+                "Exception occurs when using FasterTransformer. " \
                 "The original forward will be involved. ")
             return self
         for layer in self.children():
