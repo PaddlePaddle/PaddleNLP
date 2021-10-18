@@ -1,5 +1,3 @@
-export PYTHONPATH=$PYTHONPATH:../../../../
-
 log_dir=dp2_pp2_mp2
 rm -rf $log_dir
 

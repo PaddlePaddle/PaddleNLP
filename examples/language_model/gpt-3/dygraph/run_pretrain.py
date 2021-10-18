@@ -126,8 +126,9 @@ def do_train(args):
         "sharding_degree": args.sharding_degree
     }
 
+    accumulate_steps = args.local_batch_size // args.micro_batch_size
     strategy.pipeline_configs = {
-        "accumulate_steps": args.local_batch_size // args.micro_batch_size,
+        "accumulate_steps": accumulate_steps,
         "micro_batch_size": args.micro_batch_size
     }
 
@@ -247,11 +248,14 @@ def do_train(args):
             weight_decay=args.weight_decay,
             grad_clip=clip,
             apply_decay_param_fun=lambda x: x in decay_params,
+            # TODO: remove 'multi_precision' in definition of optimizer
+            # and add it to 'paddle.amp.decorate'
             multi_precision=args.use_pure_fp16)
 
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         scaler = fleet.distributed_scaler(scaler)
+        # level O2 means converting the network to FP16
         model, optimizer = paddle.amp.decorate(
             models=model,
             optimizers=optimizer,
@@ -300,10 +304,12 @@ def do_train(args):
                 position_ids.stop_gradient = True
 
                 if args.pp_degree == 1:
-                    lbs = args.local_batch_size
-                    mbs = args.micro_batch_size
+                    # In ParallelMode of DataParallel, 'no_sync' can be used for improving
+                    # performance of model by gradient accumulation.
                     loss = 0.0
-                    for i in range((int)(lbs / mbs)):
+                    for i in range(accumulate_steps):
+                        start_index = i * args.micro_batch_size
+                        end_index = start_index + args.micro_batch_size
                         with paddle.amp.auto_cast(
                                 args.use_pure_fp16,
                                 custom_black_list=[
@@ -313,20 +319,21 @@ def do_train(args):
                                 ],
                                 level='O2'):
                             preds = model(
-                                tokens[i * mbs:i * mbs + mbs, :],
-                                position_ids[i * mbs:i * mbs + mbs, :])
+                                tokens[start_index:end_index, :],
+                                position_ids[start_index:end_index, :])
                             loss_mbs = criterion(
-                                preds, labels[i * mbs:i * mbs + mbs, :],
-                                loss_mask[i * mbs:i * mbs + mbs, :])
-                        loss += loss_mbs
-                    loss = loss / (int)(lbs / mbs)
+                                preds, labels[start_index:end_index, :],
+                                loss_mask[start_index:end_index, :])
+                        loss_mbs = loss_mbs / accumulate_steps
+                        if args.use_pure_fp16:
+                            scaler.scale(loss_mbs).backward()
+                        else:
+                            loss_mbs.backward()
+                        loss = loss + loss_mbs
 
                     if args.use_pure_fp16:
-                        scaler.scale(loss).backward()
-                        scaler.step(optimizer)
-                        scaler.update()
+                        scaler.minimize(optimizer, loss)
                     else:
-                        loss.backward()
                         optimizer.step()
 
                     if lr_scheduler is not None:
