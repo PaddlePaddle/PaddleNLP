@@ -24,14 +24,13 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     "AutoModel",
-    "AutoModelForPretraining",
-    "AutoModelForCausalLM",
+    "AutoModelForPreTraining",
+    "AutoModelWithLMHead",
     "AutoModelForMaskedLM",
     "AutoModelForSequenceClassification",
     "AutoModelForTokenClassification",
     "AutoModelForQuestionAnswering",
     "AutoModelForMultipleChoice",
-    "AutoModelForNextSentencePrediction",
 ]
 """
 __all__ = [
@@ -331,9 +330,6 @@ MODEL_FOR_PRETRAINING_MAPPING = _LazyAutoMapping(
 MODEL_WITH_LM_HEAD_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES,
                                               MODEL_WITH_LM_HEAD_MAPPING_NAMES)
 
-MODEL_FOR_CAUSAL_LM_MAPPING = _LazyAutoMapping(
-    CONFIG_MAPPING_NAMES, MODEL_FOR_CAUSAL_LM_MAPPING_NAMES)
-
 MODEL_FOR_MASKED_LM_MAPPING = _LazyAutoMapping(
     CONFIG_MAPPING_NAMES, MODEL_FOR_MASKED_LM_MAPPING_NAMES)
 
@@ -348,9 +344,6 @@ MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING = _LazyAutoMapping(
 
 MODEL_FOR_MULTIPLE_CHOICE_MAPPING = _LazyAutoMapping(
     CONFIG_MAPPING_NAMES, MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES)
-
-MODEL_FOR_NEXT_SENTENCE_PREDICTION_MAPPING = _LazyAutoMapping(
-    CONFIG_MAPPING_NAMES, MODEL_FOR_NEXT_SENTENCE_PREDICTION_MAPPING_NAMES)
 
 
 class AutoModel(_BaseAutoModelClass):
@@ -369,20 +362,12 @@ AutoModelForPreTraining = auto_class_update(
 
 
 # Private on purpose, the public class will add the deprecation warnings.
-class _AutoModelWithLMHead(_BaseAutoModelClass):
+class AutoModelWithLMHead(_BaseAutoModelClass):
     _model_mapping = MODEL_WITH_LM_HEAD_MAPPING
 
 
-_AutoModelWithLMHead = auto_class_update(
-    _AutoModelWithLMHead, head_doc="language modeling")
-
-
-class AutoModelForCausalLM(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_CAUSAL_LM_MAPPING
-
-
-AutoModelForCausalLM = auto_class_update(
-    AutoModelForCausalLM, head_doc="causal language modeling")
+AutoModelWithLMHead = auto_class_update(
+    AutoModelWithLMHead, head_doc="language modeling")
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
@@ -391,16 +376,6 @@ class AutoModelForMaskedLM(_BaseAutoModelClass):
 
 AutoModelForMaskedLM = auto_class_update(
     AutoModelForMaskedLM, head_doc="masked language modeling")
-
-
-class AutoModelForSeq2SeqLM(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING
-
-
-AutoModelForSeq2SeqLM = auto_class_update(
-    AutoModelForSeq2SeqLM,
-    head_doc="sequence-to-sequence language modeling",
-    checkpoint_for_example="t5-base")
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
@@ -419,16 +394,6 @@ AutoModelForQuestionAnswering = auto_class_update(
     AutoModelForQuestionAnswering, head_doc="question answering")
 
 
-class AutoModelForTableQuestionAnswering(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_TABLE_QUESTION_ANSWERING_MAPPING
-
-
-AutoModelForTableQuestionAnswering = auto_class_update(
-    AutoModelForTableQuestionAnswering,
-    head_doc="table question answering",
-    checkpoint_for_example="google/tapas-base-finetuned-wtq", )
-
-
 class AutoModelForTokenClassification(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING
 
@@ -443,82 +408,3 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 
 AutoModelForMultipleChoice = auto_class_update(
     AutoModelForMultipleChoice, head_doc="multiple choice")
-
-
-class AutoModelForNextSentencePrediction(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_NEXT_SENTENCE_PREDICTION_MAPPING
-
-
-AutoModelForNextSentencePrediction = auto_class_update(
-    AutoModelForNextSentencePrediction, head_doc="next sentence prediction")
-
-
-class AutoModelForImageClassification(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING
-
-
-AutoModelForImageClassification = auto_class_update(
-    AutoModelForImageClassification, head_doc="image classification")
-
-
-class AutoModelForImageSegmentation(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_IMAGE_SEGMENTATION_MAPPING
-
-
-AutoModelForImageSegmentation = auto_class_update(
-    AutoModelForImageSegmentation, head_doc="image segmentation")
-
-
-class AutoModelForObjectDetection(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_OBJECT_DETECTION_MAPPING
-
-
-AutoModelForObjectDetection = auto_class_update(
-    AutoModelForObjectDetection, head_doc="object detection")
-
-
-class AutoModelForAudioClassification(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING
-
-
-AutoModelForAudioClassification = auto_class_update(
-    AutoModelForAudioClassification, head_doc="audio classification")
-
-
-class AutoModelForCTC(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_CTC_MAPPING
-
-
-AutoModelForCTC = auto_class_update(
-    AutoModelForCTC, head_doc="connectionist temporal classification")
-
-
-class AutoModelForSpeechSeq2Seq(_BaseAutoModelClass):
-    _model_mapping = MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING
-
-
-AutoModelForSpeechSeq2Seq = auto_class_update(
-    AutoModelForSpeechSeq2Seq,
-    head_doc="sequence-to-sequence speech-to-text modeing")
-
-
-class AutoModelWithLMHead(_AutoModelWithLMHead):
-    @classmethod
-    def from_config(cls, config):
-        warnings.warn(
-            "The class `AutoModelWithLMHead` is deprecated and will be removed in a future version. Please use "
-            "`AutoModelForCausalLM` for causal language models, `AutoModelForMaskedLM` for masked language models and "
-            "`AutoModelForSeq2SeqLM` for encoder-decoder models.",
-            FutureWarning, )
-        return super().from_config(config)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
-                        **kwargs):
-        warnings.warn(
-            "The class `AutoModelWithLMHead` is deprecated and will be removed in a future version. Please use "
-            "`AutoModelForCausalLM` for causal language models, `AutoModelForMaskedLM` for masked language models and "
-            "`AutoModelForSeq2SeqLM` for encoder-decoder models.",
-            FutureWarning, )
-        return super().from_pretrained(pretrained_model_name_or_path,
-                                       *model_args, **kwargs)
