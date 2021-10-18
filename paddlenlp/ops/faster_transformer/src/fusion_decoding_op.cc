@@ -53,8 +53,6 @@ std::vector<paddle::Tensor> DecodingForward(
     const paddle::Tensor& embedding_weight,
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& positional_embedding_weight,
-    const paddle::Tensor& trg_word,
-    const paddle::Tensor& trg_length,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -142,8 +140,6 @@ std::vector<paddle::Tensor> DecodingForward(
                                embedding_weight,
                                embedding_bias,
                                positional_embedding_weight,
-                               trg_word,
-                               trg_length,
                                output_ids,
                                parent_ids,
                                sequence_length,
@@ -199,8 +195,6 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
     const std::vector<int64_t>& embedding_weight_shape,
     const std::vector<int64_t>& embedding_bias_shape,
     const std::vector<int64_t>& positional_embedding_weight_shape,
-    const std::vector<int64_t>& trg_word_shape,
-    const std::vector<int64_t>& trg_length_shape,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -277,9 +271,7 @@ std::vector<paddle::DataType> DecodingInferDtype(
     const paddle::DataType& decoder_ln_bias,
     const paddle::DataType& embedding_weight,
     const paddle::DataType& embedding_bias,
-    const paddle::DataType& positional_embedding_weight,
-    const paddle::DataType& trg_word,
-    const paddle::DataType& trg_length) {
+    const paddle::DataType& positional_embedding_weight) {
   return {paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32};
@@ -319,9 +311,7 @@ PD_BUILD_OP(fusion_decoding)
              "DecoderLayernormBias",
              "EmbWeight",
              "EmbBias",
-             "PositionEncEmb",
-             "TrgWord",
-             "TrgLength"})
+             "PositionEncEmb"})
     .Outputs({"OutputIds", "ParentIds", "SequenceLength"})
     .Attrs({"decoding_strategy: std::string",
             "beam_size: int",

@@ -62,8 +62,6 @@ std::vector<paddle::Tensor> decoding_kernel(
     const paddle::Tensor& embedding_weight,
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& position_encoding_table,
-    const paddle::Tensor& trg_word,
-    const paddle::Tensor& trg_length,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -122,12 +120,6 @@ std::vector<paddle::Tensor> decoding_kernel(
   decoding_params.memory_tensor =
       reinterpret_cast<const DataType_*>(input.data<data_t_>());
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
-
-  // TODO(FrostML): Pass these into FasterTransformer.
-  decoding_params.trg_word = trg_word.data<int>();
-  decoding_params.trg_length = trg_length.data<int>();
-  auto trg_word_shape = trg_word.shape();
-  int trg_max_len = static_cast<int>(trg_word_shape[1]);
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
@@ -358,8 +350,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const paddle::Tensor& embedding_weight,
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& positional_embedding_weight,
-    const paddle::Tensor& trg_word,
-    const paddle::Tensor& trg_length,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -419,8 +409,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           embedding_weight,
           embedding_bias,
           positional_embedding_weight,
-          trg_word,
-          trg_length,
           output_ids,
           parent_ids,
           sequence_length,
@@ -476,8 +464,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           embedding_weight,
           embedding_bias,
           positional_embedding_weight,
-          trg_word,
-          trg_length,
           output_ids,
           parent_ids,
           sequence_length,
