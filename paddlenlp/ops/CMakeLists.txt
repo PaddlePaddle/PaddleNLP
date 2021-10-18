@@ -55,7 +55,7 @@ if(WITH_ENCODER AND NOT ON_INFER)
 endif()
 
 if(WITH_DECODER)
-  list(APPEND decoder_op_files fusion_decoder_op.cc fusion_decoder_op.cu)
+  list(APPEND decoding_op_files fusion_decoder_op.cc fusion_decoder_op.cu)
 endif()
 
 if(WITH_BART)
