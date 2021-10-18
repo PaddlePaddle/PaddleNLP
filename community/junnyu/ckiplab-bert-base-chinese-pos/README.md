@@ -1,8 +1,10 @@
 # 详细介绍
-# CKIP BERT Base Chinese
-这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
+**介绍**：这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
 
 关于完整使用方法及其他信息，请参考 https://github.com/ckiplab/ckip-transformers 。
+
+**模型结构**： **`BertForTokenClassification`**，带有token分类头的Bert模型。
+**适用下游任务**：**词性标注**，该权重已经在下游`POS`任务上进行了微调，因此可直接使用。
 
 # 使用示例
 
@@ -10,11 +12,11 @@
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
-path = "ckiplab-bert-base-chinese-pos"
+path = "junnyu/ckiplab-bert-base-chinese-pos"
 model = BertForTokenClassification.from_pretrained(path)
 model.eval()
 tokenizer = BertTokenizer.from_pretrained(path)
-text = "我叫沃尔夫冈，我住在柏林。"
+text = "傅達仁今將執行安樂死，卻突然爆出自己20年前遭緯來體育台封殺，他不懂自己哪裡得罪到電視台。"
 tokenized_text = tokenizer.tokenize(text)
 inputs = {
     k: paddle.to_tensor(
@@ -90,18 +92,49 @@ for t, s in zip(tokenized_text, score[0][1:-1]):
     label = id2label[str(index)]
     print(f"{label} {t} score {s[index].item()}")
 
-# Nh 我 score 1.0
-# VG 叫 score 0.9999830722808838
-# Nc 沃 score 0.9999146461486816
-# Nc 尔 score 0.9999760389328003
-# Nc 夫 score 0.9984875917434692
-# Na 冈 score 0.8717513680458069
+# Nb 傅 score 0.9999998807907104
+# Nb 達 score 0.9700667858123779
+# Na 仁 score 0.9985846281051636
+# Nd 今 score 0.9999947547912598
+# D 將 score 0.9999957084655762
+# VC 執 score 0.9999998807907104
+# VC 行 score 0.9951109290122986
+# Na 安 score 0.9999996423721313
+# Na 樂 score 0.9999638795852661
+# VH 死 score 0.9813857674598694
 # COMMACATEGORY ， score 1.0
-# Nh 我 score 1.0
-# VCL 住 score 0.9999992847442627
-# P 在 score 0.9999998807907104
-# Nc 柏 score 0.9999998807907104
-# Nc 林 score 0.9891127943992615
+# D 卻 score 1.0
+# D 突 score 1.0
+# Cbb 然 score 0.9989008903503418
+# VJ 爆 score 0.9999979734420776
+# VC 出 score 0.9965670108795166
+# Nh 自 score 1.0
+# Nh 己 score 1.0
+# Neu 20 score 0.9999995231628418
+# Nf 年 score 0.9125530123710632
+# Ng 前 score 0.9999992847442627
+# P 遭 score 1.0
+# Nb 緯 score 0.9999996423721313
+# VA 來 score 0.9322434663772583
+# Na 體 score 0.9846553802490234
+# Nc 育 score 0.729569137096405
+# Nc 台 score 0.9999841451644897
+# VC 封 score 0.9999997615814209
+# VC 殺 score 0.9999991655349731
+# COMMACATEGORY ， score 1.0
+# Nh 他 score 0.9999996423721313
+# D 不 score 1.0
+# VK 懂 score 1.0
+# Nh 自 score 1.0
+# Nh 己 score 0.9999978542327881
+# Ncd 哪 score 0.9856181740760803
+# Ncd 裡 score 0.9999995231628418
+# VC 得 score 0.9999988079071045
+# Na 罪 score 0.9994786381721497
+# VCL 到 score 0.8332439661026001
+# Nc 電 score 1.0
+# Nc 視 score 0.9999986886978149
+# Nc 台 score 0.9973978996276855
 # PERIODCATEGORY 。 score 1.0
 
 ```

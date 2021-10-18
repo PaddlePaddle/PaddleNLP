@@ -1,13 +1,12 @@
-from paddlenlp.transformers import BertForSequenceClassification, BertForMaskedLM, BertForTokenClassification, BertTokenizer
+from paddlenlp.transformers import BertForSequenceClassification, BertForPretraining, BertForTokenClassification, BertTokenizer
 import paddle
 
 
-def compare_math(path="MODEL/tbs17-MathBERT"):
-    model = BertForMaskedLM.from_pretrained(path)
+def compare_math(path="junnyu/tbs17-MathBERT"):
+    model = BertForPretraining.from_pretrained(path)
     tokenizer = BertTokenizer.from_pretrained(path)
     model.eval()
-    print()
-    text = "The man worked as a [MASK]."
+    text = "students apply these new understandings as they reason about and perform decimal [MASK] through the hundredths place."
     tokens = ["[CLS]"]
     text_list = text.split("[MASK]")
     for i, t in enumerate(text_list):
@@ -20,7 +19,7 @@ def compare_math(path="MODEL/tbs17-MathBERT"):
     input_ids_list = tokenizer.convert_tokens_to_ids(tokens)
     input_ids = paddle.to_tensor([input_ids_list])
     with paddle.no_grad():
-        pd_outputs = model(input_ids)[0]
+        pd_outputs = model(input_ids)[0][0]
     pd_outputs_sentence = "paddle: "
     for i, id in enumerate(input_ids_list):
         if id == tokenizer.convert_tokens_to_ids(["[MASK]"])[0]:
@@ -38,33 +37,11 @@ def compare_math(path="MODEL/tbs17-MathBERT"):
 
     print(pd_outputs_sentence)
 
-    # paddle: the man worked as a [book=0.6469274759292603||guide=0.07073356211185455||text=0.031362663954496384||man=0.023064589127898216||distance=0.02054688334465027] .  
-    # expected:
-    # https://huggingface.co/tbs17/MathBERT
-    # [{'score': 0.6469377875328064,
-    # 'sequence': 'the man worked as a book.',
-    # 'token': 2338,
-    # 'token_str': 'book'},
-    #  {'score': 0.07073448598384857,
-    # 'sequence': 'the man worked as a guide.',
-    # 'token': 5009,
-    # 'token_str': 'guide'},
-    #  {'score': 0.031362924724817276,
-    # 'sequence': 'the man worked as a text.',
-    # 'token': 3793,
-    # 'token_str': 'text'},
-    #  {'score': 0.02306508645415306,
-    # 'sequence': 'the man worked as a man.',
-    # 'token': 2158,
-    # 'token_str': 'man'},
-    #  {'score': 0.020547250285744667,
-    # 'sequence': 'the man worked as a distance.',
-    # 'token': 3292,
-    # 'token_str': 'distance'}]
+    #paddle:  students apply these new understanding ##s as they reason about and perform decimal [numbers=0.8327996134757996||##s=0.0865364819765091||operations=0.0313422717154026||placement=0.019931407645344734||places=0.01254698634147644] through the hundred ##ths place . 
 
 
 def compare_nlptown(
-        path="MODEL/nlptown-bert-base-multilingual-uncased-sentiment"):
+        path="junnyu/nlptown-bert-base-multilingual-uncased-sentiment"):
     model = BertForSequenceClassification.from_pretrained(path)
     model.eval()
     tokenizer = BertTokenizer.from_pretrained(path)
@@ -92,19 +69,13 @@ def compare_nlptown(
     # 3 stars score 0.015475980937480927
     # 4 stars score 0.1935628354549408
     # 5 stars score 0.7865128517150879
-    # https://huggingface.co/nlptown/bert-base-multilingual-uncased-sentiment?text=I+like+you.+I+love+you
-    # 1 star 0.002
-    # 2 stars 0.002
-    # 3 stars 0.015
-    # 4 stars 0.194
-    # 5 stars 0.787
 
 
-def compare_ckiplab_ws(path="MODEL/ckiplab-bert-base-chinese-ws"):
+def compare_ckiplab_ws(path="junnyu/ckiplab-bert-base-chinese-ws"):
     model = BertForTokenClassification.from_pretrained(path)
     model.eval()
     tokenizer = BertTokenizer.from_pretrained(path)
-    text = "我叫克拉拉，我住在加州伯克利。"
+    text = "傅達仁今將執行安樂死，卻突然爆出自己20年前遭緯來體育台封殺，他不懂自己哪裡得罪到電視台。"
     tokenized_text = tokenizer.tokenize(text)
     inputs = {
         k: paddle.to_tensor(
@@ -113,143 +84,63 @@ def compare_ckiplab_ws(path="MODEL/ckiplab-bert-base-chinese-ws"):
     }
     with paddle.no_grad():
         score = paddle.nn.functional.softmax(model(**inputs), axis=-1)
-    id2label = {0: "B", 1: "I"}
+    id2label = {"0": "B", "1": "I"}
     for t, s in zip(tokenized_text, score[0][1:-1]):
         index = paddle.argmax(s).item()
-        label = id2label[index]
+        label = id2label[str(index)]
         print(f"{label} {t} score {s[index].item()}")
 
-    # B 我 score 0.9999921321868896
-    # B 叫 score 0.9999772310256958
-    # B 克 score 0.9999295473098755
-    # I 拉 score 0.999772846698761
-    # I 拉 score 0.9999483823776245
-    # B ， score 0.9999879598617554
-    # B 我 score 0.9999914169311523
-    # B 住 score 0.9999860525131226
-    # B 在 score 0.6059999465942383
-    # B 加 score 0.9999884366989136
-    # I 州 score 0.9999697208404541
-    # B 伯 score 0.999879002571106
-    # I 克 score 0.9999772310256958
-    # I 利 score 0.9999678134918213
-    # B 。 score 0.9999856948852539
-
-    # https://huggingface.co/ckiplab/bert-base-chinese-ws
-    # [
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999921321868896,
-    #     "word": "我",
-    #     "start": 0,
-    #     "end": 1
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999772906303406,
-    #     "word": "叫",
-    #     "start": 1,
-    #     "end": 2
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999296069145203,
-    #     "word": "克",
-    #     "start": 2,
-    #     "end": 3
-    # },
-    # {
-    #     "entity_group": "I",
-    #     "score": 0.999772846698761,
-    #     "word": "拉",
-    #     "start": 3,
-    #     "end": 4
-    # },
-    # {
-    #     "entity_group": "I",
-    #     "score": 0.9999484419822693,
-    #     "word": "拉",
-    #     "start": 4,
-    #     "end": 5
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999879598617554,
-    #     "word": "，",
-    #     "start": 5,
-    #     "end": 6
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999914169311523,
-    #     "word": "我",
-    #     "start": 6,
-    #     "end": 7
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999861121177673,
-    #     "word": "住",
-    #     "start": 7,
-    #     "end": 8
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.6059996485710144,
-    #     "word": "在",
-    #     "start": 8,
-    #     "end": 9
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.999988317489624,
-    #     "word": "加",
-    #     "start": 9,
-    #     "end": 10
-    # },
-    # {
-    #     "entity_group": "I",
-    #     "score": 0.9999697804450989,
-    #     "word": "州",
-    #     "start": 10,
-    #     "end": 11
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9998790621757507,
-    #     "word": "伯",
-    #     "start": 11,
-    #     "end": 12
-    # },
-    # {
-    #     "entity_group": "I",
-    #     "score": 0.9999772310256958,
-    #     "word": "克",
-    #     "start": 12,
-    #     "end": 13
-    # },
-    # {
-    #     "entity_group": "I",
-    #     "score": 0.9999678134918213,
-    #     "word": "利",
-    #     "start": 13,
-    #     "end": 14
-    # },
-    # {
-    #     "entity_group": "B",
-    #     "score": 0.9999856352806091,
-    #     "word": "。",
-    #     "start": 14,
-    #     "end": 15
-    # }
-    # ]
+    # B 傅 score 0.9999865293502808
+    # I 達 score 0.999922513961792
+    # I 仁 score 0.9999332427978516
+    # B 今 score 0.9999370574951172
+    # B 將 score 0.9983423948287964
+    # B 執 score 0.9999731779098511
+    # I 行 score 0.9999544620513916
+    # B 安 score 0.9999713897705078
+    # I 樂 score 0.9999532699584961
+    # I 死 score 0.9998632669448853
+    # B ， score 0.9999871253967285
+    # B 卻 score 0.9999560117721558
+    # B 突 score 0.9999818801879883
+    # I 然 score 0.9999614953994751
+    # B 爆 score 0.9999759197235107
+    # I 出 score 0.9994433522224426
+    # B 自 score 0.9999866485595703
+    # I 己 score 0.9999630451202393
+    # B 20 score 0.9999810457229614
+    # B 年 score 0.9974608421325684
+    # B 前 score 0.8930220603942871
+    # B 遭 score 0.9999674558639526
+    # B 緯 score 0.999970555305481
+    # I 來 score 0.9999680519104004
+    # B 體 score 0.9997956156730652
+    # I 育 score 0.9999778270721436
+    # I 台 score 0.9980663657188416
+    # B 封 score 0.999984860420227
+    # I 殺 score 0.999974250793457
+    # B ， score 0.9999891519546509
+    # B 他 score 0.999988317489624
+    # B 不 score 0.9999889135360718
+    # B 懂 score 0.9997660517692566
+    # B 自 score 0.9999877214431763
+    # I 己 score 0.9999549388885498
+    # B 哪 score 0.9999915361404419
+    # I 裡 score 0.9980868101119995
+    # B 得 score 0.9999058246612549
+    # I 罪 score 0.9916028380393982
+    # I 到 score 0.8443355560302734
+    # B 電 score 0.9999363422393799
+    # I 視 score 0.9999769926071167
+    # I 台 score 0.999947190284729
+    # B 。 score 0.9999719858169556
 
 
-def compare_ckiplab_pos(path="MODEL/ckiplab-bert-base-chinese-pos"):
+def compare_ckiplab_pos(path="junnyu/ckiplab-bert-base-chinese-pos"):
     model = BertForTokenClassification.from_pretrained(path)
     model.eval()
     tokenizer = BertTokenizer.from_pretrained(path)
-    text = "我叫沃尔夫冈，我住在柏林。"
+    text = "傅達仁今將執行安樂死，卻突然爆出自己20年前遭緯來體育台封殺，他不懂自己哪裡得罪到電視台。"
     tokenized_text = tokenizer.tokenize(text)
     inputs = {
         k: paddle.to_tensor(
@@ -325,121 +216,57 @@ def compare_ckiplab_pos(path="MODEL/ckiplab-bert-base-chinese-pos"):
         label = id2label[str(index)]
         print(f"{label} {t} score {s[index].item()}")
 
-    # Nh 我 score 1.0
-    # VG 叫 score 0.9999830722808838
-    # Nc 沃 score 0.9999146461486816
-    # Nc 尔 score 0.9999760389328003
-    # Nc 夫 score 0.9984875917434692
-    # Na 冈 score 0.8717513680458069
+    # Nb 傅 score 0.9999998807907104
+    # Nb 達 score 0.9700667858123779
+    # Na 仁 score 0.9985846281051636
+    # Nd 今 score 0.9999947547912598
+    # D 將 score 0.9999957084655762
+    # VC 執 score 0.9999998807907104
+    # VC 行 score 0.9951109290122986
+    # Na 安 score 0.9999996423721313
+    # Na 樂 score 0.9999638795852661
+    # VH 死 score 0.9813857674598694
     # COMMACATEGORY ， score 1.0
-    # Nh 我 score 1.0
-    # VCL 住 score 0.9999992847442627
-    # P 在 score 0.9999998807907104
-    # Nc 柏 score 0.9999998807907104
-    # Nc 林 score 0.9891127943992615
+    # D 卻 score 1.0
+    # D 突 score 1.0
+    # Cbb 然 score 0.9989008903503418
+    # VJ 爆 score 0.9999979734420776
+    # VC 出 score 0.9965670108795166
+    # Nh 自 score 1.0
+    # Nh 己 score 1.0
+    # Neu 20 score 0.9999995231628418
+    # Nf 年 score 0.9125530123710632
+    # Ng 前 score 0.9999992847442627
+    # P 遭 score 1.0
+    # Nb 緯 score 0.9999996423721313
+    # VA 來 score 0.9322434663772583
+    # Na 體 score 0.9846553802490234
+    # Nc 育 score 0.729569137096405
+    # Nc 台 score 0.9999841451644897
+    # VC 封 score 0.9999997615814209
+    # VC 殺 score 0.9999991655349731
+    # COMMACATEGORY ， score 1.0
+    # Nh 他 score 0.9999996423721313
+    # D 不 score 1.0
+    # VK 懂 score 1.0
+    # Nh 自 score 1.0
+    # Nh 己 score 0.9999978542327881
+    # Ncd 哪 score 0.9856181740760803
+    # Ncd 裡 score 0.9999995231628418
+    # VC 得 score 0.9999988079071045
+    # Na 罪 score 0.9994786381721497
+    # VCL 到 score 0.8332439661026001
+    # Nc 電 score 1.0
+    # Nc 視 score 0.9999986886978149
+    # Nc 台 score 0.9973978996276855
     # PERIODCATEGORY 。 score 1.0
 
-    # https://huggingface.co/ckiplab/bert-base-chinese-pos
-    # [
-    # {
-    #     "entity_group": "Nh",
-    #     "score": 1,
-    #     "word": "我",
-    #     "start": 0,
-    #     "end": 1
-    # },
-    # {
-    #     "entity_group": "VG",
-    #     "score": 0.9999829530715942,
-    #     "word": "叫",
-    #     "start": 1,
-    #     "end": 2
-    # },
-    # {
-    #     "entity_group": "Nc",
-    #     "score": 0.9999146461486816,
-    #     "word": "沃",
-    #     "start": 2,
-    #     "end": 3
-    # },
-    # {
-    #     "entity_group": "Nc",
-    #     "score": 0.9999760389328003,
-    #     "word": "尔",
-    #     "start": 3,
-    #     "end": 4
-    # },
-    # {
-    #     "entity_group": "Nc",
-    #     "score": 0.9984875917434692,
-    #     "word": "夫",
-    #     "start": 4,
-    #     "end": 5
-    # },
-    # {
-    #     "entity_group": "Na",
-    #     "score": 0.8717513084411621,
-    #     "word": "冈",
-    #     "start": 5,
-    #     "end": 6
-    # },
-    # {
-    #     "entity_group": "COMMACATEGORY",
-    #     "score": 1,
-    #     "word": "，",
-    #     "start": 6,
-    #     "end": 7
-    # },
-    # {
-    #     "entity_group": "Nh",
-    #     "score": 1,
-    #     "word": "我",
-    #     "start": 7,
-    #     "end": 8
-    # },
-    # {
-    #     "entity_group": "VCL",
-    #     "score": 0.9999994039535522,
-    #     "word": "住",
-    #     "start": 8,
-    #     "end": 9
-    # },
-    # {
-    #     "entity_group": "P",
-    #     "score": 0.9999999403953552,
-    #     "word": "在",
-    #     "start": 9,
-    #     "end": 10
-    # },
-    # {
-    #     "entity_group": "Nc",
-    #     "score": 0.9999999403953552,
-    #     "word": "柏",
-    #     "start": 10,
-    #     "end": 11
-    # },
-    # {
-    #     "entity_group": "Nc",
-    #     "score": 0.9891127943992615,
-    #     "word": "林",
-    #     "start": 11,
-    #     "end": 12
-    # },
-    # {
-    #     "entity_group": "PERIODCATEGORY",
-    #     "score": 1,
-    #     "word": "。",
-    #     "start": 12,
-    #     "end": 13
-    # }
-    # ]
 
-
-def compare_ckiplab_ner(path="MODEL/ckiplab-bert-base-chinese-ner"):
+def compare_ckiplab_ner(path="junnyu/ckiplab-bert-base-chinese-ner"):
     model = BertForTokenClassification.from_pretrained(path)
     model.eval()
     tokenizer = BertTokenizer.from_pretrained(path)
-    text = "我叫克拉拉，我住在加州伯克利。"
+    text = "傅達仁今將執行安樂死，卻突然爆出自己20年前遭緯來體育台封殺，他不懂自己哪裡得罪到電視台。"
     tokenized_text = tokenizer.tokenize(text)
     inputs = {
         k: paddle.to_tensor(
@@ -528,53 +355,50 @@ def compare_ckiplab_ner(path="MODEL/ckiplab-bert-base-chinese-ner"):
         label = id2label[str(index)]
         print(f"{label} {t} score {s[index].item()}")
 
-    # O 我 score 0.9999998807907104
-    # O 叫 score 1.0
-    # B-PERSON 克 score 0.9999995231628418
-    # I-PERSON 拉 score 0.9999992847442627
-    # E-PERSON 拉 score 0.9999995231628418
+    # B-PERSON 傅 score 0.9999995231628418
+    # I-PERSON 達 score 0.9999994039535522
+    # E-PERSON 仁 score 0.9999995231628418
+    # B-DATE 今 score 0.9991734623908997
+    # O 將 score 0.9852147698402405
+    # O 執 score 1.0
+    # O 行 score 0.9999998807907104
+    # O 安 score 0.9999996423721313
+    # O 樂 score 0.9999997615814209
+    # O 死 score 0.9999997615814209
     # O ， score 1.0
-    # O 我 score 1.0
-    # O 住 score 1.0
-    # O 在 score 1.0
-    # B-GPE 加 score 0.9999984502792358
-    # I-GPE 州 score 0.9999964237213135
-    # I-GPE 伯 score 0.9999923706054688
-    # I-GPE 克 score 0.999998927116394
-    # E-GPE 利 score 0.9999991655349731
-    # O 。 score 0.9999994039535522
-
-    # https://huggingface.co/ckiplab/bert-base-chinese-ner
-    # [
-    # {
-    #     "entity_group": "PERSON",
-    #     "score": 0.9999994039535522,
-    #     "word": "克 拉",
-    #     "start": 2,
-    #     "end": 4
-    # },
-    # {
-    #     "entity_group": "PERSON",
-    #     "score": 0.9999994039535522,
-    #     "word": "拉",
-    #     "start": 4,
-    #     "end": 5
-    # },
-    # {
-    #     "entity_group": "GPE",
-    #     "score": 0.9999964833259583,
-    #     "word": "加 州 伯 克",
-    #     "start": 9,
-    #     "end": 13
-    # },
-    # {
-    #     "entity_group": "GPE",
-    #     "score": 0.9999991059303284,
-    #     "word": "利",
-    #     "start": 13,
-    #     "end": 14
-    # }
-    # ]
+    # O 卻 score 1.0
+    # O 突 score 1.0
+    # O 然 score 1.0
+    # O 爆 score 1.0
+    # O 出 score 1.0
+    # O 自 score 1.0
+    # O 己 score 1.0
+    # B-DATE 20 score 0.9999992847442627
+    # E-DATE 年 score 0.9999892711639404
+    # O 前 score 0.9999995231628418
+    # O 遭 score 1.0
+    # B-ORG 緯 score 0.9999990463256836
+    # I-ORG 來 score 0.9999986886978149
+    # I-ORG 體 score 0.999998927116394
+    # I-ORG 育 score 0.9999985694885254
+    # E-ORG 台 score 0.999998927116394
+    # O 封 score 1.0
+    # O 殺 score 1.0
+    # O ， score 1.0
+    # O 他 score 1.0
+    # O 不 score 1.0
+    # O 懂 score 1.0
+    # O 自 score 1.0
+    # O 己 score 1.0
+    # O 哪 score 1.0
+    # O 裡 score 1.0
+    # O 得 score 1.0
+    # O 罪 score 1.0
+    # O 到 score 1.0
+    # O 電 score 1.0
+    # O 視 score 1.0
+    # O 台 score 1.0
+    # O 。 score 0.9999960660934448
 
 
 if __name__ == "__main__":

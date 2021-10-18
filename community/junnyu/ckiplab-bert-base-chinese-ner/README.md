@@ -1,8 +1,10 @@
 # 详细介绍
-# CKIP BERT Base Chinese
-这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
+**介绍**：这个项目提供了繁体中文版transformer模型（包含ALBERT、BERT、GPT2）及自然语言处理工具（包含分词、词性标注、命名实体识别）。
 
 关于完整使用方法及其他信息，请参考 https://github.com/ckiplab/ckip-transformers 。
+
+**模型结构**： **`BertForTokenClassification`**，带有token分类头的Bert模型。
+**适用下游任务**：**命名实体识别**，该权重已经在下游`NER`任务上进行了微调，因此可直接使用。
 
 # 使用示例
 
@@ -14,7 +16,7 @@ path = "ckiplab-bert-base-chinese-ner"
 model = BertForTokenClassification.from_pretrained(path)
 model.eval()
 tokenizer = BertTokenizer.from_pretrained(path)
-text = "我叫克拉拉，我住在加州伯克利。"
+text = "傅達仁今將執行安樂死，卻突然爆出自己20年前遭緯來體育台封殺，他不懂自己哪裡得罪到電視台。"
 tokenized_text = tokenizer.tokenize(text)
 inputs = {
     k: paddle.to_tensor(
@@ -103,21 +105,50 @@ for t, s in zip(tokenized_text, score[0][1:-1]):
     label = id2label[str(index)]
     print(f"{label} {t} score {s[index].item()}")
 
-# O 我 score 0.9999998807907104
-# O 叫 score 1.0
-# B-PERSON 克 score 0.9999995231628418
-# I-PERSON 拉 score 0.9999992847442627
-# E-PERSON 拉 score 0.9999995231628418
+# B-PERSON 傅 score 0.9999995231628418
+# I-PERSON 達 score 0.9999994039535522
+# E-PERSON 仁 score 0.9999995231628418
+# B-DATE 今 score 0.9991734623908997
+# O 將 score 0.9852147698402405
+# O 執 score 1.0
+# O 行 score 0.9999998807907104
+# O 安 score 0.9999996423721313
+# O 樂 score 0.9999997615814209
+# O 死 score 0.9999997615814209
 # O ， score 1.0
-# O 我 score 1.0
-# O 住 score 1.0
-# O 在 score 1.0
-# B-GPE 加 score 0.9999984502792358
-# I-GPE 州 score 0.9999964237213135
-# I-GPE 伯 score 0.9999923706054688
-# I-GPE 克 score 0.999998927116394
-# E-GPE 利 score 0.9999991655349731
-# O 。 score 0.9999994039535522
+# O 卻 score 1.0
+# O 突 score 1.0
+# O 然 score 1.0
+# O 爆 score 1.0
+# O 出 score 1.0
+# O 自 score 1.0
+# O 己 score 1.0
+# B-DATE 20 score 0.9999992847442627
+# E-DATE 年 score 0.9999892711639404
+# O 前 score 0.9999995231628418
+# O 遭 score 1.0
+# B-ORG 緯 score 0.9999990463256836
+# I-ORG 來 score 0.9999986886978149
+# I-ORG 體 score 0.999998927116394
+# I-ORG 育 score 0.9999985694885254
+# E-ORG 台 score 0.999998927116394
+# O 封 score 1.0
+# O 殺 score 1.0
+# O ， score 1.0
+# O 他 score 1.0
+# O 不 score 1.0
+# O 懂 score 1.0
+# O 自 score 1.0
+# O 己 score 1.0
+# O 哪 score 1.0
+# O 裡 score 1.0
+# O 得 score 1.0
+# O 罪 score 1.0
+# O 到 score 1.0
+# O 電 score 1.0
+# O 視 score 1.0
+# O 台 score 1.0
+# O 。 score 0.9999960660934448
 
 ```
 

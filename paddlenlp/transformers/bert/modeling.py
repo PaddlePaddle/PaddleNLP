@@ -571,15 +571,15 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForQuestionAnswering
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                model = BertForQuestionAnswering.from_pretrained('bert-base-uncased')
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+                model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
-                end_logits  = outputs[1]
+                end_logits = outputs[1]
         """
 
         sequence_output, _ = self.bert(
@@ -650,8 +650,8 @@ class BertForSequenceClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForSequenceClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_classes=2)
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+                model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_classes=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -728,8 +728,8 @@ class BertForTokenClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.modeling import BertForTokenClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                model = BertForTokenClassification.from_pretrained('bert-base-uncased', num_classes=2)
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+                model = BertForTokenClassification.from_pretrained('bert-base-cased', num_classes=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
