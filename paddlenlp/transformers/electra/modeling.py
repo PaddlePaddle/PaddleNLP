@@ -447,11 +447,6 @@ class ElectraModel(ElectraPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(paddle.get_default_dtype()) * -1e9,
                 axis=[1, 2])
-        else:
-            if attention_mask.ndim == 2:
-                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-                attention_mask = (1.0 - attention_mask
-                                  ).astype(paddle.get_default_dtype()) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -553,7 +548,7 @@ class ElectraGenerator(ElectraPretrainedModel):
                 self.electra.config["embedding_size"],
                 self.electra.config["vocab_size"])
         else:
-            self.generator_lm_head_bias = paddle.create_parameter(
+            self.generator_lm_head_bias = self.create_parameter(
                 shape=[self.electra.config["vocab_size"]],
                 dtype=paddle.get_default_dtype(),
                 is_bias=True)
@@ -994,7 +989,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
             position_ids(Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (list, optional):
-                See :class:`AlbertModel`.
+                See :class:`ElectraModel`.
             raw_input_ids(Tensor, optional):
                 Raw inputs used to get discriminator labels.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -1022,7 +1017,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 and its shape is [batch_size, sequence_length].
 
             - `attention_mask` (Tensor):
-                See :class:`AlbertModel`. Its data type should be bool.
+                See :class:`ElectraModel`. Its data type should be bool.
 
         """
 
@@ -1050,10 +1045,10 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPooler(nn.Layer):
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, hidden_size, pool_act="gelu"):
         super(ElectraPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
-        self.activation = nn.Tanh()
+        self.activation = get_activation(pool_act)
         self.pool_act = pool_act
 
     def forward(self, hidden_states):
@@ -1061,8 +1056,7 @@ class ElectraPooler(nn.Layer):
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        if self.pool_act == "tanh":
-            pooled_output = self.activation(pooled_output)
+        pooled_output = self.activation(pooled_output)
         return pooled_output
 
 
@@ -1086,7 +1080,8 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         super(ElectraForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.electra = electra
-        self.pooler = ElectraPooler(self.electra.config["hidden_size"])
+        self.sequence_summary = ElectraPooler(
+            self.electra.config["hidden_size"], pool_act="gelu")
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"], 1)
@@ -1180,7 +1175,7 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
 
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
-        pooled_output = self.pooler(sequence_output)
+        pooled_output = self.sequence_summary(sequence_output)
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape(
