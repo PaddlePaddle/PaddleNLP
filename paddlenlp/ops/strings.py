@@ -44,5 +44,5 @@ def to_vocab_tensor(string_dict, name):
     """
     tensor = paddle.Tensor(core.VarDesc.VarType.VOCAB, [], name,
                            core.VarDesc.VarType.VOCAB, True)
-    tensor.value().set_string_map(string_dict)
+    tensor.value().set_vocab(string_dict)
     return tensor

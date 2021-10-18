@@ -50,7 +50,7 @@ class FasterTokenizer(nn.Layer):
                 is_split_into_words=False,
                 pad_to_max_seq_len=False):
         if in_dygraph_mode():
-            input_ids, seg_ids = core.ops.bert_tokenizer(
+            input_ids, seg_ids = core.ops.faster_tokenizer(
                 self.vocab, text, text_pair, "max_seq_len", max_seq_len,
                 "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",
                 is_split_into_words)
@@ -61,12 +61,12 @@ class FasterTokenizer(nn.Layer):
             "pad_to_max_seq_len": pad_to_max_seq_len,
             "is_split_into_words": is_split_into_words,
         }
-        helper = LayerHelper("bert_tokenizer")
+        helper = LayerHelper("faster_tokenizer")
         input_ids = helper.create_variable_for_type_inference(dtype="int64")
         seg_ids = helper.create_variable_for_type_inference(dtype="int64")
         if text_pair is None:
             helper.append_op(
-                type='bert_tokenizer',
+                type='faster_tokenizer',
                 inputs={'Vocab': self.vocab,
                         'Text': text},
                 outputs={'InputIds': input_ids,
