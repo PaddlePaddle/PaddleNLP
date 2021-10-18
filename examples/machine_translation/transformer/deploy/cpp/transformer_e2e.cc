@@ -30,18 +30,18 @@ DEFINE_int32(threads,
 DEFINE_string(model_dir,
               "./infer_model/",
               "The directory to the inference model. ");
-DEFINE_string(vocab_dir,
+DEFINE_string(vocab_file,
               "./vocab_all.bpe.33708",
-              "The directory to the vocabulary file. ");
-DEFINE_string(data_dir,
+              "The path to the vocabulary file. ");
+DEFINE_string(data_file,
               "./newstest2014.tok.bpe.33708.en",
-              "The directory to the input data. ");
+              "The path to the input data file. ");
 
 using namespace paddle_infer;
 
 std::string model_dir = "";
-std::string vocab_dir = "";
-std::string data_dir = "";
+std::string vocab_file = "";
+std::string data_file = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
@@ -140,7 +140,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(vocab_dir);
+    std::ifstream fin(vocab_file);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -239,7 +239,7 @@ void Main(
   // can turn off the IR optimization for same results as following:
   // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
-  DataReader reader(data_dir);
+  DataReader reader(data_file);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -281,8 +281,8 @@ int main(int argc, char** argv) {
   gpu_id = FLAGS_gpu_id;
 
   model_dir = FLAGS_model_dir;
-  vocab_dir = FLAGS_vocab_dir;
-  data_dir = FLAGS_data_dir;
+  vocab_file = FLAGS_vocab_file;
+  data_file = FLAGS_data_file;
 
   paddle::inference::Main(
       batch_size, FLAGS_device, gpu_id, FLAGS_use_mkl, FLAGS_threads);

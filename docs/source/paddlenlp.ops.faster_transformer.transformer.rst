@@ -12,4 +12,5 @@ transformer
 
    paddlenlp.ops.faster_transformer.transformer.decoder
    paddlenlp.ops.faster_transformer.transformer.decoding
+   paddlenlp.ops.faster_transformer.transformer.encoder
    paddlenlp.ops.faster_transformer.transformer.faster_transformer
