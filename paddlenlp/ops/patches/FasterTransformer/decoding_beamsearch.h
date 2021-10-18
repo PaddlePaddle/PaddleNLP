@@ -520,8 +520,7 @@ public:
         if (is_fuse_topk_softMax_ == true) {
           if (keep_alive_beam_ == true) {
             // Use separated alive and finish beam queues to avoid the decrease
-            // of
-            // alive beams.
+            // of alive beams.
             topK_softMax_update(logits_buf_,
                                 decoding_params.embedding_bias,
                                 finished_buf_,
@@ -575,8 +574,7 @@ public:
                              decoding_params.stream);
 
             // Use separated alive and finish beam queues to avoid the decrease
-            // of
-            // alive beams.
+            // of alive beams.
             topK_update_kernelLauncher(
                 topK_kernel_workspace,
                 topk_workspace_size_,
