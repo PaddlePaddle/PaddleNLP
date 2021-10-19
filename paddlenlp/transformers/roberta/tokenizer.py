@@ -77,11 +77,11 @@ class RobertaTokenizer(PretrainedTokenizer):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/vocab.txt",
-            "uer/roberta-base-finetuned-chinanews-chinese":
+            "roberta-base-ft-chinanews-chn":
             "https://huggingface.co/uer/roberta-base-finetuned-chinanews-chinese/resolve/main/vocab.txt",
-            "uer/roberta-base-finetuned-cluener2020-chinese":
+            "roberta-base-ft-cluener2020-chn":
             "https://huggingface.co/uer/roberta-base-finetuned-cluener2020-chinese/resolve/main/vocab.txt",
-            "uer/roberta-base-chinese-extractive-qa":
+            "roberta-base-chn-extractive-qa":
             "https://huggingface.co/uer/roberta-base-chinese-extractive-qa/resolve/main/vocab.txt",
         }
     }
@@ -98,13 +98,13 @@ class RobertaTokenizer(PretrainedTokenizer):
         "rbtl3": {
             "do_lower_case": True
         },
-        "uer/roberta-base-finetuned-chinanews-chinese": {
+        "roberta-base-ft-chinanews-chn": {
             "do_lower_case": True
         },
-        "uer/roberta-base-finetuned-cluener2020-chinese": {
+        "roberta-base-ft-cluener2020-chn": {
             "do_lower_case": True
         },
-        "uer/roberta-base-chinese-extractive-qa": {
+        "roberta-base-chn-extractive-qa": {
             "do_lower_case": True
         },
     }
@@ -343,33 +343,69 @@ class RobertaTokenizer(PretrainedTokenizer):
 
 
 class RobertaBPETokenizer(GPTTokenizer):
+    """
+    Constructs a GPT tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.GPTTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            Path to the vocab file.
+            The vocab file contains a mapping from vocabulary strings to indices.
+        merges_file (str):
+            Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
+        errors (str):
+            Paradigm to follow when decoding bytes to UTF-8.
+            Defaults to `'replace'`.
+        max_len (int, optional):
+            The maximum value of the input sequence length.
+            Defaults to `None`.
+        special_tokens (list, optional):
+            A list of special tokens not in the vocabulary.
+            Defaults to `None`.
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import RobertaBPETokenizer
+            tokenizer = RobertaBPETokenizer.from_pretrained('roberta-en-base')
+
+            tokens = tokenizer('This is a simple Paddle')
+            #{'input_ids': [0, 713, 16, 10, 2007, 221, 33151, 2],
+            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}、
+
+    """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
-    gpt_vocab_link = "https://huggingface.co/roberta-base/resolve/main/vocab.json"
-    gpt_merges_link = "https://huggingface.co/roberta-base/resolve/main/merges.txt"
+    roberta_en_base_vocab_link = "https://huggingface.co/roberta-base/resolve/main/vocab.json"
+    roberta_en_base_merges_link = "https://huggingface.co/roberta-base/resolve/main/merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "roberta-base": gpt_vocab_link,
-            "roberta-large": gpt_vocab_link,
-            "deepset/roberta-base-squad2": gpt_vocab_link,
-            "sshleifer/tiny-distilroberta-base":
+            "roberta-en-base": roberta_en_base_vocab_link,
+            "roberta-en-large": roberta_en_base_vocab_link,
+            "roberta-base-squad2": roberta_en_base_vocab_link,
+            "tiny-distilroberta-base":
             "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/vocab.json"
         },
         "merges_file": {
-            "roberta-base": gpt_merges_link,
-            "roberta-large": gpt_merges_link,
-            "deepset/roberta-base-squad2": gpt_merges_link,
-            "sshleifer/tiny-distilroberta-base":
+            "roberta-en-base": roberta_en_base_merges_link,
+            "roberta-en-large": roberta_en_base_merges_link,
+            "roberta-base-squad2": roberta_en_base_merges_link,
+            "tiny-distilroberta-base":
             "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/merges.txt"
         }
     }
     pretrained_init_configuration = {
-        "roberta-base": {},
-        "roberta-large": {},
-        "deepset/roberta-base-squad2": {},
-        "sshleifer/tiny-distilroberta-base": {}
+        "roberta-en-base": {},
+        "roberta-en-large": {},
+        "roberta-base-squad2": {},
+        "tiny-distilroberta-base": {}
     }
 
     def __init__(
@@ -445,7 +481,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
-        A BERT offset_mapping has the following format:
+        A Roberta offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) (0,0) B (0,0)``
