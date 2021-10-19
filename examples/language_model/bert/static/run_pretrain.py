@@ -125,7 +125,7 @@ def parse_args():
     parser.add_argument(
         "--use_amp",
         type=distutils.util.strtobool,
-        default=True,
+        default=False,
         help="Enable mixed precision training.")
     parser.add_argument(
         "--enable_addto",
