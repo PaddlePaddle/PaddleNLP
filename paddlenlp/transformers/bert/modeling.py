@@ -402,7 +402,7 @@ class BertModel(BertPretrainedModel):
         self.embeddings = BertEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size)
-        encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = nn.FusedTransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
             intermediate_size,

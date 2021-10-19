@@ -227,7 +227,7 @@ def dist_optimizer(args, optimizer):
         custom_black_list = ['lookup_table',
                              'lookup_table_v2'] if args.use_pure_fp16 else None
         dist_strategy.amp_configs = {
-            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention', 'fused_ffn'],
+            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention', 'fused_attention_cudnn_fmha', 'fused_ffn'],
             'init_loss_scaling': args.scale_loss,
             'custom_black_list': custom_black_list,
             'use_pure_fp16': args.use_pure_fp16
