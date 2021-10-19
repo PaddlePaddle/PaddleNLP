@@ -344,7 +344,7 @@ class RobertaTokenizer(PretrainedTokenizer):
 
 class RobertaBPETokenizer(GPTTokenizer):
     """
-    Constructs a GPT tokenizer based on byte-level Byte-Pair-Encoding.
+    Constructs a Roberta tokenizer based on byte-level Byte-Pair-Encoding.
 
     This tokenizer inherits from :class:`~paddlenlp.transformers.GPTTokenizer`
     which contains most of the main methods. For more information regarding those methods,
