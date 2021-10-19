@@ -9,8 +9,8 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了**21**种网络结构， **91** 种预训练的参数权重供用户使用，
-其中包含了 **45** 种中文语言模型的预训练权重。
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了**21**种网络结构， **96** 种预训练的参数权重供用户使用，
+其中包含了 **48** 种中文语言模型的预训练权重。
 
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
 | Model              | Pretrained Weight                       | Language     | Details of the model                    |
@@ -123,6 +123,31 @@ Transformer预训练模型汇总
 |                    |                                         |              | Trained on cased Chinese Simplified     |
 |                    |                                         |              | and Traditional text using              |
 |                    |                                         |              | Whole-Word-Masking with extented data.  |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-ner`` | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 102M parameters.              |
+|                    |                                         |              | Finetuned on NER task.                  |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-pos`` | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 102M parameters.              |
+|                    |                                         |              | Finetuned on POS task.                  |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-ws``  | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 102M parameters.              |
+|                    |                                         |              | Finetuned on WS task.                   |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/nlptown-bert-base-``            | Multilingual | 12-layer, 768-hidden,                   |
+|                    |``multilingual-uncased-sentiment``       |              | 12-heads, 167M parameters.              |
+|                    |                                         |              | Finetuned for sentiment analysis on     |
+|                    |                                         |              | product reviews in six languages:       |
+|                    |                                         |              | English, Dutch, German, French,         |
+|                    |                                         |              | Spanish and Italian.                    |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/tbs17-MathBERT``                | English      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 110M parameters.              |
+|                    |                                         |              | Trained on pre-k to graduate math       |
+|                    |                                         |              | language (English) using a masked       |
+|                    |                                         |              | language modeling (MLM) objective.      |
 |                    +-----------------------------------------+--------------+-----------------------------------------+
 |                    |``macbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, 102M parameters.              |

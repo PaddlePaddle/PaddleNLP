@@ -12,7 +12,7 @@
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
-path = "ckiplab-bert-base-chinese-ner"
+path = "junnyu/ckiplab-bert-base-chinese-ner"
 model = BertForTokenClassification.from_pretrained(path)
 model.eval()
 tokenizer = BertTokenizer.from_pretrained(path)
