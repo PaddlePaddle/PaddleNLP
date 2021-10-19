@@ -399,70 +399,70 @@ public:
 #endif
       }
 
-      DataType_ alpha = (DataType_)1.0f;
-      DataType_ beta = (DataType_)0.0f;
-      if (args_.normalization_before_) {
-        decoder_->decoder_norm1(from_tensor_[out_id],
-                                decoding_params.layernorm.gamma,
-                                decoding_params.layernorm.beta,
-                                decoder_normed_result_buf_,
-                                m,
-                                k);
+      if (step > min_trg_len) {
+        DataType_ alpha = (DataType_)1.0f;
+        DataType_ beta = (DataType_)0.0f;
+        if (args_.normalization_before_) {
+          decoder_->decoder_norm1(from_tensor_[out_id],
+                                  decoding_params.layernorm.gamma,
+                                  decoding_params.layernorm.beta,
+                                  decoder_normed_result_buf_,
+                                  m,
+                                  k);
 
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          check_cuda_error(
+              cublasGemmEx(decoding_params.cublas_handle,
+                           CUBLAS_OP_N,
+                           CUBLAS_OP_N,
+                           n,
+                           m,
+                           k,
+                           &alpha,
+                           decoding_params.embedding_kernel,
+                           AType_,
+                           n,
+                           decoder_normed_result_buf_,
+                           BType_,
+                           k,
+                           &beta,
+                           logits_buf_,
+                           CType_,
+                           n,
+                           computeType_,
+                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+        } else {
+          // Post-norm
+          check_cuda_error(
+              cublasGemmEx(decoding_params.cublas_handle,
+                           CUBLAS_OP_N,
+                           CUBLAS_OP_N,
+                           n,
+                           m,
+                           k,
+                           &alpha,
+                           decoding_params.embedding_kernel,
+                           AType_,
+                           n,
+                           from_tensor_[out_id],
+                           BType_,
+                           k,
+                           &beta,
+                           logits_buf_,
+                           CType_,
+                           n,
+                           computeType_,
+                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+        }
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
 
-        check_cuda_error(
-            cublasGemmEx(decoding_params.cublas_handle,
-                         CUBLAS_OP_N,
-                         CUBLAS_OP_N,
-                         n,
-                         m,
-                         k,
-                         &alpha,
-                         decoding_params.embedding_kernel,
-                         AType_,
-                         n,
-                         decoder_normed_result_buf_,
-                         BType_,
-                         k,
-                         &beta,
-                         logits_buf_,
-                         CType_,
-                         n,
-                         computeType_,
-                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-      } else {
-        // Post-norm
-        check_cuda_error(
-            cublasGemmEx(decoding_params.cublas_handle,
-                         CUBLAS_OP_N,
-                         CUBLAS_OP_N,
-                         n,
-                         m,
-                         k,
-                         &alpha,
-                         decoding_params.embedding_kernel,
-                         AType_,
-                         n,
-                         from_tensor_[out_id],
-                         BType_,
-                         k,
-                         &beta,
-                         logits_buf_,
-                         CType_,
-                         n,
-                         computeType_,
-                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-      }
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-
-      if (step > min_trg_len) {
         if (args_.candidate_num_ != 0) {
           // top k sampling
           update_logits_without_softmax(logits_buf_,
