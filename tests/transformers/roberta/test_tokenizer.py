@@ -456,7 +456,7 @@ class TestRobertaBPETokenizer(CpuCommonTest):
 class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
     @slow
     def test_from_pretrained(self):
-        tokenizer = RobertaBPETokenizer.from_pretrained("roberta-base")
+        tokenizer = RobertaBPETokenizer.from_pretrained("roberta-en-base")
         text1 = "This is a simple Paddle"
         text2 = "which is easy for children"
         # test batch_encode
@@ -496,7 +496,7 @@ class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
 
     @slow
     def test_from_pretrained_pad_left(self):
-        tokenizer = RobertaBPETokenizer.from_pretrained("roberta-base")
+        tokenizer = RobertaBPETokenizer.from_pretrained("roberta-en-base")
         tokenizer.padding_side = "left"
         text1 = "This is a simple Paddle"
         text2 = "which is easy for children"
