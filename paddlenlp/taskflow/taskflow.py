@@ -17,30 +17,61 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import WordTagTask
+from .knowledge_mining import WordTagTask
+from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
+from .word_segmentation import WordSegmentationTask
+from .pos_tagging import POSTaggingTask
 from .text_generation import TextGenerationTask
+from .poetry_generation import PoetryGenerationTask
+from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
-    "text2knowledge": {
+    "knowledge_mining": {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,
+                "task_flag": 'knowledge_mining-wordtag',
+                "linking": True,
             }
         },
         "default": {
             "model": "wordtag"
         }
     },
-    "text_generation": {
+    "ner": {
+        "models": {
+            "wordtag": {
+                "task_class": NERTask,
+                "task_flag": 'ner-wordtag',
+                "linking": False,
+            }
+        },
+        "default": {
+            "model": "wordtag"
+        }
+    },
+    "poetry_generation": {
         "models": {
             "gpt-cpm-large-cn": {
-                "task_class": TextGenerationTask,
+                "task_class": PoetryGenerationTask,
+                "task_flag": 'poetry_generation-gpt-cpm-large-cn',
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
+                "task_flag": 'question_answering-gpt-cpm-large-cn',
             },
         },
         "default": {
@@ -53,7 +84,33 @@ TASKS = {
                 "task_class": LacTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
-                "max_seq_len": 64
+                "task_flag": 'lexical_analysis-gru_crf',
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "word_segmentation": {
+        "models": {
+            "lac": {
+                "task_class": WordSegmentationTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'word_segmentation-gru_crf',
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "pos_tagging": {
+        "models": {
+            "lac": {
+                "task_class": POSTaggingTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'pos_tagging-gru_crf',
             }
         },
         "default": {
@@ -63,10 +120,12 @@ TASKS = {
     'sentiment_analysis': {
         "models": {
             "bilstm": {
-                "task_class": SentaTask
+                "task_class": SentaTask,
+                "task_flag": 'sentiment_analysis-bilstm',
             },
             "skep_ernie_1.0_large_ch": {
-                "task_class": SkepTask
+                "task_class": SkepTask,
+                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
             }
         },
         "default": {
@@ -76,13 +135,16 @@ TASKS = {
     'dependency_parsing': {
         "models": {
             "ddparser": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-biaffine',
             },
             "ddparser-ernie-1.0": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-1.0',
             },
             "ddparser-ernie-gram-zh": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-gram-zh',
             },
         },
         "default": {
@@ -92,7 +154,8 @@ TASKS = {
     'text_correction': {
         "models": {
             "csc-ernie-1.0": {
-                "task_class": CSCTask
+                "task_class": CSCTask,
+                "task_flag": "text_correction-csc-ernie-1.0"
             },
         },
         "default": {
