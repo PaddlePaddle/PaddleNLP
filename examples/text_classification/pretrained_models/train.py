@@ -122,7 +122,6 @@ def do_train():
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
         'ernie-1.0', accelerate_mode=args.accelerate_mode)
     print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
-    print("tokenizer.do_lower_case ", tokenizer.do_lower_case)
 
     trans_func = partial(
         convert_example,

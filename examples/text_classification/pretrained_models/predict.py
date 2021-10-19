@@ -95,16 +95,17 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese',
-        num_classes=2,
-        accelerate_mode=args.accelerate_mode)
+    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+        'ernie-1.0', num_classes=2, accelerate_mode=args.accelerate_mode)
+    print("model.accelerate_mode ", model.accelerate_mode)
+
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     data = [example["text"] for example in train_ds]
     label_map = {0: 'negative', 1: 'positive'}
 
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-1.0', accelerate_mode=args.accelerate_mode)
+    print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

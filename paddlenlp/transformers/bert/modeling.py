@@ -121,6 +121,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": False,
         },
         "bert-large-uncased": {
             "vocab_size": 30522,
@@ -136,6 +137,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": False,
         },
         "bert-base-multilingual-uncased": {
             "vocab_size": 105879,
@@ -151,6 +153,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": False,
         },
         "bert-base-cased": {
             "vocab_size": 28996,
@@ -166,6 +169,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "bert-base-chinese": {
             "vocab_size": 21128,
@@ -181,6 +185,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "bert-base-multilingual-cased": {
             "vocab_size": 119547,
@@ -196,6 +201,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "bert-large-cased": {
             "vocab_size": 28996,
@@ -211,6 +217,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "bert-wwm-chinese": {
             "vocab_size": 21128,
@@ -226,6 +233,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "bert-wwm-ext-chinese": {
             "vocab_size": 21128,
@@ -241,6 +249,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "macbert-base-chinese": {
             "vocab_size": 21128,
@@ -256,6 +265,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "macbert-large-chinese": {
             "vocab_size": 21128,
@@ -271,6 +281,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "simbert-base-chinese": {
             "vocab_size": 13685,
@@ -286,6 +297,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -675,13 +687,12 @@ class BertForSequenceClassification(BertPretrainedModel):
                                     num_classes)
         self.apply(self.init_weights)
 
-    def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None,
-            text=None, ):
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                text=None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -758,7 +769,8 @@ class BertForTokenClassification(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -793,7 +805,8 @@ class BertForTokenClassification(BertPretrainedModel):
                 logits = outputs[0]
         """
         sequence_output, _ = self.bert(
-            input_ids,
+            text=text,
+            input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask)

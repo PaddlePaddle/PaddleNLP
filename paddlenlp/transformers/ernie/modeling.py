@@ -320,10 +320,12 @@ class ErnieModel(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None,
+                max_seq_len=128):
         r"""
         Args:
             input_ids (Tensor):
@@ -382,6 +384,10 @@ class ErnieModel(ErniePretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        if text is not None and self.accelerate_mode:
+            input_ids, token_type_ids = self.tokenizer(
+                text, max_seq_len=max_seq_len)
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -423,10 +429,11 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -479,10 +486,11 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
 
         """
         _, pooled_output = self.ernie(
-            input_ids,
+            input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            text=text)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
