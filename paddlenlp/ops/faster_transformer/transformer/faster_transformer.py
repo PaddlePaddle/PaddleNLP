@@ -590,6 +590,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 The ids of source sequence words. It is a tensor with shape
                 `[batch_size, source_sequence_length]` and its data type can be
                 int or int64.
+            trg_word (Tensor):
+                The ids of target sequence words. Normally, it should NOT be
+                given. If it's given, force decoding with previous output token
+                will be trigger. Defaults to None. 
         
         Returns:
             Tensor:
