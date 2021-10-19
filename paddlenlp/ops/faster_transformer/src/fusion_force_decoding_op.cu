@@ -139,17 +139,18 @@ std::vector<paddle::Tensor> decoding_kernel(
       reinterpret_cast<const DataType_*>(input.data<data_t_>());
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
 
-  // TODO(FrostML): Pass these into FasterTransformer.
   auto trg_word_shape = trg_word.shape();
-  int trg_max_len = static_cast<int>(trg_word_shape[1]);
+  int trg_max_len =
+      (trg_word_shape.size() == 2) ? static_cast<int>(trg_word_shape[1]) : 0;
 
   paddle::Tensor trg_length =
-      (0 == trg_max_len)
-          ? paddle::Tensor(paddle::PlaceType::kGPU, {1})
-          : paddle::Tensor(paddle::PlaceType::kGPU, {trg_word_shape[0]});
+      (trg_word_shape.size() == 2 && trg_word_shape[0] != 0)
+          ? paddle::Tensor(paddle::PlaceType::kGPU, {trg_word_shape[0]})
+          : paddle::Tensor(paddle::PlaceType::kGPU, {1});
   auto trg_length_ptr = trg_length.mutable_data<int>(input.place());
 
-  if (trg_word_shape[0] != 0 && trg_word_shape[0] != 0) {
+  if (trg_word_shape.size() == 2 && trg_word_shape[0] != 0 &&
+      trg_word_shape[0] != 0) {
     decoding_params.trg_word = trg_word.data<int>();
 
     get_trg_length<<<1, trg_word_shape[0], 0, stream>>>(
