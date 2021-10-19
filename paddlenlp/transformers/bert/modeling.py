@@ -402,7 +402,7 @@ class BertModel(BertPretrainedModel):
         self.embeddings = BertEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size)
-        encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = nn.FusedTransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
             intermediate_size,
@@ -484,7 +484,7 @@ class BertModel(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞桨!")
+                inputs = tokenizer("欢迎使用百度飞浆!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
