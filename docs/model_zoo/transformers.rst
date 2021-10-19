@@ -165,13 +165,13 @@ Transformer预训练模型汇总
 |                    |                                         |              | The DistilBERT model distilled from     |
 |                    |                                         |              | the BERT model ``bert-base-cased``      |
 |                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``distilbert-base-multilingual-cased``   |              | 6-layer, 768-hidden,                    |
+|                    |``distilbert-base-multilingual-cased``   | English      | 6-layer, 768-hidden,                    |
 |                    |                                         |              | 12-heads, 200M parameters.              |
 |                    |                                         |              | The DistilBERT model distilled from     |
 |                    |                                         |              | the BERT model                          |
 |                    |                                         |              | ``bert-base-multilingual-cased``        |
 |                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``sshleifer/tiny-distilbert-base-``      |              | 2-layer, 2-hidden,                      |
+|                    |``sshleifer-tiny-distilbert-base-``      | English      | 2-layer, 2-hidden,                      |
 |                    |``uncase-finetuned-sst-2-english``       |              | 2-heads, 50K parameters.                |
 |                    |                                         |              | The DistilBERT model                    |
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
