@@ -17,6 +17,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -24,6 +25,10 @@ from visualdl import LogWriter
 from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
+
+# to import data_tools
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
 
 from dataset import create_pretrained_dataset
 from args import parse_args
@@ -85,6 +90,30 @@ def run_evaluate(args,
                    iter_steps / (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
     model.train()
+
+
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
 
 
 def do_train(args):
@@ -240,18 +269,13 @@ def do_train(args):
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,

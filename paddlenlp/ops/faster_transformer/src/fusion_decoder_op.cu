@@ -76,8 +76,13 @@ std::vector<paddle::Tensor> decoder_kernel(
   typedef typename traits_::data_t data_t_;
   typedef DecoderTransformerTraits<traits_::OpType> DecoderTraits_;
   OpenDecoder<DecoderTraits_::OpType>* decoder_;
-  decoder_ = new OpenDecoder<DecoderTraits_::OpType>(
-      batch_size_, max_seq_len_, n_head, size_per_head, memory_hidden_dim_);
+  decoder_ = new OpenDecoder<DecoderTraits_::OpType>(batch_size_,
+                                                     max_seq_len_,
+                                                     n_head,
+                                                     size_per_head,
+                                                     memory_hidden_dim_,
+                                                     true,
+                                                     ActivationType::RELU);
 
   DataType_* decoder_output = reinterpret_cast<DataType_*>(
       decoder_output_tensor.mutable_data<data_t_>());
