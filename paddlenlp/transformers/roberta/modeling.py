@@ -159,7 +159,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
-        "roberta-base": {
+        "roberta-en-base": {
             "attention_probs_dropout_prob": 0.1,
             "layer_norm_eps": 1e-05,
             "hidden_act": "gelu",
@@ -174,7 +174,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,
             "vocab_size": 50265
         },
-        "roberta-large": {
+        "roberta-en-large": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -189,7 +189,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "layer_norm_eps": 1e-05,
             "vocab_size": 50265
         },
-        "deepset/roberta-base-squad2": {
+        "roberta-base-squad2": {
             "layer_norm_eps": 1e-05,
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
@@ -204,7 +204,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,
             "vocab_size": 50265
         },
-        "uer/roberta-base-finetuned-chinanews-chinese": {
+        "roberta-base-ft-chinanews-chn": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -219,7 +219,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128
         },
-        "sshleifer/tiny-distilroberta-base": {
+        "tiny-distilroberta-base": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -234,7 +234,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,
             "vocab_size": 50265
         },
-        "uer/roberta-base-finetuned-cluener2020-chinese": {
+        "roberta-base-ft-cluener2020-chn": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -249,7 +249,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128
         },
-        "uer/roberta-base-chinese-extractive-qa": {
+        "roberta-base-chn-extractive-qa": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -276,19 +276,19 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
-            "roberta-base":
+            "roberta-en-base":
             "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_base/model_state.pdparams",
-            "roberta-large":
+            "roberta-en-large":
             "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_large/model_state.pdparams",
-            "deepset/roberta-base-squad2":
+            "roberta-base-squad2":
             "https://paddlenlp.bj.bcebos.com/models/transformers/deepset_roberta_base_squad2/model_state.pdparams",
-            "uer/roberta-base-finetuned-chinanews-chinese":
+            "roberta-base-ft-chinanews-chn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_chinanews_chinese/model_state.pdparams",
-            "sshleifer/tiny-distilroberta-base":
+            "tiny-distilroberta-base":
             "https://paddlenlp.bj.bcebos.com/models/transformers/sshleifer_tiny_distilroberta_base/model_state.pdparams",
-            "uer/roberta-base-finetuned-cluener2020-chinese":
+            "roberta-base-ft-cluener2020-chn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_cluener2020_chinese/model_state.pdparams",
-            "uer/roberta-base-chinese-extractive-qa":
+            "roberta-base-chn-extractive-qa":
             "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_chinese_extractive_qa/model_state.pdparams",
         }
     }
