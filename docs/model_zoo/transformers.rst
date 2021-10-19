@@ -158,6 +158,11 @@ Transformer预训练模型汇总
 |                    |                                         |              | 16-heads, 326M parameters.              |
 |                    |                                         |              | Trained with novel MLM as correction    |
 |                    |                                         |              | pre-training task.                      |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``simbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 108M parameters.              |
+|                    |                                         |              | Trained on 22 million pairs of similar  |
+|                    |                                         |              | sentences crawed from Baidu Know.       |
 +--------------------+-----------------------------------------+--------------+-----------------------------------------+
 |BigBird_            |``bigbird-base-uncased``                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, _M parameters.                |
