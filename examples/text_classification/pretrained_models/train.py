@@ -33,14 +33,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--accelerate_mode', default=False, type=eval,
+parser.add_argument('--accelerate_mode', default=True, type=eval,
     help="If true, it will use the FasterTokenizer to tokenize texts.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
@@ -114,16 +114,15 @@ def do_train():
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # If you wanna use bert/roberta/electra pretrained model,
-    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese',
-        num_classes=2,
-        accelerate_mode=args.accelerate_mode)
+    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+        'ernie-1.0', num_classes=2, accelerate_mode=args.accelerate_mode)
     print("model.accelerate_mode ", model.accelerate_mode)
 
     # If you wanna use bert/roberta/electra pretrained model,
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese', accelerate_mode=args.accelerate_mode)
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-1.0', accelerate_mode=args.accelerate_mode)
     print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
+    print("tokenizer.do_lower_case ", tokenizer.do_lower_case)
 
     trans_func = partial(
         convert_example,

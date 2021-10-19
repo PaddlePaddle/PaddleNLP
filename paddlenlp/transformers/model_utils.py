@@ -268,17 +268,16 @@ class PretrainedModel(Layer, GenerationMixin):
         vocab_file = resolved_resource_files.pop("vocab_file", None)
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
-        init_kwargs["vocab_file"] = vocab_file
+        # init_kwargs["vocab_file"] = vocab_file
         if accelerate_mode:
             if init_kwargs.get("accelerate_mode", False):
                 accelerate_mode = True
-                logger.info(
-                    "The tokenizer will be started as accelerated mode.")
+                logger.info("The model will be started as accelerated mode.")
             else:
                 logger.warning(
-                    "The tokenizer has not been accelerated yet. Please wait a moment."
+                    "The model has not been accelerated yet. Please wait a moment."
                 )
-        init_kwargs["accelerate_mode"] = accelerate_mode
+        # init_kwargs["accelerate_mode"] = accelerate_mode
 
         if init_class == cls.base_model_class.__name__:
             base_args = init_args
@@ -315,6 +314,13 @@ class PretrainedModel(Layer, GenerationMixin):
             # Update with newly provided args and kwargs for base model
             base_args = base_args if not args else args
             base_kwargs.update(kwargs)
+            base_parameters_dict = inspect.signature(
+                cls.base_model_class.__init__).parameters
+            if "accelerate_mode" in base_parameters_dict:
+                base_kwargs["accelerate_mode"] = accelerate_mode
+            if "vocab_file" in base_parameters_dict:
+                base_kwargs["vocab_file"] = vocab_file
+
             model = cls(*base_args, **base_kwargs)
         else:
             # Update with newly provided args and kwargs for derived model
@@ -323,6 +329,10 @@ class PretrainedModel(Layer, GenerationMixin):
             for k, v in kwargs.items():
                 if k in base_parameters_dict:
                     base_kwargs[k] = v
+            if "accelerate_mode" in base_parameters_dict:
+                base_kwargs["accelerate_mode"] = accelerate_mode
+            if "vocab_file" in base_parameters_dict:
+                base_kwargs["vocab_file"] = vocab_file
             base_model = cls.base_model_class(*base_args, **base_kwargs)
             if base_arg_index is not None:
                 derived_args[base_arg_index] = base_model

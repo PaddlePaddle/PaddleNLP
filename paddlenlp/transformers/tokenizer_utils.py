@@ -17,6 +17,7 @@
 
 import copy
 import io
+import inspect
 import json
 import os
 import six
@@ -611,7 +612,6 @@ class PretrainedTokenizer(object):
                 logger.warning(
                     "The tokenizer has not been accelerated yet. Please wait a moment."
                 )
-        init_kwargs["accelerate_mode"] = accelerate_mode
 
         # Update with newly provided args and kwargs
         init_args = init_args if not args else args
@@ -635,6 +635,9 @@ class PretrainedTokenizer(object):
                     file_path):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
+        base_parameters_dict = inspect.signature(cls.__init__).parameters
+        if "accelerate_mode" in base_parameters_dict:
+            init_kwargs["accelerate_mode"] = accelerate_mode
         tokenizer = cls(*init_args, **init_kwargs)
         return tokenizer
 

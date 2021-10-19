@@ -46,17 +46,19 @@ class FasterTokenizer(nn.Layer):
     def forward(self,
                 text,
                 text_pair=None,
+                do_lower_case=True,
                 max_seq_len=-1,
                 is_split_into_words=False,
                 pad_to_max_seq_len=False):
         if in_dygraph_mode():
             input_ids, seg_ids = core.ops.faster_tokenizer(
-                self.vocab, text, text_pair, "max_seq_len", max_seq_len,
-                "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",
-                is_split_into_words)
+                self.vocab, text, text_pair, "do_lower_case", do_lower_case,
+                "max_seq_len", max_seq_len, "pad_to_max_seq_len",
+                pad_to_max_seq_len, "is_split_into_words", is_split_into_words)
             return input_ids, seg_ids
 
         attrs = {
+            "do_lower_case": do_lower_case,
             "max_seq_len": max_seq_len,
             "pad_to_max_seq_len": pad_to_max_seq_len,
             "is_split_into_words": is_split_into_words,
