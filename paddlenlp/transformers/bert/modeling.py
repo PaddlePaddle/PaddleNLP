@@ -354,13 +354,14 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-            "bert-base-japanese": "bert-base-japanese.pdparams",  # 从百度网盘下载
+            "bert-base-japanese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese.pdparams",
             "bert-base-japanese-whole-word-masking":
-            "bert-base-japanese-whole-word-masking.pdparams",  # 从百度网盘下载
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-whole-word-masking.pdparams",
             "bert-base-japanese-char":
-            "bert-base-japanese-char.pdparams",  # 从百度网盘下载
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-char.pdparams",
             "bert-base-japanese-char-whole-word-masking":
-            "bert-base-japanese-char-whole-word-masking.pdparams"  # 从百度网盘下载
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-char-whole-word-masking.pdparams",
         }
     }
     base_model_prefix = "bert"
