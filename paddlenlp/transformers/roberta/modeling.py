@@ -109,6 +109,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "roberta-wwm-ext-large": {
             "attention_probs_dropout_prob": 0.1,
@@ -124,6 +125,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "rbt3": {
             "attention_probs_dropout_prob": 0.1,
@@ -139,6 +141,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "rbtl3": {
             "attention_probs_dropout_prob": 0.1,
@@ -154,6 +157,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -267,12 +271,19 @@ class RobertaModel(RobertaPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  accelerate_mode=False,
-                 vocab_file=None):
+                 vocab_file=None,
+                 do_lower_case=False,
+                 max_seq_len=512,
+                 pad_to_max_seq_len=True):
+        super(ErnieModel, self).__init__()
         super(RobertaModel, self).__init__()
 
         self.accelerate_mode = accelerate_mode
         if self.accelerate_mode and vocab_file is not None:
             self.tokenizer = FasterTokenizer(vocab_file)
+        self.do_lower_case = do_lower_case
+        self.max_seq_len = max_seq_len
+        self.pad_to_max_seq_len = paddle
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -292,10 +303,12 @@ class RobertaModel(RobertaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None,
+                is_split_into_words=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -356,6 +369,14 @@ class RobertaModel(RobertaPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        if text is not None and self.accelerate_mode:
+            input_ids, token_type_ids = self.tokenizer(
+                text,
+                do_lower_case=self.do_lower_case,
+                max_seq_len=self.max_seq_len,
+                is_split_into_words=is_split_into_words,
+                pad_to_max_seq_len=self.pad_to_max_seq_len)
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -470,10 +491,11 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -507,7 +529,9 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            text=text,
+            is_split_into_words=False)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -578,7 +602,9 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            text=text,
+            is_split_into_words=True)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)

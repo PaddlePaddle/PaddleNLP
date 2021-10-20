@@ -115,6 +115,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "ernie-tiny": {
             "attention_probs_dropout_prob": 0.1,
@@ -130,6 +131,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 50006,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "ernie-2.0-en": {
             "attention_probs_dropout_prob": 0.1,
@@ -144,6 +146,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "ernie-2.0-en-finetuned-squad": {
             "attention_probs_dropout_prob": 0.1,
@@ -158,6 +161,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
         "ernie-2.0-large-en": {
             "attention_probs_dropout_prob": 0.1,
@@ -173,6 +177,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
             "accelerate_mode": True,
+            "do_lower_case": True,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -297,12 +302,18 @@ class ErnieModel(ErniePretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  accelerate_mode=False,
-                 vocab_file=None):
+                 vocab_file=None,
+                 do_lower_case=False,
+                 max_seq_len=512,
+                 pad_to_max_seq_len=True):
         super(ErnieModel, self).__init__()
 
         self.accelerate_mode = accelerate_mode
         if self.accelerate_mode and vocab_file is not None:
             self.tokenizer = FasterTokenizer(vocab_file)
+        self.max_seq_len = max_seq_len
+        self.do_lower_case = do_lower_case
+        self.pad_to_max_seq_len = pad_to_max_seq_len
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -330,7 +341,7 @@ class ErnieModel(ErniePretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 text=None,
-                max_seq_len=128):
+                is_split_into_words=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -396,7 +407,11 @@ class ErnieModel(ErniePretrainedModel):
         """
         if text is not None and self.accelerate_mode:
             input_ids, token_type_ids = self.tokenizer(
-                text, max_seq_len=max_seq_len)
+                text,
+                do_lower_case=self.do_lower_case,
+                max_seq_len=self.max_seq_len,
+                is_split_into_words=is_split_into_words,
+                pad_to_max_seq_len=self.pad_to_max_seq_len)
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -479,7 +494,8 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            text=text)
+            text=text,
+            is_split_into_words=False)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -587,10 +603,11 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                text=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -620,10 +637,12 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 logits = model(**inputs)
         """
         sequence_output, _ = self.ernie(
-            input_ids,
+            input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            text=text,
+            is_split_into_words=True)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)

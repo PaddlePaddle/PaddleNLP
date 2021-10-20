@@ -121,7 +121,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": False,
+            "do_lower_case": True,
         },
         "bert-large-uncased": {
             "vocab_size": 30522,
@@ -137,7 +137,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": False,
+            "do_lower_case": True,
         },
         "bert-base-multilingual-uncased": {
             "vocab_size": 105879,
@@ -153,7 +153,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": False,
+            "do_lower_case": True,
         },
         "bert-base-cased": {
             "vocab_size": 28996,
@@ -169,7 +169,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "bert-base-chinese": {
             "vocab_size": 21128,
@@ -185,7 +185,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "bert-base-multilingual-cased": {
             "vocab_size": 119547,
@@ -201,7 +201,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "bert-large-cased": {
             "vocab_size": 28996,
@@ -217,7 +217,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "bert-wwm-chinese": {
             "vocab_size": 21128,
@@ -233,7 +233,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "bert-wwm-ext-chinese": {
             "vocab_size": 21128,
@@ -249,7 +249,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "macbert-base-chinese": {
             "vocab_size": 21128,
@@ -265,7 +265,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "macbert-large-chinese": {
             "vocab_size": 21128,
@@ -281,7 +281,7 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
             "accelerate_mode": True,
-            "do_lower_case": True,
+            "do_lower_case": False,
         },
         "simbert-base-chinese": {
             "vocab_size": 13685,
@@ -452,12 +452,18 @@ class BertModel(BertPretrainedModel):
                  pad_token_id=0,
                  pool_act="tanh",
                  accelerate_mode=False,
-                 vocab_file=None):
+                 vocab_file=None,
+                 do_lower_case=False,
+                 max_seq_len=512,
+                 pad_to_max_seq_len=True):
         super(BertModel, self).__init__()
 
         self.accelerate_mode = accelerate_mode
         if self.accelerate_mode and vocab_file is not None:
             self.tokenizer = FasterTokenizer(vocab_file)
+        self.pad_to_max_seq_len = pad_to_max_seq_len
+        self.max_seq_len = max_seq_len
+        self.do_lower_case = do_lower_case
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -483,7 +489,7 @@ class BertModel(BertPretrainedModel):
                 attention_mask=None,
                 output_hidden_states=False,
                 text=None,
-                max_seq_len=128):
+                is_split_into_words=False):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -555,7 +561,11 @@ class BertModel(BertPretrainedModel):
 
         if text is not None and self.accelerate_mode:
             input_ids, token_type_ids = self.tokenizer(
-                text, max_seq_len=max_seq_len)
+                text,
+                do_lower_case=self.do_lower_case,
+                max_seq_len=self.max_seq_len,
+                is_split_into_words=is_split_into_words,
+                pad_to_max_seq_len=self.pad_to_max_seq_len)
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -732,7 +742,8 @@ class BertForSequenceClassification(BertPretrainedModel):
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            is_split_into_words=False)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -809,7 +820,8 @@ class BertForTokenClassification(BertPretrainedModel):
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask=attention_mask,
+            is_split_into_words=False)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
