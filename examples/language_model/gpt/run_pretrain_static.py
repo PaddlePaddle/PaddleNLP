@@ -31,6 +31,7 @@ from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCr
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
@@ -92,7 +93,7 @@ def dist_optimizer(args, topo):
                 'gelu',
             ],
             "custom_black_list": ['c_softmax_with_cross_entropy'],
-            "init_loss_scaling": 32768,
+            "init_loss_scaling": args.scale_loss,
             "use_dynamic_loss_scaling": True,
         }
     if args.use_sharding:
@@ -173,7 +174,7 @@ def run_evaluate(data_loader,
                 break
             average_loss = sum(all_loss) / len(all_loss)
             logger.info(
-                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.0f tokens/s"
+                "%s step %d, epoch: %d, batch: %d, loss: %f, eval_ips: %.0f tokens/s"
                 % (task_name, global_step, epoch, eval_step, average_loss,
                    iter_steps * args.micro_batch_size * args.max_seq_len /
                    (time.time() - local_time)))
@@ -407,6 +408,7 @@ def do_train(args):
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
@@ -446,7 +448,8 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
-                if global_step == args.save_steps:
+
+                if global_step <= args.save_steps:
                     model.init_config["init_args"][0].init_config.pop("topo",
                                                                       None)
                 model.save_pretrained(output_dir)

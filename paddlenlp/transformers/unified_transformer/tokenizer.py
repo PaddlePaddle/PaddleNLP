@@ -48,7 +48,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         vocab_file (str):
             The path of file to construct vocabulary.
         sentencepiece_model_file (str):
-            The sentencepiece model file required to instantiate a 
+            The sentencepiece model file (ends with '.spm') required to instantiate a
             `SentencePiece <https://github.com/google/sentencepiece>`__.
         do_lower_case (bool, optional):
             Whether or not to lowercase the input when tokenizing. Defaults to 
@@ -246,18 +246,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text, is_split_into_words=True):
         """
-        End-to-end tokenization for UnifiedTransformer models.
+        Converts a string to a list of tokens.
 
         Args:
             text (str): 
                 The text to be tokenized.
-            is_split_into_words (bool, optinal): 
+            is_split_into_words (bool, optional):
                 Whether or not the input `text` has been pretokenized. If False, 
                 the input `text` will be pretokenized by `jieba` firstly. 
                 Defaults to True.
         
         Returns:
-            list[str]: A list of string representing converted tokens.
+            List(str): A list of string representing converted tokens.
 
         Example:
             .. code-block::
@@ -265,8 +265,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import UnifiedTransformerTokenizer
 
                 tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
-                print(tokenizer.tokenize('我爱祖国', is_split_into_words=False))
-                # ['▁我', '▁爱', '祖', '国']
+                print(tokenizer.tokenize('欢迎使用百度飞桨！', is_split_into_words=False))
+                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
         """
         return self._tokenize(text, is_split_into_words=is_split_into_words)
 
@@ -307,10 +307,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import UnifiedTransformerTokenizer
 
                 tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
-                print(tokenizer.convert_tokens_to_string(['▁我', '▁爱', '祖', '国']))
-                # 我 爱祖国
-                print(tokenizer.convert_tokens_to_string(['▁我', '▁爱', '祖', '国'], keep_space=False))
-                # 我爱祖国
+                print(tokenizer.convert_tokens_to_string(['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']))
+                # 欢迎 使用 百度 飞桨 !
+                print(tokenizer.convert_tokens_to_string(['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!'], keep_space=False))
+                # 欢迎使用百度飞桨!
         """
         tokens = self.merge_subword(tokens)
         if keep_space:
@@ -342,7 +342,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import UnifiedTransformerTokenizer
 
                 tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
-                tokens = tokenizer.tokenize('我爱祖国', is_split_into_words=False)
+                tokens = tokenizer.tokenize('欢迎使用百度飞桨！', is_split_into_words=False)
                 ids = tokenizer.convert_tokens_to_ids(tokens)
                 print(ids)
                 # [6, 121, 26907, 25475]

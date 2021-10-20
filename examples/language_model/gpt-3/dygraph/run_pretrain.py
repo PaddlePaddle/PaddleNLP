@@ -17,6 +17,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -25,11 +26,16 @@ from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTFo
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
 
+# to import data_tools
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
+
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -37,16 +43,16 @@ MODEL_CLASSES = {
 }
 
 
-def set_hyrbid_parallel_seed(basic_seed, dp_rank, mp_rank, pp_rank):
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
-    random.seed(basic_seed + dp_rank)
-    np.random.seed(basic_seed + dp_rank)
-    paddle.seed(basic_seed + dp_rank)
+    random.seed(basic_seed + data_world_rank)
+    np.random.seed(basic_seed + data_world_rank)
+    paddle.seed(basic_seed + data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + dp_rank
+    global_seed = basic_seed + data_world_rank
     tracker = get_rng_state_tracker()
     tracker.add('global_seed', global_seed)
     tracker.add('local_seed', local_seed)
@@ -86,19 +92,48 @@ def run_evaluate(args,
     model.train()
 
 
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
+
+
 def do_train(args):
     paddle.set_device(args.device)
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
         "mp_degree": args.mp_degree,
-        "pp_degree": args.pp_degree
+        "pp_degree": args.pp_degree,
+        "sharding_degree": args.sharding_degree
     }
 
+    accumulate_steps = args.local_batch_size // args.micro_batch_size
     strategy.pipeline_configs = {
-        "accumulate_steps": args.local_batch_size // args.micro_batch_size,
+        "accumulate_steps": accumulate_steps,
         "micro_batch_size": args.micro_batch_size
     }
+
+    # set control in tensor parallel
+    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
     fleet.init(is_collective=True, strategy=strategy)
 
@@ -108,10 +143,15 @@ def do_train(args):
     mp_rank = hcg.get_model_parallel_rank()
     pp_rank = hcg.get_stage_id()
     dp_rank = hcg.get_data_parallel_rank()
+    sharding_rank = hcg.get_sharding_parallel_rank()
+
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+    data_world_size = args.dp_degree * args.sharding_degree
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank, pp_rank)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
@@ -121,8 +161,8 @@ def do_train(args):
     # Define log writer
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
-        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_amp,
+        "{}_globalbsz_{}_pure_fp16_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16,
             False, global_rank).lower())
 
     if os.path.exists(log_writer_path):
@@ -183,23 +223,48 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-        beta1=args.adam_beta1,
-        beta2=args.adam_beta2,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params)
+    if args.sharding_degree > 1:
+        optimizer = DygraphShardingOptimizer(
+            hcg=fleet.get_hybrid_communicate_group(),
+            user_defined_strategy=strategy,
+            params=model.parameters(),
+            inner_optimizer_class=paddle.optimizer.AdamW,
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params)
+    else:
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params,
+            # TODO: remove 'multi_precision' in definition of optimizer
+            # and add it to 'paddle.amp.decorate'
+            multi_precision=args.use_pure_fp16)
+
+    if args.use_pure_fp16:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        scaler = fleet.distributed_scaler(scaler)
+        # level O2 means converting the network to FP16
+        model, optimizer = paddle.amp.decorate(
+            models=model,
+            optimizers=optimizer,
+            level='O2',
+            save_dtype='float32')
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -214,21 +279,16 @@ def do_train(args):
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
                 local_rank=local_rank,
-                data_world_size=args.dp_degree,
-                data_world_rank=dp_rank,
+                data_world_size=data_world_size,
+                data_world_rank=data_world_rank,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -244,23 +304,36 @@ def do_train(args):
                 position_ids.stop_gradient = True
 
                 if args.pp_degree == 1:
-                    with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
-                            custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
-                        preds = model(tokens, position_ids)
-                        loss = criterion(preds, labels, loss_mask)
+                    # In ParallelMode of DataParallel, 'no_sync' can be used for improving
+                    # performance of model by gradient accumulation.
+                    loss = 0.0
+                    for i in range(accumulate_steps):
+                        start_index = i * args.micro_batch_size
+                        end_index = start_index + args.micro_batch_size
+                        with paddle.amp.auto_cast(
+                                args.use_pure_fp16,
+                                custom_black_list=[
+                                    "reduce_sum",
+                                    "c_softmax_with_cross_entropy",
+                                    "elementwise_div"
+                                ],
+                                level='O2'):
+                            preds = model(
+                                tokens[start_index:end_index, :],
+                                position_ids[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :],
+                                loss_mask[start_index:end_index, :])
+                        loss_mbs = loss_mbs / accumulate_steps
+                        if args.use_pure_fp16:
+                            scaler.scale(loss_mbs).backward()
+                        else:
+                            loss_mbs.backward()
+                        loss = loss + loss_mbs
 
-                    if args.use_amp:
-                        scaler.scale(loss).backward()
+                    if args.use_pure_fp16:
                         scaler.minimize(optimizer, loss)
                     else:
-                        loss.backward()
                         optimizer.step()
 
                     if lr_scheduler is not None:
@@ -270,19 +343,17 @@ def do_train(args):
                 else:
                     data = [(tokens, position_ids), (labels, loss_mask)]
                     with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
+                            args.use_pure_fp16,
                             custom_black_list=[
                                 "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
+                                "elementwise_div"
+                            ],
+                            level='O2'):
                         loss = model.train_batch(
                             data,
                             optimizer=optimizer,
                             lr_scheduler=lr_scheduler,
-                            scaler=scaler if args.use_amp else None)
+                            scaler=scaler if args.use_pure_fp16 else None)
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()
@@ -309,6 +380,7 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
+                # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
                 # only dp_rank = 0 save model
                 if (global_step % args.save_steps == 0 or
                         global_step >= args.max_steps) and dp_rank == 0:
@@ -322,24 +394,25 @@ def do_train(args):
                     logger.info("Save model to %s" % output_dir)
 
                     if args.pp_degree > 1:
-                        model_to_save.save_state_dict(output_dir)
-                        if mp_rank * pp_rank == 1:
+                        if mp_rank == 0 and sharding_rank == 0 and pp_rank == 0:
                             tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_state_dict(output_dir)
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(
                                 output_dir,
-                                "model_state_mp_{:0>2d}_pp_{:0>2d}.pdopt".
-                                format(mp_rank, pp_rank)))
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank, pp_rank)))
                     else:
-                        path = os.path.join(output_dir,
-                                            'model_{:0>2d}'.format(mp_rank))
-                        os.makedirs(path, exist_ok=True)
-                        model_to_save.save_pretrained(path)
-
-                        paddle.save(optimizer.state_dict(),
-                                    os.path.join(path, "model_state.pdopt"))
-                        tokenizer.save_pretrained(path)
+                        if mp_rank == 0 and sharding_rank == 0:
+                            tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_pretrained(output_dir)
+                        paddle.save(
+                            optimizer.state_dict(),
+                            os.path.join(
+                                output_dir,
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank)))
 
                 if global_step >= args.max_steps:
                     run_evaluate(args, test_data_loader, model, criterion,

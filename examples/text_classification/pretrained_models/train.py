@@ -112,8 +112,6 @@ def do_train():
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
-
-    # If you wanna use bert/roberta/electra pretrained model,
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=2, accelerate_mode=args.accelerate_mode)
     print("model.accelerate_mode ", model.accelerate_mode)
