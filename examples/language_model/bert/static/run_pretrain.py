@@ -19,7 +19,6 @@ import os
 import random
 import time
 import h5py
-import yaml
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -420,12 +419,6 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    # Args -> Yaml
     args = parse_args()
-    config_path = args.config
-    with open(config_path, "r") as fp:
-        yaml_config = yaml.load(fp)
-    for key, val in yaml_config.items(): 
-        setattr(args, key, val)
     print (args)
     do_train(args)
