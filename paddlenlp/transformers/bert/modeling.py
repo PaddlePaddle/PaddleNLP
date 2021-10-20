@@ -20,10 +20,16 @@ from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'BertModel', "BertPretrainedModel", 'BertForPretraining',
-    'BertPretrainingCriterion', 'BertPretrainingHeads',
-    'BertForSequenceClassification', 'BertForTokenClassification',
-    'BertForQuestionAnswering', 'BertForMultipleChoice', "BertForMaskedLM"
+    'BertModel',
+    "BertPretrainedModel",
+    'BertForPretraining',
+    'BertPretrainingCriterion',
+    'BertPretrainingHeads',
+    'BertForSequenceClassification',
+    'BertForTokenClassification',
+    'BertForQuestionAnswering',
+    'BertForMultipleChoice',
+    "BertForMaskedLM",
 ]
 
 
@@ -974,6 +980,7 @@ class BertForMultipleChoice(BertPretrainedModel):
     """
     Bert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
     softmax) e.g. for RocStories/SWAG tasks.
+    
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
