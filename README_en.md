@@ -77,7 +77,7 @@ ddp("百度是一家高科技公司")
 # Sentiment Analysis
 senta = Taskflow("sentiment_analysis")
 senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
->>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
+>>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
 ```
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
