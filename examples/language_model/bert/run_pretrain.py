@@ -20,7 +20,6 @@ import os
 import random
 import time
 import h5py
-import yaml
 import distutils.util
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
