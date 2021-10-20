@@ -36,7 +36,8 @@ import paddlenlp.ops as ops
 from visualdl import LogWriter
 
 # Used to load the data_tools path, should import before dataset
-sys.path.insert(0, "../../")
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
@@ -448,7 +449,7 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
-                if global_step == args.save_steps:
+                if global_step <= args.save_steps:
                     model.init_config["init_args"][0].init_config.pop("topo",
                                                                       None)
                 model.save_pretrained(output_dir)
