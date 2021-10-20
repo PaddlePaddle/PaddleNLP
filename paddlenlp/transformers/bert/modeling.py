@@ -357,11 +357,11 @@ class BertPretrainedModel(PretrainedModel):
             "bert-base-japanese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese.pdparams",
             "bert-base-japanese-whole-word-masking":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-whole-word-masking.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/bert-base-japanese-whole-word-masking.pdparams",
             "bert-base-japanese-char":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-char.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/bert-base-japanese-char.pdparams",
             "bert-base-japanese-char-whole-word-masking":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/bert-base-japanese-char-whole-word-masking.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char-whole-word-masking/bert-base-japanese-char-whole-word-masking.pdparams",
         }
     }
     base_model_prefix = "bert"
