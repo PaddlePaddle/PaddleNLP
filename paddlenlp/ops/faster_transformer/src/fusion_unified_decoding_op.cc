@@ -80,9 +80,7 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     }
     output_dims = {max_len, batch_size, beam_size};
     parent_ids_dims = output_dims;
-  } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling" ||
-             decoding_strategy == "sampling") {
+  } else if (decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     parent_ids_dims = {1};
   } else {
@@ -220,9 +218,7 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     }
     output_dims = {max_len, batch_size, beam_size};
     return {output_dims, output_dims, sequence_length_dims};
-  } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling" ||
-             decoding_strategy == "sampling") {
+  } else if (decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     return {output_dims, {1}, sequence_length_dims};
   } else {

@@ -72,7 +72,7 @@ class FasterTransformer(TransformerModel):
             The end token id. Defaults to 1.
         decoding_strategy (str, optional):
             Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
-            'topk_sampling' and 'topp_sampling'. For beam search strategies,
+            and 'sampling'. For beam search strategies,
             'v2' would select the top `beam_size * 2` beams and process the top
             `beam_size` alive and finish beams in them separately, while 'v1'
             would only select the top `beam_size` beams and mix up the alive and

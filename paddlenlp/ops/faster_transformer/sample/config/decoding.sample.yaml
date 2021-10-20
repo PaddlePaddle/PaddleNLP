@@ -1,12 +1,12 @@
 # Batch size during inference. 
 infer_batch_size: 32
 # Hyparams for generation:
-decoding_strategy: "beam_search"
+decoding_strategy: "sampling"
 # The parameters for beam search.
 beam_size: 4
-# The parameters for topk sampling. 
+# The parameters for top_k sampling. 
 topk: 4
-# The parameters for topp sampling. 
+# The parameters for top_p sampling. 
 topp: 0.0
 max_out_len: 32
 # The number of decoded sentences to output.

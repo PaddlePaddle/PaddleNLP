@@ -41,22 +41,20 @@ def parse_args():
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=[
-            "beam_search", "topk_sampling", "topp_sampling", "beam_search_v2"
-        ],
-        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling', 'beam_search_v2']. "
+        choices=["beam_search", "sampling", "beam_search_v2"],
+        help="Decoding strategy. Can be one of ['beam_search', 'sampling', 'beam_search_v2']. "
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
         "--topk",
         default=4,
         type=int,
-        help="The k value for topk_sampling. Default is 4. ")
+        help="The k value for top_k sampling. Default is 4. ")
     parser.add_argument(
         "--topp",
         default=0.0,
         type=float,
-        help="The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. "
+        help="The probability threshold for top_p sampling. Default is 0.0 which means it won't go through top_p sampling. "
     )
     parser.add_argument(
         "--benchmark",

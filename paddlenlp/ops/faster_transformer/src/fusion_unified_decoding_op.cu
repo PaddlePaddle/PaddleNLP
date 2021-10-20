@@ -84,16 +84,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search") ? beam_size : 1;
-  int candidate_num_ =
-      ("topk_sampling" == decoding_strategy ||
-       "topp_sampling" == decoding_strategy || "sampling" == decoding_strategy)
-          ? topk
-          : 1;
-  float probability_threshold_ =
-      ("topk_sampling" == decoding_strategy ||
-       "topp_sampling" == decoding_strategy || "sampling" == decoding_strategy)
-          ? topp
-          : 0.0;
+  int candidate_num_ = ("sampling" == decoding_strategy) ? topk : 1;
+  float probability_threshold_ = ("sampling" == decoding_strategy) ? topp : 0.0;
 
   auto cache_k0_dims = cache_k[0].shape();
   int batch_size_ = (decoding_strategy == "beam_search")
@@ -215,9 +207,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     // for matmul bias
     decoding_params.embedding_bias = embedding_bias.data<float>();
     decoding_params.logits_mask = logits_mask.data<float>();
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy ||
-             "sampling" == decoding_strategy) {
+  } else if ("sampling" == decoding_strategy) {
     decoding_params.embedding_bias_T =
         reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
     decoding_params.logits_mask_T =
@@ -262,9 +252,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     unified_decoding_beam_search_->forward(params, decoding_params);
 
     delete unified_decoding_beam_search_;
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy ||
-             "sampling" == decoding_strategy) {
+  } else if ("sampling" == decoding_strategy) {
     TransformerSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
     unified_decoding_sampling_ =
         new TransformerSampling<DecodingTraits_::OpType>(allocator_,
@@ -291,7 +279,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     delete unified_decoding_sampling_;
   } else {
     PD_THROW(
-        "Only beam_search, topk_sampling and topp_sampling are supported for "
+        "Only beam_search sampling are supported for "
         "FasterTransformer. ");
   }
   delete[] params;

@@ -41,9 +41,8 @@ def parse_args():
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=["beam_search", "topk_sampling", "topp_sampling"],
-        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
-    )
+        choices=["beam_search", "sampling"],
+        help="Decoding strategy. Can be one of ['beam_search', 'sampling']. ")
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
         "--diversity_rate",
@@ -54,12 +53,12 @@ def parse_args():
         "--topk",
         default=4,
         type=int,
-        help="The k value for topk_sampling. Default is 4. ")
+        help="The k value for top_k sampling. Default is 4. ")
     parser.add_argument(
         "--topp",
         default=0.0,
         type=float,
-        help="The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. "
+        help="The probability threshold for top_p sampling. Default is 0.0 which means it won't go through top_p sampling. "
     )
     parser.add_argument(
         "--batch_size", default=None, type=int, help="Batch size. ")
@@ -170,7 +169,7 @@ def do_predict(args):
             if not args.profile:
                 if args.decoding_strategy == "beam_search":
                     finished_seq = finished_seq.numpy().transpose([1, 2, 0])
-                elif args.decoding_strategy == "topk_sampling" or args.decoding_strategy == "topp_sampling":
+                elif args.decoding_strategy == "sampling":
                     finished_seq = np.expand_dims(
                         finished_seq.numpy().transpose([1, 0]), axis=1)
                 for ins in finished_seq:
@@ -188,12 +187,12 @@ def do_predict(args):
                     "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.beam_size,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "topk_sampling":
+            elif args.decoding_strategy == "sampling" and args.topk > 0:
                 logger.info(
                     "Setting info: batch size: {}, topk: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.topk,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "topp_sampling":
+            elif args.decoding_strategy == "sampling" and args.topp > 0.0:
                 logger.info(
                     "Setting info: batch size: {}, topp: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.topp,

@@ -83,14 +83,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
                      decoding_strategy == "beam_search_v2")
                         ? beam_size
                         : 1;
-  int candidate_num_ = (decoding_strategy == "topk_sampling" ||
-                        decoding_strategy == "topp_sampling")
-                           ? topk
-                           : 1;
-  float probability_threshold_ = (decoding_strategy == "topk_sampling" ||
-                                  decoding_strategy == "topp_sampling")
-                                     ? topp
-                                     : 0.0;
+  int candidate_num_ = (decoding_strategy == "sampling") ? topk : 1;
+  float probability_threshold_ = (decoding_strategy == "sampling") ? topp : 0.0;
 
   auto input_dims = input.shape();
   int batch_size_ = (decoding_strategy == "beam_search" ||
@@ -233,8 +227,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     // for matmul bias
     decoding_params.embedding_bias =
         reinterpret_cast<const float*>(embedding_bias.data<float>());
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
+  } else if ("sampling" == decoding_strategy) {
     decoding_params.embedding_bias_T =
         reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
   }
@@ -293,8 +286,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     decoding_beamsearch_->forward(params, decoding_params);
 
     delete decoding_beamsearch_;
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
+  } else if ("sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
     decoding_sampling_ =
         new DecodingSampling<DecodingTraits_::OpType>(allocator_,
@@ -319,7 +311,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     delete decoding_sampling_;
   } else {
     PD_THROW(
-        "Only beam_search, topk_sampling and topp_sampling are supported for "
+        "Only beam_search, beam_search_v2 and sampling are supported for "
         "FasterTransformer. ");
   }
   delete[] params;

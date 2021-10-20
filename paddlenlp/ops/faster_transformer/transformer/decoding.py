@@ -755,7 +755,7 @@ class InferGptDecoding(nn.Layer):
 class InferUnifiedDecoding(nn.Layer):
     def __init__(self,
                  model,
-                 decoding_strategy="topk_sampling",
+                 decoding_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  logits_mask=None,
@@ -1324,12 +1324,7 @@ class InferBartDecoding(nn.Layer):
         elif self._decoding_strategy == "greedy_search":
             top_k = 1
             top_p = 0.0
-            self._decoding_strategy = "topk_sampling"
-        elif self._decoding_strategy == "sampling":
-            if abs(top_p - 0.0) < 1e-6 and top_k > 0:
-                self._decoding_strategy = "topk_sampling"
-            elif top_p != 1.0 and top_k == 0:
-                self._decoding_strategy = "topp_sampling"
+            self._decoding_strategy = "sampling"
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
