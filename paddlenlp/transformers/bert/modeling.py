@@ -54,7 +54,10 @@ class BertEmbeddings(Layer):
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
+            if paddle.is_compiled_with_npu():
+                seq_length = paddle.cumsum(ones, axis=-1, dtype='int32')
+            else:
+                seq_length = paddle.cumsum(ones, axis=-1)
 
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
