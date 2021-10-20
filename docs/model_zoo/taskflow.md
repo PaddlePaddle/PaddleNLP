@@ -134,7 +134,7 @@ ddp("百度是一家高科技公司")
 >>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
 
 # 使用ddparser-ernie-1.0进行预测
-ddp = Taskflow("dependency_parsing",model="ddparser-ernie-1.0")
+ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("百度是一家高科技公司")
 >>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
 ```
