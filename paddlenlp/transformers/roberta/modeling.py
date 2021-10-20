@@ -275,7 +275,6 @@ class RobertaModel(RobertaPretrainedModel):
                  do_lower_case=False,
                  max_seq_len=512,
                  pad_to_max_seq_len=True):
-        super(ErnieModel, self).__init__()
         super(RobertaModel, self).__init__()
 
         self.accelerate_mode = accelerate_mode
