@@ -80,7 +80,9 @@ def prepare_train_features(examples, tokenizer, args):
         offsets = tokenized_example['offset_mapping']
 
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_example['token_type_ids']
+        sequence_A_lengths = input_ids.index(tokenizer.sep_token_id) + 2
+        sequence_B_lengths = len(input_ids) - sequence_A_lengths
+        sequence_ids = [0] * sequence_A_lengths + [1] * sequence_B_lengths
 
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = tokenized_example['overflow_to_sample']
@@ -144,8 +146,11 @@ def prepare_validation_features(examples, tokenizer, args):
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
+        input_ids = tokenized_example["input_ids"]
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_example['token_type_ids']
+        sequence_A_lengths = input_ids.index(tokenizer.sep_token_id) + 2
+        sequence_B_lengths = len(input_ids) - sequence_A_lengths
+        sequence_ids = [0] * sequence_A_lengths + [1] * sequence_B_lengths
 
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = tokenized_example['overflow_to_sample']
@@ -175,7 +180,7 @@ def evaluate(model, data_loader, args, global_step, write_predictions=False):
     all_end_logits = []
 
     for batch in data_loader:
-        input_ids, token_type_ids = batch
+        input_ids = batch[0]
         start_logits_tensor, end_logits_tensor = model(input_ids)
 
         for idx in range(start_logits_tensor.shape[0]):
@@ -257,8 +262,7 @@ def run(args):
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
         dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
         }): fn(samples)
 
         dev_data_loader = DataLoader(
@@ -293,7 +297,6 @@ def run(args):
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
             "start_positions": Stack(dtype="int64"),
             "end_positions": Stack(dtype="int64")
         }): fn(samples)
@@ -339,7 +342,7 @@ def run(args):
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, start_positions, end_positions = batch
+                input_ids, start_positions, end_positions = batch
 
                 logits = model(input_ids=input_ids)
                 loss = criterion(logits, (start_positions, end_positions))
