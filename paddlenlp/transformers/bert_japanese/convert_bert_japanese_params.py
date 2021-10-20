@@ -10,7 +10,7 @@ model_names = [
 
 for model_name in model_names:
     torch_model_url = "https://huggingface.co/cl-tohoku/%s/resolve/main/pytorch_model.bin" % model_name
-    torch_model_path = get_path_from_url(torch_model_url, '.')
+    torch_model_path = get_path_from_url(torch_model_url, '../bert')
     torch_state_dict = torch.load(torch_model_path)
 
     paddle_model_path = "%s.pdparams" % model_name
