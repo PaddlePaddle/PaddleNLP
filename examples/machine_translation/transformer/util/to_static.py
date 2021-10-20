@@ -33,16 +33,6 @@ def apply_to_static(config, model):
     support_to_static = config.get('to_static', False)
     if support_to_static:
         specs = create_input_specs()
-        is_pass = config.get('enable_pass', False)
-        if is_pass:
-            build_strategy = paddle.static.BuildStrategy()
-            #build_strategy.fuse_elewise_add_act_ops = True
-            #build_strategy.fuse_bn_act_ops = True
-            #build_strategy.fuse_bn_add_act_ops = True
-            #build_strategy.enable_addto = True
-        else: 
-            build_strategy = None
+        build_strategy = None
         model = to_static(model, input_spec=specs, build_strategy=build_strategy)
-        #logger.info("Successfully to apply @to_static with specs: {}".format(
-        #    specs))
     return model

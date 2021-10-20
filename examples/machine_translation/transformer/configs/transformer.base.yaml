@@ -127,5 +127,3 @@ max_iter: None
 
 # enable to static ? 
 to_static: False
-# enable static pass optimization
-enable_pass: False

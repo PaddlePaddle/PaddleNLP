@@ -155,11 +155,6 @@ def parse_args():
         default=1,
         help="Number of merge steps before gradient update."
         "global_batch_size = gradient_merge_steps * batch_size.")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="./bert.yaml",
-        help="The config file which store the default value")
     args = parser.parse_args()
     return args
 
