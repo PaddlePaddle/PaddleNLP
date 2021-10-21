@@ -117,11 +117,11 @@ class RougeL(paddle.metric.Metric):
 
     .. math::
 
-        R_{LCS} = \\frac{LCS(C,S)}{len(S)}
+        R_{LCS} = \frac{LCS(C,S)}{len(S)}
 
-        P_{LCS} = \\frac{LCS(C,S)}{len(C)}
+        P_{LCS} = \frac{LCS(C,S)}{len(C)}
 
-        F_{LCS} = \\frac{(1 + \\gamma^2)R_{LCS}P_{LCS}}{R_{LCS}} + \\gamma^2{R_{LCS}}
+        F_{LCS} = \frac{(1 + \\gamma^2)R_{LCS}P_{LCS}}{R_{LCS}} + \\gamma^2{R_{LCS}}
 
     where `C` is the candidate sentence, and `S` is the reference sentence.
 
