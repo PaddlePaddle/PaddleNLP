@@ -58,10 +58,7 @@ class ErnieEmbeddings(nn.Layer):
             # maybe need use shape op to unify static graph and dynamic graph
             #seq_length = input_ids.shape[1]
             ones = paddle.ones_like(input_ids, dtype="int64")
-            if paddle.is_compiled_with_npu():
-                seq_length = paddle.cumsum(ones, axis=1, dtype='int32')
-            else:
-                seq_length = paddle.cumsum(ones, axis=1)
+            seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
         if token_type_ids is None:
