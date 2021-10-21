@@ -248,6 +248,10 @@ class RougeLForDuReader(RougeL):
     Rouge-L metric with bonus for DuReader contest.
 
     Please refer to `DuReader Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for more details.
+
+    Args:
+        alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest. Defaults to 1.0.
+        beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest. Defaults to 1.0.
     '''
 
     def __init__(self, alpha=1.0, beta=1.0, gamma=1.2):

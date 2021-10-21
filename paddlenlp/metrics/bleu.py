@@ -245,8 +245,8 @@ class BLEUForDuReader(BLEU):
 
     Args:
         n_size (int, optional): Number of gram for BLEU metric. Defaults to 4.
-        alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest.
-        beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest.
+        alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest. Defaults to 1.0.
+        beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest. Defaults to 1.0.
 
     '''
 
