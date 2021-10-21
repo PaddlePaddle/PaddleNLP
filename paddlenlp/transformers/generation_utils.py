@@ -346,9 +346,6 @@ class GenerationMixin(object):
                                      expand_size,
                                      attention_mask=None,
                                      **model_kwargs):
-        if expand_size == 1:
-            return input_ids, model_kwargs
-
         index = paddle.tile(
             paddle.arange(input_ids.shape[0]).unsqueeze(-1),
             [1, expand_size]).reshape([-1])

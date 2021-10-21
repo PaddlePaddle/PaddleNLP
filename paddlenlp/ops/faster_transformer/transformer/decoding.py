@@ -717,7 +717,14 @@ class InferGptDecoding(nn.Layer):
         self.topp = topp
         self.max_out_len = max_out_len
         self.temperature = temperature
-        print(topk, topp)
+        if topp == 1 and topk > 0:
+            topp = 0
+        elif topp > 0 and topk == 0:
+            pass
+        else:
+            raise ValueError(
+                "Only topk sampling or topp sampling are supported. " \
+                "Topk sampling and topp sampling cannot be both applied. ")
         output_ids = infer_gpt_decoding(
             input=[input_ids],
             word_emb=self.word_emb,
@@ -1059,7 +1066,22 @@ class InferUnifiedDecoding(nn.Layer):
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
+                num_return_sequences=1,
                 pos_bias=True):
+        if self._decoding_strategy == "greedy_search":
+            self._decoding_strategy = "topk_sampling"
+            topk = 1
+            topp = 0
+        elif self._decoding_strategy == "sampling":
+            if topp == 1 and topk > 0:
+                self._decoding_strategy = "topk_sampling"
+                topp = 0
+            elif topp > 0 and topk == 0:
+                self._decoding_strategy = "topp_sampling"
+            else:
+                raise ValueError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied. ")
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -1117,6 +1139,7 @@ class InferUnifiedDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
+            num_return_sequences=num_return_sequences,
             decoding_strategy=self._decoding_strategy)
 
         return ids
@@ -1322,15 +1345,16 @@ class InferBartDecoding(nn.Layer):
                 alpha=0.6):
         # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
         if self._decoding_strategy.startswith("beam_search"):
-            memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-                memory_seq_lens, beam_size)
             self._decoding_strategy = "beam_search_v2"
         elif self._decoding_strategy == "greedy_search":
             self._decoding_strategy = "topk_sampling"
+            top_k = 1
+            top_p = 0
         elif self._decoding_strategy == "sampling":
-            if abs(top_p - 0.0) < 1e-6 and top_k > 0:
+            if top_p == 1 and top_k > 0:
                 self._decoding_strategy = "topk_sampling"
-            elif top_p != 1.0 and top_k == 0:
+                top_p = 0
+            elif top_p > 0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"
             else:
                 raise ValueError(

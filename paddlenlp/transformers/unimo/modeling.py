@@ -452,6 +452,16 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         else:
             return logits
 
+    def get_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterUNIMOText
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        self._faster_entry = FasterUNIMOText(
+            self,
+            decode_strategy=decode_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
+
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
         logits[:, self.unimo.unk_token_id] = -1e9

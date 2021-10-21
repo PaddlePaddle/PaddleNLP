@@ -1088,8 +1088,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
     def get_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        decoding_strategy = kwargs.get('decode_strategy')
-        if decoding_strategy == "beam_search":
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == "beam_search":
             return False
         self._faster_entry = FasterGPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
