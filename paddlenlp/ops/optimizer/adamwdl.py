@@ -57,7 +57,7 @@ class AdamWDL(AdamW):
     is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237.
 
     .. math::
-        t & = t + 1
+        & t = t + 1
     
         & moment\_1\_out = {\beta}_1 * moment\_1 + (1 - {\beta}_1) * grad
 
