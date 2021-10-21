@@ -114,12 +114,10 @@ def do_train():
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=2, accelerate_mode=args.accelerate_mode)
-    print("model.accelerate_mode ", model.accelerate_mode)
 
     # If you wanna use bert/roberta/electra pretrained model,
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
         'ernie-1.0', accelerate_mode=args.accelerate_mode)
-    print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
 
     trans_func = partial(
         convert_example,

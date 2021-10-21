@@ -40,8 +40,6 @@ parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, F
 parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
 parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
-parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
-parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -50,17 +48,15 @@ class Predictor(object):
     def __init__(self,
                  model_dir,
                  device="gpu",
-                 max_seq_length=128,
                  batch_size=32,
                  use_tensorrt=False,
                  precision="fp32",
                  cpu_threads=10,
                  enable_mkldnn=False):
-        self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = os.path.join(model_dir, "inference.pdmodel")
+        params_file = os.path.join(model_dir, "inference.pdiparams")
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -114,24 +110,16 @@ class Predictor(object):
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
-        if args.benchmark:
-            self.autolog.times.start()
-
         self.input_handles[0].copy_from_cpu(data)
         self.predictor.run()
         logits = self.output_handle.copy_to_cpu()
-        # if args.benchmark:
-        #     self.autolog.times.stamp()
 
-        # probs = softmax(logits, axis=1)
-        # idx = np.argmax(probs, axis=1)
-        # idx = idx.tolist()
-        # labels = [label_map[i] for i in idx]
+        probs = softmax(logits, axis=1)
+        idx = np.argmax(probs, axis=1)
+        idx = idx.tolist()
+        labels = [label_map[i] for i in idx]
 
-        # if args.benchmark:
-        #     self.autolog.times.end(stamp=True)
-
-        # return labels
+        return labels
 
 
 if __name__ == "__main__":
@@ -150,12 +138,5 @@ if __name__ == "__main__":
 
     results = []
     for batch_data in batches:
-        predictor.predict(batch_data, label_map)
-    import time
-    start_time = time.time()
-    for _ in range(10):
-        for batch_data in batches:
-            predictor.predict(batch_data, label_map)
-    end_time = time.time()
-    print("#sample %d, cost time: %.5f" % (len(data) * 10,
-                                           (end_time - start_time)))
+        batch_res = predictor.predict(batch_data, label_map)
+        results.extend(batch_res)
