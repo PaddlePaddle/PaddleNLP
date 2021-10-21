@@ -522,6 +522,7 @@ public:
             word_ids_buf_,
             (step > min_trg_len) ? nullptr : decoding_params.sequence_length,
             (int *)nullptr,
+            (int *)nullptr,
             decoding_params.output_ids + (step - 1) * args_.batch_size_,
             (DataType_ *)nullptr,
             false,

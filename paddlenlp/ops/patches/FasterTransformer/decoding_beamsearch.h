@@ -677,6 +677,7 @@ public:
             finished_buf_,
             word_ids_buf_,
             (step > min_trg_len) ? nullptr : decoding_params.sequence_length,
+            (keep_alive_beam_) ? parent_ids_buf_ : nullptr,
             (keep_alive_beam_) ? decoding_params.parent_ids + (step - 1) * m * 2
                                : decoding_params.parent_ids + (step - 1) * m,
             (keep_alive_beam_) ? decoding_params.output_ids + (step - 1) * m * 2

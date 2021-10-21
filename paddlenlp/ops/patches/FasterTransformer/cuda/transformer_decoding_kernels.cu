@@ -333,6 +333,7 @@ __global__ void update_with_force_decoding_kernel(const int* trg_word,
                                                   bool* finished,
                                                   int* word_ids,
                                                   int* sequence_length,
+                                                  int* parent_ids_buf,
                                                   int* parent_ids,
                                                   int* output_ids,
                                                   T* scores,
@@ -341,23 +342,35 @@ __global__ void update_with_force_decoding_kernel(const int* trg_word,
                                                   const int beam_width,
                                                   const int max_trg_len,
                                                   const int step) {
-  int bid = blockIdx.x;
-  int tid = threadIdx.x;
+  int bid = blockIdx.x;   // batch_size
+  int tid = threadIdx.x;  // beam_width
 
   const T MAX_T_VAL = (sizeof(T) == 2) ? HALF_FLT_MAX : 1e20f;
   if (step <= trg_length[bid]) {
-    finished[tid] = false;
+    finished[bid * beam_width + tid] = false;
 
     int word_id = trg_word[bid * max_trg_len + step - 1];
-    word_ids[tid] = word_id;
-    output_ids[tid] = word_id;
+
+    if (keep_alive_beam) {
+      if (tid >= beam_width / 2) {
+        word_ids[bid * beam_width / 2 + tid - beam_width / 2] = word_id;
+      }
+    } else {
+      word_ids[bid * beam_width + tid] = word_id;
+    }
+
+    output_ids[bid * beam_width + tid] = word_id;
     if (sequence_length) {
-      sequence_length[tid]++;
+      sequence_length[bid * beam_width + tid]++;
     }
 
     if (parent_ids && scores) {
       if (keep_alive_beam) {
-        parent_ids[tid] = beam_width / 2;
+        parent_ids[bid * beam_width + tid] = bid * beam_width + beam_width / 2;
+        if (tid >= beam_width / 2) {
+          parent_ids_buf[bid * beam_width / 2 + tid - beam_width / 2] =
+              bid * beam_width / 2;
+        }
 
         if (tid == beam_width / 2) {
           scores[bid * beam_width + tid] = 0;
@@ -365,7 +378,7 @@ __global__ void update_with_force_decoding_kernel(const int* trg_word,
           scores[bid * beam_width + tid] = -MAX_T_VAL;
         }
       } else {
-        parent_ids[tid] = 0;
+        parent_ids[bid * beam_width + tid] = bid * beam_width;
 
         if (tid == 0) {
           scores[bid * beam_width + tid] = 0;
@@ -383,6 +396,7 @@ void update_with_force_deocdingLauncher(const int* trg_word,
                                         bool* finished,
                                         int* word_ids,
                                         int* sequence_length,
+                                        int* parent_ids_buf,
                                         int* parent_ids,
                                         int* output_ids,
                                         T* scores,
@@ -402,6 +416,7 @@ void update_with_force_deocdingLauncher(const int* trg_word,
       finished,
       word_ids,
       sequence_length,
+      parent_ids_buf,
       parent_ids,
       output_ids,
       scores,
@@ -537,6 +552,7 @@ template void update_with_force_deocdingLauncher(const int* trg_word,
                                                  bool* finished,
                                                  int* word_ids,
                                                  int* sequence_length,
+                                                 int* parent_ids_buf,
                                                  int* parent_ids,
                                                  int* output_ids,
                                                  float* scores,
@@ -552,6 +568,7 @@ template void update_with_force_deocdingLauncher(const int* trg_word,
                                                  bool* finished,
                                                  int* word_ids,
                                                  int* sequence_length,
+                                                 int* parent_ids_buf,
                                                  int* parent_ids,
                                                  int* output_ids,
                                                  half* scores,

@@ -589,7 +589,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
-                0, batch_size * beam_size, step=beam_size, dtype=scores_dtype),
+                0, batch_size * beam_size, step=beam_size, dtype="int64"),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
