@@ -27,7 +27,7 @@ def to_string_tensor(string_values, name):
         string_values(list[string]): The value will be setted to the tensor.
         name(string): The name of the tensor.
     """
-    tensor = paddle.Tensor(core.VarDesc.VarType.STRINGS, [], name,
+    tensor = paddle.Tensor(core.VarDesc.VarType.STRING, [], name,
                            core.VarDesc.VarType.STRINGS, False)
     tensor.value().set_string_list(string_values)
     return tensor
@@ -42,7 +42,7 @@ def to_vocab_tensor(string_dict, name):
         string_dict(dict): The value will be setted to the tensor.
         name(string): The name of the tensor.
     """
-    tensor = paddle.Tensor(core.VarDesc.VarType.VOCAB, [], name,
+    tensor = paddle.Tensor(core.VarDesc.VarType.RAW, [], name,
                            core.VarDesc.VarType.VOCAB, True)
     tensor.value().set_vocab(string_dict)
     return tensor

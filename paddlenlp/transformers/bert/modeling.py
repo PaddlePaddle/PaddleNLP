@@ -19,8 +19,6 @@ import paddle.nn as nn
 import paddle.tensor as tensor
 import paddle.nn.functional as F
 from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
 
 from paddlenlp.layers import FasterTokenizer
 from .. import PretrainedModel, register_base_model
