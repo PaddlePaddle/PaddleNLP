@@ -18,7 +18,7 @@ import os
 import unicodedata
 import collections
 
-from .. import PretrainedTokenizer, BertTokenizer, BasicTokenizer, WordpieceTokenizer
+from .. import BertTokenizer, BasicTokenizer, WordpieceTokenizer
 
 __all__ = [
     'BertJapaneseTokenizer', 'MecabTokenizer', 'CharacterTokenizer'

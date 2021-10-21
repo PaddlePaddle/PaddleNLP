@@ -1,3 +1,4 @@
 {
-  "bert-base-japanese-whole-word-masking": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/bert-base-japanese-whole-word-masking.pdparams"
+  "model_state": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/model_state.pdparams",
+  "vocab_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/vocab.txt"
 }

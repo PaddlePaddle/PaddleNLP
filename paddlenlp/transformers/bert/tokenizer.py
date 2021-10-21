@@ -328,13 +328,13 @@ class BertTokenizer(PretrainedTokenizer):
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
             "bert-base-japanese":
-            "https://huggingface.co/cl-tohoku/bert-base-japanese/resolve/main/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/vocab.txt",
             "bert-base-japanese-whole-word-masking":
-            "https://huggingface.co/cl-tohoku/bert-base-japanese-whole-word-masking/resolve/main/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/vocab.txt",
             "bert-base-japanese-char":
-            "https://huggingface.co/cl-tohoku/bert-base-japanese-char/resolve/main/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/vocab.txt",
             "bert-base-japanese-char-whole-word-masking":
-            "https://huggingface.co/cl-tohoku/bert-base-japanese-char-whole-word-masking/resolve/main/vocab.txt"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char-whole-word-masking/vocab.txt"
         }
     }
     pretrained_init_configuration = {

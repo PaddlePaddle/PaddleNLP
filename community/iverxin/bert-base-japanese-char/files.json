@@ -1,3 +1,4 @@
 {
-  "bert-base-japanese-char": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/bert-base-japanese-char.pdparams"
+  "model_state": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/model_state.pdparams",
+  "vocab_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/vocab.txt"
 }
