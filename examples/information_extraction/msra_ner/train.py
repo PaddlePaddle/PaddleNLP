@@ -67,7 +67,7 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
             length, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
-        precision, recall, f1_score = metric.accumulate()
+    precision, recall, f1_score = metric.accumulate()
     print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (avg_loss, precision, recall, f1_score))
     model.train()
