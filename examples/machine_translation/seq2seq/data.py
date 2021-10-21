@@ -118,6 +118,6 @@ def prepare_train_input(insts, bos_id, eos_id, pad_id):
     src, src_length = Pad(pad_val=pad_id, ret_length=True)(
         [inst[0] for inst in insts])
     tgt, tgt_length = Pad(pad_val=pad_id, ret_length=True)(
-        [inst[1] for inst in insts])
+        [inst[1] for inst in insts], dtype="int64")
     tgt_mask = (tgt[:, :-1] != pad_id).astype("float32")
     return src, src_length, tgt[:, :-1], tgt[:, 1:, np.newaxis], tgt_mask

@@ -840,7 +840,8 @@ class MPNetForQuestionAnswering(MPNetPretrainedModel):
     Args:
         mpnet (:class:`MPNetModel`):
             An instance of MPNetModel.
-
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
     """
 
     def __init__(self, mpnet, num_classes=2):
@@ -859,7 +860,9 @@ class MPNetForQuestionAnswering(MPNetPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`MPNetModel`.
-            token_type_ids (Tensor, optional):
+            position_ids (Tensor, optional):
+                See :class:`MPNetModel`.
+            attention_mask (Tensor, optional):
                 See :class:`MPNetModel`.
 
         Returns:
