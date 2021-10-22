@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 import paddle.fluid.core as core
 
+__all__ = ['to_string_tensor', 'to_vocab_tensor']
 
-def to_strings_tensor(string_values, name):
+
+def to_string_tensor(string_values, name):
     """
     Create the tensor that the value holds the list of string.
     NOTICE: The value will be holded in the cpu place. 
@@ -24,22 +27,22 @@ def to_strings_tensor(string_values, name):
         string_values(list[string]): The value will be setted to the tensor.
         name(string): The name of the tensor.
     """
-    tensor = paddle.Tensor(core.VarDesc.VarType.STRINGS, [], name,
+    tensor = paddle.Tensor(core.VarDesc.VarType.STRING, [], name,
                            core.VarDesc.VarType.STRINGS, False)
     tensor.value().set_string_list(string_values)
     return tensor
 
 
-def to_map_tensor(string_dict, name):
+def to_vocab_tensor(vocab_dict, name):
     """
     Create the tensor that the value holds the map, the type of key is the string.
     NOTICE: The value will be holded in the cpu place. 
  
     Args:
-        string_dict(dict): The value will be setted to the tensor.
+        vocab_dict(dict): The value will be setted to the tensor.
         name(string): The name of the tensor.
     """
-    tensor = paddle.Tensor(core.VarDesc.VarType.MAP, [], name,
-                           core.VarDesc.VarType.MAP, True)
-    tensor.value().set_string_map(string_dict)
+    tensor = paddle.Tensor(core.VarDesc.VarType.RAW, [], name,
+                           core.VarDesc.VarType.VOCAB, True)
+    tensor.value().set_vocab(vocab_dict)
     return tensor
