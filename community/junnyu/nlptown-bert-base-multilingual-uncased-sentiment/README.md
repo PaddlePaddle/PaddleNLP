@@ -20,14 +20,15 @@
 微调后的模型在每种语言的 5,000 条商品评论中获得了以下准确率：
 - Accuracy (exact) 完全匹配。
 - Accuracy (off-by-1) 是模型预测的评分等级与人工给出的评分等级差值小于等于 1 所占的百分比。
-| Language | Accuracy (exact)       | Accuracy (off-by-1) |
-| -------- | ---------------------- | ------------------- |
-| English  | 67%                    | 95%                 |
-| Dutch    | 57%                    | 93%                 |
-| German   | 61%                    | 94%                 |
-| French   | 59%                    | 94%                 |
-| Italian  | 59%                    | 95%                 |
-| Spanish  | 58%                    | 95%                 |
+
+| Language | Accuracy (exact) | Accuracy (off-by-1) |
+| -------- | ---------------- | ------------------- |
+| English  | 67%              | 95%                 |
+| Dutch    | 57%              | 93%                 |
+| German   | 61%              | 94%                 |
+| French   | 59%              | 94%                 |
+| Italian  | 59%              | 95%                 |
+| Spanish  | 58%              | 95%                 |
 
 ## 联系方式
 对于类似模型的问题、反馈和/或请求，请联系 [NLP Town](https://www.nlp.town)。
