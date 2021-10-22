@@ -5,9 +5,9 @@ decoding_strategy: "sampling"
 # The parameters for beam search.
 beam_size: 4
 # The parameters for top_k sampling. 
-topk: 4
+top_k: 4
 # The parameters for top_p sampling. 
-topp: 0.0
+top_p: 0.0
 max_out_len: 32
 # The number of decoded sentences to output.
 n_best: 1

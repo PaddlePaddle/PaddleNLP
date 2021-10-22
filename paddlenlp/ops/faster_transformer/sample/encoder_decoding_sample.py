@@ -87,8 +87,8 @@ def do_predict(args):
         eos_id=args.eos_idx,
         decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
-        topk=args.topk,
-        topp=args.topp,
+        top_k=args.top_k,
+        top_p=args.top_p,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)

@@ -45,8 +45,8 @@ transformer = FasterTransformer(
     eos_id=args.eos_idx,
     decoding_strategy=args.decoding_strategy,
     beam_size=args.beam_size,
-    topk=args.topk,
-    topp=args.topp,
+    top_k=args.top_k,
+    top_p=args.top_p,
     max_out_len=args.max_out_len,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
@@ -99,12 +99,12 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 * `--decoding_lib`: 选项用于指明编译好的 FasterTransformer decoding lib 的位置
 * `--decoding_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`sampling`，`beam_search_v2`。
   * 当使用 `beam_search` 的时候，需要指定 `--beam_size` 的值
-  * 当使用 top_k sampling 的时候，需要指定 `--topk` 的值
-  * 当使用 top_p sampling 的时候，需要指定 `--topp` 的值，并且需要保证 `--topk` 的值为 0
+  * 当使用 top_k sampling 的时候，需要指定 `--top_k` 的值
+  * 当使用 top_p sampling 的时候，需要指定 `--top_p` 的值，并且需要保证 `--top_k` 的值为 0
 * `--beam_size`: 解码策略是 `beam_search` 的时候，beam size 的大小，数据类型是 `int`
 * `--diversity_rate`: 解码策略是 `beam_search` 的时候，设置 diversity rate 的大小，数据类型是 `float`。当设置的 `diversity_rate` 大于 0 的时候，FasterTransformer 仅支持 beam size 为 1，4，16，64
-* `--topk`: 解码策略是 top_k sampling 的时候，topk 计算的 k 值的大小，数据类型是 `int`
-* `--topp`: 解码策略是 top_p sampling 的时候，p 的大小，数据类型是 `float`
+* `--top_k`: 解码策略是 top_k sampling 的时候，top_k 计算的 k 值的大小，数据类型是 `int`
+* `--top_p`: 解码策略是 top_p sampling 的时候，p 的大小，数据类型是 `float`
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 

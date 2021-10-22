@@ -83,12 +83,12 @@ class FasterTransformer(TransformerModel):
             and be slower.
         beam_size (int, optional):
             The beam width for beam search. Defaults to 4. 
-        topk (int, optional):
+        top_k (int, optional):
             The number of highest probability tokens to keep for top-k sampling.
             Defaults to 4. 
-        topp (float, optional):
+        top_p (float, optional):
             The most probable tokens whose cumulative probability is not less than
-            `topp` are kept for top-p sampling. Defaults to 4. 
+            `top_p` are kept for top-p sampling. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         diversity_rate (float, optional):
@@ -125,8 +125,8 @@ class FasterTransformer(TransformerModel):
                  eos_id=1,
                  decoding_strategy="beam_search",
                  beam_size=4,
-                 topk=1,
-                 topp=0.0,
+                 top_k=1,
+                 top_p=0.0,
                  max_out_len=256,
                  diversity_rate=0.0,
                  decoding_lib=None,
@@ -144,8 +144,8 @@ class FasterTransformer(TransformerModel):
         args.pop("__class__", None)
         self.decoding_strategy = args.pop("decoding_strategy")
         self.beam_size = args.pop("beam_size")
-        self.topk = args.pop("topk")
-        self.topp = args.pop("topp")
+        self.top_k = args.pop("top_k")
+        self.top_p = args.pop("top_p")
         self.max_out_len = args.pop("max_out_len")
         self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
@@ -181,8 +181,8 @@ class FasterTransformer(TransformerModel):
             eos_id=eos_id,
             decoding_strategy=decoding_strategy,
             beam_size=beam_size,
-            topk=topk,
-            topp=topp,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_out_len,
             diversity_rate=self.diversity_rate,
             decoding_lib=self.decoding_lib,
@@ -488,9 +488,9 @@ class TransformerGenerator(paddle.nn.Layer):
                  **kwargs):
         logger.warning(
             "TransformerGenerator is an experimental API and subject to change.")
-        # `kwargs` can include output_time_major, use_fp16_decoding, topk, topp.
+        # `kwargs` can include output_time_major, use_fp16_decoding, top_k, top_p.
         # The later three arguments can only work when using FasterTransformer,
-        # and expose topk, topp later.
+        # and expose top_k, top_p later.
         super(TransformerGenerator, self).__init__()
         self.d_model = d_model
         self.max_length = max_length
@@ -648,8 +648,8 @@ class TransformerGenerator(paddle.nn.Layer):
 class FasterGPT(nn.Layer):
     def __init__(self,
                  model,
-                 topk=4,
-                 topp=0.0,
+                 top_k=4,
+                 top_p=0.0,
                  max_out_len=256,
                  bos_id=50256,
                  eos_id=50256,
@@ -660,8 +660,8 @@ class FasterGPT(nn.Layer):
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(
             model=model,
-            topk=topk,
-            topp=topp,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_out_len,
             bos_id=bos_id,
             eos_id=eos_id,
@@ -852,8 +852,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             memory_seq_lens=seq_len,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
-            topk=top_k,
-            topp=top_p,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_length,
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,
@@ -1015,8 +1015,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             memory_seq_lens=seq_len,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
-            topk=top_k,
-            topp=top_p,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_length,
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,

@@ -388,8 +388,8 @@ class InferTransformerDecoding(nn.Layer):
                  eos_id=1,
                  decoding_strategy="beam_search",
                  beam_size=4,
-                 topk=1,
-                 topp=0.0,
+                 top_k=1,
+                 top_p=0.0,
                  max_out_len=256,
                  diversity_rate=0.0,
                  decoding_lib=None,
@@ -567,7 +567,7 @@ class InferTransformerDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, self._beam_size, self._topk, self._topp,
+            self._decoding_strategy, self._beam_size, self._top_k, self._top_p,
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
@@ -586,8 +586,8 @@ class InferTransformerDecoding(nn.Layer):
 class InferGptDecoding(nn.Layer):
     def __init__(self,
                  model,
-                 topk=4,
-                 topp=0.0,
+                 top_k=4,
+                 top_p=0.0,
                  max_out_len=256,
                  bos_id=50256,
                  eos_id=50256,
@@ -605,8 +605,8 @@ class InferGptDecoding(nn.Layer):
             load("FasterTransformer", verbose=True)
 
         super(InferGptDecoding, self).__init__()
-        self.topk = topk
-        self.topp = topp
+        self.top_k = top_k
+        self.top_p = top_p
         self.max_out_len = max_out_len
         self.temperature = temperature
         self.use_fp16_decoding = use_fp16_decoding
@@ -738,8 +738,8 @@ class InferGptDecoding(nn.Layer):
             decoder_ln_bias=self.decoder_ln_bias,
             pos_emb=self.pos_emb,
             linear_weight=self.linear_weight,
-            topk=self.topk,
-            topp=self.topp,
+            topk=self.top_k,
+            topp=self.top_p,
             max_out_len=self.max_out_len,
             head_num=self.head_num,
             size_per_head=self.size_per_head,
@@ -1048,8 +1048,8 @@ class InferUnifiedDecoding(nn.Layer):
                 memory_seq_lens,
                 decoding_type_id,
                 beam_size=4,
-                topk=4,
-                topp=0.0,
+                top_k=4,
+                top_p=0.0,
                 max_out_len=256,
                 bos_id=0,
                 eos_id=1,
@@ -1092,8 +1092,8 @@ class InferUnifiedDecoding(nn.Layer):
             type_emb=self.sub_modules["type_emb"],
             _decoding_strategy=self._decoding_strategy,
             _beam_size=beam_size,
-            _topk=topk,
-            _topp=topp,
+            _topk=top_k,
+            _topp=top_p,
             _n_head=self._n_head,
             _size_per_head=self._size_per_head,
             _n_layer=self._n_layer,

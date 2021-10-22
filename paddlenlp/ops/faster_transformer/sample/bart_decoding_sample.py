@@ -78,7 +78,7 @@ def parse_args():
         "--top_p",
         default=1.0,
         type=float,
-        help="The probability threshold to procedure topp sampling. ")
+        help="The probability threshold to procedure top_p sampling. ")
     parser.add_argument(
         "--max_out_len", default=50, type=int, help="Maximum output length. ")
     parser.add_argument(

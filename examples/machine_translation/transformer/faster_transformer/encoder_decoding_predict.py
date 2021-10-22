@@ -50,12 +50,12 @@ def parse_args():
         type=float,
         help="The diversity rate for beam search. ")
     parser.add_argument(
-        "--topk",
+        "--top_k",
         default=4,
         type=int,
         help="The k value for top_k sampling. Default is 4. ")
     parser.add_argument(
-        "--topp",
+        "--top_p",
         default=0.0,
         type=float,
         help="The probability threshold for top_p sampling. Default is 0.0 which means it won't go through top_p sampling. "
@@ -187,15 +187,15 @@ def do_predict(args):
                     "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.beam_size,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "sampling" and args.topk > 0:
+            elif args.decoding_strategy == "sampling" and args.top_k > 0:
                 logger.info(
-                    "Setting info: batch size: {}, topk: {}, use fp16: {}. ".
-                    format(args.infer_batch_size, args.topk,
+                    "Setting info: batch size: {}, top_k: {}, use fp16: {}. ".
+                    format(args.infer_batch_size, args.top_k,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "sampling" and args.topp > 0.0:
+            elif args.decoding_strategy == "sampling" and args.top_p > 0.0:
                 logger.info(
-                    "Setting info: batch size: {}, topp: {}, use fp16: {}. ".
-                    format(args.infer_batch_size, args.topp,
+                    "Setting info: batch size: {}, top_p: {}, use fp16: {}. ".
+                    format(args.infer_batch_size, args.top_p,
                            args.use_fp16_decoding))
             paddle.fluid.core._cuda_synchronize(place)
             logger.info("Average time latency is {} ms/batch. ".format((
@@ -212,8 +212,8 @@ if __name__ == "__main__":
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
     args.diversity_rate = ARGS.diversity_rate
-    args.topk = ARGS.topk
-    args.topp = ARGS.topp
+    args.top_k = ARGS.top_k
+    args.top_p = ARGS.top_p
     args.profile = ARGS.profile
     args.benchmark = ARGS.benchmark
     if ARGS.batch_size:

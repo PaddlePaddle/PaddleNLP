@@ -119,8 +119,8 @@ transformer = FasterTransformer(
     eos_id=args.eos_idx,
     decoding_strategy=args.decoding_strategy,
     beam_size=args.beam_size,
-    topk=args.topk,
-    topp=args.topp,
+    top_k=args.top_k,
+    top_p=args.top_p,
     max_out_len=args.max_out_len,
     decoding_lib=args.decoding_lib,
     use_fp16_decoding=args.use_fp16_decoding)
@@ -172,8 +172,8 @@ model = model_class.from_pretrained(args.model_name)
 # Define model
 gpt = FasterGPT(
     model=model,
-    topk=args.topk,
-    topp=args.topp,
+    top_k=args.top_k,
+    top_p=args.top_p,
     max_out_len=args.max_out_len,
     bos_id=bos_id,
     eos_id=eos_id,
@@ -182,7 +182,7 @@ gpt = FasterGPT(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 top_k sampling 和 top_p sampling，不支持 beam-search。
 
 若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文所述完成编译。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
@@ -194,15 +194,15 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
+python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --top_k 4 --top_p 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
 * `--model_name_or_path`: 预训练模型的名称或是路径。
 * `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不指定或是不存在则将自动进行 jit 编译产出该 lib。
 * `--batch_size`: 一个 batch 内，样本数目的大小。
-* `--topk`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
-* `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
+* `--top_k`: 执行 top_k sampling 的时候的 `k` 的大小，默认是 4。
+* `--top_p`: 执行 top_p sampling 的时候的阈值的大小，默认是 0.0 表示不执行 top_p sampling。
 * `--max_out_len`: 最长的生成长度。
 * `--start_token`: 字符串，表示任意生成的时候的开始 token。
 * `--end_token`: 字符串，生成的结束 token。
@@ -300,7 +300,7 @@ cd bin/
 如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./faster_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
 
 ``` sh
-python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en  --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en  --top_k 4 --top_p 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
 ```
 
 各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。

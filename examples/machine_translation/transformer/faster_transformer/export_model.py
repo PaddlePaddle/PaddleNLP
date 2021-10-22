@@ -46,12 +46,12 @@ def parse_args():
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
-        "--topk",
+        "--top_k",
         default=4,
         type=int,
         help="The k value for top_k sampling. Default is 4. ")
     parser.add_argument(
-        "--topp",
+        "--top_p",
         default=0.0,
         type=float,
         help="The probability threshold for top_p sampling. Default is 0.0 which means it won't go through top_p sampling. "
@@ -146,8 +146,8 @@ if __name__ == "__main__":
     args.use_fp16_decoding = ARGS.use_fp16_decoding
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
-    args.topk = ARGS.topk
-    args.topp = ARGS.topp
+    args.top_k = ARGS.top_k
+    args.top_p = ARGS.top_p
     args.benchmark = ARGS.benchmark
     args.vocab_file = ARGS.vocab_file
     args.unk_token = ARGS.unk_token

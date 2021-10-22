@@ -51,15 +51,15 @@ def parse_args():
     parser.add_argument(
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
-        "--topk",
+        "--top_k",
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
-        "--topp",
+        "--top_p",
         default=0.0,
         type=float,
-        help="The probability threshold to procedure topp sampling. ")
+        help="The probability threshold to procedure top_p sampling. ")
     parser.add_argument(
         "--max_out_len", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
@@ -102,8 +102,8 @@ def do_predict(args):
     # Define model
     gpt = FasterGPT(
         model=model,
-        topk=args.topk,
-        topp=args.topp,
+        top_k=args.top_k,
+        top_p=args.top_p,
         max_out_len=args.max_out_len,
         bos_id=bos_id,
         eos_id=eos_id,
@@ -145,7 +145,7 @@ def do_predict(args):
                 max_length=args.max_out_len,
                 decode_strategy="sampling",
                 temperature=args.temperature,
-                top_k=args.topk,
+                top_k=args.top_k,
                 top_p=1.0,
                 num_return_sequences=1)
         paddle.fluid.core._cuda_synchronize(place)

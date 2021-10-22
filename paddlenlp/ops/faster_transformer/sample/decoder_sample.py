@@ -33,7 +33,7 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoder_lib",
-        default="../../build/lib/libdecoding_op.so",
+        default="./build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
@@ -66,9 +66,6 @@ def do_predict(args):
         decoder_lib=args.decoder_lib,
         use_fp16_decoder=args.use_fp16_decoder)
 
-    # Load checkpoint.
-    transformer.load(
-        os.path.join(args.init_from_params, "transformer.pdparams"))
     # Set evaluate mode
     transformer.eval()
 

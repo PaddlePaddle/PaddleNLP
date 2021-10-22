@@ -45,21 +45,21 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../build/lib/libdecoding_op.so",
+        default="./build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
-        "--topk",
+        "--top_k",
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
-        "--topp",
+        "--top_p",
         default=0.0,
         type=float,
-        help="The probability threshold to procedure topp sampling. ")
+        help="The probability threshold to procedure top_p sampling. ")
     parser.add_argument(
         "--max_out_len", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
@@ -102,8 +102,8 @@ def do_predict(args):
     # Define model
     gpt = FasterGPT(
         model=model,
-        topk=args.topk,
-        topp=args.topp,
+        top_k=args.top_k,
+        top_p=args.top_p,
         max_out_len=args.max_out_len,
         bos_id=bos_id,
         eos_id=eos_id,
