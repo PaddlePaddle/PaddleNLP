@@ -20,7 +20,7 @@ from paddlenlp.utils.log import logger
 class Demo:
     def __init__(self, model_name_or_path="junnyu/microsoft-DialoGPT-small", max_predict_len=32):
 
-        self.tokenizer = GPTTokenizer.from_pretrained(model_name_or_path, eol_token="<|endoftext|>")
+        self.tokenizer = GPTTokenizer.from_pretrained(model_name_or_path)
         logger.info("Loading the model parameters, please wait...")
         self.max_predict_len = max_predict_len
         self.model = GPTLMHeadModel.from_pretrained(
@@ -35,7 +35,7 @@ class Demo:
         # Let's chat for 5 lines
         for step in range(5):
             # encode the new user input, add the eos_token and return a tensor in Pytorch
-            ids = self.tokenizer(input(">> User:"))["input_ids"] + [self.tokenizer.eol_token_id]
+            ids = self.tokenizer(input(">> User:"))["input_ids"] + [self.tokenizer.eos_token_id]
             new_user_input_ids = paddle.to_tensor(np.array(ids).reshape(1, -1).astype("int64"))
 
             # append the new user input tokens to the chat history
@@ -43,7 +43,7 @@ class Demo:
 
 
             # generated a response while limiting the total chat history to 1000 tokens,
-            chat_history_ids = self.model.generate(bot_input_ids, max_length=self.max_predict_len, pad_token_id=self.tokenizer.eol_token_id,decode_strategy="sampling",top_k=5,)[0]
+            chat_history_ids = self.model.generate(bot_input_ids, max_length=self.max_predict_len, pad_token_id=self.tokenizer.eos_token_id,decode_strategy="sampling",top_k=5,)[0]
 
             # pretty print last ouput tokens from bot
             print("DialoGPT: {}".format(self.tokenizer.convert_ids_to_string(chat_history_ids[0].tolist()).replace("<|endoftext|>","")))
