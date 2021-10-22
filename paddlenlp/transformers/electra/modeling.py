@@ -19,11 +19,18 @@ import paddle.nn.functional as F
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
-    'ElectraDiscriminator', 'ElectraGenerator', 'ElectraClassificationHead',
-    'ElectraForSequenceClassification', 'ElectraForTokenClassification',
-    'ElectraPretrainingCriterion', 'ElectraForMultipleChoice',
-    'ElectraForQuestionAnswering', 'ElectraForMaskedLM'
+    'ElectraModel',
+    'ElectraPretrainedModel',
+    'ElectraForTotalPretraining',
+    'ElectraDiscriminator',
+    'ElectraGenerator',
+    'ElectraClassificationHead',
+    'ElectraForSequenceClassification',
+    'ElectraForTokenClassification',
+    'ElectraPretrainingCriterion',
+    'ElectraForMultipleChoice',
+    'ElectraForQuestionAnswering',
+    'ElectraForMaskedLM',
 ]
 
 
@@ -441,12 +448,18 @@ class ElectraModel(ElectraPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
+
         '''
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(paddle.get_default_dtype()) * -1e9,
                 axis=[1, 2])
+        else:
+            if attention_mask.ndim == 2:
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+                attention_mask = (1.0 - attention_mask
+                                  ).astype(paddle.get_default_dtype()) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -490,11 +503,11 @@ class ElectraDiscriminator(ElectraPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
             position_ids (Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
-                See :class:`ElectraModel`.
-            use_cache (bool, optional):
                 See :class:`ElectraModel`.
 
         Returns:
@@ -513,8 +526,8 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs)
-                logits = output[0]
+                logits = model(**inputs)
+
         """
         discriminator_sequence_output = self.electra(
             input_ids, token_type_ids, position_ids, attention_mask)
@@ -567,11 +580,11 @@ class ElectraGenerator(ElectraPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
             position_ids (Tensor, optional):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
-                See :class:`ElectraModel`.
-            use_cache (bool, optional):
                 See :class:`ElectraModel`.
 
         Returns:
@@ -589,8 +602,8 @@ class ElectraGenerator(ElectraPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs)
-                prediction_scores = output[0]
+                prediction_scores = model(**inputs)
+
         """
         generator_sequence_output = self.electra(input_ids, token_type_ids,
                                                  position_ids, attention_mask)
@@ -714,9 +727,8 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                logits = model(**inputs)
 
-                logits = outputs[0]
         """
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -786,9 +798,8 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs)
+                logits = model(**inputs)
 
-                logits = outputs[0]
         """
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -1097,13 +1108,13 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
             token_type_ids (Tensor, optional):
-                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
             position_ids(Tensor, optional):
-                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
-                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
 
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
@@ -1326,8 +1337,8 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import ElectraForQuestionAnswering, ElectraTokenizer
 
-                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
-                model = ElectraForQuestionAnswering.from_pretrained('electra-base')
+                tokenizer = ElectraTokenizer.from_pretrained('electra-small')
+                model = ElectraForQuestionAnswering.from_pretrained('electra-small')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -1349,4 +1360,5 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
         return start_logits, end_logits
 
 
+# ElectraForMaskedLM is the same as ElectraGenerator
 ElectraForMaskedLM = ElectraGenerator

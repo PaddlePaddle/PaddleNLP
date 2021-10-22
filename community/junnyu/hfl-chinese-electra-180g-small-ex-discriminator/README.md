@@ -1,6 +1,8 @@
 # 详细介绍
 **介绍**：该模型是small版本的Electra discriminator模型，并且在180G的中文数据上进行训练。
+
 **模型结构**： **`ElectraDiscriminator`**，带有判别器的中文Electra模型。
+
 **适用下游任务**：**通用下游任务**，如：句子级别分类，token级别分类，抽取式问答等任务。
 
 # 使用示例
@@ -22,7 +24,7 @@ inputs = {
 }
 
 with paddle.no_grad():
-    logits = pdmodel(**inputs)
+    logits = model(**inputs)
 
 print(logits.shape)
 
