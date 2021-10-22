@@ -23,9 +23,14 @@ from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'GPTModel', "GPTPretrainedModel", 'GPTForPretraining',
-    'GPTPretrainingCriterion', 'GPTForGreedyGeneration', 'GPTLMHeadModel',
-    'GPTForTokenClassification', 'GPTForSequenceClassification'
+    'GPTModel',
+    'GPTPretrainedModel',
+    'GPTForPretraining',
+    'GPTPretrainingCriterion',
+    'GPTForGreedyGeneration',
+    'GPTLMHeadModel',
+    'GPTForTokenClassification',
+    'GPTForSequenceClassification',
 ]
 
 
@@ -1190,7 +1195,6 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
     def __init__(self, gpt, num_classes=2):
         super(GPTForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
         self.gpt = gpt  # allow gpt to be config
         self.score = nn.Linear(
             self.gpt.config["hidden_size"], num_classes, bias_attr=False)
@@ -1227,12 +1231,15 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
         """
 
+        # sequence_output shape [bs, seq_len, hidden_size]
         sequence_output = self.gpt(input_ids,
                                    position_ids=position_ids,
                                    attention_mask=attention_mask)
+        # logits shape [bs, seq_len, num_class]
         logits = self.score(sequence_output)
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
+        # sequence_lengths shape [bs,]
         sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(
             axis=-1) - 1
         pooled_logits = logits.gather_nd(
