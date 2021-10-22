@@ -59,7 +59,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
-        "--decoding_strategy",
+        "--decode_strategy",
         default='greedy_search',
         type=str,
         help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
@@ -140,7 +140,7 @@ def do_predict(args):
     # Define model
     faster_bart = FasterBART(
         model=model,
-        decoding_strategy=args.decoding_strategy,
+        decode_strategy=args.decode_strategy,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
@@ -158,7 +158,7 @@ def do_predict(args):
                 input_ids=input_ids,
                 mem_seq_lens=mem_seq_lens,
                 max_length=args.max_out_len,
-                decode_strategy=args.decoding_strategy,
+                decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.beam_size,
@@ -170,7 +170,7 @@ def do_predict(args):
             (time.perf_counter() - start) / 50 * 1000))
 
         # Output
-        if args.decoding_strategy.startswith('beam_search'):
+        if args.decode_strategy.startswith('beam_search'):
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
@@ -178,8 +178,8 @@ def do_predict(args):
                         break
                     generated_ids = post_process_seq(beam, bos_id, eos_id)
                     print(tokenizer.convert_ids_to_string(generated_ids))
-        elif args.decoding_strategy.endswith(
-                'sampling') or args.decoding_strategy == "greedy_search":
+        elif args.decode_strategy.endswith(
+                'sampling') or args.decode_strategy == "greedy_search":
             finished_seq = finished_seq.numpy().transpose([1, 0])
             for ins in finished_seq:
                 generated_ids = post_process_seq(ins, bos_id, eos_id)

@@ -43,7 +43,7 @@ transformer = FasterTransformer(
     weight_sharing=args.weight_sharing,
     bos_id=args.bos_idx,
     eos_id=args.eos_idx,
-    decoding_strategy=args.decoding_strategy,
+    decode_strategy=args.decode_strategy,
     beam_size=args.beam_size,
     top_k=args.top_k,
     top_p=args.top_p,
@@ -91,13 +91,13 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decode_strategy beam_search --beam_size 5
 ```
 
 其中:
 * `--config`: 选项用于指明配置文件的位置
 * `--decoding_lib`: 选项用于指明编译好的 FasterTransformer decoding lib 的位置
-* `--decoding_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`sampling`，`beam_search_v2`。
+* `--decode_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`sampling`，`beam_search_v2`。
   * 当使用 `beam_search` 的时候，需要指定 `--beam_size` 的值
   * 当使用 top_k sampling 的时候，需要指定 `--top_k` 的值
   * 当使用 top_p sampling 的时候，需要指定 `--top_p` 的值，并且需要保证 `--top_k` 的值为 0
@@ -120,7 +120,7 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decode_strategy beam_search --beam_size 5
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FasterTransformer decoding lib 的位置。
@@ -136,7 +136,7 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
 ``` sh
-python export_model.py --config ../configs/transformer.base.yaml  --decoding_strategy beam_search --beam_size 5
+python export_model.py --config ../configs/transformer.base.yaml  --decode_strategy beam_search --beam_size 5
 ```
 
 若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `export_model.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。

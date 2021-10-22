@@ -210,7 +210,7 @@ def generate(args):
     if args.faster:
         model = FasterBART(
             model,
-            decoding_strategy=args.decode_strategy,
+            decode_strategy=args.decode_strategy,
             decoding_lib=args.decoding_lib,
             use_fp16_decoding=args.use_fp16_decoding)
 

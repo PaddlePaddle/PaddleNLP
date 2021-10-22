@@ -346,13 +346,13 @@ def finalize(beam_size,
              parent_ids,
              out_seq_lens,
              max_seq_len=None,
-             decoding_strategy="beam_search"):
+             decode_strategy="beam_search"):
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
     ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
-    if decoding_strategy.startswith("beam_search"):
+    if decode_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
-            beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
+            beam_size * 2 if decode_strategy.endswith("_v2") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -386,7 +386,7 @@ class InferTransformerDecoding(nn.Layer):
                  d_model,
                  bos_id=0,
                  eos_id=1,
-                 decoding_strategy="beam_search",
+                 decode_strategy="beam_search",
                  beam_size=4,
                  top_k=1,
                  top_p=0.0,
@@ -473,7 +473,7 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
-            if not decoding_strategy.startswith("beam_search"):
+            if not decode_strategy.startswith("beam_search"):
                 linear.bias = transfer_param(linear.bias)
 
             positional_embedding.weight = transfer_param(
@@ -549,7 +549,7 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_bias = [linear.bias]
 
     def forward(self, enc_output, memory_seq_lens):
-        if self._decoding_strategy.startswith("beam_search"):
+        if self._decode_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 enc_output, self._beam_size)
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
@@ -567,7 +567,7 @@ class InferTransformerDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, self._beam_size, self._top_k, self._top_p,
+            self._decode_strategy, self._beam_size, self._top_k, self._top_p,
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
@@ -578,7 +578,7 @@ class InferTransformerDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decode_strategy=self._decode_strategy)
 
         return ids
 
@@ -755,7 +755,7 @@ class InferGptDecoding(nn.Layer):
 class InferUnifiedDecoding(nn.Layer):
     def __init__(self,
                  model,
-                 decoding_strategy="sampling",
+                 decode_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  logits_mask=None,
@@ -976,7 +976,7 @@ class InferUnifiedDecoding(nn.Layer):
                         restore_data=True,
                         reserve_var=True), [1, 0])
             ]
-            if self._decoding_strategy != "beam_search":
+            if self._decode_strategy != "beam_search":
                 self.sub_modules["linear_bias"] = [
                     transfer_param(
                         self._model.lm_head.decoder_bias,
@@ -1090,7 +1090,7 @@ class InferUnifiedDecoding(nn.Layer):
             linear_bias=self.sub_modules["linear_bias"],
             pos_emb=self.sub_modules["pos_emb"],
             type_emb=self.sub_modules["type_emb"],
-            _decoding_strategy=self._decoding_strategy,
+            _decoding_strategy=self._decode_strategy,
             _beam_size=beam_size,
             _topk=top_k,
             _topp=top_p,
@@ -1114,7 +1114,7 @@ class InferUnifiedDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decode_strategy=self._decode_strategy)
 
         return ids
 
@@ -1123,7 +1123,7 @@ class InferBartDecoding(nn.Layer):
     def __init__(
             self,
             model,
-            decoding_strategy="beam_search_v2",
+            decode_strategy="beam_search_v2",
             decoding_lib=None,
             use_fp16_decoding=False, ):
         # if decoding_lib is None:
@@ -1227,7 +1227,7 @@ class InferBartDecoding(nn.Layer):
 
             model.lm_head_weight = transfer_param(
                 model.lm_head_weight, restore_data=True)
-            if not decoding_strategy.startswith("beam_search"):
+            if not decode_strategy.startswith("beam_search"):
                 model.final_logits_bias = transfer_param(
                     model.final_logits_bias, is_bias=True, restore_data=True)
 
@@ -1317,14 +1317,14 @@ class InferBartDecoding(nn.Layer):
                 rel_len=False,
                 alpha=0.6):
         # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
-        if self._decoding_strategy.startswith("beam_search"):
+        if self._decode_strategy.startswith("beam_search"):
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 memory_seq_lens, beam_size)
-            self._decoding_strategy = "beam_search_v2"
-        elif self._decoding_strategy == "greedy_search":
+            self._decode_strategy = "beam_search_v2"
+        elif self._decode_strategy == "greedy_search":
             top_k = 1
             top_p = 0.0
-            self._decoding_strategy = "sampling"
+            self._decode_strategy = "sampling"
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
@@ -1338,7 +1338,7 @@ class InferBartDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, beam_size, top_k, top_p, self._n_head,
+            self._decode_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, max_out_len, diversity_rate, rel_len,
             alpha)
@@ -1348,5 +1348,5 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decode_strategy=self._decode_strategy)
         return ids

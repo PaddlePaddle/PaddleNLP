@@ -31,7 +31,7 @@ tokenizer = UNIMOTokenizer.from_pretrained(args.model_name_or_path)
 
 model = FasterUNIMOText(
     model,
-    decoding_strategy=args.decode_strategy,
+    decode_strategy=args.decode_strategy,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 

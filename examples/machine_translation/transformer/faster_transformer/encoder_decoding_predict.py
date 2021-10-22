@@ -38,7 +38,7 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
-        "--decoding_strategy",
+        "--decode_strategy",
         default="beam_search",
         type=str,
         choices=["beam_search", "sampling"],
@@ -145,7 +145,7 @@ def do_predict(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
-        decoding_strategy=args.decoding_strategy,
+        decode_strategy=args.decode_strategy,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         diversity_rate=args.diversity_rate,
@@ -167,9 +167,9 @@ def do_predict(args):
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
             if not args.profile:
-                if args.decoding_strategy == "beam_search":
+                if args.decode_strategy == "beam_search":
                     finished_seq = finished_seq.numpy().transpose([1, 2, 0])
-                elif args.decoding_strategy == "sampling":
+                elif args.decode_strategy == "sampling":
                     finished_seq = np.expand_dims(
                         finished_seq.numpy().transpose([1, 0]), axis=1)
                 for ins in finished_seq:
@@ -182,17 +182,17 @@ def do_predict(args):
                         sequence = " ".join(word_list) + "\n"
                         f.write(sequence)
         if args.profile:
-            if args.decoding_strategy == "beam_search":
+            if args.decode_strategy == "beam_search":
                 logger.info(
                     "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.beam_size,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "sampling" and args.top_k > 0:
+            elif args.decode_strategy == "sampling" and args.top_k > 0:
                 logger.info(
                     "Setting info: batch size: {}, top_k: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.top_k,
                            args.use_fp16_decoding))
-            elif args.decoding_strategy == "sampling" and args.top_p > 0.0:
+            elif args.decode_strategy == "sampling" and args.top_p > 0.0:
                 logger.info(
                     "Setting info: batch size: {}, top_p: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.top_p,
@@ -209,7 +209,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
-    args.decoding_strategy = ARGS.decoding_strategy
+    args.decode_strategy = ARGS.decode_strategy
     args.beam_size = ARGS.beam_size
     args.diversity_rate = ARGS.diversity_rate
     args.top_k = ARGS.top_k

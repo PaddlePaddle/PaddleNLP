@@ -38,7 +38,7 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
-        "--decoding_strategy",
+        "--decode_strategy",
         default="beam_search",
         type=str,
         choices=["beam_search", "sampling", "beam_search_v2"],
@@ -106,7 +106,7 @@ def do_predict(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
-        decoding_strategy=args.decoding_strategy,
+        decode_strategy=args.decode_strategy,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
@@ -144,7 +144,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
-    args.decoding_strategy = ARGS.decoding_strategy
+    args.decode_strategy = ARGS.decode_strategy
     args.beam_size = ARGS.beam_size
     args.top_k = ARGS.top_k
     args.top_p = ARGS.top_p
