@@ -9,401 +9,426 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了**21**种网络结构， **91** 种预训练的参数权重供用户使用，
-其中包含了 **45** 种中文语言模型的预训练权重。
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **21** 种网络结构， **96** 种预训练的参数权重供用户使用，
+其中包含了 **48** 种中文语言模型的预训练权重。
 
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-| Model              | Pretrained Weight                       | Language     | Details of the model                    |
-+====================+=========================================+==============+=========================================+
-|ALBERT_             |``albert-base-v1``                       | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 768-hidden, 12-heads, 11M parameters.   |
-|                    |                                         |              | ALBERT base model                       |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-large-v1``                      | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 1024-hidden, 16-heads, 17M parameters.  |
-|                    |                                         |              | ALBERT large model                      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-xlarge-v1``                     | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 2048-hidden, 16-heads, 58M parameters.  |
-|                    |                                         |              | ALBERT xlarge model                     |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-xxlarge-v1``                    | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 4096-hidden, 64-heads, 223M parameters. |
-|                    |                                         |              | ALBERT xxlarge model                    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-base-v2``                       | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 768-hidden, 12-heads, 11M parameters.   |
-|                    |                                         |              | ALBERT base model (version2)            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-large-v2``                      | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 1024-hidden, 16-heads, 17M parameters.  |
-|                    |                                         |              | ALBERT large model (version2)           |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-xlarge-v2``                     | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 2048-hidden, 16-heads, 58M parameters.  |
-|                    |                                         |              | ALBERT xlarge model (version2)          |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-xxlarge-v2``                    | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 4096-hidden, 64-heads, 223M parameters. |
-|                    |                                         |              | ALBERT xxlarge model (version2)         |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-tiny``                  | Chinese      | 4 repeating layers, 128 embedding,      |
-|                    |                                         |              | 312-hidden, 12-heads, 4M parameters.    |
-|                    |                                         |              | ALBERT tiny model (Chinese)             |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-small``                 | Chinese      | 6 repeating layers, 128 embedding,      |
-|                    |                                         |              | 384-hidden, 12-heads, _M parameters.    |
-|                    |                                         |              | ALBERT small model (Chinese)            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-base``                  | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 768-hidden, 12-heads, 12M parameters.   |
-|                    |                                         |              | ALBERT base model (Chinese)             |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-large``                 | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 1024-hidden, 16-heads, 18M parameters.  |
-|                    |                                         |              | ALBERT large model (Chinese)            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-xlarge``                | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                         |              | 2048-hidden, 16-heads, 60M parameters.  |
-|                    |                                         |              | ALBERT xlarge model (Chinese)           |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``albert-chinese-xxlarge``               | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                         |              | 4096-hidden, 16-heads, 235M parameters. |
-|                    |                                         |              | ALBERT xxlarge model (Chinese)          |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|BART_               |``bart-base``                            | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 217M parameters.              |
-|                    |                                         |              | BART base model (English)               |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bart-large``                           | English      | 24-layer, 768-hidden,                   |
-|                    |                                         |              | 16-heads, 509M parameters.              |
-|                    |                                         |              | BART large model (English).             |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|BERT_               |``bert-base-uncased``                    | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 110M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-large-uncased``                   | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-base-cased``                      | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 109M parameters.              |
-|                    |                                         |              | Trained on cased English text.          |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-large-cased``                     | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 335M parameters.              |
-|                    |                                         |              | Trained on cased English text.          |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-base-multilingual-uncased``       | Multilingual | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 168M parameters.              |
-|                    |                                         |              | Trained on lower-cased text             |
-|                    |                                         |              | in the top 102 languages                |
-|                    |                                         |              | with the largest Wikipedias.            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-base-multilingual-cased``         | Multilingual | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 179M parameters.              |
-|                    |                                         |              | Trained on cased text                   |
-|                    |                                         |              | in the top 104 languages                |
-|                    |                                         |              | with the largest Wikipedias.            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-base-chinese``                    | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on cased Chinese Simplified     |
-|                    |                                         |              | and Traditional text.                   |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-wwm-chinese``                     | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on cased Chinese Simplified     |
-|                    |                                         |              | and Traditional text using              |
-|                    |                                         |              | Whole-Word-Masking.                     |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``bert-wwm-ext-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on cased Chinese Simplified     |
-|                    |                                         |              | and Traditional text using              |
-|                    |                                         |              | Whole-Word-Masking with extented data.  |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``macbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 102M parameters.              |
-|                    |                                         |              | Trained with novel MLM as correction    |
-|                    |                                         |              | pre-training task.                      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``macbert-large-chinese``                | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 326M parameters.              |
-|                    |                                         |              | Trained with novel MLM as correction    |
-|                    |                                         |              | pre-training task.                      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``simbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on 22 million pairs of similar  |
-|                    |                                         |              | sentences crawed from Baidu Know.       |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|BigBird_            |``bigbird-base-uncased``                 | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, _M parameters.                |
-|                    |                                         |              | Trained on lower-cased English text.    |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ConvBert_           |``convbert-base``                        | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 106M parameters.              |
-|                    |                                         |              | The ConvBERT base model.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``convbert-medium-small``                | English      | 12-layer, 384-hidden,                   |
-|                    |                                         |              | 8-heads, 17M parameters.                |
-|                    |                                         |              | The ConvBERT medium small model.        |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``convbert-small``                       | English      | 12-layer, 128-hidden,                   |
-|                    |                                         |              | 4-heads, 13M parameters.                |
-|                    |                                         |              | The ConvBERT small model.               |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|DistilBert_         |``distilbert-base-uncased``              | English      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 66M parameters.               |
-|                    |                                         |              | The DistilBERT model distilled from     |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``distilbert-base-cased``                | English      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 66M parameters.               |
-|                    |                                         |              | The DistilBERT model distilled from     |
-|                    |                                         |              | the BERT model ``bert-base-cased``      |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ELECTRA_            |``electra-small``                        | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 4-heads, _M parameters.                 |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``electra-base``                         | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, _M parameters.                |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``electra-large``                        | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, _M parameters.                |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``chinese-electra-small``                | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 4-heads, _M parameters.                 |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``chinese-electra-base``                 | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, _M parameters.                |
-|                    |                                         |              | Trained on Chinese text.                |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ERNIE_              |``ernie-1.0``                            | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-tiny``                           | Chinese      | 3-layer, 1024-hidden,                   |
-|                    |                                         |              | 16-heads, _M parameters.                |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-2.0-en``                         | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 103M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-2.0-en-finetuned-squad``         | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 110M parameters.              |
-|                    |                                         |              | Trained on finetuned squad text.        |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-2.0-large-en``                   | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ERNIE-DOC_          |``ernie-doc-base-zh``                    | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-doc-base-en``                    | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 103M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ERNIE-GEN_          |``ernie-gen-base-en``                    | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-gen-large-en``                   | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``ernie-gen-large-en-430g``              | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on lower-cased English text.    |
-|                    |                                         |              | with extended data (430 GB).            |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|ERNIE-GRAM_         |``ernie-gram-zh``                        | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|GPT_                |``gpt-cpm-large-cn``                     | Chinese      | 32-layer, 2560-hidden,                  |
-|                    |                                         |              | 32-heads, 2.6B parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt-cpm-small-cn-distill``             | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 109M parameters.              |
-|                    |                                         |              | The model distilled from                |
-|                    |                                         |              | the GPT model ``gpt-cpm-large-cn``      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt2-medium-en``                       | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 345M parameters.              |
-|                    |                                         |              | Trained on English text.                |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|MPNet_              |``mpnet-base``                           | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 109M parameters.              |
-|                    |                                         |              | MPNet Base Model.                       |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|NeZha_              |``nezha-base-chinese``                   | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``nezha-large-chinese``                  | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``nezha-base-wwm-chinese``               | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 16-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``nezha-large-wwm-chinese``              | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|RoBERTa_            |``roberta-wwm-ext``                      | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 102M parameters.              |
-|                    |                                         |              | Trained on English Text using           |
-|                    |                                         |              | Whole-Word-Masking with extended data.  |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-wwm-ext-large``                | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 325M parameters.              |
-|                    |                                         |              | Trained on English Text using           |
-|                    |                                         |              | Whole-Word-Masking with extended data.  |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``rbt3``                                 | Chinese      | 3-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 38M parameters.               |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``rbtl3``                                | Chinese      | 3-layer, 1024-hidden,                   |
-|                    |                                         |              | 16-heads, 61M parameters.               |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|RoFormer_           |``roformer-chinese-small``               | Chinese      | 6-layer, 384-hidden,                    |
-|                    |                                         |              | 6-heads, 30M parameters.                |
-|                    |                                         |              | Roformer Small Chinese model.           |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-base``                | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 124M parameters.              |
-|                    |                                         |              | Roformer Base Chinese model.            |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-char-small``          | Chinese      | 6-layer, 384-hidden,                    |
-|                    |                                         |              | 6-heads, 15M parameters.                |
-|                    |                                         |              | Roformer Chinese Char Small model.      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-char-base``           | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 95M parameters.               |
-|                    |                                         |              | Roformer Chinese Char Base model.       |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-sim-char-ft-small``   | Chinese      | 6-layer, 384-hidden,                    |
-|                    |                                         |              | 6-heads, 15M parameters.                |
-|                    |                                         |              | Roformer Chinese Char Ft Small model.   |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-sim-char-ft-base``    | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 95M parameters.               |
-|                    |                                         |              | Roformer Chinese Char Ft Base model.    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-sim-char-small``      | Chinese      | 6-layer, 384-hidden,                    |
-|                    |                                         |              | 6-heads, 15M parameters.                |
-|                    |                                         |              | Roformer Chinese Sim Char Small model.  |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-chinese-sim-char-base``       | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 95M parameters.               |
-|                    |                                         |              | Roformer Chinese Sim Char Base model.   |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-english-small-discriminator`` | English      | 12-layer, 256-hidden,                   |
-|                    |                                         |              | 4-heads, 13M parameters.                |
-|                    |                                         |              | Roformer English Small Discriminator.   |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``roformer-english-small-generator``     | English      | 12-layer, 64-hidden,                    |
-|                    |                                         |              | 1-heads, 5M parameters.                 |
-|                    |                                         |              | Roformer English Small Generator.       |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|SKEP_               |``skep_ernie_1.0_large_ch``              | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained using the Erine model           |
-|                    |                                         |              | ``ernie_1.0``                           |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``skep_ernie_2.0_large_en``              | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 336M parameters.              |
-|                    |                                         |              | Trained using the Erine model           |
-|                    |                                         |              | ``ernie_2.0_large_en``                  |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``skep_roberta_large_en``                | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 355M parameters.              |
-|                    |                                         |              | Trained using the RoBERTa model         |
-|                    |                                         |              | ``roberta_large_en``                    |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|TinyBert_           |``tinybert-4l-312d``                     | English      | 4-layer, 312-hidden,                    |
-|                    |                                         |              | 12-heads, 14.5M parameters.             |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``tinybert-6l-768d``                     | English      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 67M parameters.               |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``tinybert-4l-312d-v2``                  | English      | 4-layer, 312-hidden,                    |
-|                    |                                         |              | 12-heads, 14.5M parameters.             |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``tinybert-6l-768d-v2``                  | English      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 67M parameters.               |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``tinybert-4l-312d-zh``                  | Chinese      | 4-layer, 312-hidden,                    |
-|                    |                                         |              | 12-heads, 14.5M parameters.             |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``tinybert-6l-768d-zh``                  | Chinese      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 67M parameters.               |
-|                    |                                         |              | The TinyBert model distilled from       |
-|                    |                                         |              | the BERT model ``bert-base-uncased``    |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|UnifiedTransformer_ |``unified_transformer-12L-cn``           | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text.                |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``unified_transformer-12L-cn-luge``      | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 108M parameters.              |
-|                    |                                         |              | Trained on Chinese text (LUGE.ai).      |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``plato-mini``                           | Chinese      | 6-layer, 768-hidden,                    |
-|                    |                                         |              | 12-heads, 66M parameters.               |
-|                    |                                         |              | Trained on Chinese text.                |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|UNIMO_              |``unimo-text-1.0``                       | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 99M parameters.               |
-|                    |                                         |              | UNIMO-text-1.0 model.                   |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``unimo-text-1.0-large``                 | English      | 24-layer, 768-hidden,                   |
-|                    |                                         |              | 16-heads, 316M parameters.              |
-|                    |                                         |              | UNIMO-text-1.0 large model.             |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
-|XLNet_              |``xlnet-base-cased``                     | English      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 110M parameters.              |
-|                    |                                         |              | XLNet English model                     |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``xlnet-large-cased``                    | English      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, 340M parameters.              |
-|                    |                                         |              | XLNet Large English model               |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``chinese-xlnet-base``                   | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 117M parameters.              |
-|                    |                                         |              | XLNet Chinese model                     |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``chinese-xlnet-mid``                    | Chinese      | 24-layer, 768-hidden,                   |
-|                    |                                         |              | 12-heads, 209M parameters.              |
-|                    |                                         |              | XLNet Medium Chinese model              |
-|                    +-----------------------------------------+--------------+-----------------------------------------+
-|                    |``chinese-xlnet-large``                  | Chinese      | 24-layer, 1024-hidden,                  |
-|                    |                                         |              | 16-heads, _M parameters.                |
-|                    |                                         |              | XLNet Large Chinese model               |
-+--------------------+-----------------------------------------+--------------+-----------------------------------------+
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+| Model              | Pretrained Weight                                                                | Language     | Details of the model                    |
++====================+==================================================================================+==============+=========================================+
+|ALBERT_             |``albert-base-v1``                                                                | English      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 768-hidden, 12-heads, 11M parameters.   |
+|                    |                                                                                  |              | ALBERT base model                       |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-large-v1``                                                               | English      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 1024-hidden, 16-heads, 17M parameters.  |
+|                    |                                                                                  |              | ALBERT large model                      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-xlarge-v1``                                                              | English      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 2048-hidden, 16-heads, 58M parameters.  |
+|                    |                                                                                  |              | ALBERT xlarge model                     |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-xxlarge-v1``                                                             | English      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 4096-hidden, 64-heads, 223M parameters. |
+|                    |                                                                                  |              | ALBERT xxlarge model                    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-base-v2``                                                                | English      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 768-hidden, 12-heads, 11M parameters.   |
+|                    |                                                                                  |              | ALBERT base model (version2)            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-large-v2``                                                               | English      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 1024-hidden, 16-heads, 17M parameters.  |
+|                    |                                                                                  |              | ALBERT large model (version2)           |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-xlarge-v2``                                                              | English      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 2048-hidden, 16-heads, 58M parameters.  |
+|                    |                                                                                  |              | ALBERT xlarge model (version2)          |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-xxlarge-v2``                                                             | English      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 4096-hidden, 64-heads, 223M parameters. |
+|                    |                                                                                  |              | ALBERT xxlarge model (version2)         |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-tiny``                                                           | Chinese      | 4 repeating layers, 128 embedding,      |
+|                    |                                                                                  |              | 312-hidden, 12-heads, 4M parameters.    |
+|                    |                                                                                  |              | ALBERT tiny model (Chinese)             |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-small``                                                          | Chinese      | 6 repeating layers, 128 embedding,      |
+|                    |                                                                                  |              | 384-hidden, 12-heads, _M parameters.    |
+|                    |                                                                                  |              | ALBERT small model (Chinese)            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-base``                                                           | Chinese      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 768-hidden, 12-heads, 12M parameters.   |
+|                    |                                                                                  |              | ALBERT base model (Chinese)             |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-large``                                                          | Chinese      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 1024-hidden, 16-heads, 18M parameters.  |
+|                    |                                                                                  |              | ALBERT large model (Chinese)            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-xlarge``                                                         | Chinese      | 24 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 2048-hidden, 16-heads, 60M parameters.  |
+|                    |                                                                                  |              | ALBERT xlarge model (Chinese)           |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``albert-chinese-xxlarge``                                                        | Chinese      | 12 repeating layers, 128 embedding,     |
+|                    |                                                                                  |              | 4096-hidden, 16-heads, 235M parameters. |
+|                    |                                                                                  |              | ALBERT xxlarge model (Chinese)          |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|BART_               |``bart-base``                                                                     | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 217M parameters.              |
+|                    |                                                                                  |              | BART base model (English)               |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bart-large``                                                                    | English      | 24-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 16-heads, 509M parameters.              |
+|                    |                                                                                  |              | BART large model (English).             |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|BERT_               |``bert-base-uncased``                                                             | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 110M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-large-uncased``                                                            | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-base-cased``                                                               | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 109M parameters.              |
+|                    |                                                                                  |              | Trained on cased English text.          |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-large-cased``                                                              | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 335M parameters.              |
+|                    |                                                                                  |              | Trained on cased English text.          |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-base-multilingual-uncased``                                                | Multilingual | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 168M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased text             |
+|                    |                                                                                  |              | in the top 102 languages                |
+|                    |                                                                                  |              | with the largest Wikipedias.            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-base-multilingual-cased``                                                  | Multilingual | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 179M parameters.              |
+|                    |                                                                                  |              | Trained on cased text                   |
+|                    |                                                                                  |              | in the top 104 languages                |
+|                    |                                                                                  |              | with the largest Wikipedias.            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-base-chinese``                                                             | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on cased Chinese Simplified     |
+|                    |                                                                                  |              | and Traditional text.                   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-wwm-chinese``                                                              | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on cased Chinese Simplified     |
+|                    |                                                                                  |              | and Traditional text using              |
+|                    |                                                                                  |              | Whole-Word-Masking.                     |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``bert-wwm-ext-chinese``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on cased Chinese Simplified     |
+|                    |                                                                                  |              | and Traditional text using              |
+|                    |                                                                                  |              | Whole-Word-Masking with extented data.  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-ner``                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Finetuned on NER task.                  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-pos``                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Finetuned on POS task.                  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/ckiplab-bert-base-chinese-ws``                                           | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Finetuned on WS task.                   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/nlptown-bert-base-multilingual-uncased-sentiment``                       | Multilingual | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 167M parameters.              |
+|                    |                                                                                  |              | Finetuned for sentiment analysis on     |
+|                    |                                                                                  |              | product reviews in six languages:       |
+|                    |                                                                                  |              | English, Dutch, German, French,         |
+|                    |                                                                                  |              | Spanish and Italian.                    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``junnyu/tbs17-MathBERT``                                                         | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 110M parameters.              |
+|                    |                                                                                  |              | Trained on pre-k to graduate math       |
+|                    |                                                                                  |              | language (English) using a masked       |
+|                    |                                                                                  |              | language modeling (MLM) objective.      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-base-chinese``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained with novel MLM as correction    |
+|                    |                                                                                  |              | pre-training task.                      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-large-chinese``                                                         | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 326M parameters.              |
+|                    |                                                                                  |              | Trained with novel MLM as correction    |
+|                    |                                                                                  |              | pre-training task.                      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``simbert-base-chinese``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on 22 million pairs of similar  |
+|                    |                                                                                  |              | sentences crawed from Baidu Know.       |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|BigBird_            |``bigbird-base-uncased``                                                          | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, _M parameters.                |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ConvBert_           |``convbert-base``                                                                 | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 106M parameters.              |
+|                    |                                                                                  |              | The ConvBERT base model.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``convbert-medium-small``                                                         | English      | 12-layer, 384-hidden,                   |
+|                    |                                                                                  |              | 8-heads, 17M parameters.                |
+|                    |                                                                                  |              | The ConvBERT medium small model.        |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``convbert-small``                                                                | English      | 12-layer, 128-hidden,                   |
+|                    |                                                                                  |              | 4-heads, 13M parameters.                |
+|                    |                                                                                  |              | The ConvBERT small model.               |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|DistilBert_         |``distilbert-base-uncased``                                                       | English      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 66M parameters.               |
+|                    |                                                                                  |              | The DistilBERT model distilled from     |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``distilbert-base-cased``                                                         | English      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 66M parameters.               |
+|                    |                                                                                  |              | The DistilBERT model distilled from     |
+|                    |                                                                                  |              | the BERT model ``bert-base-cased``      |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ELECTRA_            |``electra-small``                                                                 | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 4-heads, _M parameters.                 |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``electra-base``                                                                  | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, _M parameters.                |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``electra-large``                                                                 | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, _M parameters.                |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``chinese-electra-small``                                                         | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 4-heads, _M parameters.                 |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``chinese-electra-base``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, _M parameters.                |
+|                    |                                                                                  |              | Trained on Chinese text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ERNIE_              |``ernie-1.0``                                                                     | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-tiny``                                                                    | Chinese      | 3-layer, 1024-hidden,                   |
+|                    |                                                                                  |              | 16-heads, _M parameters.                |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-2.0-en``                                                                  | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 103M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-2.0-en-finetuned-squad``                                                  | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 110M parameters.              |
+|                    |                                                                                  |              | Trained on finetuned squad text.        |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-2.0-large-en``                                                            | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ERNIE-DOC_          |``ernie-doc-base-zh``                                                             | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-doc-base-en``                                                             | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 103M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ERNIE-GEN_          |``ernie-gen-base-en``                                                             | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-gen-large-en``                                                            | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-gen-large-en-430g``                                                       | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on lower-cased English text.    |
+|                    |                                                                                  |              | with extended data (430 GB).            |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|ERNIE-GRAM_         |``ernie-gram-zh``                                                                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|GPT_                |``gpt-cpm-large-cn``                                                              | Chinese      | 32-layer, 2560-hidden,                  |
+|                    |                                                                                  |              | 32-heads, 2.6B parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``gpt-cpm-small-cn-distill``                                                      | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 109M parameters.              |
+|                    |                                                                                  |              | The model distilled from                |
+|                    |                                                                                  |              | the GPT model ``gpt-cpm-large-cn``      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``gpt2-medium-en``                                                                | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 345M parameters.              |
+|                    |                                                                                  |              | Trained on English text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|MPNet_              |``mpnet-base``                                                                    | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 109M parameters.              |
+|                    |                                                                                  |              | MPNet Base Model.                       |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|NeZha_              |``nezha-base-chinese``                                                            | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``nezha-large-chinese``                                                           | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``nezha-base-wwm-chinese``                                                        | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 16-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``nezha-large-wwm-chinese``                                                       | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|RoBERTa_            |``roberta-wwm-ext``                                                               | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained on English Text using           |
+|                    |                                                                                  |              | Whole-Word-Masking with extended data.  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roberta-wwm-ext-large``                                                         | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 325M parameters.              |
+|                    |                                                                                  |              | Trained on English Text using           |
+|                    |                                                                                  |              | Whole-Word-Masking with extended data.  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``rbt3``                                                                          | Chinese      | 3-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 38M parameters.               |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``rbtl3``                                                                         | Chinese      | 3-layer, 1024-hidden,                   |
+|                    |                                                                                  |              | 16-heads, 61M parameters.               |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|RoFormer_           |``roformer-chinese-small``                                                        | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                                                                  |              | 6-heads, 30M parameters.                |
+|                    |                                                                                  |              | Roformer Small Chinese model.           |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-base``                	                                        | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 124M parameters.              |
+|                    |                                                                                  |              | Roformer Base Chinese model.            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-char-small``                                                   | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                                                                  |              | 6-heads, 15M parameters.                |
+|                    |                                                                                  |              | Roformer Chinese Char Small model.      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-char-base``                                                    | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 95M parameters.               |
+|                    |                                                                                  |              | Roformer Chinese Char Base model.       |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-ft-small``                                            | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                                                                  |              | 6-heads, 15M parameters.                |
+|                    |                                                                                  |              | Roformer Chinese Char Ft Small model.   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-ft-base``                                             | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 95M parameters.               |
+|                    |                                                                                  |              | Roformer Chinese Char Ft Base model.    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-small``                                               | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                                                                  |              | 6-heads, 15M parameters.                |
+|                    |                                                                                  |              | Roformer Chinese Sim Char Small model.  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-base``                                                | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 95M parameters.               |
+|                    |                                                                                  |              | Roformer Chinese Sim Char Base model.   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-english-small-discriminator``                                          | English      | 12-layer, 256-hidden,                   |
+|                    |                                                                                  |              | 4-heads, 13M parameters.                |
+|                    |                                                                                  |              | Roformer English Small Discriminator.   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-english-small-generator``                                              | English      | 12-layer, 64-hidden,                    |
+|                    |                                                                                  |              | 1-heads, 5M parameters.                 |
+|                    |                                                                                  |              | Roformer English Small Generator.       |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|SKEP_               |``skep_ernie_1.0_large_ch``                                                       | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained using the Erine model           |
+|                    |                                                                                  |              | ``ernie_1.0``                           |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``skep_ernie_2.0_large_en``                                                       | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 336M parameters.              |
+|                    |                                                                                  |              | Trained using the Erine model           |
+|                    |                                                                                  |              | ``ernie_2.0_large_en``                  |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``skep_roberta_large_en``                                                         | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 355M parameters.              |
+|                    |                                                                                  |              | Trained using the RoBERTa model         |
+|                    |                                                                                  |              | ``roberta_large_en``                    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|TinyBert_           |``tinybert-4l-312d``                                                              | English      | 4-layer, 312-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``tinybert-6l-768d``                                                              | English      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 67M parameters.               |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``tinybert-4l-312d-v2``                                                           | English      | 4-layer, 312-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``tinybert-6l-768d-v2``                                                           | English      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 67M parameters.               |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``tinybert-4l-312d-zh``                                                           | Chinese      | 4-layer, 312-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``tinybert-6l-768d-zh``                                                           | Chinese      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 67M parameters.               |
+|                    |                                                                                  |              | The TinyBert model distilled from       |
+|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|UnifiedTransformer_ |``unified_transformer-12L-cn``                                                    | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``unified_transformer-12L-cn-luge``                                               | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text (LUGE.ai).      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``plato-mini``                                                                    | Chinese      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 66M parameters.               |
+|                    |                                                                                  |              | Trained on Chinese text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|UNIMO_              |``unimo-text-1.0``                                                                | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 99M parameters.               |
+|                    |                                                                                  |              | UNIMO-text-1.0 model.                   |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``unimo-text-1.0-large``                                                          | English      | 24-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 16-heads, 316M parameters.              |
+|                    |                                                                                  |              | UNIMO-text-1.0 large model.             |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|XLNet_              |``xlnet-base-cased``                                                              | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 110M parameters.              |
+|                    |                                                                                  |              | XLNet English model                     |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``xlnet-large-cased``                                                             | English      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 340M parameters.              |
+|                    |                                                                                  |              | XLNet Large English model               |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``chinese-xlnet-base``                                                            | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 117M parameters.              |
+|                    |                                                                                  |              | XLNet Chinese model                     |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``chinese-xlnet-mid``                                                             | Chinese      | 24-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 209M parameters.              |
+|                    |                                                                                  |              | XLNet Medium Chinese model              |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``chinese-xlnet-large``                                                           | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, _M parameters.                |
+|                    |                                                                                  |              | XLNet Large Chinese model               |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 
 
 ------------------------------------
@@ -411,49 +436,49 @@ Transformer预训练模型适用任务汇总
 ------------------------------------
 
 
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-| Model              | Sequence Classification | Token Classification | Question Answering | Text Generation |
-+====================+=========================+======================+====================+=================+
-|ALBERT_             | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|BART_               | ✅                      | ✅                   | ✅                 | ✅              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|BERT_               | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|BigBird_            | ✅                      | ❌                   | ❌                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ELECTRA_            | ✅                      | ✅                   | ❌                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ERNIE_              | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ERNIE-DOC_          | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ERNIE-GEN_          | ❌                      | ❌                   | ❌                 | ✅              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|ERNIE-GRAM_         | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|GPT_                | ❌                      | ❌                   | ❌                 | ✅              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|MPNet_              | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|NeZha_              | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|RoBERTa_            | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|RoFormer_           | ✅                      | ✅                   | ✅                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|SKEP_               | ✅                      | ✅                   | ❌                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|TinyBert_           | ✅                      | ❌                   | ❌                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|UnifiedTransformer_ | ❌                      | ❌                   | ❌                 | ✅              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
-|XLNet_              | ✅                      | ✅                   | ❌                 | ❌              |
-+--------------------+-------------------------+----------------------+--------------------+-----------------+
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+| Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
++====================+=========================+======================+====================+=================+=================+
+|ALBERT_             | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|BART_               | ✅                      | ✅                   | ✅                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|BERT_               | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|BigBird_            | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ELECTRA_            | ✅                      | ✅                   | ❌                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ERNIE_              | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ERNIE-DOC_          | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ERNIE-GEN_          | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|ERNIE-GRAM_         | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|GPT_                | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|MPNet_              | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|NeZha_              | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|RoBERTa_            | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|RoFormer_           | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|SKEP_               | ✅                      | ✅                   | ❌                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|TinyBert_           | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|UnifiedTransformer_ | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|XLNet_              | ✅                      | ✅                   | ❌                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 
 .. _ALBERT: https://arxiv.org/abs/1909.11942
 .. _BART: https://arxiv.org/abs/1910.13461
