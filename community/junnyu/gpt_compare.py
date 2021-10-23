@@ -32,7 +32,7 @@ def compare(a, b):
     print("max dif:", maxdif)
 
 
-def compare_lm(path="community/junnyu/microsoft-DialoGPT-small"):
+def compare_lm(path="junnyu/microsoft-DialoGPT-small"):
     pdmodel = PDGPT2LMHeadModel.from_pretrained(path)
     ptmodel = PTGPT2LMHeadModel.from_pretrained(path).cuda()
     if "chinese" in path:
@@ -65,8 +65,8 @@ def compare_lm(path="community/junnyu/microsoft-DialoGPT-small"):
 
 def test_GPTForTokenClassification():
 
-    tokenizer = GPTTokenizer.from_pretrained("community/junnyu/distilgpt2")
-    m = GPTForTokenClassification.from_pretrained("community/junnyu/distilgpt2")
+    tokenizer = GPTTokenizer.from_pretrained("junnyu/distilgpt2")
+    m = GPTForTokenClassification.from_pretrained("junnyu/distilgpt2")
     inputs = tokenizer(
         "Welcome to use PaddlePaddle and PaddleNLP!",
         return_token_type_ids=False)
@@ -81,9 +81,8 @@ def test_GPTForTokenClassification():
 
 def test_GPTForSequenceClassification():
     paddle.set_grad_enabled(False)
-    tokenizer = GPTTokenizer.from_pretrained("community/junnyu/distilgpt2")
-    m = GPTForSequenceClassification.from_pretrained(
-        "community/junnyu/distilgpt2")
+    tokenizer = GPTTokenizer.from_pretrained("junnyu/distilgpt2")
+    m = GPTForSequenceClassification.from_pretrained("junnyu/distilgpt2")
     inputs = tokenizer(
         "Welcome to use PaddlePaddle and PaddleNLP!",
         return_token_type_ids=False)
@@ -98,15 +97,15 @@ def test_GPTForSequenceClassification():
 
 if __name__ == "__main__":
     # compare_lm(
-    #     path="community/junnyu/microsoft-DialoGPT-small")
+    #     path="junnyu/microsoft-DialoGPT-small")
     # mean dif: 7.501994e-05
     # max dif: 0.00036621094
     # compare_lm(
-    #     path="community/junnyu/distilgpt2")
+    #     path="junnyu/distilgpt2")
     # mean dif: 7.249901e-06
     # max dif: 5.340576e-05
     # compare_lm(
-    #     path="community/junnyu/uer-gpt2-chinese-poem")
+    #     path="junnyu/uer-gpt2-chinese-poem")
     # mean dif: 1.0497178e-06
     # max dif: 1.335144e-05
 
