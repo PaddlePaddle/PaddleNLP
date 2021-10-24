@@ -22,10 +22,14 @@ def process_batch_size(args):
     if args.global_batch_size is None and args.local_batch_size is None:
         raise ValueError("global_batch_size or local_batch_size should be set.")
     elif args.global_batch_size is not None and args.local_batch_size is not None:
-        assert args.global_batch_size // args.local_batch_size == args.dp_degree, \
-            "global_batch_size[{}] should be divided by local_batch_size[{}] when dp_degree is [{}]"\
-                .format(args.global_batch_size, args.local_batch_size, args.dp_degree)
+        assert args.global_batch_size // args.local_batch_size == (args.dp_degree *
+            args.sharding_degree), "global_batch_size[{}] should be divided by local_batch_size[{}] "\
+            "when dp_degree is [{}] and sharding_degree is [{}]".format(args.global_batch_size,
+            args.local_batch_size, args.dp_degree, args.sharding_degree)
     elif args.global_batch_size is not None and args.local_batch_size is None:
+        assert args.global_batch_size % (args.dp_degree * args.sharding_degree) == 0, \
+            "global_batch_size[{}] should be divided by dp_degree[{}] times sharding_degree[{}]"\
+            .format(args.global_batch_size, args.dp_degree, args.sharding_degree)
         args.local_batch_size = args.global_batch_size // (args.dp_degree *
                                                            args.sharding_degree)
     else:
@@ -220,13 +224,13 @@ def parse_args(MODEL_CLASSES):
         const=False,
         help="Using the recompute to save the memory.")
 
-    # AMP config
+    # Pure FP16 config
     parser.add_argument(
-        "--use_amp",
+        "--use_pure_fp16",
         type=str2bool,
         nargs='?',
         const=False,
-        help="Enable mixed precision training.")
+        help="Enable pure fp16 precision training.")
 
     parser.add_argument(
         "--scale_loss",
