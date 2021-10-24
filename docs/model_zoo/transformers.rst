@@ -277,11 +277,11 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``junnyu/microsoft-DialoGPT-medium``                                              | English      | 24-layer, 1024-hidden,                  |
-|                    |                                                                                  |              | 16-heads, _M parameters.                |
+|                    |                                                                                  |              | 16-heads, 354M parameters.                |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``junnyu/microsoft-DialoGPT-large``                                               | English      | 36-layer, 1280-hidden,                  |
-|                    |                                                                                  |              | 20-heads, _M parameters.                |
+|                    |                                                                                  |              | 20-heads, 774M parameters.                |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``junnyu/uer-gpt2-chinese-poem``                                                  | Chinese      | 12-layer, 768-hidden,                   |

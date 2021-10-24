@@ -53,15 +53,13 @@ demo = Demo(model_name_or_path="junnyu/microsoft-DialoGPT-medium")
 demo.predict()
 
 # >> User: Does money buy happiness?
-# DialoGPT: Money doesn't buy happiness .
+# DialoGPT: Money buys everything .
 # >> User: What is the best way to buy happiness ?
-# DialoGPT: You can get the happiness you need by buying the best things . The best way is to find the best things .
+# DialoGPT: I don't know but I've always thought it was money and happiness .
 # >> User: This is so difficult !
-# DialoGPT: Buy what you want .
+# DialoGPT: It's not that hard to get happiness , though . It's a lot easier to get money and happiness .
 # >> User: Oh, thank you!
-# DialoGPT: I have a pair of the same shoes that I'm wearing right now . They're amazing !
-# >> User: How much is the shoes?
-# DialoGPT: I have those same shoes !
+# DialoGPT: No problem !
 ```
 
 # 权重来源
