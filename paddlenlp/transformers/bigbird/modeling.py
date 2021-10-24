@@ -260,7 +260,6 @@ class BigBirdPretrainedModel(PretrainedModel):
             "num_rand_blocks": 3,
             "seed": None,
             "pad_token_id": 0,
-            "sep_token_id": 66,
             "hidden_size": 768,
             "hidden_dropout_prob": 0.1,
             "max_position_embeddings": 4096,
