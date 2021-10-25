@@ -649,6 +649,8 @@ class FasterGPT(GPTPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
+        self.generate = self.forward
+
         self.decoding = InferGptDecoding(
             model=model,
             decoding_lib=decoding_lib,
@@ -729,6 +731,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self._n_layer = self._model.num_hidden_layers
         self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
+        self.generate = self.forward
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -869,6 +872,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         self._n_layer = self._model.num_hidden_layers
         self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
+        self.generate = self.forward
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -1002,6 +1006,8 @@ class FasterBART(BartPretrainedModel):
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
         self._decode_strategy = decode_strategy
+        self.generate = self.forward
+
         self.decoding = InferBartDecoding(
             model=model,
             decoding_strategy=decode_strategy,
