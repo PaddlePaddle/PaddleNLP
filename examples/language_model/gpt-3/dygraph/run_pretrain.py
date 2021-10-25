@@ -17,6 +17,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -24,6 +25,10 @@ from visualdl import LogWriter
 from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
+
+# to import data_tools
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
 
 from dataset import create_pretrained_dataset
 from args import parse_args
@@ -87,6 +92,30 @@ def run_evaluate(args,
     model.train()
 
 
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
+
+
 def do_train(args):
     paddle.set_device(args.device)
     strategy = fleet.DistributedStrategy()
@@ -97,8 +126,9 @@ def do_train(args):
         "sharding_degree": args.sharding_degree
     }
 
+    accumulate_steps = args.local_batch_size // args.micro_batch_size
     strategy.pipeline_configs = {
-        "accumulate_steps": args.local_batch_size // args.micro_batch_size,
+        "accumulate_steps": accumulate_steps,
         "micro_batch_size": args.micro_batch_size
     }
 
@@ -131,8 +161,8 @@ def do_train(args):
     # Define log writer
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
-        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_amp,
+        "{}_globalbsz_{}_pure_fp16_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16,
             False, global_rank).lower())
 
     if os.path.exists(log_writer_path):
@@ -217,15 +247,24 @@ def do_train(args):
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params)
+            apply_decay_param_fun=lambda x: x in decay_params,
+            # TODO: remove 'multi_precision' in definition of optimizer
+            # and add it to 'paddle.amp.decorate'
+            multi_precision=args.use_pure_fp16)
+
+    if args.use_pure_fp16:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        scaler = fleet.distributed_scaler(scaler)
+        # level O2 means converting the network to FP16
+        model, optimizer = paddle.amp.decorate(
+            models=model,
+            optimizers=optimizer,
+            level='O2',
+            save_dtype='float32')
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -240,18 +279,13 @@ def do_train(args):
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,
@@ -270,23 +304,36 @@ def do_train(args):
                 position_ids.stop_gradient = True
 
                 if args.pp_degree == 1:
-                    with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
-                            custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
-                        preds = model(tokens, position_ids)
-                        loss = criterion(preds, labels, loss_mask)
+                    # In ParallelMode of DataParallel, 'no_sync' can be used for improving
+                    # performance of model by gradient accumulation.
+                    loss = 0.0
+                    for i in range(accumulate_steps):
+                        start_index = i * args.micro_batch_size
+                        end_index = start_index + args.micro_batch_size
+                        with paddle.amp.auto_cast(
+                                args.use_pure_fp16,
+                                custom_black_list=[
+                                    "reduce_sum",
+                                    "c_softmax_with_cross_entropy",
+                                    "elementwise_div"
+                                ],
+                                level='O2'):
+                            preds = model(
+                                tokens[start_index:end_index, :],
+                                position_ids[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :],
+                                loss_mask[start_index:end_index, :])
+                        loss_mbs = loss_mbs / accumulate_steps
+                        if args.use_pure_fp16:
+                            scaler.scale(loss_mbs).backward()
+                        else:
+                            loss_mbs.backward()
+                        loss = loss + loss_mbs
 
-                    if args.use_amp:
-                        scaler.scale(loss).backward()
+                    if args.use_pure_fp16:
                         scaler.minimize(optimizer, loss)
                     else:
-                        loss.backward()
                         optimizer.step()
 
                     if lr_scheduler is not None:
@@ -296,19 +343,17 @@ def do_train(args):
                 else:
                     data = [(tokens, position_ids), (labels, loss_mask)]
                     with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
+                            args.use_pure_fp16,
                             custom_black_list=[
                                 "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
+                                "elementwise_div"
+                            ],
+                            level='O2'):
                         loss = model.train_batch(
                             data,
                             optimizer=optimizer,
                             lr_scheduler=lr_scheduler,
-                            scaler=scaler if args.use_amp else None)
+                            scaler=scaler if args.use_pure_fp16 else None)
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()
