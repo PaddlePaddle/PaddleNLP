@@ -2,6 +2,7 @@
 **介绍**：nlptown-bert-base-multilingual-uncased-sentiment是一个带有序列分类头的多语言BERT模型，该模型可用于对英语、荷兰语、德语、法语、西班牙语和意大利语这六种语言的商品评论进行情感分析。其中评论的情感标签为1-5之间的星级。
 
 **模型结构**： **`BertForSequenceClassification`**，带有序列分类头的Bert模型。
+
 **适用下游任务**：**情感分类**，该权重已经在下游`Sentiment classification`任务上进行了微调，因此可直接使用。
 
 ## 训练数据
@@ -19,14 +20,15 @@
 微调后的模型在每种语言的 5,000 条商品评论中获得了以下准确率：
 - Accuracy (exact) 完全匹配。
 - Accuracy (off-by-1) 是模型预测的评分等级与人工给出的评分等级差值小于等于 1 所占的百分比。
+
 | Language | Accuracy (exact) | Accuracy (off-by-1) |
-| -------- | ---------------------- | ------------------- |
-| English  | 67%                 | 95%
-| Dutch    | 57%                 | 93%
-| German   | 61%                 | 94%
-| French   | 59%                 | 94%
-| Italian  | 59%                 | 95%
-| Spanish  | 58%                 | 95%
+| -------- | ---------------- | ------------------- |
+| English  | 67%              | 95%                 |
+| Dutch    | 57%              | 93%                 |
+| German   | 61%              | 94%                 |
+| French   | 59%              | 94%                 |
+| Italian  | 59%              | 95%                 |
+| Spanish  | 58%              | 95%                 |
 
 ## 联系方式
 对于类似模型的问题、反馈和/或请求，请联系 [NLP Town](https://www.nlp.town)。
