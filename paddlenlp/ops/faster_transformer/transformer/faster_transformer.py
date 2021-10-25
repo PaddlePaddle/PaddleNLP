@@ -852,9 +852,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
-        print([k.shape for k in cache_k])
-        print([v.shape for v in cache_v])
-        print(seq_len)
+
         return self.decoding(
             cache_k=cache_k,
             cache_v=cache_v,
