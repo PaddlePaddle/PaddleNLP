@@ -73,7 +73,7 @@ def evaluate(model, criterion, metric, data_loader):
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
-        accu = metric.accumulate()
+    accu = metric.accumulate()
     print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
     model.train()
     metric.reset()

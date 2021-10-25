@@ -77,7 +77,7 @@ def evaluate(model, criterion, metric, data_loader):
         probs = F.sigmoid(logits)
         losses.append(loss.numpy())
         metric.update(probs, labels)
-        auc, f1_score = metric.accumulate()
+    auc, f1_score = metric.accumulate()
     print("eval loss: %.5f, auc: %.5f, f1 score: %.5f" % (np.mean(losses), auc, f1_score))
     model.train()
     metric.reset()
