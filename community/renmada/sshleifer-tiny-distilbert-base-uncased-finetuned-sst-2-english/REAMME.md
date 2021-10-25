@@ -3,11 +3,16 @@ tiny-distilbert-base-uncased在sst-2上finetune后的模型
 # 模型来源
 https://huggingface.co/sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-english
 # 模型使用
-这个模型的命名方式用的是bert的前缀，转化成paddle时手动改成了distilbert。由于他的权重里有pooler而paddlenlp的distilbert没有pooler实现，因此例子只显示如何用DistilBertModel加载权重。
-```python 
+```python
 import paddle
-from paddlenlp.transformers import DistilBertModel, DistilBertTokenizer
+from paddlenlp.transformers import DistilBertForSequenceClassification, DistilBertTokenizer
 
-model = DistilBertModel.from_pretrained('distilbert-base-multilingual-cased')
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+model = DistilBertForSequenceClassification.from_pretrained('renmada/distilbert-base-multilingual-cased', num_classes=9)
+tokenizer = DistilBertTokenizer.from_pretrained('renmada/distilbert-base-multilingual-cased')
+inp = 'It is good'
+ids = tokenizer.encode(inp)['input_ids']
+ids = paddle.to_tensor([ids])
+model.eval()
+with paddle.no_grad():
+    logtis = model(ids)
 ```

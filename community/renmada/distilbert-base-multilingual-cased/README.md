@@ -6,12 +6,12 @@ The model is trained on the concatenation of Wikipedia in 104 different language
 https://huggingface.co/distilbert-base-multilingual-cased
 
 # 模型使用
-```python 
+```python
 import paddle
 from paddlenlp.transformers import DistilBertForMaskedLM, DistilBertTokenizer
 
-model = DistilBertForMaskedLM.from_pretrained('distilbert-base-multilingual-cased')
-tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
+model = DistilBertForMaskedLM.from_pretrained('renmada/distilbert-base-multilingual-cased')
+tokenizer = DistilBertTokenizer.from_pretrained('renmada/distilbert-base-multilingual-cased')
 
 inp = '北京是中国的首都'
 ids = tokenizer.encode(inp)['input_ids']  # [101, 10751, 13672, 16299, 10124, 10105, 12185, 10108, 50513, 119, 102]
@@ -27,6 +27,6 @@ model.eval()
 with paddle.no_grad():
     mlm_logits = model(ids)
     mlm_pred = paddle.topk(mlm_logits, 1, -1)[1][0].unsqueeze(-1)
-    
+
 print(''.join(tokenizer.vocab.idx_to_token[int(x)] for x in mlm_pred[1:-1]))  # 汉阳是中国的首都
 ```
