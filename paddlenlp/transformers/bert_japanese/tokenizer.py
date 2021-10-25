@@ -31,17 +31,21 @@ class BertJapaneseTokenizer(BertTokenizer):
         vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
-        do_lower_case (bool):
+        do_lower_case (bool, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to`False`.
-        do_word_tokenize (bool):
+        do_word_tokenize (bool, optional):
             Whether to do word tokenization. Defaults to`True`.
-        do_subword_tokenize (bool):
+        do_subword_tokenize (bool, optional):
             Whether to do subword tokenization. Defaults to`True`.
-        word_tokenizer_type (str):
+        word_tokenizer_type (str, optional):
             Type of word tokenizer. Defaults to`basic`.
-        subword_tokenizer_type (str):
+        subword_tokenizer_type (str, optional):
             Type of subword tokenizer. Defaults to`wordpiece`.
+        never_split (bool, optional):
+            Kept for backward compatibility purposes. Defaults to`None`.
+        mecab_kwargs (str, optional):
+            Dictionary passed to the `MecabTokenizer` constructor.
         unk_token (str):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
@@ -59,8 +63,7 @@ class BertJapaneseTokenizer(BertTokenizer):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-        mecab_kwargs (str):
-            Dictionary passed to the `MecabTokenizer` constructor.
+
 
     Examples:
         .. code-block::
@@ -111,9 +114,7 @@ class BertJapaneseTokenizer(BertTokenizer):
         if do_word_tokenize:
             if word_tokenizer_type == "basic":
                 self.basic_tokenizer = BasicTokenizer(
-                    do_lower_case=do_lower_case,
-                    never_split=never_split,
-                    tokenize_chinese_chars=False)
+                    do_lower_case=do_lower_case, )
             elif word_tokenizer_type == "mecab":
                 self.basic_tokenizer = MecabTokenizer(
                     do_lower_case=do_lower_case,
