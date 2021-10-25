@@ -20,6 +20,9 @@ import paddle.nn.functional as F
 
 class Perplexity(paddle.metric.Metric):
     """
+    Perplexity is a metric used to judge how good a language model is.
+    We can define perplexity as the inverse probability of the test set,
+    normalised by the number of the words in the test set.
     Perplexity is calculated using cross entropy. It supports both padding data
     and no padding data.
 
@@ -28,15 +31,34 @@ class Perplexity(paddle.metric.Metric):
     which indicates the actual length of samples.
 
     This Perplexity requires that the output of your network is prediction,
-    label and sequence length (opitonal). If the Perplexity here doesn't meet
+    label and sequence length (optional). If the Perplexity here doesn't meet
     your needs, you could override the `compute` or `update` method for
-    caculating Perplexity.
+    calculating Perplexity.
 
     Args:
         seq_len(int): Sequence length of each sample, it must be provided while
             data is not padded. Defaults to 20.
         name(str): Name of `Metric` instance. Defaults to 'Perplexity'.
 
+    Example:
+        .. code-block::
+
+            import paddle
+            from paddlenlp.transformers import BertTokenizer
+            from paddlenlp.metrics import Perplexity
+
+            paddle.seed(2021)
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            batch_size, seq_len, vocab_size = 1, 4, tokenizer.vocab_size
+            logits = paddle.rand([batch_size, seq_len, vocab_size])
+            labels= paddle.to_tensor([[1,0,1,1]])
+
+            perplexity = Perplexity()
+            correct = perplexity.compute(logits,labels)
+            perplexity.update(correct.numpy())
+            res = perplexity.accumulate()
+            print(res)
+            # 48263.528820122105
     """
 
     def __init__(self, name='Perplexity', *args, **kwargs):
@@ -60,6 +82,10 @@ class Perplexity(paddle.metric.Metric):
                 Sequence mask tensor, and its type could be float32, float64,
                 int32 or int64, and has a shape of [batch_size, sequence_length].
                 It's used to calculate loss. Defaults to None.
+
+        Returns:
+            tuple or Tensor: Returns tuple (`ce, word_num`) if `seq_mask` is not None. Otherwise, returns tensor `ce`.
+            `ce` it the cross entropy loss, its shape is [batch_size, sequence_length] and its data type should be float32.
 
         """
         if label.dim() == 2:
@@ -106,7 +132,7 @@ class Perplexity(paddle.metric.Metric):
         Calculates and returns the value of perplexity.
 
         Returns:
-            perplexity: Calculation results.
+            float: Returns `perplexity`, the calculation results.
         """
         return np.exp(self.total_ce / self.total_word_num)
 
