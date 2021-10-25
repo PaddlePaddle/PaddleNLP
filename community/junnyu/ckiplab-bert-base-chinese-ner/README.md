@@ -4,6 +4,7 @@
 关于完整使用方法及其他信息，请参考 https://github.com/ckiplab/ckip-transformers 。
 
 **模型结构**： **`BertForTokenClassification`**，带有token分类头的Bert模型。
+
 **适用下游任务**：**命名实体识别**，该权重已经在下游`NER`任务上进行了微调，因此可直接使用。
 
 # 使用示例
