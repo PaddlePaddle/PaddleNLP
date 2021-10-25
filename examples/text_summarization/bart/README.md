@@ -216,6 +216,7 @@ python generate.py \
     --faster \
     --use_fp16_decoding \
     --decoding_lib=../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --alpha=0.0 \
     --device=gpu
 ```
 其中新增参数释义如下：
