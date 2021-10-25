@@ -143,13 +143,11 @@ class WordTagTask(Task):
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         self._static_mode = False
-        self._log_name = self.kwargs[
-            'log_name'] if 'log_name' in self.kwargs else 'wordtag'
         self._linking = self.kwargs[
             'linking'] if 'linking' in self.kwargs else False
-        term_schema_path = download_file(
-            self._task_path, "termtree_type.csv", URLS['termtree_type'][0],
-            URLS['termtree_type'][1], self._log_name)
+        term_schema_path = download_file(self._task_path, "termtree_type.csv",
+                                         URLS['termtree_type'][0],
+                                         URLS['termtree_type'][1])
         term_data_path = download_file(self._task_path, "TermTree.V1.0",
                                        URLS['TermTree.V1.0'][0],
                                        URLS['TermTree.V1.0'][1])

@@ -45,15 +45,15 @@ PaddleNLP目前支持的预训练模型结构类型汇总可见
 
 4.2 创建个人目录
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-如果你是首次进行权重贡献，那么你需要在 ``PaddleNLP/paddlenlp/transformers/community/`` 下新建一个目录。
-目录名称使用你的github名称，比如新建目录 ``PaddleNLP/paddlenlp/transformers/community/yingyibiao/`` 。
+如果你是首次进行权重贡献，那么你需要在 ``PaddleNLP/community/`` 下新建一个目录。
+目录名称使用你的github名称，比如新建目录 ``PaddleNLP/community/yingyibiao/`` 。
 如果已有个人目录，则可以跳过此步骤。
 
 4.3 创建权重目录
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 在步骤4.2的个人目录下新建一个权重目录，权重目录名为本次贡献的模型权重名称。
 比如我想贡献 ``bert-base-uncased-sst-2-finetuned`` 这个模型，
-则新建权重目录 ``PaddleNLP/paddlenlp/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/`` 。
+则新建权重目录 ``PaddleNLP/community/yingyibiao/bert-base-uncased-sst-2-finetuned/`` 。
 
 4.4 在权重目录下添加PR（pull request）相关文件
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
