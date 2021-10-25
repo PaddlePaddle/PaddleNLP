@@ -22,7 +22,9 @@ from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
-    'BasicTokenizer', 'BertTokenizer', 'WordpieceTokenizer',
+    'BasicTokenizer',
+    'BertTokenizer',
+    'WordpieceTokenizer',
 ]
 
 
