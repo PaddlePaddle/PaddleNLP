@@ -49,7 +49,7 @@ def parse_args():
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--batch_size", default=1, type=int, help="Batch size. ")
+        "--batch_size", default=4, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -57,7 +57,7 @@ def parse_args():
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
         "--topp",
-        default=0.7,
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
@@ -136,7 +136,7 @@ def do_predict(args):
                 use_fast=True)
             #print(out_seq)
             output_sequence = out_seq.numpy()
-            print(output_sequence)
+
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))

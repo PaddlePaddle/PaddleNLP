@@ -152,7 +152,7 @@ def do_predict(args):
                 length_penalty=args.length_penalty,
                 num_return_sequences=2,
                 use_fast=True)
-            print(finished_seq)
+
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))

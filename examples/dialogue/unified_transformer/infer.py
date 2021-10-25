@@ -110,7 +110,8 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences)
+            num_return_sequences=args.num_return_sequences,
+            use_fast=False)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
@@ -118,17 +119,9 @@ def infer(args):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        if args.faster:
-            ids = output
-            results = select_response(
-                ids,
-                None,
-                tokenizer,
-                num_return_sequences=args.num_return_sequences)
-        else:
-            ids, scores = output
-            results = select_response(ids, scores, tokenizer, args.max_dec_len,
-                                      args.num_return_sequences)
+        ids, scores = output
+        results = select_response(ids, scores, tokenizer, args.max_dec_len,
+                                  args.num_return_sequences)
         pred_responses.extend(results)
 
         start_time = time.time()
