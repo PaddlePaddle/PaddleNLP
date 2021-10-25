@@ -458,8 +458,6 @@ class ElectraModel(ElectraPretrainedModel):
         else:
             if attention_mask.ndim == 2:
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-                attention_mask = (1.0 - attention_mask
-                                  ).astype(paddle.get_default_dtype()) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
