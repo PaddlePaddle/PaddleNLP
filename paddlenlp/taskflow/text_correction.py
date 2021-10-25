@@ -308,9 +308,10 @@ class CSCTask(Task):
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
         rest_words = []
-        if len(words) > self._max_seq_length - 2:
-            rest_words = words[max_seq_length - 2:]
-            words = words[:self._max_seq_length - 2]
+        max_seq_length = self._max_seq_length - 2
+        if len(words) > max_seq_length:
+            rest_words = words[max_seq_length:]
+            words = words[:max_seq_length]
 
         pred_result = ""
         for j, word in enumerate(words):
