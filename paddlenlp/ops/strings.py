@@ -18,7 +18,7 @@ import paddle.fluid.core as core
 __all__ = ['to_string_tensor', 'to_vocab_tensor']
 
 
-def to_string_tensor(string_values, name):
+def to_string_tensor(string_values, name="text"):
     """
     Create the tensor that the value holds the list of string.
     NOTICE: The value will be holded in the cpu place. 

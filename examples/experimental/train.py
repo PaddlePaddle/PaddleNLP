@@ -68,6 +68,7 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in data_loader:
         texts, labels = batch['text'], batch['label']
+        texts = to_string_tensor(texts, "texts")
         logits = model(texts)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
@@ -105,7 +106,7 @@ def do_train():
     model = SequenceClassificationModel.from_pretrained(
         'ernie-1.0',
         num_classes=len(train_ds.label_list),
-        max_seq_len=args.max_seq_len)
+        max_seq_len=args.max_seq_length)
 
     train_data_loader = create_dataloader(
         train_ds, mode='train', batch_size=args.batch_size)
@@ -142,8 +143,8 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
-            text = to_string_tensor(texts, "texts")
-            logits = model(texts, max_seq_len=args.max_seq_length)
+            texts = to_string_tensor(texts, "texts")
+            logits = model(texts)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)

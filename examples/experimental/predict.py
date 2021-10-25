@@ -17,6 +17,7 @@ import os
 
 import paddle
 import paddle.nn.functional as F
+from paddlenlp.ops import to_string_tensor
 
 from model import SequenceClassificationModel
 
@@ -54,6 +55,7 @@ def predict(model, data, label_map, batch_size=1):
     results = []
     model.eval()
     for texts in batches:
+        texts = to_string_tensor(texts)
         logits = model(texts)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()

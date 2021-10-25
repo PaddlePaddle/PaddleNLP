@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", type=int, default=1, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, False], help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
@@ -43,13 +43,11 @@ class Predictor(object):
     def __init__(self,
                  model_dir,
                  device="gpu",
-                 max_seq_length=128,
                  batch_size=32,
                  use_tensorrt=False,
                  precision="fp32",
                  cpu_threads=10,
                  enable_mkldnn=False):
-        self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
         model_file = os.path.join(model_dir, "inference.pdmodel")
@@ -113,30 +111,37 @@ class Predictor(object):
         self.predictor.run()
         logits = self.output_handle.copy_to_cpu()
 
-        probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-        labels = [label_map[i] for i in idx]
+        # probs = softmax(logits, axis=1)
+        # idx = np.argmax(probs, axis=1)
+        # idx = idx.tolist()
+        # labels = [label_map[i] for i in idx]
 
-        return labels
+        # return labels
 
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
-                          args.batch_size, args.use_tensorrt, args.precision,
-                          args.cpu_threads, args.enable_mkldnn)
+    predictor = Predictor(args.model_dir, args.device, args.batch_size,
+                          args.use_tensorrt, args.precision, args.cpu_threads,
+                          args.enable_mkldnn)
 
-    test_ds = load_dataset("chnsenticorp", splits=["test"])
-    data = [d["text"] for d in test_ds]
+    # test_ds = load_dataset("chnsenticorp", splits=["test"])
+    text = '小说是文学的一种样式，一般描写人物故事，塑造多种多样的人物形象，但亦有例外。它是拥有不完整布局、发展及主题的文学作品。而对话是不是具有鲜明的个性，每个人物说的没有独特的语言风格，是衡量小说水准的一个重要标准。与其他文学样式相比，小说的容量较大，它可以细致的展现人物性格和命运，可以表现错综复杂的矛盾冲突，同时还可以描述人物所处的社会生活环境。小说一词，最早见于《庄子·外物》：“饰小说以干县令，其于大达亦远矣。”这里所说的小说，是指琐碎的言谈、小的道理，与现时所说的小说相差甚远。文学中，小说通常指长篇小说、中篇、短篇小说和诗的形式。小说是文学的一种样式，一般描写人物故事，塑造多种多样的人物形象，但亦有例外。它是拥有不完整布局、发展及主题的文学作品。而对话是不是具有鲜明的个性，每个人物说的没有独特的语言风格，是衡量小说水准的一个重要标准。与其他文学样式相比，小说的容量较大，它可以细致的展现人物性格和命运，可以表现错综复杂的矛盾冲突，同时还可以描述人物所处的社会生活环境。小说一词，最早见于《庄子·外物》：“饰小说以干县令，其于大达亦远矣。”这里所说的小说，是指琐碎的言谈、小的道理，与现时所说的小说相差甚远。文学中'
+    data = [text[:args.max_seq_length]] * 1000
     batches = [
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
     ]
-    label_map = {0: 'negative', 1: 'positive'}
+    for _ in range(50):
+        for batch_data in batches:
+            predictor.predict(batch_data, label_map=None)
 
-    results = []
-    for batch_data in batches:
-        results.extend(predictor.predict(batch_data, label_map))
-    for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+    import time
+    start = time.time()
+    for _ in range(100):
+        for batch_data in batches:
+            predictor.predict(batch_data, label_map=None)
+    end = time.time()
+
+    print("num data: %d, batch_size: %d, cost time: %.5f" %
+          (len(data) * 100, args.batch_size, (end - start)))

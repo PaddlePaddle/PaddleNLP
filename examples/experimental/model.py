@@ -97,8 +97,8 @@ class SequenceClassificationModel(object):
                 model,
                 do_lower_case=tokenizer.do_lower_case,
                 is_split_into_words=False,
-                max_seq_len=512,
-                pad_to_max_seq_len=True)
+                max_seq_len=max_seq_len,
+                pad_to_max_seq_len=pad_to_max_seq_len)
         else:
             raise ValueError(
                 "Unknown name %s. Now SequenceClassificationModel surports  %s"
