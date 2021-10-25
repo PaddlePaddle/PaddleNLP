@@ -211,7 +211,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--scale_loss",
         type=float,
-        default=128,
+        default=32768,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
     parser.add_argument(
@@ -245,6 +245,13 @@ def parse_args(MODEL_CLASSES):
         default="cosine",
         choices=["cosine", "none"],
         help="Learning rate decay style.")
+    parser.add_argument(
+        '-p',
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 
