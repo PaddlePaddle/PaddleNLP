@@ -81,7 +81,7 @@ class BLEU(paddle.metric.Metric):
 
         BLEU & = BP\exp(\sum_{n=1}^N w_{n} \log{p_{n}})
 
-    where `c` is the length of candidate sentence, and 'r' is the length of refrence sentence.
+    where `c` is the length of candidate sentence, and `r` is the length of reference sentence.
 
     Args:
         trans_func (callable, optional): `trans_func` transforms the network
@@ -90,11 +90,11 @@ class BLEU(paddle.metric.Metric):
             If `trans_func` is None and BLEU is used as `paddle.metric.Metric`
             instance, `default_trans_func` will be performed and `vocab` must
             be provided.
-        n_size (int, optional): Number of gram for BLEU metric. Default: 4.
+        n_size (int, optional): Number of gram for BLEU metric. Defaults to 4.
         weights (list, optional): The weights of precision of each gram.
-            Default: None.
+            Defaults to None.
         name (str, optional): Name of `paddle.metric.Metric` instance.
-            Default: "bleu".
+            Defaults to "bleu".
 
     Examples:
         1. Using as a general evaluation object.
@@ -205,7 +205,10 @@ class BLEU(paddle.metric.Metric):
 
     def accumulate(self):
         '''
-        Calculate the final bleu metric.
+        Calculates and returns the final bleu metric.
+
+        Returns:
+            Tensor: Returns the accumulated metric `bleu` and its data type is float64.
         '''
         prob_list = []
         for n_size in range(self.n_size):
@@ -239,6 +242,12 @@ class BLEUForDuReader(BLEU):
     BLEU metric with bonus for DuReader contest.
 
     Please refer to `DuReader Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for more details.
+
+    Args:
+        n_size (int, optional): Number of gram for BLEU metric. Defaults to 4.
+        alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest. Defaults to 1.0.
+        beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest. Defaults to 1.0.
+
     '''
 
     def __init__(self, n_size=4, alpha=1.0, beta=1.0):
