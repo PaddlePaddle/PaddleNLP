@@ -609,8 +609,6 @@ class InferGptDecoding(nn.Layer):
         self.size_per_head = int(self.model.gpt.config['hidden_size'] /
                                  self.head_num)
         self.num_layer = self.model.gpt.config['num_hidden_layers']
-        self.bos_id = model.gpt.config['bos_token_id']
-        self.eos_id = model.gpt.config['eos_token_id']
         data_type = "float32"
         if self.use_fp16_decoding:
             data_type = "float16"
@@ -711,6 +709,9 @@ class InferGptDecoding(nn.Layer):
                 input_ids,
                 topk=4,
                 topp=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 max_out_len=256,
                 temperature=1):
         self.topk = topk
@@ -754,8 +755,8 @@ class InferGptDecoding(nn.Layer):
             head_num=self.head_num,
             size_per_head=self.size_per_head,
             num_layer=self.num_layer,
-            bos_id=self.bos_id,
-            eos_id=self.eos_id,
+            bos_id=bos_token_id,
+            eos_id=eos_token_id,
             temperature=self.temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
@@ -1061,8 +1062,9 @@ class InferUnifiedDecoding(nn.Layer):
                 topk=4,
                 topp=0.0,
                 max_out_len=256,
-                bos_id=0,
-                eos_id=1,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
@@ -1122,8 +1124,8 @@ class InferUnifiedDecoding(nn.Layer):
             _n_head=self._n_head,
             _size_per_head=self._size_per_head,
             _n_layer=self._n_layer,
-            _bos_id=bos_id,
-            _eos_id=eos_id,
+            _bos_id=bos_token_id,
+            _eos_id=eos_token_id,
             _max_out_len=max_out_len,
             _diversity_rate=diversity_rate,
             _unk_id=self._unk_id,
@@ -1178,8 +1180,6 @@ class InferBartDecoding(nn.Layer):
         self._num_decoder_layers = model.bart.config['num_decoder_layers']
         self._n_head = model.bart.config['decoder_attention_heads']
         self._d_model = model.bart.config['d_model']
-        self._bos_id = model.bart.config['bos_token_id']
-        self._eos_id = model.bart.config['eos_token_id']
 
         # process weights
         if use_fp16_decoding:
@@ -1341,6 +1341,9 @@ class InferBartDecoding(nn.Layer):
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 num_return_sequences=1,
                 alpha=0.6):
         # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
@@ -1375,7 +1378,7 @@ class InferBartDecoding(nn.Layer):
             self.linear_weight, self.linear_bias, self.pos_emb,
             self._decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            self._bos_id, self._eos_id, max_out_len, diversity_rate, rel_len,
+            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
             alpha)
 
         ids = finalize(

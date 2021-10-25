@@ -648,9 +648,9 @@ class TransformerGenerator(paddle.nn.Layer):
 class FasterGPT(GPTPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
+        self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.generate = self.forward
-
         self.decoding = InferGptDecoding(
             model=model,
             decoding_lib=decoding_lib,
@@ -661,10 +661,20 @@ class FasterGPT(GPTPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 temperature=0,
                 decode_strategy="sample",
                 num_return_sequences=1,
                 **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
         if input_ids.dtype == "int64":
             paddle.cast(input_ids, "int32")
         # change top_p to zero if not using top_p sampling for FT
@@ -679,6 +689,9 @@ class FasterGPT(GPTPretrainedModel):
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             temperature=temperature)
 
     def export_params(self, state_to_load, place):
@@ -717,19 +730,17 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
         self._decode_strategy = decode_strategy
-        self.bos_token_id = model.bos_token_id
-        self.pad_token_id = model.pad_token_id
-        self.eos_token_id = model.eos_token_id
-        self.unk_token_id = model.unk_token_id
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.unk_token_id = self._model.unk_token_id
+        self.mask_token_id = self._model.mask_token_id
+        self.bos_token_id = self._model.bos_token_id
+        self.pad_token_id = self._model.pad_token_id
         self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
-
         self._n_head = self._model.num_attention_heads
         self._hidden_dims = self._model.hidden_size
         self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
-        self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
         self.generate = self.forward
 
@@ -744,7 +755,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             size_per_head=self._size_per_head,
             n_layer=self._n_layer,
             unk_id=self.unk_token_id,
-            mask_id=self._mask_id,
+            mask_id=self.mask_token_id,
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
@@ -794,11 +805,22 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 max_length=128,
                 top_k=4,
                 top_p=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 num_beams=4,
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
                 **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
+
         temperature = model_kwargs.pop('temperature', 1.0)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
@@ -830,7 +852,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
-
+        print([k.shape for k in cache_k])
+        print([v.shape for v in cache_v])
+        print(seq_len)
         return self.decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -840,8 +864,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
-            bos_id=self.bos_token_id,
-            eos_id=self.eos_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             temperature=temperature,
             num_return_sequences=num_return_sequences,
             decoding_type_id=decoding_type_id,
@@ -857,20 +882,18 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         super(FasterUNIMOText, self).__init__()
         self._model = model
         self._decode_strategy = decode_strategy
-
-        self.bos_token_id = model.bos_token_id
-        self.pad_token_id = model.pad_token_id
-        self.eos_token_id = model.eos_token_id
-        self.unk_token_id = model.unk_token_id
+        self.unk_token_id = self._model.unk_token_id
+        self.mask_token_id = self._model.mask_token_id
+        self.bos_token_id = self._model.bos_token_id
+        self.pad_token_id = self._model.pad_token_id
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
-        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
 
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
         self._n_head = self._model.num_attention_heads
         self._hidden_dims = self._model.hidden_size
         self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
-        self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
         self.generate = self.forward
 
@@ -885,7 +908,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             size_per_head=self._size_per_head,
             n_layer=self._n_layer,
             unk_id=self.unk_token_id,
-            mask_id=self._mask_id,
+            mask_id=self.mask_token_id,
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
@@ -936,11 +959,21 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
                 **model_kwargs):
-        #print(model_kwargs)
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
+
         temperature = model_kwargs.pop('temperature', 1.0)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
@@ -980,8 +1013,9 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
-            bos_id=self.bos_token_id,
-            eos_id=self.eos_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             temperature=temperature,
             num_return_sequences=num_return_sequences,
             decoding_type_id=decoding_type_id,
@@ -996,6 +1030,7 @@ class FasterBART(BartPretrainedModel):
                  use_fp16_decoding=False):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
         if use_fp16_decoding:
             weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
                 model.bart.encoder.embed_tokens.weight))
@@ -1006,10 +1041,10 @@ class FasterBART(BartPretrainedModel):
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
         self._decode_strategy = decode_strategy
-        self.generate = self.forward
 
+        self.generate = self.forward
         self.decoding = InferBartDecoding(
-            model=model,
+            model=self._model,
             decoding_strategy=decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
@@ -1027,11 +1062,21 @@ class FasterBART(BartPretrainedModel):
                 num_beams=4,
                 top_k=1,
                 top_p=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 max_length=256,
                 diversity_rate=0.0,
                 length_penalty=0.6,
                 num_return_sequences=1,
                 **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
 
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
@@ -1061,6 +1106,9 @@ class FasterBART(BartPretrainedModel):
             memory_seq_lens=seq_len,
             beam_size=num_beams,
             top_k=top_k,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,

@@ -100,18 +100,7 @@ def do_predict(args):
 
     # Define model
     gpt = model
-    '''
-    gpt = FasterGPT(
-        model=model,
-        topk=args.topk,
-        topp=args.topp,
-        max_length=args.max_length,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        temperature=args.temperature,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
-    '''
+
     # Set evaluate mode
     gpt.eval()
     input_ids = np.array(
@@ -131,6 +120,8 @@ def do_predict(args):
                 top_p=args.topp,
                 max_length=args.max_length,
                 temperature=args.temperature,
+                bos_id=bos_id,
+                eos_id=eos_id,
                 num_beam=4,
                 decode_strategy="beam_search",
                 use_fast=True)
