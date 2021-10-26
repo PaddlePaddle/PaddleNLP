@@ -367,27 +367,7 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "simbert-base-chinese": {
             "do_lower_case": True
-        },
-        "bert-base-japanese": {
-            "do_lower_case": False,
-            "word_tokenizer_type": "mecab",
-            "subword_tokenizer_type": "wordpiece",
-        },
-        "bert-base-japanese-whole-word-masking": {
-            "do_lower_case": False,
-            "word_tokenizer_type": "mecab",
-            "subword_tokenizer_type": "wordpiece",
-        },
-        "bert-base-japanese-char": {
-            "do_lower_case": False,
-            "word_tokenizer_type": "mecab",
-            "subword_tokenizer_type": "character",
-        },
-        "bert-base-japanese-char-whole-word-masking": {
-            "do_lower_case": False,
-            "word_tokenizer_type": "mecab",
-            "subword_tokenizer_type": "character",
-        },
+        }
     }
     padding_side = 'right'
 

@@ -298,15 +298,7 @@ class BertPretrainedModel(PretrainedModel):
             "macbert-large-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-            "bert-base-japanese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese/model_state.pdparams",
-            "bert-base-japanese-whole-word-masking":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/model_state.pdparams",
-            "bert-base-japanese-char":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char/model_state.pdparams",
-            "bert-base-japanese-char-whole-word-masking":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/iverxin/bert-base-japanese-char-whole-word-masking/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams"
         }
     }
     base_model_prefix = "bert"
