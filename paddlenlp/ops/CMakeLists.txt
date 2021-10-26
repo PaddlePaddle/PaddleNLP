@@ -245,28 +245,31 @@ set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_at
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(FT_PATCH_COMMAND
-  cp ${allocator_src} ${allocator_dst}
-  && cp ${common_src} ${common_dst}
-  && cp ${cmakelists_src} ${cmakelists_dst}
-  && cp ${topk_kernels_src} ${topk_kernels_dst}
-  && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
-  && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
-  && cp ${beamsearch_h_src} ${trans_dst}
-  && cp ${sampling_h_src} ${trans_dst}
-  && cp ${arguments_h_src} ${trans_dst}
-  && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
-  && cp ${open_decoder_h_src} ${open_decoder_h_dst}
-  && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst}
-  && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
-  && cat ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
-  && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
-  && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
-  && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
-  && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
-  && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst}
-  && cat ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
-  && cat ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
-  && ${OPT_OPEN_ATTN_COMMAND}
+  bash -c
+  "( [ -f paddle_cmake_patched ] && echo 'Already patched' ) || ( \
+  cp ${allocator_src} ${allocator_dst} \
+  && cp ${common_src} ${common_dst} \
+  && cp ${cmakelists_src} ${cmakelists_dst} \
+  && cp ${topk_kernels_src} ${topk_kernels_dst} \
+  && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst} \
+  && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst} \
+  && cp ${beamsearch_h_src} ${trans_dst} \
+  && cp ${sampling_h_src} ${trans_dst} \
+  && cp ${arguments_h_src} ${trans_dst} \
+  && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst} \
+  && cp ${open_decoder_h_src} ${open_decoder_h_dst} \
+  && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst} \
+  && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst} \
+  && cat ${lightseq_kernels_cu_src} >> ${topk_kernels_dst} \
+  && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst} \
+  && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst} \
+  && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst} \
+  && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst} \
+  && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst} \
+  && cat ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst} \
+  && cat ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst} \
+  && ${OPT_OPEN_ATTN_COMMAND} \
+  && touch paddle_cmake_patched )"
   && ${MUTE_COMMAND}
 )
 
