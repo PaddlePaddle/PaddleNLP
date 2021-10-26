@@ -7,7 +7,7 @@ https://huggingface.co/sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-en
 import paddle
 from paddlenlp.transformers import DistilBertForSequenceClassification, DistilBertTokenizer
 
-model = DistilBertForSequenceClassification.from_pretrained('renmada/distilbert-base-multilingual-cased', num_classes=9)
+model = DistilBertForSequenceClassification.from_pretrained('renmada/distilbert-base-multilingual-cased')
 tokenizer = DistilBertTokenizer.from_pretrained('renmada/distilbert-base-multilingual-cased')
 inp = 'It is good'
 ids = tokenizer.encode(inp)['input_ids']
