@@ -252,21 +252,23 @@ def do_train(args):
                     lr_scheduler.step()
                 optimizer.clear_grad()
 
+                paddle.device.cuda.synchronize()
                 train_run_cost += time.time() - train_start
 
                 # Profile for model benchmark
                 profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_freq == 0:
+                    loss_numpy = loss.numpy()
                     speed = args.logging_freq / (
                         train_reader_cost + train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, loss, avg_reader_cost,
-                           1. / speed, speed, speed * default_global_tokens_num,
-                           optimizer.get_lr()))
-                    log_writer.add_scalar("loss", float(loss), global_step)
+                        % (global_step, epoch, step, loss_numpy,
+                           avg_reader_cost, 1. / speed, speed, speed *
+                           default_global_tokens_num, optimizer.get_lr()))
+                    log_writer.add_scalar("loss", loss_numpy, global_step)
                     log_writer.add_scalar("learning_rate",
                                           optimizer.get_lr(), global_step)
 

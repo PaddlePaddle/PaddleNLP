@@ -364,7 +364,7 @@ def do_train(args):
                             scaler=scaler if args.use_pure_fp16 else None)
 
                 # Sync for profile time, delete it may be a little faster
-                loss.numpy()
+                paddle.device.cuda.synchronize()
                 train_run_cost += time.time() - train_start
                 # Profile for model benchmark
                 profiler.add_profiler_step(args.profiler_options)
