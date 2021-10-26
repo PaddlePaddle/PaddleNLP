@@ -292,9 +292,9 @@ class BertTokenizer(PretrainedTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import BertTokenizer
-            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-            inputs = berttokenizer.tokenize('He was a puppeteer')
+            inputs = tokenizer.tokenize('He was a puppeteer')
             print(inputs)
 
             '''
