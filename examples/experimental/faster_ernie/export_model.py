@@ -17,8 +17,7 @@ import os
 
 import paddle
 import paddlenlp
-
-from model import SequenceClassificationModel
+from paddlenlp.experimental import FastSequenceClassificationModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -32,7 +31,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = SequenceClassificationModel.from_pretrained(
+    model = FastSequenceClassificationModel.from_pretrained(
         'ernie-1.0',
         num_classes=len(label_map),
         max_seq_len=args.max_seq_length)

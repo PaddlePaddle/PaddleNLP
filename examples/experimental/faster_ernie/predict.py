@@ -18,8 +18,9 @@ import os
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.ops import to_string_tensor
+from paddlenlp.experimental import FastSequenceClassificationModel
 
-from model import SequenceClassificationModel
+# from model import SequenceClassificationModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = SequenceClassificationModel.from_pretrained(
+    model = FastSequenceClassificationModel.from_pretrained(
         'ernie-1.0',
         num_classes=len(label_map),
         max_seq_len=args.max_seq_length)

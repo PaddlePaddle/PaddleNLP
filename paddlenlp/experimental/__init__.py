@@ -13,3 +13,4 @@
 # limitations under the License.
 
 from .faster_tokenizer import *
+from .model import *

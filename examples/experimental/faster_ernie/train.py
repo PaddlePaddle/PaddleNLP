@@ -25,8 +25,9 @@ import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.ops import to_string_tensor
+from paddlenlp.experimental import FastSequenceClassificationModel
 
-from model import SequenceClassificationModel
+# from model import SequenceClassificationModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -103,7 +104,7 @@ def do_train():
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    model = SequenceClassificationModel.from_pretrained(
+    model = FastSequenceClassificationModel.from_pretrained(
         'ernie-1.0',
         num_classes=len(train_ds.label_list),
         max_seq_len=args.max_seq_length)

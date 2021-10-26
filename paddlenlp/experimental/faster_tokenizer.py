@@ -22,7 +22,7 @@ __all__ = ["FasterTokenizer"]
 
 
 class FasterTokenizer(nn.Layer):
-    def __init__(self, vocab, do_lower_case=True, is_split_into_words=False):
+    def __init__(self, vocab, do_lower_case=False, is_split_into_words=False):
         super(FasterTokenizer, self).__init__()
         vocab_tensor = to_vocab_tensor(vocab, "vocab")
         self.register_buffer("vocab", vocab_tensor, persistable=True)
