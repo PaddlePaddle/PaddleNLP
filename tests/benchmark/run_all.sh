@@ -8,6 +8,8 @@
 #   bash tests/benchmark/run_all.sh
 
 
+profile=${1:-"off"}
+
 export BENCHMARK_ROOT=/workspace
 run_env=$BENCHMARK_ROOT/run_env
 log_date=`date "+%Y.%m%d.%H%M%S"`
@@ -21,8 +23,8 @@ fi
 # this for update the log_path coding mat
 export TRAIN_LOG_DIR=${save_log_dir}/train_log
 mkdir -p ${TRAIN_LOG_DIR}
-
 log_path=${TRAIN_LOG_DIR}
+
 ################################# 配置python, 如:
 rm -rf $run_env
 mkdir $run_env
@@ -41,17 +43,15 @@ pip install pybind11 regex sentencepiece tqdm visualdl -i https://mirror.baidu.c
 pip install -e ./
 
 # Download test dataset and save it to PaddleNLP/data
-
 if [ -d data ]; then
     rm -rf data
 fi
-
 mkdir -p data && cd data
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
 cd -
 
-model_name='gpt2-en'
+model_name='nlp'
 mode_list=(static dygraph)
 repo_list=(gpt2 gpt3) # gpt3 is optimized for speed and need paddle develop version
 max_iters=200 # control the test time
@@ -59,15 +59,15 @@ max_iters=200 # control the test time
 SP_CARDNUM='0'
 MP_CARDNUM='0,1,2,3,4,5,6,7'
 for mod_item in ${mode_list[@]}; do
-    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item}
-    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item}
+    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item} ${profile}
+    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item} ${profile} 
     if [ $mod_item == 'dygraph' ]; then
         # now, in dygraph mod, the bs=16 will out of mem in 32G V100
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item}
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item} ${profile}
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item} ${profile}
     else
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item}
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item}
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item} ${profile}
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item} ${profile}
     fi
 done
 
@@ -77,14 +77,14 @@ python3 -m pip install paddlepaddle_gpu-0.0.0.post102-cp37-cp37m-linux_x86_64.wh
 rm paddlepaddle_gpu-0.0.0.post102-cp37-cp37m-linux_x86_64.whl 
 
 for mod_item in ${mode_list[@]}; do
-    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item} gpt3
-    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item} gpt3
+    CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp32  ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
+    CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp32 ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
     if [ $mod_item == 'dygraph' ]; then
         # now, in dygraph mod, the bs=16 will out of mem in 32G V100
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 8 fp16  ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 8 fp16 ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
     else
-        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item} gpt3
-        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item} gpt3
+        CUDA_VISIBLE_DEVICES=$SP_CARDNUM bash tests/benchmark/run_benchmark.sh sp 16 fp16  ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
+        CUDA_VISIBLE_DEVICES=$MP_CARDNUM bash tests/benchmark/run_benchmark.sh mp 16 fp16 ${max_iters} ${model_name} ${mod_item} ${profile} gpt3
     fi
 done
