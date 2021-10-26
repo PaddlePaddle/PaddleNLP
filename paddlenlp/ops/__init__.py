@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.fluid.core as core
-
 from .strings import *
 from .faster_transformer.transformer.decoding import *
 from .faster_transformer.transformer.faster_transformer import *
@@ -28,5 +26,3 @@ paddle.nn.TransformerEncoder._ft_forward = encoder_forward
 
 paddle.nn.TransformerEncoderLayer._ori_forward = paddle.nn.TransformerEncoderLayer.forward
 paddle.nn.TransformerEncoder._ori_forward = paddle.nn.TransformerEncoder.forward
-
-Strings = core.VarDesc.VarType.STRINGS

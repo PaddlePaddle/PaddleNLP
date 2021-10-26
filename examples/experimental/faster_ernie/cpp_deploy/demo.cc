@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 
 #include "paddle/include/paddle_inference_api.h"
@@ -26,9 +27,26 @@ std::shared_ptr<Predictor> InitPredictor() {
   return CreatePredictor(config);
 }
 
+void softmax(const std::vector<float>& src,
+             std::vector<float>* res,
+             int num_classes = 2) {
+  size_t length = src.size();
+  assert(length % num_classes == 0);
+
+  res->resize(src.size());
+  transform(src.begin(), src.end(), res->begin(), exp);
+  for (size_t i = 0; i < length; i += num_classes) {
+    float sum =
+        accumulate(res->begin() + i, res->begin() + i + num_classes, 0.0);
+    for (size_t j = i; j < i + num_classes; j++) {
+      res->at(j) /= sum;
+    }
+  }
+}
+
 void Run(Predictor* predictor,
          std::vector<std::string>* input_data,
-         std::vector<float>* probs) {
+         std::vector<float>* out_data) {
   auto input_names = predictor->GetInputNames();
 
   auto text = predictor->GetInputHandle(input_names[0]);
@@ -42,8 +60,8 @@ void Run(Predictor* predictor,
   std::vector<int> output_shape = logits->shape();
   int logits_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
-  probs->resize(logits_num);
-  logits->CopyToCpu(probs->data());
+  out_data->resize(logits_num);
+  logits->CopyToCpu(out_data->data());
 }
 
 int main(int argc, char* argv[]) {
@@ -56,9 +74,16 @@ int main(int argc, char* argv[]) {
       "动画片",
       "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上"
       "办理入住手续，节省时间。"};
+  std::vector<float> logits;
+  Run(predictor.get(), &data, &logits);
 
   std::vector<float> probs;
-  Run(predictor.get(), &data, &probs);
+  int num_classes = 2;
+  softmax(logits, &probs, num_classes);
+  for (size_t i = 0; i < probs.size(); i += num_classes) {
+    LOG(INFO) << i;
+    LOG(INFO) << probs[i] << " " << probs[i + 1] << " ";
+  }
 
   return 0;
 }

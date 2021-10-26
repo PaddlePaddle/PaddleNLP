@@ -21,7 +21,7 @@ from paddlenlp.experimental import FastSequenceClassificationModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900.pdparams', help="The path to model parameters to be loaded.")
+parser.add_argument("--params_path", type=str, default='./checkpoint/model_900.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         model,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None, None], dtype=paddlenlp.ops.Strings),  # texts
+                shape=[None, None], dtype=paddlenlp.Strings),  # texts
         ])
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")

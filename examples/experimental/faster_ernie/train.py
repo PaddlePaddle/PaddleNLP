@@ -144,7 +144,7 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
-            texts = to_string_tensor(texts, "texts")
+            texts = to_string_tensor(texts)
             logits = model(texts)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
