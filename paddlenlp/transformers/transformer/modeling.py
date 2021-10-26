@@ -963,9 +963,6 @@ class InferTransformerModel(TransformerModel):
                 transformer(
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        trg_word = paddle.to_tensor(
-            [123, 456, 888, 909, 332, self.bos_id],
-            dtype=src_word.dtype).reshape([2, 3])
         if trg_word is not None:
             trg_length = paddle.sum(paddle.cast(
                 trg_word != self.bos_id, dtype="int32"),
