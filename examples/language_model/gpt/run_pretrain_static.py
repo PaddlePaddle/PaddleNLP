@@ -408,6 +408,8 @@ def do_train(args):
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+
+            # Profile for model benchmark
             profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:

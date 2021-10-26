@@ -24,6 +24,7 @@ from visualdl import LogWriter
 from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 from paddlenlp.ops import Topology
 
 from dataset import create_pretrained_dataset
@@ -243,6 +244,9 @@ def do_train(args):
                 if lr_scheduler is not None:
                     lr_scheduler.step()
                 optimizer.clear_grad()
+
+                # Profile for model benchmark
+                profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)

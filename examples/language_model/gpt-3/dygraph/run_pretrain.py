@@ -25,6 +25,7 @@ from visualdl import LogWriter
 from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
@@ -354,6 +355,9 @@ def do_train(args):
                             optimizer=optimizer,
                             lr_scheduler=lr_scheduler,
                             scaler=scaler if args.use_pure_fp16 else None)
+
+                # Profile for model benchmark
+                profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()

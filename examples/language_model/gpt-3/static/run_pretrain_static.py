@@ -32,6 +32,7 @@ from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
@@ -410,6 +411,9 @@ def do_train(args):
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+
+            # Profile for model benchmark
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
