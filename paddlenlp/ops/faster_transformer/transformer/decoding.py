@@ -718,14 +718,6 @@ class InferGptDecoding(nn.Layer):
         self.topp = topp
         self.max_out_len = max_out_len
         self.temperature = temperature
-        if topp == 1 and topk > 0:
-            topp = 0
-        elif topp > 0 and topk == 0:
-            pass
-        else:
-            raise ValueError(
-                "Only topk sampling or topp sampling are supported. " \
-                "Topk sampling and topp sampling cannot be both applied. ")
         output_ids = infer_gpt_decoding(
             input=[input_ids],
             word_emb=self.word_emb,

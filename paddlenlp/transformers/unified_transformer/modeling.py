@@ -483,6 +483,9 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
         from paddlenlp.ops import FasterUnifiedTransformer
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') > 1 and kwargs.get('top_p') != 1:
+            return False
         self._faster_entry = FasterUnifiedTransformer(
             self,
             decode_strategy=decode_strategy,
