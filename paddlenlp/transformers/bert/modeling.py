@@ -495,6 +495,10 @@ class BertModel(BertPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
