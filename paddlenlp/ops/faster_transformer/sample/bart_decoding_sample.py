@@ -138,11 +138,12 @@ def do_predict(args):
     input_ids, mem_seq_lens = prepare_input(tokenizer, sentences, pad_id)
 
     # Define model
-    faster_bart = FasterBART(
-        model=model,
-        decoding_strategy=args.decoding_strategy,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+    faster_bart = model
+    # faster_bart = FasterBART(
+    #     model=model,
+    #     decoding_strategy=args.decoding_strategy,
+    #     decoding_lib=args.decoding_lib,
+    #     use_fp16_decoding=args.use_fp16_decoding)
 
     # Set evaluate mode
     faster_bart.eval()
