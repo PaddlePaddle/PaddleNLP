@@ -69,13 +69,13 @@ class BertJapaneseTokenizer(BertTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import BertJapaneseTokenizer
-            berttokenizer = BertJapaneseTokenizer.from_pretrained('bert-base-japanese')
+            tokenizer = BertJapaneseTokenizer.from_pretrained('iverxin/bert-base-japanese/')
 
-            inputs = berttokenizer.tokenize('こんにちは')
+            inputs = tokenizer('こんにちは')
             print(inputs)
 
             '''
-            ['こん', '##にち', '##は']
+            {'input_ids': [2, 10350, 25746, 28450, 3], 'token_type_ids': [0, 0, 0, 0, 0]}
             '''
 
     """
