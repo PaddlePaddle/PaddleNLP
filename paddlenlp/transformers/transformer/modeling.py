@@ -546,7 +546,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         if kwargs.get("trg_word", None) is not None:
             if in_dygraph_mode():
                 if paddle.shape(kwargs.get("trg_word"))[1] > time:
-                    beam_search_output, beam_search_state = self.force_decoding_vanilla(
+                    beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state,
                         kwargs.get("trg_word"), kwargs.get("trg_length"), time)
             else:
@@ -560,7 +560,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                 from functools import partial
                 beam_search_output, beam_search_state = paddle.static.nn.case(
                     [(condition(kwargs.get("trg_word"), time), partial(
-                        self.force_decoding_vanilla,
+                        self.force_decoding,
                         beam_search_output=beam_search_output,
                         beam_search_state=beam_search_state,
                         trg_word=kwargs.get("trg_word"),
@@ -576,8 +576,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
         return (beam_search_output, beam_search_state, next_inputs, finished)
 
-    def force_decoding_vanilla(self, beam_search_output, beam_search_state,
-                               trg_word, trg_length, time):
+    def force_decoding(self, beam_search_output, beam_search_state, trg_word,
+                       trg_length, time):
         batch_size = paddle.shape(beam_search_output.predicted_ids)[0]
         beam_size = paddle.shape(beam_search_output.predicted_ids)[1]
 
@@ -585,7 +585,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores_dtype = beam_search_output.scores.dtype
         parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
         scores = paddle.ones(
-            shape=[batch_size, beam_size], dtype=scores_dtype) * -10e9
+            shape=[batch_size, beam_size], dtype=scores_dtype) * -1e9
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
@@ -1112,6 +1112,20 @@ class InferTransformerModel(TransformerModel):
         ## init states (caches) for transformer, need to be updated according to selected beam
         caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
 
+        if trg_word is not None:
+            scores_dtype = finished_scores.dtype
+            scores = paddle.ones(
+                shape=[batch_size, beam_size * 2], dtype=scores_dtype) * -1e9
+            scores = paddle.scatter(
+                scores.flatten(),
+                paddle.arange(
+                    0,
+                    batch_size * beam_size * 2,
+                    step=beam_size * 2,
+                    dtype=finished_seq.dtype),
+                paddle.zeros([batch_size]))
+            scores = paddle.reshape(scores, [batch_size, beam_size * 2])
+
         def update_states(caches, topk_coordinates, beam_size, batch_size):
             new_caches = []
             for cache in caches:
@@ -1166,13 +1180,7 @@ class InferTransformerModel(TransformerModel):
 
             return bound_is_met
 
-        def grow_topk(i,
-                      logits,
-                      alive_seq,
-                      alive_log_probs,
-                      states,
-                      trg_word=None,
-                      trg_length=None):
+        def grow_topk(i, logits, alive_seq, alive_log_probs, states):
             """
             This function takes the current alive sequences, and grows them to topk
             sequences where k = 2*beam.
@@ -1194,8 +1202,8 @@ class InferTransformerModel(TransformerModel):
                 topk_ids = paddle.cast(topk_ids, dtype=alive_seq.dtype)
 
             if trg_word is not None:
-                topk_ids, topk_scores = force_decoding_t2t(
-                    topk_ids, topk_scores, trg_word, trg_length, i)
+                topk_ids, topk_scores = force_decoding_v2(topk_ids, topk_scores,
+                                                          i)
 
             topk_log_probs = topk_scores * length_penalty
 
@@ -1284,49 +1292,25 @@ class InferTransformerModel(TransformerModel):
 
             return finished_seq, finished_scores, finished_flags
 
-        def force_decoding_t2t(topk_ids, topk_scores, trg_word, trg_length,
-                               time):
-            if trg_word.shape[1] <= time:
-                return topk_ids, topk_scores
-
-            batch_size = trg_word.shape[0]
+        def force_decoding_v2(topk_ids, topk_scores, time):
             beam_size = topk_ids.shape[1]
+            if trg_word.shape[1] > time:
+                force_position = paddle.unsqueeze(trg_length > time, [1])
+                force_position.stop_gradient = True
+                force_position = paddle.tile(force_position, [1, beam_size])
 
-            force_position = paddle.unsqueeze(trg_length > time, [1])
-            force_position = paddle.tile(force_position, [1, beam_size])
+                crt_trg_word = paddle.slice(
+                    trg_word, axes=[1], starts=[time], ends=[time + 1])
+                crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
 
-            scores_dtype = topk_scores.dtype
-            scores = paddle.ones(
-                shape=[batch_size, beam_size], dtype=scores_dtype) * -10e9
-            scores = paddle.scatter(
-                scores.flatten(),
-                paddle.arange(
-                    0,
-                    batch_size * beam_size,
-                    step=beam_size,
-                    dtype=topk_ids.dtype),
-                paddle.zeros([batch_size])).reshape([batch_size, beam_size])
+                topk_ids = paddle.where(force_position, crt_trg_word, topk_ids)
 
-            crt_trg_word = paddle.slice(
-                trg_word, axes=[1], starts=[time], ends=[time + 1])
-            crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
-
-            topk_ids = paddle.where(force_position, crt_trg_word, topk_ids)
-
-            topk_scores = paddle.where(force_position, scores, topk_scores)
+                topk_scores = paddle.where(force_position, scores, topk_scores)
 
             return topk_ids, topk_scores
 
-        def inner_loop(i,
-                       pre_word,
-                       alive_seq,
-                       alive_log_probs,
-                       finished_seq,
-                       finished_scores,
-                       finished_flags,
-                       caches,
-                       trg_word=None,
-                       trg_length=None):
+        def inner_loop(i, pre_word, alive_seq, alive_log_probs, finished_seq,
+                       finished_scores, finished_flags, caches):
             trg_pos = paddle.full(
                 shape=paddle.shape(pre_word),
                 dtype=alive_seq.dtype,
@@ -1342,8 +1326,7 @@ class InferTransformerModel(TransformerModel):
                 dec_input, enc_output, None, trg_src_attn_bias, caches)
             logits = self.linear(logits)
             topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
-                i, logits, alive_seq, alive_log_probs, caches, trg_word,
-                trg_length)
+                i, logits, alive_seq, alive_log_probs, caches)
             alive_seq, alive_log_probs, states = grow_alive(
                 topk_seq, topk_scores, topk_log_probs, topk_finished, states)
             caches = states
@@ -1353,30 +1336,21 @@ class InferTransformerModel(TransformerModel):
             pre_word = paddle.reshape(alive_seq[:, :, -1],
                                       [batch_size * beam_size, 1])
             return (i + 1, pre_word, alive_seq, alive_log_probs, finished_seq,
-                    finished_scores, finished_flags, caches, trg_word,
-                    trg_length)
+                    finished_scores, finished_flags, caches)
 
-        def is_not_finish(i,
-                          pre_word,
-                          alive_seq,
-                          alive_log_probs,
-                          finished_seq,
-                          finished_scores,
-                          finished_flags,
-                          caches,
-                          trg_word=None,
-                          trg_length=None):
+        def is_not_finish(i, pre_word, alive_seq, alive_log_probs, finished_seq,
+                          finished_scores, finished_flags, caches):
             return paddle.greater_than(
                 i < max_len,
                 early_finish(alive_log_probs, finished_scores, finished_flags))
 
-        _, pre_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches, trg_word, trg_length = paddle.static.nn.while_loop(
+        _, pre_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
             is_not_finish,
             inner_loop, [
                 paddle.zeros(
-                    shape=[1], dtype="int64"), pre_word, alive_seq,
-                alive_log_probs, finished_seq, finished_scores, finished_flags,
-                caches, trg_word, trg_length
+                    shape=[1],
+                    dtype="int64"), pre_word, alive_seq, alive_log_probs,
+                finished_seq, finished_scores, finished_flags, caches
             ])
 
         # (gongenlei) `paddle.where` doesn't support broadcast, so we need to use `paddle.unsqueeze`
