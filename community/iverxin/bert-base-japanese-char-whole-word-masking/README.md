@@ -47,7 +47,7 @@ For training models, we used Cloud TPUs provided by [TensorFlow Research Cloud](
 import paddle
 from paddlenlp.transformers import BertJapaneseTokenizer, BertForMaskedLM
 
-path = "iverxin/bert-base-japanese-char-whole-word-masking"
+path = "iverxin/bert-base-japanese-char-whole-word-masking/"
 tokenizer = BertJapaneseTokenizer.from_pretrained(path)
 model = BertForMaskedLM.from_pretrained(path)
 text1 = "こんにちは"
