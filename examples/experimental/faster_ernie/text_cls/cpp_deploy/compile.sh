@@ -20,8 +20,8 @@ mkdir -p build
 cd build
 rm -rf *
 
-# same with the demo.cc
-DEMO_NAME=demo
+# same with the text_cls_infer.cc
+PROJECT_NAME=text_cls_infer
 
 WITH_MKL=ON
 WITH_GPU=ON
@@ -32,7 +32,7 @@ CUDA_LIB=/usr/local/cuda/lib64
 
 cmake .. -DPADDLE_LIB=${LIB_DIR} \
   -DWITH_MKL=${WITH_MKL} \
-  -DDEMO_NAME=${DEMO_NAME} \
+  -DPROJECT_NAME=${PROJECT_NAME} \
   -DWITH_GPU=${WITH_GPU} \
   -DWITH_STATIC_LIB=OFF \
   -DCUDNN_LIB=${CUDNN_LIB} \

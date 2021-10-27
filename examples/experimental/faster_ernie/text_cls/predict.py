@@ -31,20 +31,6 @@ args = parser.parse_args()
 
 
 def predict(model, data, label_map, batch_size=1):
-    """
-    Predicts the data labels.
-
-    Args:
-        model (obj:`paddle.nn.Layer`): A model to classify texts.
-        data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-            A Example object contains `text`(word_ids) and `seq_len`(sequence length).
-        label_map(obj:`dict`): The label id (key) to label str (value) map.
-        batch_size(obj:`int`, defaults to 1): The number of batch.
-
-    Returns:
-        results(obj:`dict`): All the predictions labels.
-    """
-
     # Seperates data into some batches.
     batches = [
         data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)

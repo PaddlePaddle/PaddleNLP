@@ -52,15 +52,6 @@ def set_seed(seed):
 
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader):
-    """
-    Given a dataset, it evals model and computes the metric.
-
-    Args:
-        model(obj:`paddle.nn.Layer`): A model to classify texts.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
-        metric(obj:`paddle.metric.Metric`): The evaluation metric.
-    """
     model.eval()
     metric.reset()
     losses = []
@@ -78,7 +69,7 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
 
 
-def create_dataloader(dataset, mode='train', batch_size=1, batchify_fn=None):
+def create_dataloader(dataset, mode='train', batch_size=1):
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
