@@ -300,6 +300,43 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 | SST-2 | Accuracy                     |      0.94495      |
 
 
+### 序列标注
+
+以MSRA命名实体识别任务为例，启动Fine-tuning的方式如下：
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
+    --model_name_or_path gpt-cpm-small-cn-distill \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --learning_rate 2e-5 \
+    --num_train_epochs 3 \
+    --logging_steps 25 \
+    --save_steps 250 \
+    --output_dir ./tmp/msra_ner/ \
+    --device gpu
+```
+
+其中参数释义如下：
+- `model_name_or_path`: 指示了某种特定配置的模型。
+- `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
+- `batch_size`: 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate`: 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `num_train_epochs`: 表示训练轮数。
+- `logging_steps`: 表示日志打印间隔。
+- `save_steps`: 表示模型保存及评估间隔。
+- `output_dir`: 表示模型保存路径。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+
+基于`gpt-cpm-small-cn-distill`在MSRA的NER任务上Fine-tuning后，在验证集上有如下结果：
+
+ Metric                       | Result      |
+------------------------------|-------------|
+Precision                     | 0.484939    |
+Recall                        | 0.634716    |
+F1                            | 0.549810    |
+
 ## 其他
 
 本项目提供了Huggingface的权重转化示例`converter.py`，`python xxx-gpt.bin`即可完成转换。用户可以参考转化脚本，转换自己需要的模型权重。
