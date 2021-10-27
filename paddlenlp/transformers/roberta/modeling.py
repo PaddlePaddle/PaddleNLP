@@ -158,111 +158,6 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
             "pad_token_id": 0
-        },
-        "roberta-en-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "layer_norm_eps": 1e-05,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 1,
-            "type_vocab_size": 1,
-            "vocab_size": 50265
-        },
-        "roberta-en-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "pad_token_id": 1,
-            "type_vocab_size": 1,
-            "layer_norm_eps": 1e-05,
-            "vocab_size": 50265
-        },
-        "roberta-base-squad2": {
-            "layer_norm_eps": 1e-05,
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 1,
-            "type_vocab_size": 1,
-            "vocab_size": 50265
-        },
-        "roberta-base-ft-chinanews-chn": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128
-        },
-        "tiny-distilroberta-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 2,
-            "initializer_range": 0.02,
-            "intermediate_size": 2,
-            "layer_norm_eps": 1e-05,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 2,
-            "num_hidden_layers": 2,
-            "pad_token_id": 1,
-            "type_vocab_size": 1,
-            "vocab_size": 50265
-        },
-        "roberta-base-ft-cluener2020-chn": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128
-        },
-        "roberta-base-chn-extractive-qa": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 21128
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -276,20 +171,6 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
-            "roberta-en-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_base/model_state.pdparams",
-            "roberta-en-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_large/model_state.pdparams",
-            "roberta-base-squad2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/deepset_roberta_base_squad2/model_state.pdparams",
-            "roberta-base-ft-chinanews-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_chinanews_chinese/model_state.pdparams",
-            "tiny-distilroberta-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/sshleifer_tiny_distilroberta_base/model_state.pdparams",
-            "roberta-base-ft-cluener2020-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_cluener2020_chinese/model_state.pdparams",
-            "roberta-base-chn-extractive-qa":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_chinese_extractive_qa/model_state.pdparams",
         }
     }
     base_model_prefix = "roberta"
