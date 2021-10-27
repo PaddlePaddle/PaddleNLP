@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 
 #include "paddle/include/paddle_inference_api.h"
 
@@ -44,24 +45,33 @@ void softmax(const std::vector<float>& src,
   }
 }
 
+template <typename T>
+void GetOutput(Predictor* predictor,
+               std::string output_name,
+               std::vector<T>* out_data) {
+  auto output = predictor->GetOutputHandle(output_name);
+  std::vector<int> output_shape = output->shape();
+  int out_num = std::accumulate(
+      output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
+  out_data->resize(out_num);
+  output->CopyToCpu(out_data->data());
+}
+
 void Run(Predictor* predictor,
          std::vector<std::string>* input_data,
-         std::vector<float>* out_data) {
+         std::vector<float>* logits,
+         std::vector<int64_t>* predictions) {
   auto input_names = predictor->GetInputNames();
 
   auto text = predictor->GetInputHandle(input_names[0]);
   text->ReshapeStrings(input_data->size());
   text->CopyStringsFromCpu(input_data);
 
-  predictor->Run();
+  CHECK(predictor->Run());
 
   auto output_names = predictor->GetOutputNames();
-  auto logits = predictor->GetOutputHandle(output_names[0]);
-  std::vector<int> output_shape = logits->shape();
-  int logits_num = std::accumulate(
-      output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
-  out_data->resize(logits_num);
-  logits->CopyToCpu(out_data->data());
+  GetOutput(predictor, output_names[0], logits);
+  GetOutput(predictor, output_names[1], predictions);
 }
 
 int main(int argc, char* argv[]) {
@@ -74,15 +84,18 @@ int main(int argc, char* argv[]) {
       "动画片",
       "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上"
       "办理入住手续，节省时间。"};
-  std::vector<float> logits;
-  Run(predictor.get(), &data, &logits);
-
-  std::vector<float> probs;
-  int num_classes = 2;
-  softmax(logits, &probs, num_classes);
-  for (size_t i = 0; i < probs.size(); i += num_classes) {
-    LOG(INFO) << i;
-    LOG(INFO) << probs[i] << " " << probs[i + 1] << " ";
+  std::unordered_map<std::size_t, std::string> label_map = {{0, "negative"},
+                                                            {1, "positive"}};
+  for (size_t i = 0; i < data.size(); i += FLAGS_batch_size) {
+    std::vector<std::string> batch(FLAGS_batch_size);
+    batch.assign(data.begin() + i, data.begin() + i + FLAGS_batch_size);
+    std::vector<float> logits;
+    std::vector<int64_t> predictions;
+    Run(predictor.get(), &batch, &logits, &predictions);
+    for (size_t j = 0; j < FLAGS_batch_size; j++) {
+      LOG(INFO) << "The text is " << batch[j] << "; The predition label is "
+                << label_map[predictions[j]];
+    }
   }
 
   return 0;

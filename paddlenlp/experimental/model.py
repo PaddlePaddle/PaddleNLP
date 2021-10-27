@@ -12,17 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
+import paddle.fluid.core as core
 import paddle.nn as nn
 from paddlenlp.experimental import FasterTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertForTokenClassification
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieForTokenClassification
 from paddlenlp.transformers import RobertaForSequenceClassification, RobertaForTokenClassification
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
+from paddlenlp.utils.log import logger
 
-__all__ = ["FastSequenceClassificationModel", "FastTokenClassificationModel"]
+__all__ = [
+    "FasterModelForSequenceClassification", "FasterModelForTokenClassification"
+]
 
 
-class FasterPretrainedModel(nn.Layer):
+class SequenceClassificationModel(nn.Layer):
     def __init__(self,
                  vocab,
                  model,
@@ -30,7 +35,7 @@ class FasterPretrainedModel(nn.Layer):
                  is_split_into_words=False,
                  max_seq_len=512,
                  pad_to_max_seq_len=True):
-        super(FasterPretrainedModel, self).__init__()
+        super(SequenceClassificationModel, self).__init__()
         self.tokenizer = FasterTokenizer(
             vocab,
             do_lower_case=do_lower_case,
@@ -47,10 +52,28 @@ class FasterPretrainedModel(nn.Layer):
             pad_to_max_seq_len=self.pad_to_max_seq_len)
 
         logits = self.model(input_ids, token_type_ids)
-        return logits
+        predictions = paddle.argmax(logits, axis=-1)
+        return logits, predictions
+
+    def to_static(self, output_path):
+        self.eval()
+
+        # Convert to static graph with specific input description
+        model = paddle.jit.to_static(
+            self,
+            input_spec=[
+                paddle.static.InputSpec(
+                    shape=[None, None], dtype=core.VarDesc.VarType.STRINGS)
+            ])
+        paddle.jit.save(model, output_path)
+        logger.info("Already save the static model to the path %s" %
+                    output_path)
 
 
-class FastSequenceClassificationModel(object):
+TokenClassificationModel = SequenceClassificationModel
+
+
+class FasterModelForSequenceClassification(object):
     name_model = {
         'bert-base-uncased': (BertForSequenceClassification, BertTokenizer),
         'bert-large-uncased': (BertForSequenceClassification, BertTokenizer),
@@ -94,7 +117,7 @@ class FastSequenceClassificationModel(object):
             tokenizer = tokenizer_cls.from_pretrained(
                 pretrained_model_name_or_path)
 
-            return FasterPretrainedModel(
+            return SequenceClassificationModel(
                 tokenizer.vocab.token_to_idx,
                 model,
                 do_lower_case=tokenizer.do_lower_case,
@@ -107,7 +130,7 @@ class FastSequenceClassificationModel(object):
                               list(name_model.keys())))
 
 
-class FastTokenClassificationModel(object):
+class FasterModelForTokenClassification(object):
     name_model = {
         'bert-base-uncased': (BertForTokenClassification, BertTokenizer),
         'bert-large-uncased': (BertForTokenClassification, BertTokenizer),
@@ -151,7 +174,7 @@ class FastTokenClassificationModel(object):
             tokenizer = tokenizer_cls.from_pretrained(
                 pretrained_model_name_or_path)
 
-            return FasterPretrainedModel(
+            return TokenClassificationModel(
                 tokenizer.vocab.token_to_idx,
                 model,
                 do_lower_case=tokenizer.do_lower_case,
@@ -159,6 +182,6 @@ class FastTokenClassificationModel(object):
                 max_seq_len=max_seq_len,
                 pad_to_max_seq_len=pad_to_max_seq_len)
         else:
-            raise ValueError("Unknown name %s. Now %s surports  %s" %
+            raise ValueError("Unknown name %s. Now %s supports  %s" %
                              (pretrained_model_name_or_path, cls.__name__,
                               list(name_model.keys())))

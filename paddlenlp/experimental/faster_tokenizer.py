@@ -12,20 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.nn as nn
+import paddle
 import paddle.fluid.core as core
+import paddle.nn as nn
 from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
-from paddlenlp.ops import to_vocab_tensor, to_string_tensor
 
-__all__ = ["FasterTokenizer"]
+__all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
+
+
+def to_tensor(string_values, name="text"):
+    """
+    Create the tensor that the value holds the list of string.
+    NOTICE: The value will be holded in the cpu place. 
+ 
+    Args:
+        string_values(list[string]): The value will be setted to the tensor.
+        name(string): The name of the tensor.
+    """
+    tensor = paddle.Tensor(core.VarDesc.VarType.STRING, [], name,
+                           core.VarDesc.VarType.STRINGS, False)
+    tensor.value().set_string_list(string_values)
+    return tensor
+
+
+def to_vocab_buffer(vocab_dict, name):
+    """
+    Create the tensor that the value holds the map, the type of key is the string.
+    NOTICE: The value will be holded in the cpu place. 
+ 
+    Args:
+        vocab_dict(dict): The value will be setted to the tensor. 
+            The key is token and the value is the token index.
+        name(string): The name of the tensor.
+    """
+    tensor = paddle.Tensor(core.VarDesc.VarType.RAW, [], name,
+                           core.VarDesc.VarType.VOCAB, True)
+    tensor.value().set_vocab(vocab_dict)
+    return tensor
 
 
 class FasterTokenizer(nn.Layer):
     def __init__(self, vocab, do_lower_case=False, is_split_into_words=False):
         super(FasterTokenizer, self).__init__()
-        vocab_tensor = to_vocab_tensor(vocab, "vocab")
-        self.register_buffer("vocab", vocab_tensor, persistable=True)
+        vocab_buffer = to_vocab_buffer(vocab, "vocab")
+        self.register_buffer("vocab", vocab_buffer, persistable=True)
 
         self.do_lower_case = do_lower_case
         self.is_split_into_words = is_split_into_words

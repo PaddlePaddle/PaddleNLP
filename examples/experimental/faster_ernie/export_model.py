@@ -17,7 +17,7 @@ import os
 
 import paddle
 import paddlenlp
-from paddlenlp.experimental import FastSequenceClassificationModel
+from paddlenlp.experimental import FasterModelForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -31,7 +31,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = FastSequenceClassificationModel.from_pretrained(
+    model = FasterModelForSequenceClassification.from_pretrained(
         'ernie-1.0',
         num_classes=len(label_map),
         max_seq_len=args.max_seq_length)
@@ -40,15 +40,16 @@ if __name__ == "__main__":
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-    model.eval()
-
-    # Convert to static graph with specific input description
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype=paddlenlp.Strings),  # texts
-        ])
-    # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
-    paddle.jit.save(model, save_path)
+    model.to_static(save_path)
+
+    # # Convert to static graph with specific input description
+    # model = paddle.jit.to_static(
+    #     model,
+    #     input_spec=[
+    #         paddle.static.InputSpec(
+    #             shape=[None, None], dtype=paddlenlp.Strings),  # texts
+    #     ])
+    # # Save in static graph model.
+    # save_path = os.path.join(args.output_path, "inference")
+    # paddle.jit.save(model, save_path)

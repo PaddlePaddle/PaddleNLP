@@ -24,10 +24,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.ops import to_string_tensor
-from paddlenlp.experimental import FastSequenceClassificationModel
-
-# from model import SequenceClassificationModel
+from paddlenlp.experimental import FasterModelForSequenceClassification, to_tensor
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -69,8 +66,8 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in data_loader:
         texts, labels = batch['text'], batch['label']
-        texts = to_string_tensor(texts, "texts")
-        logits = model(texts)
+        texts = to_tensor(texts, "texts")
+        logits, predictions = model(texts)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
@@ -104,7 +101,7 @@ def do_train():
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    model = FastSequenceClassificationModel.from_pretrained(
+    model = FasterModelForSequenceClassification.from_pretrained(
         'ernie-1.0',
         num_classes=len(train_ds.label_list),
         max_seq_len=args.max_seq_length)
@@ -144,11 +141,11 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
-            texts = to_string_tensor(texts)
-            logits = model(texts)
+            texts = to_tensor(texts)
+            logits, predictions = model(texts)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
-            correct = metric.compute(probs, labels)
+            correct = metric.compute(logits, labels)
             metric.update(correct)
             acc = metric.accumulate()
 

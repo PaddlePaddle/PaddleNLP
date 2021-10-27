@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.fluid.core as core
-
-Strings = core.VarDesc.VarType.STRINGS
 __version__ = '2.0.0'  # Maybe dev is better
 
 from . import data
 from . import datasets
 from . import embeddings
-from . import experimental
 from . import ops
 from . import layers
 from . import metrics
@@ -28,4 +24,5 @@ from . import seq2vec
 from . import transformers
 from . import utils
 from . import losses
+from . import experimental
 from .taskflow import Taskflow
