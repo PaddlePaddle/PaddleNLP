@@ -1,6 +1,9 @@
 import io
+import os
 import time
 
+import paddle
+import paddlenlp
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.experimental import FasterTokenizer
 from paddlenlp.utils.downloader import get_path_from_url
@@ -30,6 +33,17 @@ data = [text[:max_seq_length]] * 100
 
 text_tensor = to_string_tensor(data)
 pp_tokenizer = FasterTokenizer(vocab, do_lower_case=False)
+
+# Convert to static graph with specific input description
+model = paddle.jit.to_static(
+    pp_tokenizer,
+    input_spec=[
+        paddle.static.InputSpec(
+            shape=[None, None], dtype=paddlenlp.Strings),  # texts
+    ])
+# Save in static graph model.
+save_path = os.path.join("export", "inference")
+paddle.jit.save(model, save_path)
 
 batches = [
     to_string_tensor(data[idx:idx + batch_size])
