@@ -411,11 +411,11 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                     (sequence_output,
                      sequence_output[:, self.content_summary_index].clone(
                      ).unsqueeze([1]).expand_as(sequence_output)), 2)
-            else:
-                sequence_output = paddle.concat(
-                    (sequence_output,
-                     sequence_output[:, self.content_summary_index].unsqueeze(
-                         [1]).expand_as(sequence_output)), 2)
+            else: 
+                content_output = paddle.expand(content_output.unsqueeze([1]), 
+                    shape=(sequence_output.shape[0], sequence_output.shape[1], sequence_output.shape[2]))
+
+                sequence_output = paddle.concat((sequence_output, content_output), 2)
 
             sequence_output = self.feature_fuse(sequence_output)
 

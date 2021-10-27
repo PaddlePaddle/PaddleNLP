@@ -75,7 +75,7 @@ class NPTagTask(Task):
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self._static_mode = False
+        self._static_mode = True
         self._batch_size = batch_size
         self._linking = linking
         self._construct_tokenizer(model)
@@ -161,9 +161,11 @@ class NPTagTask(Task):
         """
         self._input_spec = [
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
+                shape=[None, None], dtype="int64",
+                name="input_ids"), # input_ids
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
+                shape=[None, None], dtype="int64",
+                name="token_type_ids"), # segment_ids
         ]
 
     def _construct_model(self, model):
@@ -206,8 +208,8 @@ class NPTagTask(Task):
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'), # input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64') # token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id), # input_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id) # token_type_ids
         ): fn(samples)
 
         infer_data_loader = paddle.io.DataLoader(
@@ -227,30 +229,19 @@ class NPTagTask(Task):
         all_scores_can = []
         all_preds_can = []
         pred_ids = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                with paddle.no_grad():
-                    for batch in inputs['data_loader']:
-                        input_ids, token_type_ids = batch
-                        logits = self._model(input_ids, token_type_ids)
-                        logits = logits.numpy()
-                        logits = logits.squeeze()[-(self._cls_seq_length + 1): -1, self._vocab_ids]
-                        # Find topk candidates of scores and predicted indices.
-                        scores_can, pred_ids_can = self._find_topk(logits, k=4, axis=-1)
-                        all_scores_can.extend([scores_can.tolist()])
-                        all_preds_can.extend([pred_ids_can.tolist()])
-                        pred_ids.extend([pred_ids_can[:, 0].tolist()])
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    data_dict = dict()
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    results = self._exe.run(
-                        self._static_program,
-                        feed=data_dict,
-                        fetch_list=self._static_fetch_targets)
-                    all_pred_tags.extend(results[1].tolist())
+
+        for batch in inputs['data_loader']:
+            input_ids, token_type_ids = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+            self.predictor.run()
+            logits = self.output_handle[0].copy_to_cpu()
+            logits = logits.squeeze()[-(self._cls_seq_length + 1): -1, self._vocab_ids]
+            # Find topk candidates of scores and predicted indices.
+            scores_can, pred_ids_can = self._find_topk(logits, k=4, axis=-1)
+            all_scores_can.extend([scores_can.tolist()])
+            all_preds_can.extend([pred_ids_can.tolist()])
+            pred_ids.extend([pred_ids_can[:, 0].tolist()])                
 
         inputs['all_scores_can'] = all_scores_can
         inputs['all_preds_can'] = all_preds_can
@@ -269,7 +260,6 @@ class NPTagTask(Task):
             }
 
             if cls_label not in self._name_dict:
-                result['_tmp'] = cls_label
                 scores_can = inputs['all_scores_can'][i]
                 pred_ids_can = inputs['all_preds_can'][i]
                 labels_can = self._search(scores_can, pred_ids_can, 0, [], 0)
