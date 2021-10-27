@@ -21,6 +21,6 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --mp_degree 2\
     --pp_degree 2\
     --sharding_degree 1\
-    --use_amp True\
+    --use_pure_fp16 True\
     --use_recompute False
 

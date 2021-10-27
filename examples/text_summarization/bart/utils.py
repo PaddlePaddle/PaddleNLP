@@ -106,6 +106,7 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
         return seq
 
     if ignore_pad_token_for_loss:
+        labels = np.asarray(labels)
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_preds, decoded_labels = [], []
     for pred, label in zip(preds, labels):

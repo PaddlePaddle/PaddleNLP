@@ -24,6 +24,7 @@ BART是一种Seq2Seq结构的降噪自编码器，通过增加噪声来破环文
 ├── run_summarization.py # 模型finetune主程序入口
 ├── generate.py # 模型生成主程序入口
 ├── utils.py # 定义参数及一些工具函数
+├── requirements.txt # 环境依赖文件
 └── README.md # 文档说明
 ```
 
@@ -215,6 +216,7 @@ python generate.py \
     --faster \
     --use_fp16_decoding \
     --decoding_lib=../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --alpha=0.0 \
     --device=gpu
 ```
 其中新增参数释义如下：
