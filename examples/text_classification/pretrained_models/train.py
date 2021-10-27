@@ -40,7 +40,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -73,7 +73,7 @@ def evaluate(model, criterion, metric, data_loader):
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
-        accu = metric.accumulate()
+    accu = metric.accumulate()
     print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
     model.train()
     metric.reset()

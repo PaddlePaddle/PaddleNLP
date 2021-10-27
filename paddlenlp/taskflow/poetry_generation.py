@@ -59,12 +59,3 @@ class PoetryGenerationTask(TextGenerationTask):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        if self._static_mode:
-            download_file(
-                self._task_path, "static" + os.path.sep + "inference.pdiparams",
-                URLS[self.model][0], URLS[self.model][1], "poetry_generation")
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
-        self._construct_tokenizer(model)
-        self.kwargs['generation_task'] = 'poetry_generation'

@@ -129,7 +129,7 @@ class LSTMModel(nn.Layer):
         logits = self.output_layer(fc_out)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
-        return idx
+        return idx, probs
 
 
 class SkepSequenceModel(SkepPretrainedModel):
@@ -158,4 +158,4 @@ class SkepSequenceModel(SkepPretrainedModel):
         logits = self.classifier(pooled_output)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1)
-        return idx
+        return idx, probs
