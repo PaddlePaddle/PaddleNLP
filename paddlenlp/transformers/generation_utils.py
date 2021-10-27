@@ -453,14 +453,10 @@ class GenerationMixin(object):
         if kwargs['min_length'] != 0:
             # not support for min_length yet in the faster version
             return
-        if kwargs['decode_strategy'] == 'beam_search' and kwargs[
-                'num_return_sequences'] != 1:
-            # When 'num_return_sequences' is bigger than 1, the faster version
-            # may include unfinished results while the original version must
-            # return beams all finished since stop criterion differs.
+        if kwargs['repetition_penalty'] != 0:
+            # not support for repetition_penalty yet in the faster version
             return
-        elif kwargs['decode_strategy'] == 'sampling' and kwargs[
-                'temperature'] != 1:
+        if kwargs['temperature'] != 1:
             # not support for temperature yet in the faster version
             return
 
