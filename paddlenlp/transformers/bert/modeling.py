@@ -298,7 +298,7 @@ class BertPretrainedModel(PretrainedModel):
             "macbert-large-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
         }
     }
     base_model_prefix = "bert"
