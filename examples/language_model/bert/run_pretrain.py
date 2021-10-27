@@ -416,7 +416,7 @@ def do_train(args):
                  masked_lm_scale) = batch
                 with paddle.amp.auto_cast(
                         args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_attention_cudnn_fmha", "fused_ffn"]):
+                        custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"]):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,

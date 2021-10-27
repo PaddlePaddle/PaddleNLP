@@ -184,10 +184,7 @@ def reset_program_state_dict(model, state_dict):
 
     new_state_dict = dict()
     for n, p in state_dict.items():
-        #if "fused_multi_head_attention" in p.name:
-        #    print(p.name)
-        #    print(p.dtype)
-        if "layer_norm" not in p.name and "fused_multi_head_attention" not in p.name and "fused_feed_forward" not in p.name:
+        if "layer_norm" not in p.name:
             dtype_str = "float32"
             if str(p.dtype) == "VarType.FP64":
                 dtype_str = "float64"
@@ -227,7 +224,7 @@ def dist_optimizer(args, optimizer):
         custom_black_list = ['lookup_table',
                              'lookup_table_v2'] if args.use_pure_fp16 else None
         dist_strategy.amp_configs = {
-            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention', 'fused_attention_cudnn_fmha', 'fused_ffn'],
+            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention' 'fused_feedforward'],
             'init_loss_scaling': args.scale_loss,
             'custom_black_list': custom_black_list,
             'use_pure_fp16': args.use_pure_fp16
@@ -316,7 +313,7 @@ def do_train(args):
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
         p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm", "ffn", "feed_forward", "atten"])
+        if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
