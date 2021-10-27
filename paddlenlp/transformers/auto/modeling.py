@@ -13,25 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.nn import Layer
-
-from .. import PretrainedModel, register_base_model
-"""Factory function to build auto-model classes."""
+import os
 import importlib
 from collections import OrderedDict
-
-from ...file_utils import copy_func
-from .configuration_auto import replace_list_option_in_docstrings
-
-import os
-import re
-import shutil
-import sys
-from pathlib import Path
-from typing import Dict, Optional, Union
+import paddle
+from paddlenlp.transformers import *
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 
 CLASS_DOCSTRING = """
     This is a generic model class that will be instantiated as one of the model classes of the library when created
@@ -47,7 +34,7 @@ FROM_PRETRAINED_DOCSTRING = """
         List options
         The model is set in evaluation mode by default using ``model.eval()`` (so for instance, dropout modules are
         deactivated). To train the model, you should first set it back in training mode with ``model.train()``
-        
+
         Args:
             pretrained_model_name_or_path (:obj:`str` or :obj:`os.PathLike`):
                 Can be either:
@@ -118,7 +105,6 @@ FROM_PRETRAINED_DOCSTRING = """
                       attribute will be passed to the underlying model's ``__init__`` function.
 """
 '''
-
 def _get_model_class(config, model_mapping):
     supported_models = model_mapping[type(config)]
     if not isinstance(supported_models, (list, tuple)):
@@ -135,24 +121,7 @@ def _get_model_class(config, model_mapping):
     return supported_models[0]
 
 '''
-
-
-class _BaseAutoModelClass:
-    # Base class for auto models.
-    _model_mapping = None
-
-    def __init__(self, *args, **kwargs):
-        raise EnvironmentError(
-            f"{self.__class__.__name__} is designed to be instantiated "
-            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
-        )
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
-                        **kwargs):
-        #config = kwargs.pop("config", None)
-        trust_remote_code = kwargs.pop("trust_remote_code", False)
-        kwargs["_from_auto"] = True
+"""
         if not isinstance(config, PretrainedConfig):
             config, kwargs = AutoConfig.from_pretrained(
                 pretrained_model_name_or_path,
@@ -190,6 +159,7 @@ class _BaseAutoModelClass:
             f"Unrecognized configuration class {config.__class__} for this kind of AutoModel: {cls.__name__}.\n"
             f"Model type should be one of {', '.join(c.__name__ for c in cls._model_mapping.keys())}."
         )
+"""
 
 
 def insert_head_doc(docstring, head_doc=""):
@@ -201,6 +171,8 @@ def insert_head_doc(docstring, head_doc=""):
     return docstring.replace("one of the model classes of the library ",
                              "one of the base model classes of the library ")
 
+
+'''
 
 def auto_class_update(cls,
                       checkpoint_for_example="bert-base-cased",
@@ -230,6 +202,7 @@ def auto_class_update(cls,
         model_mapping._model_mapping)(from_pretrained)
     cls.from_pretrained = classmethod(from_pretrained)
     return cls
+'''
 
 
 def get_values(model_mapping):
@@ -239,21 +212,7 @@ def get_values(model_mapping):
             result += list(model)
         else:
             result.append(model)
-
     return result
-
-
-def getattribute_from_module(module, attr):
-    if attr is None:
-        return None
-    if isinstance(attr, tuple):
-        return tuple(getattribute_from_module(module, a) for a in attr)
-    if hasattr(module, attr):
-        return getattr(module, attr)
-    # Some of the mappings have entries model_type -> object of another model type. In that case we try to grab the
-    # object at the top level.
-    transformers_module = importlib.import_module("transformers")
-    return getattribute_from_module(transformers_module, attr)
 
 
 def model_type_to_module_name(key):
@@ -276,8 +235,9 @@ class _LazyAutoMapping(OrderedDict):
         value = self._model_mapping[key]
         module_name = model_type_to_module_name(key)
         if module_name not in self._modules:
+            #self._modules[module_name] = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
             self._modules[module_name] = importlib.import_module(
-                f".{module_name}", "paddlenlp.transformers")
+                f"paddlenlp.transformers.{module_name}.modeling")
         return getattr(self._modules[module_name], value)
 
     def keys(self):
@@ -294,6 +254,47 @@ class _LazyAutoMapping(OrderedDict):
 
     def __contains__(self, item):
         return item in self._model_mapping
+
+
+class _BaseAutoModelClass:
+    # Base class for auto models.
+    _model_mapping = None
+    model_config_file = "model_config.json"
+
+    def __init__(self, *args, **kwargs):
+        raise EnvironmentError(
+            f"{self.__class__.__name__} is designed to be instantiated "
+            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
+        )
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+                        **kwargs):
+        #config = kwargs.pop("config", None)
+        trust_remote_code = kwargs.pop("trust_remote_code", False)
+        #kwargs["_from_auto"] = True
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path,
+                                       cls.model_config_file)
+        else:
+            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                                 pretrained_model_name_or_path,
+                                                 cls.model_config_file)
+            # From community-contributed pretrained models
+
+            if os.path.isfile(community_config_path):
+                config_file = community_config_path
+
+            # Assuming from built-in pretrained models
+            else:
+                for pattern, model_class in cls._model_mapping.items():
+                    if pattern in pretrained_model_name_or_path:
+                        #print(pattern, model_class)
+                        return model_class.from_pretrained(
+                            pretrained_model_name_or_path, **kwargs)
 
 
 __all__ = [
@@ -471,16 +472,15 @@ MODEL_MAPPING_NAMES = OrderedDict([
     # Base model mapping
     ("albert", "AlbertModel"),
     ("bart", "BartModel"),
-    ("bert", "BertModel"),
     ("bigbird", "BigBirdModel"),
     ("convbert", "ConvBertModel"),
     ("distilbert", "DistilBertModel"),
     ("electra", "ElectraModel"),
-    ("ernie", "ErnieModel"),
     ("ernie-ctm", "ErnieCtmModel"),
     ("ernie-doc", "ErnieDocModel"),
     ("ernie-gen", "ErnieForGeneration"),
     ("ernie-gram", "ErnieGramModel"),
+    ("ernie", "ErnieModel"),
     ("gpt", "GPTModel"),
     ("mpnet", "MPNetModel"),
     ("nezha", "NeZhaModel"),
@@ -488,6 +488,7 @@ MODEL_MAPPING_NAMES = OrderedDict([
     ("roformer", "RoFormerModel"),
     ("skep", "SkepModel"),
     ("tinybert", "TinyBertModel"),
+    ("bert", "BertModel"),
     ("unimo", "UNIMOModel"),
     ("xlnet", "XLNetModel"),
 ])
@@ -496,7 +497,6 @@ MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     # Model for pre-training mapping
     ("albert", "AlbertForPreTraining"),
     ("bart", "BartForConditionalGeneration"),
-    ("bert", "BertForPreTraining"),
     ("bigbird", "BigBirdForPreTraining"),
     ("convbert", "ConvBertForTotalPretraining"),
     ("electra", "ElectraForTotalPreTraining"),
@@ -505,16 +505,17 @@ MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     ("nezha", "NeZhaForPretraining"),
     ("roformer", "RoformerForPretraining"),
     ("tinybert", "TinyBertForPretraining"),
+    ("bert", "BertForPreTraining"),
 ])
 
 MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
     # Model with LM heads mapping
     ("albert", "AlbertForMaskedLM"),
     ("bart", "BartForConditionalGeneration"),
-    ("bert", "BertPretrainingHeads"),
     ("bigbird", "BigBirdPretrainingHeads"),
     ("convbert", "ConvBertClassificationHead"),
     ("distilbert", "DistilBertForMaskedLM"),
+    ("bert", "BertPretrainingHeads"),
     ("electra", "ElectraClassificationHead"),
     ("gpt", "GPTLMHeadModel"),
     ("mpnet", "MPNetForMaskedLM"),
@@ -537,53 +538,54 @@ MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     # Model for Sequence Classification mapping
     ("albert", "AlbertForSequenceClassification"),
     ("bart", "BartForSequenceClassification"),
-    ("bert", "BertForSequenceClassification"),
     ("bigbird", "BigBirdForSequenceClassification"),
     ("convbert", "ConvBertForSequenceClassification"),
     ("distilbert", "DistilBertForSequenceClassification"),
     ("electra", "ElectraForSequenceClassification"),
-    ("ernie", "ErnieForSequenceClassification"),
     ("ernie-doc", "ErnieDocForSequenceClassification"),
     ("ernie-gram", "ErnieGramForSequenceClassification"),
+    ("ernie", "ErnieForSequenceClassification"),
     ("gpt", "GPTForSequenceClassification"),
     ("mpnet", "MPNetForSequenceClassification"),
     ("nezha", "NeZhaForSequenceClassification"),
     ("roberta", "RobertaForSequenceClassification"),
     ("roformer", "RoFormerForSequenceClassification"),
     ("skep", "SkepForSequenceClassification"),
+    ("tinybert", "TinyBertForSequenceClassification"),
+    ("bert", "BertForSequenceClassification"),
     ("xlnet", "XLNetForSequenceClassification"),
 ])
 
 MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES = OrderedDict([
     # Model for Question Answering mapping
     ("bart", "BartForQuestionAnswering"),
-    ("bert", "BertForQuestionAnswering"),
     ("convbert", "ConvBertForQuestionAnswering"),
     ("distilbert", "DistilBertForQuestionAnswering"),
-    ("ernie", "ErnieForQuestionAnswering"),
     ("ernie-doc", "ErnieDocForQuestionAnswering"),
     ("ernie-gram", "ErnieGramForQuestionAnswering"),
+    ("ernie", "ErnieForQuestionAnswering"),
     ("mpnet", "MPNetForQuestionAnswering"),
     ("nezha", "NeZhaForQuestionAnswering"),
     ("roberta", "RobertaForQuestionAnswering"),
+    ("bert", "BertForQuestionAnswering"),
     ("roformer", "RoFormerForQuestionAnswering"),
 ])
 
 MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     # Model for Token Classification mapping
     ("albert", "AlbertForTokenClassification"),
-    ("bert", "BertForTokenClassification"),
     ("bigbird", "BigBirdForTokenClassification"),
     ("convbert", "ConvBertForTokenClassification"),
     ("distilbert", "DistilBertForTokenClassification"),
     ("electra", "ElectraForTokenClassification"),
-    ("ernie", "ErnieForTokenClassification"),
     ("ernie-ctm", "ErnieCtmForTokenClassification"),
     ("ernie-doc", "ErnieDocForTokenClassification"),
     ("ernie-gram", "ErnieGramForTokenClassification"),
+    ("ernie", "ErnieForTokenClassification"),
     ("mpnet", "MPNetForTokenClassification"),
     ("nezha", "NeZhaForTokenClassification"),
     ("roberta", "RobertaForTokenClassification"),
+    ("bert", "BertForTokenClassification"),
     ("roformer", "RoformerForTokenClassification"),
     ("skep", "SkepForTokenClassification"),
     ("xlnet", "XlnetForTokenClassification"),
@@ -621,18 +623,19 @@ MODEL_FOR_MULTIPLE_CHOICE_MAPPING = _LazyAutoMapping(
 
 
 class AutoModel(_BaseAutoModelClass):
+    #_model_mapping = MODEL_MAPPING_NAMES
     _model_mapping = MODEL_MAPPING
 
 
-AutoModel = auto_class_update(AutoModel)
+#AutoModel = auto_class_update(AutoModel)
 
 
 class AutoModelForPreTraining(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_PRETRAINING_MAPPING
 
 
-AutoModelForPreTraining = auto_class_update(
-    AutoModelForPreTraining, head_doc="pretraining")
+#AutoModelForPreTraining = auto_class_update(
+#    AutoModelForPreTraining, head_doc="pretraining")
 
 
 # Private on purpose, the public class will add the deprecation warnings.
@@ -640,45 +643,48 @@ class AutoModelWithLMHead(_BaseAutoModelClass):
     _model_mapping = MODEL_WITH_LM_HEAD_MAPPING
 
 
-AutoModelWithLMHead = auto_class_update(
-    AutoModelWithLMHead, head_doc="language modeling")
+#AutoModelWithLMHead = auto_class_update(
+#    AutoModelWithLMHead, head_doc="language modeling")
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_MASKED_LM_MAPPING
 
 
-AutoModelForMaskedLM = auto_class_update(
-    AutoModelForMaskedLM, head_doc="masked language modeling")
+#AutoModelForMaskedLM = auto_class_update(
+#    AutoModelForMaskedLM, head_doc="masked language modeling")
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING
 
 
-AutoModelForSequenceClassification = auto_class_update(
-    AutoModelForSequenceClassification, head_doc="sequence classification")
+#AutoModelForSequenceClassification = auto_class_update(
+#    AutoModelForSequenceClassification, head_doc="sequence classification")
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_QUESTION_ANSWERING_MAPPING
 
 
-AutoModelForQuestionAnswering = auto_class_update(
-    AutoModelForQuestionAnswering, head_doc="question answering")
+#AutoModelForQuestionAnswering = auto_class_update(
+#    AutoModelForQuestionAnswering, head_doc="question answering")
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING
 
 
-AutoModelForTokenClassification = auto_class_update(
-    AutoModelForTokenClassification, head_doc="token classification")
+#AutoModelForTokenClassification = auto_class_update(
+#    AutoModelForTokenClassification, head_doc="token classification")
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_MULTIPLE_CHOICE_MAPPING
 
 
-AutoModelForMultipleChoice = auto_class_update(
-    AutoModelForMultipleChoice, head_doc="multiple choice")
+#AutoModelForMultipleChoice = auto_class_update(
+#    AutoModelForMultipleChoice, head_doc="multiple choice")
+
+if __name__ == '__main__':
+    print(AutoModel.from_pretrained('albert-base-v1'))
