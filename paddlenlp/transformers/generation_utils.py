@@ -21,6 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.data_feeder import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
 
@@ -433,7 +434,7 @@ class GenerationMixin(object):
 
         return logits
 
-    def get_faster_entry(self, kwargs):
+    def prepare_faster_entry(self, kwargs):
         pass
 
     def _convert_to_faster(self, kwargs):
@@ -442,8 +443,24 @@ class GenerationMixin(object):
 
     def _build_faster(self, kwargs):
         self._faster_entry = False
+
+        # common check for FasterTransformer
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            return
+        if kwargs['decode_strategy'] == 'beam_search' and kwargs[
+                'num_return_sequences'] != 1:
+            # When 'num_return_sequences' is bigger than 1, the faster version
+            # may include unfinished results while the original version must
+            # return beams all finished since stop criterion differs.
+            return
+        elif kwargs['decode_strategy'] == 'sampling' and kwargs[
+                'temperature'] != 1:
+            # not support for temperature yet in the faster version
+            return
+
         # 1. custom convert
-        if not self.get_faster_entry(kwargs):
+        if not self.prepare_faster_entry(kwargs):
             # 2. try general convert
             self._convert_to_faster(kwargs)
 
@@ -615,6 +632,7 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+        # Switch to FasterTransformer automatically if supporting.
         if getattr(self, '_faster_entry', None) is not False:
             # TODO(guosheng): need better way to avoid recursive building
             if not self.__class__.__module__.endswith('faster_transformer'):
@@ -627,11 +645,25 @@ class GenerationMixin(object):
                     if self._faster_entry:
                         model_kwargs = args.pop('model_kwargs')
                         # transpose to batch major to be consistent with original results
-                        output_ids = paddle.transpose(
-                            self._faster_entry(**args, **model_kwargs), [1, 0])
+                        output_ids = self._faster_entry(**args, **model_kwargs)
+                        if len(output_ids.shape) == 2:  # sampling
+                            output_ids = paddle.transpose(output_ids, [1, 0])
+                        else:  # beam search
+                            output_ids = paddle.transpose(output_ids, [1, 2, 0])
+                            output_ids = output_ids[:, :
+                                                    num_return_sequences].reshape(
+                                                        [
+                                                            -1,
+                                                            output_ids.shape[-1]
+                                                        ])
                         # append dummy scores to be consistent with original results
                         scores = None
                         return output_ids, scores
+                    else:
+                        # TODO(guosheng): Maybe we can report the unsupported
+                        # reasons to help users enable FasterTransformer when not
+                        # supporting.
+                        pass
                 except Exception:
                     logger.warning(
                         "FasterTransformer is not available, "
