@@ -28,6 +28,7 @@ from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
+from .noun_phrase_tagging import NPTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -161,7 +162,18 @@ TASKS = {
         "default": {
             "model": "csc-ernie-1.0"
         }
-    }
+    },
+    "noun_phrase_tagging": {
+        "models": {
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'noun_phrase_tagging',
+            }
+        },
+        "default": {
+            "model": "nptag"
+        }
+    },
 }
 
 
