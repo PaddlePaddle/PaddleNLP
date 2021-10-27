@@ -69,6 +69,7 @@ def do_export(args):
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
+        beam_search_version=args.beam_search_version,
         rel_len=args.use_rel_len,
         alpha=args.alpha)
 
@@ -95,7 +96,10 @@ def do_export(args):
         input_spec=[
             # src_word
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")
+                shape=[None, None], dtype="int64"),
+            # trg_word
+            # paddle.static.InputSpec(
+            #     shape=[None, None], dtype="int64")
         ])
 
     # Save converted static graph model
