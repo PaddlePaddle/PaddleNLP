@@ -21,6 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.data_feeder import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
 
@@ -170,7 +171,7 @@ class BeamSearchScorer(object):
                 # add to generated hypotheses if end of sentence
                 if (eos_token_id is not None) and (
                         next_token.numpy().item() == eos_token_id):
-                    # If beam_token does not belong to top num_beams tokens, 
+                    # If beam_token does not belong to top num_beams tokens,
                     # it should not be added
                     is_beam_token_worse_than_top_num_beams = (
                         beam_token_rank >= self.group_size)
@@ -357,10 +358,10 @@ class GenerationMixin(object):
     def update_model_kwargs_for_generation(outputs,
                                            model_kwargs,
                                            is_encoder_decoder=False):
-        # Update the model inputs during generation. 
-        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
-        # and they contain pad value, the result vectors updated by this method 
-        # may be different from expected. In this case, you need to rewrite the 
+        # Update the model inputs during generation.
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
+        # and they contain pad value, the result vectors updated by this method
+        # may be different from expected. In this case, you need to rewrite the
         # method.
 
         # update cache
@@ -433,10 +434,36 @@ class GenerationMixin(object):
         return {"input_ids": input_ids}
 
     def adjust_logits_during_generation(self, logits):
-        # Implement in subclasses for custom behavior to adjust the logits in 
+        # Implement in subclasses for custom behavior to adjust the logits in
         # the generate method.
 
         return logits
+
+    def prepare_faster_entry(self, kwargs):
+        pass
+
+    def _convert_to_faster(self, kwargs):
+        # try general convert
+        pass
+
+    def _build_faster(self, kwargs):
+        self._faster_entry = False
+
+        # common check for FasterTransformer
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            return
+        if kwargs['repetition_penalty'] != 0:
+            # not support for repetition_penalty yet in the faster version
+            return
+        if kwargs['temperature'] != 1:
+            # not support for temperature yet in the faster version
+            return
+
+        # 1. custom convert
+        if not self.prepare_faster_entry(kwargs):
+            # 2. try general convert
+            self._convert_to_faster(kwargs)
 
     @paddle.no_grad()
     def generate(self,
@@ -610,6 +637,42 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+        # Switch to FasterTransformer automatically if supporting.
+        if getattr(self, '_faster_entry', None) is not False:
+            # TODO(guosheng): need better way to avoid recursive building
+            if not self.__class__.__module__.endswith('faster_transformer'):
+                args = locals()
+                args.pop('self')
+                args.pop("__class__", None)
+                try:
+                    if not hasattr(self, '_faster_entry'):
+                        self._build_faster(args)
+                    if self._faster_entry:
+                        model_kwargs = args.pop('model_kwargs')
+                        # transpose to batch major to be consistent with original results
+                        output_ids = self._faster_entry(**args, **model_kwargs)
+                        if len(output_ids.shape) == 2:  # sampling
+                            output_ids = paddle.transpose(output_ids, [1, 0])
+                        else:  # beam search
+                            output_ids = paddle.transpose(output_ids, [1, 2, 0])
+                            output_ids = output_ids[:, :
+                                                    num_return_sequences].reshape(
+                                                        [
+                                                            -1,
+                                                            output_ids.shape[-1]
+                                                        ])
+                        # append dummy scores to be consistent with original results
+                        scores = None
+                        return output_ids, scores
+                    else:
+                        # TODO(guosheng): Maybe we can report the unsupported
+                        # reasons to help users enable FasterTransformer when not
+                        # supporting.
+                        pass
+                except Exception:
+                    logger.warning(
+                        "FasterTransformer is not available, "
+                        "and the original version would be used instead.")
 
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -778,7 +841,7 @@ class GenerationMixin(object):
             sorted_indices = paddle.argsort(probs, descending=True)
             cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
 
-            # Remove tokens with cumulative probs above the top_p, But keep at 
+            # Remove tokens with cumulative probs above the top_p, But keep at
             # least min_tokens_to_keep tokens
             sorted_indices_to_remove = cumulative_probs > top_p
             if min_tokens_to_keep > 1:
