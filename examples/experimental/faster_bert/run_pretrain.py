@@ -32,7 +32,7 @@ from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
+from static.modeling import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -416,7 +416,7 @@ def do_train(args):
                  masked_lm_scale) = batch
                 with paddle.amp.auto_cast(
                         args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu"]):
+                        custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"]):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,

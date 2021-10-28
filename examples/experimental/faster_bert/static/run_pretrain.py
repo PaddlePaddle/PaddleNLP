@@ -30,7 +30,7 @@ import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
 
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
+from modeling import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from dataset import create_data_holder, create_pretraining_dataset
@@ -160,7 +160,7 @@ def parse_args():
 
 def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
                                         worker_index):
-    """  
+    """
     Spliting the train file according to the worker index.
     """
     num_files = len(files)
@@ -176,7 +176,7 @@ def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
 
 def reset_program_state_dict(model, state_dict):
     """
-    Initialize the parameter from the bert config, and set the parameter by 
+    Initialize the parameter from the bert config, and set the parameter by
     reseting the state dict."
     """
     scale = model.initializer_range if hasattr(model, "initializer_range")\
@@ -224,7 +224,7 @@ def dist_optimizer(args, optimizer):
         custom_black_list = ['lookup_table',
                              'lookup_table_v2'] if args.use_pure_fp16 else None
         dist_strategy.amp_configs = {
-            'custom_white_list': ['softmax', 'layer_norm', 'gelu'],
+            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention' 'fused_feedforward'],
             'init_loss_scaling': args.scale_loss,
             'custom_black_list': custom_black_list,
             'use_pure_fp16': args.use_pure_fp16
