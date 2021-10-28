@@ -121,45 +121,6 @@ def _get_model_class(config, model_mapping):
     return supported_models[0]
 
 '''
-"""
-        if not isinstance(config, PretrainedConfig):
-            config, kwargs = AutoConfig.from_pretrained(
-                pretrained_model_name_or_path,
-                return_unused_kwargs=True,
-                **kwargs)
-        if hasattr(config, "auto_map") and cls.__name__ in config.auto_map:
-            if not trust_remote_code:
-                raise ValueError(
-                    f"Loading {pretrained_model_name_or_path} requires you to execute the modeling file in that repo "
-                    "on your local machine. Make sure you have read the code there to avoid malicious use, then set "
-                    "the option `trust_remote_code=True` to remove this error.")
-            if kwargs.get("revision", None) is None:
-                logger.warn(
-                    "Explicitly passing a `revision` is encouraged when loading a model with custom code to ensure "
-                    "no malicious code has been contributed in a newer revision."
-                )
-            class_ref = config.auto_map[cls.__name__]
-            module_file, class_name = class_ref.split(".")
-            model_class = get_class_from_dynamic_module(
-                pretrained_model_name_or_path, module_file + ".py", class_name,
-                **kwargs)
-            return model_class.from_pretrained(
-                pretrained_model_name_or_path,
-                *model_args,
-                config=config,
-                **kwargs)
-        elif type(config) in cls._model_mapping.keys():
-            model_class = _get_model_class(config, cls._model_mapping)
-            return model_class.from_pretrained(
-                pretrained_model_name_or_path,
-                *model_args,
-                config=config,
-                **kwargs)
-        raise ValueError(
-            f"Unrecognized configuration class {config.__class__} for this kind of AutoModel: {cls.__name__}.\n"
-            f"Model type should be one of {', '.join(c.__name__ for c in cls._model_mapping.keys())}."
-        )
-"""
 
 
 def insert_head_doc(docstring, head_doc=""):
@@ -271,7 +232,7 @@ class _BaseAutoModelClass:
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
         #config = kwargs.pop("config", None)
-        trust_remote_code = kwargs.pop("trust_remote_code", False)
+        #trust_remote_code = kwargs.pop("trust_remote_code", False)
         #kwargs["_from_auto"] = True
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -283,8 +244,8 @@ class _BaseAutoModelClass:
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
                                                  cls.model_config_file)
-            # From community-contributed pretrained models
 
+            # From community-contributed pretrained models
             if os.path.isfile(community_config_path):
                 config_file = community_config_path
 
@@ -495,17 +456,17 @@ MODEL_MAPPING_NAMES = OrderedDict([
 
 MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     # Model for pre-training mapping
-    ("albert", "AlbertForPreTraining"),
+    ("albert", "AlbertForPretraining"),
     ("bart", "BartForConditionalGeneration"),
-    ("bigbird", "BigBirdForPreTraining"),
+    ("bigbird", "BigBirdForPretraining"),
     ("convbert", "ConvBertForTotalPretraining"),
-    ("electra", "ElectraForTotalPreTraining"),
-    ("ernie", "ErnieForPreTraining"),
+    ("electra", "ElectraForTotalPretraining"),
+    ("ernie", "ErnieForPretraining"),
     ("gpt", "GPTForPretraining"),
     ("nezha", "NeZhaForPretraining"),
-    ("roformer", "RoformerForPretraining"),
+    ("roformer", "RoFormerForPretraining"),
     ("tinybert", "TinyBertForPretraining"),
-    ("bert", "BertForPreTraining"),
+    ("bert", "BertForPretraining"),
 ])
 
 MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
@@ -529,9 +490,9 @@ MODEL_FOR_MASKED_LM_MAPPING_NAMES = OrderedDict([
     ("albert", "AlbertForMaskedLM"),
     ("bart", "BartForConditionalGeneration"),
     ("distilbert", "DistilBertForMaskedLM"),
-    ("electra", "ElectraForMaskedLM"),
+    #("electra", "ElectraForMaskedLM"),
     ("mpnet", "MPNetForMaskedLM"),
-    ("roberta", "RobertaForMaskedLM"),
+    #("roberta", "RobertaForMaskedLM"),
 ])
 
 MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
@@ -545,7 +506,6 @@ MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("ernie-doc", "ErnieDocForSequenceClassification"),
     ("ernie-gram", "ErnieGramForSequenceClassification"),
     ("ernie", "ErnieForSequenceClassification"),
-    ("gpt", "GPTForSequenceClassification"),
     ("mpnet", "MPNetForSequenceClassification"),
     ("nezha", "NeZhaForSequenceClassification"),
     ("roberta", "RobertaForSequenceClassification"),
@@ -574,7 +534,6 @@ MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES = OrderedDict([
 MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     # Model for Token Classification mapping
     ("albert", "AlbertForTokenClassification"),
-    ("bigbird", "BigBirdForTokenClassification"),
     ("convbert", "ConvBertForTokenClassification"),
     ("distilbert", "DistilBertForTokenClassification"),
     ("electra", "ElectraForTokenClassification"),
@@ -586,15 +545,15 @@ MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("nezha", "NeZhaForTokenClassification"),
     ("roberta", "RobertaForTokenClassification"),
     ("bert", "BertForTokenClassification"),
-    ("roformer", "RoformerForTokenClassification"),
+    ("roformer", "RoFormerForTokenClassification"),
     ("skep", "SkepForTokenClassification"),
-    ("xlnet", "XlnetForTokenClassification"),
+    ("xlnet", "XLNetForTokenClassification"),
 ])
 
 MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES = OrderedDict([
     # Model for Multiple Choice mapping
     ("albert", "AlbertForMultipleChoice"),
-    ("convbert", "ConvbertForMultipleChoice"),
+    ("convbert", "ConvBertForMultipleChoice"),
     ("mpnet", "MPNetForMultipleChoice"),
     ("nezha", "NeZhaForMultipleChoice"),
 ])
@@ -687,4 +646,15 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 #    AutoModelForMultipleChoice, head_doc="multiple choice")
 
 if __name__ == '__main__':
-    print(AutoModel.from_pretrained('albert-base-v1'))
+    tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'bert-base-uncased')
+
+    #print(model)
+
+    inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+    inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+    outputs = model(**inputs)
+    print(outputs)
+
+    logits = outputs[0]
