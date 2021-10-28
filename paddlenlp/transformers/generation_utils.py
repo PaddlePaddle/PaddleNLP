@@ -1127,7 +1127,6 @@ class GenerationMixin(object):
 
                 next_scores = F.softmax(logits)
                 next_scores = paddle.log(next_scores)
-                print(next_scores)
                 vocab_size = next_scores.shape[-1]
 
                 next_scores = logits_processors(
@@ -1135,9 +1134,9 @@ class GenerationMixin(object):
                     next_scores,
                     current_tokens=current_tokens,
                     beam_group_idx=beam_group_idx)
-                print(next_scores)
+
                 next_scores = next_scores + beam_scores[
-                    batch_group_indices].unsqueeze(-1).expand_as(next_scores)
+                    batch_group_indices].unsqueeze(-1)
 
                 # reshape for beam search
                 next_scores = next_scores.reshape(
@@ -1321,8 +1320,6 @@ class HammingDiversityLogitsProcessor(LogitsProcessor):
         self._num_sub_beams = num_beams // num_beam_groups
 
     def __call__(self, input_ids, scores, current_tokens, beam_group_idx):
-        # hamming diversity: penalise using same token in current group which was used in previous groups at
-        # the same time step
         batch_size = current_tokens.shape[0] // self._num_beams
         group_start_idx = beam_group_idx * self._num_sub_beams
         group_end_idx = min(group_start_idx + self._num_sub_beams,
@@ -1334,7 +1331,6 @@ class HammingDiversityLogitsProcessor(LogitsProcessor):
             return scores
 
         for batch_idx in range(batch_size):
-            # predicted tokens of last time step of previous groups
             previous_group_tokens = current_tokens[batch_idx * self._num_beams:
                                                    batch_idx * self._num_beams +
                                                    group_start_idx]
