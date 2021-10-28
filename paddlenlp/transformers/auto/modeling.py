@@ -43,10 +43,7 @@ FROM_PRETRAINED_DOCSTRING = """
                       a user or organization name, like ``dbmdz/bert-base-german-cased``.
                     - A path to a `directory` containing model weights saved using
                       :func:`~transformers.PreTrainedModel.save_pretrained`, e.g., ``./my_model_directory/``.
-                    - A path or url to a `tensorflow index checkpoint file` (e.g, ``./tf_model/model.ckpt.index``). In
-                      this case, ``from_tf`` should be set to :obj:`True` and a configuration object should be provided
-                      as ``config`` argument. This loading path is slower than converting the TensorFlow checkpoint in
-                      a PyTorch model using the provided conversion scripts and loading the PyTorch model afterwards.
+                    - A path or url.
             model_args (additional positional arguments, `optional`):
                 Will be passed along to the underlying model ``__init__()`` method.
             config (:class:`~transformers.PretrainedConfig`, `optional`):
@@ -58,69 +55,7 @@ FROM_PRETRAINED_DOCSTRING = """
                       by supplying the save directory.
                     - The model is loaded by supplying a local directory as ``pretrained_model_name_or_path`` and a
                       configuration JSON file named `config.json` is found in the directory.
-            state_dict (`Dict[str, torch.Tensor]`, `optional`):
-                A state dictionary to use instead of a state dictionary loaded from saved weights file.
-                This option can be used if you want to create a model from a pretrained configuration but load your own
-                weights. In this case though, you should check if using
-                :func:`~transformers.PreTrainedModel.save_pretrained` and
-                :func:`~transformers.PreTrainedModel.from_pretrained` is not a simpler option.
-            cache_dir (:obj:`str` or :obj:`os.PathLike`, `optional`):
-                Path to a directory in which a downloaded pretrained model configuration should be cached if the
-                standard cache should not be used.
-            from_tf (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Load the model weights from a TensorFlow checkpoint save file (see docstring of
-                ``pretrained_model_name_or_path`` argument).
-            force_download (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
-                cached versions if they exist.
-            resume_download (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (:obj:`Dict[str, str]`, `optional`):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., :obj:`{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
-            output_loading_info(:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether ot not to also return a dictionary containing missing keys, unexpected keys and error messages.
-            local_files_only(:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not to only look at local files (e.g., not try downloading the model).
-            revision(:obj:`str`, `optional`, defaults to :obj:`"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so ``revision`` can be any
-                identifier allowed by git.
-            trust_remote_code (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not to allow for custom models defined on the Hub in their own modeling files. This option
-                should only be set to :obj:`True` for repositories you trust and in which you have read the code, as it
-                will execute code present on the Hub on your local machine.
-            kwargs (additional keyword arguments, `optional`):
-                Can be used to update the configuration object (after it being loaded) and initiate the model (e.g.,
-                :obj:`output_attentions=True`). Behaves differently depending on whether a ``config`` is provided or
-                automatically loaded:
-                    - If a configuration is provided with ``config``, ``**kwargs`` will be directly passed to the
-                      underlying model's ``__init__`` method (we assume all relevant updates to the configuration have
-                      already been done)
-                    - If a configuration is not provided, ``kwargs`` will be first passed to the configuration class
-                      initialization function (:func:`~transformers.PretrainedConfig.from_pretrained`). Each key of
-                      ``kwargs`` that corresponds to a configuration attribute will be used to override said attribute
-                      with the supplied ``kwargs`` value. Remaining keys that do not correspond to any configuration
-                      attribute will be passed to the underlying model's ``__init__`` function.
 """
-'''
-def _get_model_class(config, model_mapping):
-    supported_models = model_mapping[type(config)]
-    if not isinstance(supported_models, (list, tuple)):
-        return supported_models
-
-    name_to_model = {model.__name__: model for model in supported_models}
-    architectures = getattr(config, "architectures", [])
-    for arch in architectures:
-        if arch in name_to_model:
-            return name_to_model[arch]
-
-    # If not architecture is set in the config or match the supported models, the first element of the tuple is the
-    # defaults.
-    return supported_models[0]
-
-'''
 
 
 def insert_head_doc(docstring, head_doc=""):
@@ -437,6 +372,7 @@ MODEL_MAPPING_NAMES = OrderedDict([
     ("convbert", "ConvBertModel"),
     ("distilbert", "DistilBertModel"),
     ("electra", "ElectraModel"),
+    ("skep", "SkepModel"),
     ("ernie-ctm", "ErnieCtmModel"),
     ("ernie-doc", "ErnieDocModel"),
     ("ernie-gen", "ErnieForGeneration"),
@@ -447,7 +383,6 @@ MODEL_MAPPING_NAMES = OrderedDict([
     ("nezha", "NeZhaModel"),
     ("roberta", "RobertaModel"),
     ("roformer", "RoFormerModel"),
-    ("skep", "SkepModel"),
     ("tinybert", "TinyBertModel"),
     ("bert", "BertModel"),
     ("unimo", "UNIMOModel"),
@@ -503,6 +438,7 @@ MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("convbert", "ConvBertForSequenceClassification"),
     ("distilbert", "DistilBertForSequenceClassification"),
     ("electra", "ElectraForSequenceClassification"),
+    ("skep", "SkepForSequenceClassification"),
     ("ernie-doc", "ErnieDocForSequenceClassification"),
     ("ernie-gram", "ErnieGramForSequenceClassification"),
     ("ernie", "ErnieForSequenceClassification"),
@@ -510,7 +446,6 @@ MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("nezha", "NeZhaForSequenceClassification"),
     ("roberta", "RobertaForSequenceClassification"),
     ("roformer", "RoFormerForSequenceClassification"),
-    ("skep", "SkepForSequenceClassification"),
     ("tinybert", "TinyBertForSequenceClassification"),
     ("bert", "BertForSequenceClassification"),
     ("xlnet", "XLNetForSequenceClassification"),
@@ -537,6 +472,7 @@ MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("convbert", "ConvBertForTokenClassification"),
     ("distilbert", "DistilBertForTokenClassification"),
     ("electra", "ElectraForTokenClassification"),
+    ("skep", "SkepForTokenClassification"),
     ("ernie-ctm", "ErnieCtmForTokenClassification"),
     ("ernie-doc", "ErnieDocForTokenClassification"),
     ("ernie-gram", "ErnieGramForTokenClassification"),
@@ -546,7 +482,6 @@ MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
     ("roberta", "RobertaForTokenClassification"),
     ("bert", "BertForTokenClassification"),
     ("roformer", "RoFormerForTokenClassification"),
-    ("skep", "SkepForTokenClassification"),
     ("xlnet", "XLNetForTokenClassification"),
 ])
 
@@ -647,10 +582,8 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 
 if __name__ == '__main__':
     tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
-    model = AutoModelForSequenceClassification.from_pretrained(
-        'bert-base-uncased')
-
-    #print(model)
+    model = AutoModel.from_pretrained('junnyu/tbs17-MathBERT')
+    print(model)
 
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
