@@ -31,17 +31,18 @@ class Distinct(paddle.metric.Metric):
     the network output to a string list.
 
     Args:
-        trans_func (callable, optional): `trans_func` transforms the network
-            output to a string list. Default: None. 
+        n_size (int, optional):
+            Number of gram for :class:`Distinct` metric. Defaults to 2.
+        trans_func (callable, optional):
+            `trans_func` transforms the network output to a string list. Defaults to None.
             
             .. note::
                 When :class:`Distinct` is used as a :class:`paddle.metric.Metric` 
                 class, `trans_func` must be provided. Please note that the 
                 input of `trans_func` is numpy array.
-        n_size (int, optional): Number of gram for :class:`Distinct` metric. 
-            Default: 2.
+
         name (str, optional): Name of :class:`paddle.metric.Metric` instance.
-            Default: "distinct".
+            Defaults to "distinct".
 
     Examples:
         1. Using as a general evaluation object.
@@ -51,8 +52,10 @@ class Distinct(paddle.metric.Metric):
             from paddlenlp.metrics import Distinct
             distinct = Distinct()
             cand = ["The","cat","The","cat","on","the","mat"]
+            #update the states
             distinct.add_inst(cand)
-            print(distinct.score()) # 0.8333333333333334
+            print(distinct.score())
+            # 0.8333333333333334
 
         2. Using as an instance of `paddle.metric.Metric`.
                 
@@ -80,6 +83,7 @@ class Distinct(paddle.metric.Metric):
             distinct = Distinct(trans_func=partial(trans_func, tokenizer=tokenizer))
             batch_size, seq_len, vocab_size = 4, 16, tokenizer.vocab_size
             logits = paddle.rand([batch_size, seq_len, vocab_size])
+
             distinct.update(logits.numpy())
             print(distinct.accumulate()) # 1.0
     """

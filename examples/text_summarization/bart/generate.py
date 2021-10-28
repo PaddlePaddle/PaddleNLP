@@ -26,7 +26,7 @@ from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
 from paddlenlp.ops import FasterBART
 from utils import convert_example, compute_metrics
 
-summarization_name_mapping = {"cnn_dailymail": ("article", "highlights"), }
+summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 
 
 def parse_args():

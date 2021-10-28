@@ -114,7 +114,8 @@ class BoWEncoder(nn.Layer):
 
         Returns:
             Tensor: 
-                Shape as `(batch_size, emb_dim)`, and dtype is same as `inputs`. The result vector of BagOfEmbedding.
+                Returns tensor `summed`, the result vector of BagOfEmbedding.
+                Its data type is same as `inputs` and its shape is `[batch_size, emb_dim]`.
         """
         if mask is not None:
             inputs = inputs * mask
@@ -265,13 +266,13 @@ class CNNEncoder(nn.Layer):
                 Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`. 
                 Its each elements identify whether the corresponding input token is padding or not. 
                 If True, not padding token. If False, padding token. 
-                Defaults to `None`
+                Defaults to `None`.
 
         Returns:
-            Tensor: 
+            Tensor:
+                Returns tensor `result`.
                 If output_dim is None, the result shape is of `(batch_size, output_dim)` and 
-                dtype is `float`; 
-                If not, the result shape is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
+                dtype is `float`; If not, the result shape is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
 
         """
         if mask is not None:
@@ -449,8 +450,8 @@ class GRUEncoder(nn.Layer):
                 The sequence length of the input sequence.
 
         Returns:
-            Tensor: Shape as `(batch_size, hidden_size)` and dtype is `float`. 
-                The hidden state at the last time step for every layer.
+            Tensor: Returns tensor `output`, the hidden state at the last time step for every layer.
+            Its data type is `float` and its shape is `[batch_size, hidden_size]`.
 
         """
         encoded_text, last_hidden = self.gru_layer(
@@ -639,9 +640,8 @@ class LSTMEncoder(nn.Layer):
                 The sequence length of the input sequence.
 
         Returns:
-            Tensor: 
-                Shape as `(batch_size, hidden_size)` and dtype as float.
-                The hidden state at the last time step for every layer.
+            Tensor: Returns tensor `output`, the hidden state at the last time step for every layer.
+            Its data type is `float` and its shape is `[batch_size, hidden_size]`.
 
         """
         encoded_text, (last_hidden, last_cell) = self.lstm_layer(
@@ -830,9 +830,8 @@ class RNNEncoder(nn.Layer):
                 The sequence length of the input sequence.
 
         Returns:
-            last_hidden (Tensor): 
-                Shape as `(batch_size, hidden_size)` and dtype as `float`.
-                The hidden state at the last time step for every layer.
+            Tensor: Returns tensor `output`, the hidden state at the last time step for every layer.
+            Its data type is `float` and its shape is `[batch_size, hidden_size]`.
 
         """
         encoded_text, last_hidden = self.rnn_layer(
@@ -969,7 +968,7 @@ class TCNEncoder(nn.Layer):
     
     .. math::
     
-        receptive filed = $2 * \sum_{i=0}^{len(num\_channels)-1}2^i(kernel\_size-1)$.
+        receptive filed = 2 * \sum_{i=0}^{len(num\_channels)-1}2^i(kernel\_size-1).
     
     Temporal Convolutional Networks is a simple convolutional architecture. It outperforms canonical recurrent networks
     such as LSTMs in many tasks. See https://arxiv.org/pdf/1803.01271.pdf for more details.
@@ -1029,13 +1028,13 @@ class TCNEncoder(nn.Layer):
     
         .. math::
         
-            receptive filed = $2 * \sum_{i=0}^{len(num\_channels)-1}2^i(kernel\_size-1)$.
+            receptive filed = 2 * \sum_{i=0}^{len(num\_channels)-1}2^i(kernel\_size-1).
 
         Args:
-            inputs (paddle.Tensor): The input tensor with shape `[batch_size, num_tokens, input_size]`.
+            inputs (Tensor): The input tensor with shape `[batch_size, num_tokens, input_size]`.
 
         Returns:
-            output (paddle.Tensor): The output tensor with shape `[batch_size, num_channels[-1]]`.
+            Tensor: Returns tensor `output` with shape `[batch_size, num_channels[-1]]`.
         """
         inputs_t = inputs.transpose([0, 2, 1])
         output = self.network(inputs_t).transpose([2, 0, 1])[-1]
