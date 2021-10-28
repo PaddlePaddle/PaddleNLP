@@ -66,6 +66,5 @@ class SentenceTransformer(nn.Layer):
         projection = paddle.concat([query_mean, title_mean, sub], axis=-1)
 
         logits = self.classifier(projection)
-        probs = F.softmax(logits)
 
-        return probs
+        return logits
