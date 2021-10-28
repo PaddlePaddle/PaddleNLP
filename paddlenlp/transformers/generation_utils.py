@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.data_feeder import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
 
@@ -171,7 +172,7 @@ class BeamSearchScorer(object):
                 # add to generated hypotheses if end of sentence
                 if (eos_token_id is not None) and (
                         next_token.numpy().item() == eos_token_id):
-                    # If beam_token does not belong to top num_beams tokens, 
+                    # If beam_token does not belong to top num_beams tokens,
                     # it should not be added
                     is_beam_token_worse_than_top_num_beams = (
                         beam_token_rank >= self.group_size)
@@ -381,10 +382,10 @@ class GenerationMixin(object):
     def update_model_kwargs_for_generation(outputs,
                                            model_kwargs,
                                            is_encoder_decoder=False):
-        # Update the model inputs during generation. 
-        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
-        # and they contain pad value, the result vectors updated by this method 
-        # may be different from expected. In this case, you need to rewrite the 
+        # Update the model inputs during generation.
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
+        # and they contain pad value, the result vectors updated by this method
+        # may be different from expected. In this case, you need to rewrite the
         # method.
 
         # update cache
@@ -457,7 +458,7 @@ class GenerationMixin(object):
         return {"input_ids": input_ids}
 
     def adjust_logits_during_generation(self, logits):
-        # Implement in subclasses for custom behavior to adjust the logits in 
+        # Implement in subclasses for custom behavior to adjust the logits in
         # the generate method.
 
         return logits
@@ -471,7 +472,12 @@ class GenerationMixin(object):
 
     def _build_faster(self, kwargs):
         self._faster_entry = False
-        # 1. custom convert
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            return
+        if kwargs['repetition_penalty'] != 0:
+            # not support for repetition_penalty yet in the faster version
+            return
         if not self.get_faster_entry(kwargs):
             # 2. try general convert
             self._convert_to_faster(kwargs)
@@ -856,7 +862,7 @@ class GenerationMixin(object):
             sorted_indices = paddle.argsort(probs, descending=True)
             cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
 
-            # Remove tokens with cumulative probs above the top_p, But keep at 
+            # Remove tokens with cumulative probs above the top_p, But keep at
             # least min_tokens_to_keep tokens
             sorted_indices_to_remove = cumulative_probs > top_p
             if min_tokens_to_keep > 1:

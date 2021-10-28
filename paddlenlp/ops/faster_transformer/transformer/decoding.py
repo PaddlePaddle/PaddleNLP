@@ -1066,7 +1066,9 @@ class InferUnifiedDecoding(nn.Layer):
             self._decoding_strategy = "topk_sampling"
             topk = 1
             topp = 0
-        elif self._decoding_strategy == "sampling":
+        elif self._decoding_strategy in [
+                "sampling", "topk_sampling", "topp_sampling"
+        ]:
             if topp == 1 and topk > 0:
                 self._decoding_strategy = "topk_sampling"
                 topp = 0
@@ -1344,11 +1346,13 @@ class InferBartDecoding(nn.Layer):
         elif self._decoding_strategy == "greedy_search":
             self._decoding_strategy = "topk_sampling"
             top_k = 1
-            top_p = 0
-        elif self._decoding_strategy == "sampling":
+            top_p = 0.0
+        elif self._decoding_strategy in [
+                "sampling", "topk_sampling", "topp_sampling"
+        ]:
             if top_p == 1 and top_k > 0:
                 self._decoding_strategy = "topk_sampling"
-                top_p = 0
+                top_p = 0.0
             elif top_p > 0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"
             else:

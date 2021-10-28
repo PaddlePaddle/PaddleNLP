@@ -18,6 +18,7 @@ from .attention_utils import create_bigbird_rand_mask_idx_list
 
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert_japanese.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .gpt.modeling import *

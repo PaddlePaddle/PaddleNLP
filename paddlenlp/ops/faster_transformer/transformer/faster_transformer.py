@@ -581,7 +581,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 rel_len=rel_len,
                 alpha=alpha)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         r"""
         Performs decoding for transformer model.
 
@@ -627,7 +627,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 transformer(
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        out = self.transformer(src_word)
+        out = self.transformer(src_word, trg_word)
         # TODO(guosheng): FasterTransformer has an output with layout
         # `[seq_len, batch_size, beam_size]`. While the output layout of
         # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
