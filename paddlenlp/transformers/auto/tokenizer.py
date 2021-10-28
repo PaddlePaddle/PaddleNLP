@@ -18,44 +18,50 @@ from collections import OrderedDict
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
 
+__all__ = ["AutoTokenizer", ]
+
+TOKENIZER_MAPPING_NAMES = OrderedDict([
+    # Base model mapping
+    ("albert", "AlbertTokenizer"),
+    ("bart", "BartTokenizer"),
+    ("bigbird", "BigBirdTokenizer"),
+    ("convbert", "ConvBertTokenizer"),
+    ("distilbert", "DistilBertTokenizer"),
+    ("electra", "ElectraTokenizer"),
+    ("skep", "SkepTokenizer"),
+    ("ernie-ctm", "ErnieCtmTokenizer"),
+    ("ernie-doc", "ErnieDocTokenizer"),
+    ("ernie-gram", "ErnieGramTokenizer"),
+    ("ernie", "ErnieTokenizer"),
+    ("gpt", "GPTTokenizer"),
+    ("mpnet", "MPNetTokenizer"),
+    ("nezha", "NeZhaTokenizer"),
+    ("roberta", "RobertaTokenizer"),
+    ("roformer", "RoFormerTokenizer"),
+    ("tinybert", "TinyBertTokenizer"),
+    ("bert", "BertTokenizer"),
+    ("unified_transformer", "UnifiedTransformerTokenizer"),
+    ("unimo", "UNIMOTokenizer"),
+    ("xlnet", "XLNetTokenizer"),
+])
+
 CLASS_DOCSTRING = """
-    This is a generic model class that will be instantiated as one of the model classes of the library when created
-    with the :meth:`~paddlenlp.transformers.BaseAutoModelClass.from_pretrained` class method.
-    This class cannot be instantiated directly using ``__init__()`` (throws an error).
+    This is a generic model class that will be instantiated as one of the model classes of 
+    the library when created with the :meth:`~paddlenlp.transformers.BaseAutoModelClass.from_pretrained` 
+    class method. This class cannot be instantiated directly using ``__init__()`` (throws an error).
 """
 
 FROM_PRETRAINED_DOCSTRING = """
         Instantiate one of the model classes of the library from a pretrained model.
-        The model class to instantiate is selected based on the :obj:`model_type` property of the config object (either
-        passed as an argument or loaded from :obj:`pretrained_model_name_or_path` if possible), or when it's missing,
-        by falling back to using pattern matching on :obj:`pretrained_model_name_or_path`:
-        List options
-        The model is set in evaluation mode by default using ``model.eval()`` (so for instance, dropout modules are
-        deactivated). To train the model, you should first set it back in training mode with ``model.train()``
-
         Args:
             pretrained_model_name_or_path (:obj:`str` or :obj:`os.PathLike`):
                 Can be either:
-                    - A string, the `model id` of a pretrained model hosted inside a model repo on huggingface.co.
-                      Valid model ids can be located at the root-level, like ``bert-base-uncased``, or namespaced under
-                      a user or organization name, like ``dbmdz/bert-base-german-cased``.
+                    - A string, the `model id` of a pretrained model hosted inside a model repo.
                     - A path to a `directory` containing model weights saved using
-                      :func:`~transformers.PreTrainedModel.save_pretrained`, e.g., ``./my_model_directory/``.
-                    - A path or url to a `tensorflow index checkpoint file` (e.g, ``./tf_model/model.ckpt.index``). In
-                      this case, ``from_tf`` should be set to :obj:`True` and a configuration object should be provided
-                      as ``config`` argument. This loading path is slower than converting the TensorFlow checkpoint in
-                      a PyTorch model using the provided conversion scripts and loading the PyTorch model afterwards.
+                      :func:`~PreTrainedModel.save_pretrained`, e.g., ``./my_bert/``.
+                    - A path or url.
             model_args (additional positional arguments, `optional`):
                 Will be passed along to the underlying model ``__init__()`` method.
-            config (:class:`~transformers.PretrainedConfig`, `optional`):
-                Configuration for the model to use instead of an automatically loaded configuration. Configuration can
-                be automatically loaded when:
-                    - The model is a model provided by the library (loaded with the `model id` string of a pretrained
-                      model).
-                    - The model was saved using :meth:`~PreTrainedModel.save_pretrained` and is reloaded
-                      by supplying the save directory.
-                    - The model is loaded by supplying a local directory as ``pretrained_model_name_or_path`` and a
-                      configuration JSON file named `config.json` is found in the directory.
 """
 
 
@@ -98,9 +104,7 @@ def auto_class_update(cls,
         model_mapping._model_mapping)(from_pretrained)
     cls.from_pretrained = classmethod(from_pretrained)
     return cls
-'''
-
-
+    
 def get_values(model_mapping):
     result = []
     for model in model_mapping.values():
@@ -109,6 +113,8 @@ def get_values(model_mapping):
         else:
             result.append(model)
     return result
+
+'''
 
 
 def tokenizer_type_to_module_name(key):
@@ -129,10 +135,9 @@ class _LazyAutoMapping(OrderedDict):
         if key not in self._tokenizer_mapping:
             raise KeyError(key)
         value = self._tokenizer_mapping[key]
-        #module_name = tokenizer_type_to_module_name(key)
-        module_name = key
+        module_name = tokenizer_type_to_module_name(key)
+        #module_name = key
         if module_name not in self._modules:
-            #self._modules[module_name] = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
             self._modules[module_name] = importlib.import_module(
                 f"paddlenlp.transformers.{module_name}.tokenizer")
         return getattr(self._modules[module_name], value)
@@ -156,7 +161,8 @@ class _LazyAutoMapping(OrderedDict):
 class _BaseAutoTokenizerClass:
     # Base class for auto models.
     _tokenizer_mapping = None
-    model_config_file = "model_config.json"
+
+    tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -173,11 +179,11 @@ class _BaseAutoTokenizerClass:
         # From local dir path
         if os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
-                                       cls.model_config_file)
+                                       cls.tokenizer_config_file)
         else:
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
-                                                 cls.model_config_file)
+                                                 cls.tokenizer_config_file)
 
             # From community-contributed pretrained models
             if os.path.isfile(community_config_path):
@@ -198,33 +204,6 @@ class _BaseAutoTokenizerClass:
                                 pretrained_model_name_or_path, **kwargs)
 
 
-__all__ = ["AutoTokenizer", ]
-
-TOKENIZER_MAPPING_NAMES = OrderedDict([
-    # Base model mapping
-    ("albert", "AlbertTokenizer"),
-    ("bart", "BartTokenizer"),
-    ("bigbird", "BigBirdTokenizer"),
-    ("convbert", "ConvBertTokenizer"),
-    ("distilbert", "DistilBertTokenizer"),
-    ("electra", "ElectraTokenizer"),
-    ("skep", "SkepTokenizer"),
-    ("ernie-ctm", "ErnieCtmTokenizer"),
-    ("ernie-doc", "ErnieDocTokenizer"),
-    ("ernie-gram", "ErnieGramTokenizer"),
-    ("ernie", "ErnieTokenizer"),
-    ("gpt", "GPTTokenizer"),
-    ("mpnet", "MPNetTokenizer"),
-    ("nezha", "NeZhaTokenizer"),
-    ("roberta", "RobertaTokenizer"),
-    ("roformer", "RoFormerTokenizer"),
-    ("tinybert", "TinyBertTokenizer"),
-    ("bert", "BertTokenizer"),
-    ("unimo", "UNIMOTokenizer"),
-    ("xlnet", "XLNetTokenizer"),
-])
-
-
 def get_all_model_configurations():
     albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
     bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
@@ -239,8 +218,7 @@ def get_all_model_configurations():
     ))
     erniedoc = tuple(ErnieDocPretrainedModel.pretrained_init_configuration.keys(
     ))
-    erniegram = tuple(
-        ErnieGramPretrainedModel.pretrained_init_configuration.keys())
+    erniegram = tuple(ErnieGramModel.pretrained_init_configuration.keys())
     ernie = tuple(ErniePretrainedModel.pretrained_init_configuration.keys())
     gpt = tuple(GPTPretrainedModel.pretrained_init_configuration.keys())
     mpnet = tuple(MPNetPretrainedModel.pretrained_init_configuration.keys())
@@ -249,6 +227,8 @@ def get_all_model_configurations():
     roformer = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
     tinybert = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
     bert = tuple(BertPretrainedModel.pretrained_init_configuration.keys())
+    unifiedtransformer = tuple(
+        UnifiedTransformerModel.pretrained_init_configuration.keys())
     unimo = tuple(UNIMOPretrainedModel.pretrained_init_configuration.keys())
     xlnet = tuple(XLNetPretrainedModel.pretrained_init_configuration.keys())
 
@@ -272,6 +252,7 @@ def get_all_model_configurations():
         (roformer, RoFormerTokenizer),
         (tinybert, TinyBertTokenizer),
         (bert, BertTokenizer),
+        (unifiedtransformer, UnifiedTransformerTokenizer),
         (unimo, UNIMOTokenizer),
         (xlnet, XLNetTokenizer),
     ])
@@ -283,10 +264,10 @@ TOKENIZER_MAPPING = _LazyAutoMapping(TOKENIZER_MAPPING_NAMES)
 
 class AutoTokenizer(_BaseAutoTokenizerClass):
     #_model_mapping = MODEL_MAPPING_NAMES
-    TOKENIZER_MAPPING_NAMES1 = get_all_model_configurations()
-    _tokenizer_mapping = TOKENIZER_MAPPING_NAMES1
+    MAPPING_NAMES = get_all_model_configurations()
+    _tokenizer_mapping = MAPPING_NAMES
 
 
 #AutoModel = auto_class_update(AutoModel)
 
-print(AutoTokenizer.from_pretrained(('rbt3')))
+print(AutoTokenizer.from_pretrained(('plato-mini')))
