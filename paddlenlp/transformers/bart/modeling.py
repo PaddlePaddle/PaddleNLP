@@ -759,6 +759,34 @@ class BartForConditionalGeneration(BartPretrainedModel):
     def get_decoder(self):
         return self.bart.get_decoder()
 
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterBART
+        decoding_strategy = kwargs.get('decode_strategy')
+        model_kwargs = kwargs['model_kwargs']
+        use_fp16_decoding = model_kwargs.get('use_fp16_decoding', False)
+        # TODO(guosheng): Currently, beam_search_v2 in FasterTransformer uses
+        # t2t beam search which has some difference with beam search in generation
+        # api on finish queue addition and early-stop criterion, and it seems
+        # lead to poor performance on bart cnn-sum model, thus we disable it temporarily.
+        if decoding_strategy == 'beam_search':
+            return False
+        # Some checks on kwargs. For example, FasterBART needs `mem_seq_lens` as
+        # one input while BART not, thus check whether `mem_seq_lens` in kwargs.
+        if model_kwargs.get('mem_seq_lens', None) is None:
+            return False
+        # Assume no args change among multi-turns run to convert parameters only
+        # once. Additionaly, use some converted args as default values instead of
+        # converting args to allow overriding.
+        # TODO(guosheng): maybe use weakref for the model in faster model
+        self._faster_entry = partial(
+            FasterBART(
+                self,
+                decoding_strategy=decoding_strategy,
+                use_fp16_decoding=use_fp16_decoding).generate,
+            alpha=kwargs.get('length_penalty'),
+            rel_len=False)
+        return self._faster_entry
+
     def forward(self,
                 input_ids,
                 attention_mask=None,
