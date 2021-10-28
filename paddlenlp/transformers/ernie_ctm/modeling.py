@@ -602,26 +602,50 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
                 attention_mask=None,
                 position_ids=None,
                 tag_labels=None):
-        """
-        Forward method of model, using MLM model to do classification.
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            tag_labels (Tensor, optional):
+                The input predicted tensor.
+                Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
+                Defaults to `None`.
+
+        Returns:
+            tuple: Returns tensor `logits`, the scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmNptagModel.from_pretrained('ernie-ctm')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 45, 23000]
+
         """
         outputs = self.ernie_ctm(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids)
-
         sequence_output = outputs[0]
-
         logits = self.predictions(sequence_output)
-
-        loss = None
-        if tag_labels is not None:
-            loss_fct = nn.loss.CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.ernie_ctm.config["vocab_size"]), tag_labels.view(-1))
-            return loss, logits
-        else:
-            return logits
+        return logits
         
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
