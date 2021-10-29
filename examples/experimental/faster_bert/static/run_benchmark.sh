@@ -33,5 +33,5 @@
     --logging_steps $logging_steps \
     --save_steps 50000 \
     --max_steps $max_steps \
-    --gradient_merge_steps 1\
+    --gradient_merge_steps 4096\
     --use_amp $use_amp

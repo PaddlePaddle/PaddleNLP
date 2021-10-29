@@ -29,6 +29,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
+import paddle.fluid.core as core
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
@@ -411,6 +412,12 @@ def do_train(args):
                 train_reader_cost = time.time() - batch_start
                 reader_cost_avg.record(train_reader_cost)
                 global_step += 1
+                if global_step == 1:
+                    core.nvprof_start()
+                    core.nvprof_enable_record_event()
+                    core.nvprof_nvtx_push(str(global_step))
+
+                core.nvprof_nvtx_push("forward")
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
                  masked_lm_scale) = batch
@@ -425,6 +432,8 @@ def do_train(args):
                     loss = criterion(prediction_scores, seq_relationship_score,
                                      masked_lm_labels, next_sentence_labels,
                                      masked_lm_scale)
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push("backward")
                 if args.use_amp:
                     scaler.scale(loss).backward()
                     scaler.minimize(optimizer, loss)
@@ -433,11 +442,15 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
+                core.nvprof_nvtx_pop()
+
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
+                        core.nvprof_nvtx_pop()
+                        core.nvprof_nvtx_push(str(global_step))
                         logger.info(
                             "global step: %d, epoch: %d, batch: %d, loss: %f, "
                             "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
@@ -466,6 +479,7 @@ def do_train(args):
                             os.path.join(output_dir, "model_state.pdopt"))
                 if global_step >= args.max_steps:
                     del train_data_loader
+                    core.nvprof_nvtx_pop()
                     return
                 batch_start = time.time()
 

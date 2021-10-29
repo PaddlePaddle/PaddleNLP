@@ -28,6 +28,7 @@ import distutils.util
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
+import paddle.fluid.core as core
 
 from paddlenlp.utils.tools import TimeCostAverage
 from modeling import BertForPretraining, BertModel, BertPretrainingCriterion
@@ -376,16 +377,33 @@ def do_train(args):
                 train_reader_cost = time.time() - batch_start
                 reader_cost_avg.record(train_reader_cost)
                 global_step += 1
+                if global_step == 1:
+                    core.nvprof_start()
+                    core.nvprof_enable_record_event()
+                    core.nvprof_nvtx_push(str(global_step))
+
+                core.nvprof_nvtx_push("forward")
+
                 train_start = time.time()
                 loss_return = exe.run(main_program,
                                       feed=batch,
                                       fetch_list=[loss])
+
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push("backward")
+
                 total_samples += args.batch_size
                 # In the new 2.0 api, must call this function to change the learning_rate
                 lr_scheduler.step()
+
+                core.nvprof_nvtx_pop()
+
+
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_nvtx_push(str(global_step))
                     print(
                         "tobal step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
@@ -411,6 +429,7 @@ def do_train(args):
                 if global_step >= args.max_steps:
                     reader_start = time.time()
                     del train_data_loader
+                    core.nvprof_nvtx_pop()
                     return
                 batch_start = time.time()
             del train_data_loader
