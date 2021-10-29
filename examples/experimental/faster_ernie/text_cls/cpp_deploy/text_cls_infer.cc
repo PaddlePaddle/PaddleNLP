@@ -13,12 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
-#include <algorithm>
-#include <cmath>
+#include <iostream>
 #include <numeric>
-#include <unordered_map>
 
 #include "paddle/include/paddle_inference_api.h"
 
@@ -28,17 +25,7 @@ using paddle_infer::CreatePredictor;
 
 DEFINE_string(model_file, "", "Directory of the inference model.");
 DEFINE_string(params_file, "", "Directory of the inference model.");
-DEFINE_int32(batch_size, 1, "Directory of the inference model.");
 DEFINE_bool(use_gpu, true, "enable gpu");
-
-std::shared_ptr<Predictor> InitPredictor() {
-  Config config;
-  config.SetModel(FLAGS_model_file, FLAGS_params_file);
-  if (FLAGS_use_gpu) {
-    config.EnableUseGpu(100, 0);
-  }
-  return CreatePredictor(config);
-}
 
 template <typename T>
 void GetOutput(Predictor* predictor,
@@ -52,46 +39,37 @@ void GetOutput(Predictor* predictor,
   output->CopyToCpu(out_data->data());
 }
 
-void Run(Predictor* predictor,
-         const std::vector<std::string>& input_data,
-         std::vector<float>* logits,
-         std::vector<int64_t>* predictions) {
-  auto input_names = predictor->GetInputNames();
-
-  auto text = predictor->GetInputHandle(input_names[0]);
-  text->ReshapeStrings(input_data.size());
-  text->CopyStringsFromCpu(&input_data);
-
-  CHECK(predictor->Run());
-
-  auto output_names = predictor->GetOutputNames();
-  GetOutput(predictor, output_names[0], logits);
-  GetOutput(predictor, output_names[1], predictions);
-}
-
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
-  auto predictor = InitPredictor();
+
+  Config config;
+  config.SetModel(FLAGS_model_file, FLAGS_params_file);
+  if (FLAGS_use_gpu) {
+    config.EnableUseGpu(100, 0);
+  }
+  auto predictor = CreatePredictor(config);
 
   std::vector<std::string> data{
       "这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般",
-      "怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的"
-      "动画片",
-      "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上"
-      "办理入住手续，节省时间。"};
-  std::unordered_map<std::size_t, std::string> label_map = {{0, "negative"},
-                                                            {1, "positive"}};
-  for (size_t i = 0; i < data.size(); i += FLAGS_batch_size) {
-    std::vector<std::string> batch(FLAGS_batch_size);
-    batch.assign(data.begin() + i, data.begin() + i + FLAGS_batch_size);
-    std::vector<float> logits;
-    std::vector<int64_t> predictions;
-    Run(predictor.get(), batch, &logits, &predictions);
-    for (size_t j = 0; j < FLAGS_batch_size; j++) {
-      LOG(INFO) << "The text is " << batch[j] << "; The predition label is "
-                << label_map[predictions[j]];
-    }
-  }
+      "请问：有些字打错了，我怎么样才可以回去编辑一下啊？",
+      "本次入住酒店的网络不是很稳定，断断续续，希望能够改进。"};
+  auto input_names = predictor->GetInputNames();
+  auto text = predictor->GetInputHandle(input_names[0]);
+  text->ReshapeStrings(data.size());
+  text->CopyStringsFromCpu(&data);
+  predictor->Run();
 
+  std::vector<float> logits;
+  std::vector<int64_t> preds;
+  auto output_names = predictor->GetOutputNames();
+  for (size_t i = 0; i < data.size(); i++) {
+  }
+  GetOutput(predictor.get(), output_names[0], &logits);
+  GetOutput(predictor.get(), output_names[1], &preds);
+  for (size_t i = 0; i < data.size(); i++) {
+    std::string label = (preds[i] == 0) ? "negative" : "positive";
+    std::cout << "The text is " << data[i] << "; The predition label is "
+              << label << std::endl;
+  }
   return 0;
 }
