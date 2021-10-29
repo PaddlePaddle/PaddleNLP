@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -xe
 
-# 运行示例：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${batch_size} ${fp_item} 500 ${model_mode}
+# 运行示例：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${batch_size} ${fp_item} 2000 ${model_mode}
 # 参数说明
 function _set_params(){
     run_mode=${1:-"sp"}          # 单卡sp|多卡mp
     batch_size=${2:-"64"}
     fp_item=${3:-"fp32"}        # fp32|fp16
-    max_iter=${4:-"500"}       # 可选，如果需要修改代码提前中断
+    max_iter=${4:-"2000"}       # 可选，如果需要修改代码提前中断
     model_name=${5:-"xlnet-base-cased"}
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}  # TRAIN_LOG_DIR 后续QA设置该参数
 
@@ -26,6 +26,8 @@ function _train(){
     train_cmd="--model_name_or_path=${model_name}
                --task_name=SST-2
                --max_seq_length=128
+               --logging_steps=500
+               --save_steps=2000
                --batch_size=${batch_size}
                --learning_rate=2e-5
                --max_steps=${max_iter}

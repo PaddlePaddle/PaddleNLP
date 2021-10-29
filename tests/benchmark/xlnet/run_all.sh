@@ -11,8 +11,8 @@
 # 这一步无需操作，数据和模型会自动下载
 
 # 3 批量运行（如不方便批量，1，2需放到单个模型中）
-model_mode_list=(xlnet-base-cased)
-fp_item_list=(fp32)
+model_mode_list=(xlnet-base-cased xlnet-large-cased)
+fp_item_list=(fp32 fp16)
 bs_item=(32 64 96 128)
 for model_mode in ${model_mode_list[@]}; do
       for fp_item in ${fp_item_list[@]}; do
