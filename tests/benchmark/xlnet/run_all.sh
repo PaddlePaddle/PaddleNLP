@@ -1,9 +1,11 @@
+#!/usr/bin/env bash
+
 # 提供可稳定复现性能的脚本，默认在标准docker环境内py37执行： paddlepaddle/paddle:latest-gpu-cuda10.1-cudnn7  paddle=2.1.2  py=37
 # 执行目录：需说明
-cd .
+# cd .
 
 # 1 安装该模型需要的依赖 (如需开启优化策略请注明)
-pip install sentencepiece  # 安装 sentencepiece
+# pip install sentencepiece  # 安装 sentencepiece
 
 # 2 拷贝该模型需要数据、预训练模型
 # 这一步无需操作，数据和模型会自动下载
