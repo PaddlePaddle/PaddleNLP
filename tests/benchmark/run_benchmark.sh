@@ -55,7 +55,7 @@ function _train(){
 
     if [ $fp_item = "fp16" ]; then
         use_fp16_cmd="--use_amp true" 
-        if [ $dygraph_name = "dygraph" && $gpt_repo = "gpt3" ]; then
+        if [ $dygraph_name = "dygraph" ] && [ $gpt_repo = "gpt3" ]; then
             use_fp16_cmd="--use_pure_fp16 true"
         fi
     fi
