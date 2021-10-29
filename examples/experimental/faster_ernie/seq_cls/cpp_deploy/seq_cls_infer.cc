@@ -65,9 +65,7 @@ int main(int argc, char* argv[]) {
   GetOutput(predictor.get(), output_names[0], &logits);
   GetOutput(predictor.get(), output_names[1], &preds);
   for (size_t i = 0; i < data.size(); i++) {
-    std::string label = (preds[i] == 0) ? "negative" : "positive";
-    std::cout << "The text is " << data[i] << "; The predition label is "
-              << label << std::endl;
+    std::cout << data[i] << " : " << preds[i] << std::endl;
   }
   return 0;
 }
