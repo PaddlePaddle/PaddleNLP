@@ -8,7 +8,7 @@ function _set_params(){
     batch_size=${2:-"64"}
     fp_item=${3:-"fp32"}        # fp32|fp16
     max_iter=${4:-"500"}       # 可选，如果需要修改代码提前中断
-    model_name=${5:-"model_name"}
+    model_name=${5:-"xlnet-base-cased"}
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}  # TRAIN_LOG_DIR 后续QA设置该参数
 
 #   以下不用修改
