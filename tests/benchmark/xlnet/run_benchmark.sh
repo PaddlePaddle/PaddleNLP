@@ -30,7 +30,6 @@ function _train(){
                --learning_rate=2e-5
                --max_steps=${max_iter}
                --output_dir=${run_log_path}
-               --fp=${fp_item}
     "
 
     case ${run_mode} in
