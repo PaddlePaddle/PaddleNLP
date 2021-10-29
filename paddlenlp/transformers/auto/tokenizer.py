@@ -13,201 +13,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import io
 import importlib
+import json
 from collections import OrderedDict
 from paddlenlp.transformers import *
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 __all__ = ["AutoTokenizer", ]
 
 TOKENIZER_MAPPING_NAMES = OrderedDict([
     # Base model mapping
-    ("albert", "AlbertTokenizer"),
-    ("bart", "BartTokenizer"),
-    ("bigbird", "BigBirdTokenizer"),
-    ("convbert", "ConvBertTokenizer"),
-    ("distilbert", "DistilBertTokenizer"),
-    ("electra", "ElectraTokenizer"),
-    ("skep", "SkepTokenizer"),
-    ("ernie-ctm", "ErnieCtmTokenizer"),
-    ("ernie-doc", "ErnieDocTokenizer"),
-    ("ernie-gram", "ErnieGramTokenizer"),
-    ("ernie", "ErnieTokenizer"),
-    ("gpt", "GPTTokenizer"),
-    ("mpnet", "MPNetTokenizer"),
-    ("nezha", "NeZhaTokenizer"),
-    ("roberta", "RobertaTokenizer"),
-    ("roformer", "RoFormerTokenizer"),
-    ("tinybert", "TinyBertTokenizer"),
-    ("bert", "BertTokenizer"),
-    ("unified_transformer", "UnifiedTransformerTokenizer"),
-    ("unimo", "UNIMOTokenizer"),
-    ("xlnet", "XLNetTokenizer"),
+    ("AlbertTokenizer", "albert"),
+    ("BartTokenizer", "bart"),
+    ("BigBirdTokenizer", "bigbird"),
+    ("ConvBertTokenizer", "convbert"),
+    ("DistilBertTokenizer", "distilbert"),
+    ("ElectraTokenizer", "electra"),
+    ("SkepTokenizer", "skep"),
+    ("ErnieCtmTokenizer", "ernie-ctm"),
+    ("ErnieDocTokenizer", "ernie-doc"),
+    ("ErnieGramTokenizer", "ernie-gram"),
+    ("ErnieTokenizer", "ernie"),
+    ("GPTTokenizer", "gpt"),
+    ("MPNetTokenizer", "mpnet"),
+    ("NeZhaTokenizer", "nezha"),
+    ("RobertaTokenizer", "roberta"),
+    ("RoFormerTokenizer", "roformer"),
+    ("TinyBertTokenizer", "tinybert"),
+    ("BertTokenizer", "bert"),
+    ("UnifiedTransformerTokenizer", "unified_transformer"),
+    ("UNIMOTokenizer", "unimo"),
+    ("XLNetTokenizer", "xlnet"),
 ])
-
-CLASS_DOCSTRING = """
-    This is a generic model class that will be instantiated as one of the model classes of 
-    the library when created with the :meth:`~paddlenlp.transformers.BaseAutoModelClass.from_pretrained` 
-    class method. This class cannot be instantiated directly using ``__init__()`` (throws an error).
-"""
-
-FROM_PRETRAINED_DOCSTRING = """
-        Instantiate one of the model classes of the library from a pretrained model.
-        Args:
-            pretrained_model_name_or_path (:obj:`str` or :obj:`os.PathLike`):
-                Can be either:
-                    - A string, the `model id` of a pretrained model hosted inside a model repo.
-                    - A path to a `directory` containing model weights saved using
-                      :func:`~PreTrainedModel.save_pretrained`, e.g., ``./my_bert/``.
-                    - A path or url.
-            model_args (additional positional arguments, `optional`):
-                Will be passed along to the underlying model ``__init__()`` method.
-"""
-
-
-def insert_head_doc(docstring, head_doc=""):
-    if len(head_doc) > 0:
-        return docstring.replace(
-            "one of the model classes of the library ",
-            f"one of the model classes of the library (with a {head_doc} head) ",
-        )
-    return docstring.replace("one of the model classes of the library ",
-                             "one of the base model classes of the library ")
-
-
-'''
-def auto_class_update(cls,
-                      checkpoint_for_example="bert-base-cased",
-                      head_doc=""):
-    # Create a new class with the right name from the base class
-    model_mapping = cls._model_mapping
-    name = cls.__name__
-    class_docstring = insert_head_doc(CLASS_DOCSTRING, head_doc=head_doc)
-    cls.__doc__ = class_docstring.replace("BaseAutoModelClass", name)
-
-    # Now we need to copy and re-register `from_pretrained` as class methods otherwise we can't
-    # have a specific docstrings for them.
-    from_pretrained_docstring = FROM_PRETRAINED_DOCSTRING
-
-    from_pretrained = copy_func(_BaseAutoModelClass.from_pretrained)
-    from_pretrained_docstring = insert_head_doc(
-        from_pretrained_docstring, head_doc=head_doc)
-    from_pretrained_docstring = from_pretrained_docstring.replace(
-        "BaseAutoModelClass", name)
-    from_pretrained_docstring = from_pretrained_docstring.replace(
-        "checkpoint_placeholder", checkpoint_for_example)
-    shortcut = checkpoint_for_example.split("/")[-1].split("-")[0]
-    from_pretrained_docstring = from_pretrained_docstring.replace(
-        "shortcut_placeholder", shortcut)
-    from_pretrained.__doc__ = from_pretrained_docstring
-    from_pretrained = replace_list_option_in_docstrings(
-        model_mapping._model_mapping)(from_pretrained)
-    cls.from_pretrained = classmethod(from_pretrained)
-    return cls
-    
-def get_values(model_mapping):
-    result = []
-    for model in model_mapping.values():
-        if isinstance(model, (list, tuple)):
-            result += list(model)
-        else:
-            result.append(model)
-    return result
-
-'''
-
-
-def tokenizer_type_to_module_name(key):
-    """Converts a key to the corresponding module."""
-    return key.replace("-", "_")
-
-
-class _LazyAutoMapping(OrderedDict):
-    """
-    A dictionary that lazily load its values when they are requested.
-    """
-
-    def __init__(self, tokenizer_mapping):
-        self._tokenizer_mapping = tokenizer_mapping
-        self._modules = {}
-
-    def __getitem__(self, key):
-        if key not in self._tokenizer_mapping:
-            raise KeyError(key)
-        value = self._tokenizer_mapping[key]
-        module_name = tokenizer_type_to_module_name(key)
-        #module_name = key
-        if module_name not in self._modules:
-            self._modules[module_name] = importlib.import_module(
-                f"paddlenlp.transformers.{module_name}.tokenizer")
-        return getattr(self._modules[module_name], value)
-
-    def keys(self):
-        return self._tokenizer_mapping.keys()
-
-    def values(self):
-        return [self[k] for k in self._tokenizer_mapping.keys()]
-
-    def items(self):
-        return [(k, self[k]) for k in self._tokenizer_mapping.keys()]
-
-    def __iter__(self):
-        return iter(self._tokenizer_mapping.keys())
-
-    def __contains__(self, item):
-        return item in self._tokenizer_mapping
-
-
-class _BaseAutoTokenizerClass:
-    # Base class for auto models.
-    _tokenizer_mapping = None
-
-    tokenizer_config_file = "tokenizer_config.json"
-
-    def __init__(self, *args, **kwargs):
-        raise EnvironmentError(
-            f"{self.__class__.__name__} is designed to be instantiated "
-            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
-        )
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
-                        **kwargs):
-
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-
-        # From local dir path
-        if os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path,
-                                       cls.tokenizer_config_file)
-        else:
-            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                                 pretrained_model_name_or_path,
-                                                 cls.tokenizer_config_file)
-
-            # From community-contributed pretrained models
-            if os.path.isfile(community_config_path):
-                config_file = community_config_path
-
-            # Assuming from built-in pretrained models
-            else:
-                for tokenizer_names, tokenizer_class in cls._tokenizer_mapping.items(
-                ):
-                    if type(tokenizer_names) == tuple:
-                        for pattern in tokenizer_names:
-                            if pattern in pretrained_model_name_or_path:
-                                return tokenizer_class.from_pretrained(
-                                    pretrained_model_name_or_path, **kwargs)
-                    else:
-                        if tokenizer_names in pretrained_model_name_or_path:
-                            return tokenizer_class.from_pretrained(
-                                pretrained_model_name_or_path, **kwargs)
 
 
 def get_all_model_configurations():
     albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
     bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
-    bigbird = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
+    bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
     convbert = tuple(ConvBertPretrainedModel.pretrained_init_configuration.keys(
     ))
     distilbert = tuple(
@@ -232,7 +78,7 @@ def get_all_model_configurations():
     unimo = tuple(UNIMOPretrainedModel.pretrained_init_configuration.keys())
     xlnet = tuple(XLNetPretrainedModel.pretrained_init_configuration.keys())
 
-    TOKENIZER_MAPPING_NAMES1 = OrderedDict([
+    MAPPING_NAMES = OrderedDict([
         # Base model mapping
         (albert, AlbertTokenizer),
         (bart, BartTokenizer),
@@ -256,18 +102,119 @@ def get_all_model_configurations():
         (unimo, UNIMOTokenizer),
         (xlnet, XLNetTokenizer),
     ])
-    return TOKENIZER_MAPPING_NAMES1
+    return MAPPING_NAMES
 
 
-TOKENIZER_MAPPING = _LazyAutoMapping(TOKENIZER_MAPPING_NAMES)
+class _BaseAutoTokenizerClass:
+    # Base class for auto models.
+    _tokenizer_mapping = None
+    _name_mapping = None
+    tokenizer_config_file = "tokenizer_config.json"
+
+    def __init__(self, *args, **kwargs):
+        raise EnvironmentError(
+            f"{self.__class__.__name__} is designed to be instantiated "
+            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
+        )
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+                        **kwargs):
+
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path,
+                                       cls.tokenizer_config_file)
+            if os.path.exists(config_file):
+                with io.open(config_file, encoding="utf-8") as f:
+                    init_kwargs = json.load(f)
+                # class name corresponds to this configuration
+                init_class = init_kwargs.pop("init_class")
+                class_name = cls._name_mapping[init_class]
+                import_class = importlib.import_module(
+                    f"paddlenlp.transformers.{class_name}.tokenizer")
+                tokenizer_name = getattr(import_class, init_class)
+                return tokenizer_name.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
+
+        else:
+            for tokenizer_names, tokenizer_class in cls._tokenizer_mapping.items(
+            ):
+                if type(tokenizer_names) == tuple:
+                    # From built-in pretrained models
+                    for pattern in tokenizer_names:
+                        if pattern == pretrained_model_name_or_path:
+                            return tokenizer_class.from_pretrained(
+                                pretrained_model_name_or_path, **kwargs)
+                else:
+                    if tokenizer_names == pretrained_model_name_or_path:
+                        return tokenizer_class.from_pretrained(
+                            pretrained_model_name_or_path, **kwargs)
+
+            # Assuming from community-contributed pretrained models
+            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                                 pretrained_model_name_or_path,
+                                                 cls.tokenizer_config_file)
+
+            default_root = os.path.join(MODEL_HOME,
+                                        pretrained_model_name_or_path)
+            try:
+                resolved_vocab_file = get_path_from_url(community_config_path,
+                                                        default_root)
+                if os.path.exists(resolved_vocab_file):
+                    with io.open(resolved_vocab_file, encoding="utf-8") as f:
+                        init_kwargs = json.load(f)
+                    # class name corresponds to this configuration
+                    init_class = init_kwargs.pop("init_class")
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.tokenizer")
+                    tokenizer_name = getattr(import_class, init_class)
+                    return tokenizer_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+            except RuntimeError as err:
+                logger.error(err)
+                raise RuntimeError(
+                    f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                    "- a correct model-identifier of built-in pretrained models,\n"
+                    "- or a correct model-identifier of community-contributed pretrained models,\n"
+                    "- or the correct path to a directory containing relevant tokenizer files.\n"
+                )
 
 
 class AutoTokenizer(_BaseAutoTokenizerClass):
     #_model_mapping = MODEL_MAPPING_NAMES
     MAPPING_NAMES = get_all_model_configurations()
     _tokenizer_mapping = MAPPING_NAMES
+    _name_mapping = TOKENIZER_MAPPING_NAMES
 
 
-#AutoModel = auto_class_update(AutoModel)
+if __name__ == '__main__':
+    # From local dir path
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/Untitled Folder/my_bert'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/Untitled Folder/my_bart'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/Untitled Folder/my_bigbird'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
-print(AutoTokenizer.from_pretrained(('plato-mini')))
+    # From built-in pretrained models
+    tokenizer = AutoTokenizer.from_pretrained(('bert-base-cased'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    tokenizer = AutoTokenizer.from_pretrained(('rbt3'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    tokenizer = AutoTokenizer.from_pretrained(('plato-mini'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    tokenizer = AutoTokenizer.from_pretrained(('bigbird-base-uncased'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+
+    # From community-contributed pretrained models
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('yingyibiao/bert-base-uncased-sst-2-finetuned'))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))

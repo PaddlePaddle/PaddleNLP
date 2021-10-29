@@ -134,6 +134,8 @@ class _LazyAutoMapping(OrderedDict):
             #self._modules[module_name] = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
             self._modules[module_name] = importlib.import_module(
                 f"paddlenlp.transformers.{module_name}.modeling")
+            print(value)
+        print(getattr(self._modules[module_name], value))
         return getattr(self._modules[module_name], value)
 
     def keys(self):
@@ -582,12 +584,13 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 
 if __name__ == '__main__':
     tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
-    model = AutoModel.from_pretrained('junnyu/tbs17-MathBERT')
+    model = AutoModel.from_pretrained('albert-base-v1')
     print(model)
-
+'''
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
     outputs = model(**inputs)
     print(outputs)
 
     logits = outputs[0]
+'''
