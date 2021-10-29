@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.experimental import FasterModelForSequenceClassification, to_tensor
+from paddlenlp.experimental import FasterErnieModel, FasterErnieForSequenceClassification, to_tensor
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -92,7 +92,7 @@ def do_train():
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    model = FasterModelForSequenceClassification.from_pretrained(
+    model = FasterErnieForSequenceClassification.from_pretrained(
         'ernie-1.0',
         num_classes=len(train_ds.label_list),
         max_seq_len=args.max_seq_length)
@@ -152,10 +152,11 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % 100 == 0 and rank == 0:
+                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
-                save_path = os.path.join(args.save_dir,
-                                         "model_%d.pdparams" % global_step)
-                paddle.save(model.state_dict(), save_path)
+                model._layers.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":

@@ -8,4 +8,4 @@ work_path=$(dirname $(readlink -f $0))
 bash ${work_path}/compile.sh
 
 # 2. run
-./build/text_cls_infer --model_file ../export/inference.pdmodel --params_file ../export/inference.pdiparams
+./build/seq_cls_infer --model_file ../export/inference.pdmodel --params_file ../export/inference.pdiparams

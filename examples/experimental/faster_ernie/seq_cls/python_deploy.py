@@ -132,16 +132,15 @@ if __name__ == "__main__":
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
     ]
-    for _ in range(50):
-        for batch_data in batches:
-            predictor.predict(batch_data, label_map=None)
+    for _ in range(10):
+        predictor.predict(batches[0], label_map=None)
 
     import time
     start = time.time()
-    for _ in range(100):
+    for _ in range(10):
         for batch_data in batches:
             predictor.predict(batch_data, label_map=None)
     end = time.time()
 
     print("num data: %d, batch_size: %d, cost time: %.5f" %
-          (len(data) * 100, args.batch_size, (end - start)))
+          (len(data) * 10, args.batch_size, (end - start)))

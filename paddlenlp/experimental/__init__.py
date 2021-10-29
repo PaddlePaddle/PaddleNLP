@@ -13,4 +13,5 @@
 # limitations under the License.
 
 from .faster_tokenizer import *
-from .model import *
+from .model_utils import *
+from .ernie_model import *

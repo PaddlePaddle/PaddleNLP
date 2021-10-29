@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(text_cls_infer CXX C)
+project(seq_cls_infer CXX C)
 option(WITH_MKL        "Compile demo with MKL/OpenBlas support, default use MKL."       ON)
 option(WITH_GPU        "Compile demo with GPU/CPU, default use CPU."                    OFF)
 option(WITH_STATIC_LIB "Compile demo with static/shared library, default use static."   ON)

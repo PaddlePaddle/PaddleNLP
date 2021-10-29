@@ -62,8 +62,6 @@ int main(int argc, char* argv[]) {
   std::vector<float> logits;
   std::vector<int64_t> preds;
   auto output_names = predictor->GetOutputNames();
-  for (size_t i = 0; i < data.size(); i++) {
-  }
   GetOutput(predictor.get(), output_names[0], &logits);
   GetOutput(predictor.get(), output_names[1], &preds);
   for (size_t i = 0; i < data.size(); i++) {

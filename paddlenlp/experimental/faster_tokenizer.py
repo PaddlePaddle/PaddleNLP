@@ -65,7 +65,7 @@ class FasterTokenizer(nn.Layer):
                 text,
                 text_pair=None,
                 max_seq_len=-1,
-                pad_to_max_seq_len=False):
+                pad_to_max_seq_len=True):
         if in_dygraph_mode():
             input_ids, seg_ids = core.ops.faster_tokenizer(
                 self.vocab, text, text_pair, "do_lower_case",

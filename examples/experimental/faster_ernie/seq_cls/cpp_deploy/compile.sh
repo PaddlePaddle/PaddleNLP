@@ -20,8 +20,8 @@ mkdir -p build
 cd build
 rm -rf *
 
-# same with the text_cls_infer.cc
-PROJECT_NAME=text_cls_infer
+# same with the seq_cls_infer.cc
+PROJECT_NAME=seq_cls_infer
 
 WITH_MKL=ON
 WITH_GPU=ON
