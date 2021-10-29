@@ -18,7 +18,7 @@ function _set_params(){
     log_file=${run_log_path}/${model_name}_${run_mode}_bs${batch_size}_${fp_item}_${num_gpu_devices}
 }
 
-python -m paddle.distributed.launch --gpus "0" ./run_glue.py \
+python -m paddle.distributed.launch --gpus "0" ../../../examples/language_model/xlnet/run_glue.py \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
     --max_seq_length 128 \
