@@ -64,7 +64,7 @@ def parse_args():
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.",)
     parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.",)
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization",)
-    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="Select cpu, gpu, xpu devices.",)
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="Select cpu, gpu, xpu, npu devices.",)
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup_steps. If > 0: Override warmup_proportion",)
     parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.",)
     parser.add_argument('-p', '--profiler_options', type=str, default=None, help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".',)
