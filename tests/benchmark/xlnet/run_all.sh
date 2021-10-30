@@ -13,7 +13,7 @@ pip install sentencepiece  # 安装 sentencepiece
 # 3 批量运行（如不方便批量，1，2需放到单个模型中）
 model_mode_list=(xlnet-base-cased)
 fp_item_list=(fp32)
-bs_item_list=(32 64 96 128)
+bs_item_list=(16 32 64 128)
 for model_mode in ${model_mode_list[@]}; do
     for fp_item in ${fp_item_list[@]}; do
           for bs_item in ${bs_item_list[@]}; do

@@ -329,6 +329,8 @@ def do_train(args):
                     print(final_res)
                     exit(0)
 
+            reader_start = time.time()
+
 
 def print_arguments(args):
     """print arguments"""
