@@ -23,6 +23,7 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
+from paddlenlp.utils import profiler
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
@@ -66,6 +67,7 @@ def parse_args():
     parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="Select cpu, gpu, xpu devices.",)
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup_steps. If > 0: Override warmup_proportion",)
     parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.",)
+    parser.add_argument('-p', '--profiler_options', type=str, default=None, help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".',)
     # yapf: enable
 
     args = parser.parse_args()
@@ -272,6 +274,9 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
+
+            # Profile for model benchmark
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_steps == 0:
                 print(
