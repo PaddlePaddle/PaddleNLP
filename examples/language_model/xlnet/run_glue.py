@@ -262,10 +262,16 @@ def do_train(args):
     metric = metric_class()
 
     global_step = 0
-    tic_train = time.time()
     model.train()
+
+    train_reader_cost = 0.0
+    train_run_cost = 0.0
+    reader_start = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
+            train_reader_cost += time.time() - reader_start
+            train_start = time.time()
+
             global_step += 1
             input_ids, token_type_ids, attention_mask, labels = batch
             logits = model(input_ids, token_type_ids, attention_mask)
@@ -275,16 +281,23 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
 
+            train_run_cost += time.time() - train_start
             # Profile for model benchmark
             profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_steps == 0:
+                speed = args.logging_steps / (train_reader_cost + train_run_cost)
+                avg_reader_cost = train_reader_cost / args.logging_steps
                 print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s, avg_reader_cost: %.4f sec, avg_batch_cost: %.4f sec, avg_samples: %d, avg_ips: %.4f sequences/sec"
                     % (global_step, num_training_steps, epoch, step,
                        paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
+                       speed, avg_reader_cost, 1.0 / speed, args.batch_size,
+                       speed * args.batch_size,
+                       ))
+
+                train_reader_cost = 0.0
+                train_run_cost = 0.0
 
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
@@ -315,7 +328,6 @@ def do_train(args):
                 if global_step == num_training_steps:
                     print(final_res)
                     exit(0)
-                tic_train += time.time() - tic_eval
 
 
 def print_arguments(args):
