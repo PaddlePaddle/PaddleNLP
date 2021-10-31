@@ -154,7 +154,7 @@ For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zo
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-##  Wide-range NLP Task Support
+## Wide-range NLP Task Support
 
 PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
 
@@ -162,6 +162,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 
 - [Word Embedding](./examples/word_embedding/)
 - [Lexical Analysis](./examples/lexical_analysis/)
+- [Dependency Parsing](./examples/dependency_parsing/)
 - [Language Model](./examples/language_model/)
 - [Semantic Parsing (Text to SQL)](./examples/text_to_sql):star:
 - [Text Classification](./examples/text_classification/)
