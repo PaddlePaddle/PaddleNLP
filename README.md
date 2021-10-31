@@ -26,7 +26,7 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
   - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
 
 - **多场景的应用示例**
-  - 覆盖从学术到工业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+  - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
 
 - **高性能分布式训练**
   - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成超大规模参数的模型训练。
@@ -48,9 +48,9 @@ pip install --upgrade paddlenlp
 
 ## 易用的文本领域API
 
-### Taskflow：开箱即用的工业级NLP能力
+### Taskflow：开箱即用的产业级NLP能力
 
-Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**工业级的效果**与**极致的预测性能**。
+Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
 
 ```python
 from paddlenlp import Taskflow
@@ -80,7 +80,7 @@ senta = Taskflow("sentiment_analysis")
 senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
 >>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
 ```
-更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)
+更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
 ### Transformer API: 强大的预训练模型生态底座
 
@@ -166,10 +166,14 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :------------  | ---- |
 | [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./examples/language_model/rnnlm)和[Transformer-XL](./examples/language_model/transformer-xl)两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
-| [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
+| [语言模型](./examples/language_model/)  | 覆盖了经典的LSTM类语言模型，和Transformer类的预训练语言模型，如BERT, ERNIE, GPT, XLNet, BART，ELECTRA，BigBird等。 |
+| [语义解析](./examples/text_to_sql/):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
-### NLP 核心技术
+#### 依存分析 (Dependency Parsing))
+
+| 模型  | 简介    |
+| :----- | ------ |
+| [Deep Biaffine Parsing](./examples/dependency_parsing/) | 实现了Deep Biaffine Parsing句法分析模型，并提供高质量的中文预训练模型可供直接使用。|
 
 #### 文本分类 (Text Classification)
 
