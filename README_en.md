@@ -84,7 +84,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
 
 ### Transformer API: Awesome Pre-trained Model Ecosystem
 
-We provide **22** network architectures and over **90** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
+We provide **24** network architectures and over **100** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
 
 ```python
 from paddlenlp.transformers import *

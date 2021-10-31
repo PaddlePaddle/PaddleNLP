@@ -84,7 +84,7 @@ senta("怀着十分激动的心情放映，可是看着看着发现，在放映�
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**22**个网络结构和**90**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如。欢迎开发者贡献更多预训练模型！🤗
+覆盖**24**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -158,7 +158,7 @@ wordemb.cosine_sim("艺术", "火车")
 ## 多场景的应用示例
 
 PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模式和全新的API体系开发，更加简单易懂。
-涵盖了[NLP基础技术](#nlp-基础技术)、[NLP核心技术](#nlp-核心技术)、[NLP系统应用](#nlp-系统应用)以及文本相关的拓展应用如[模型压缩](./examples/model_compression/)、与知识库结合的[文本知识关联](./examples/text_to_knowledge)、与图结合的[文本图学习](./examples/text_graph/)等。
+涵盖了[NLP基础技术](#nlp-基础技术)、[NLP系统应用](#nlp-系统应用)以及文本相关的[NLP拓展应用](#拓展应用)、与知识库结合的[文本知识关联](./examples/text_to_knowledge)、与图结合的[文本图学习](./examples/text_graph/)等。
 
 ### NLP 基础技术
 
@@ -169,11 +169,11 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | [语言模型](./examples/language_model/)  | 覆盖了经典的LSTM类语言模型，和Transformer类的预训练语言模型，如BERT, ERNIE, GPT, XLNet, BART，ELECTRA，BigBird等。 |
 | [语义解析](./examples/text_to_sql/):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
-#### 依存分析 (Dependency Parsing))
+#### 句法依存分析 (Dependency Parsing)
 
 | 模型  | 简介    |
 | :----- | ------ |
-| [Deep Biaffine Parsing](./examples/dependency_parsing/) | 实现了Deep Biaffine Parsing句法分析模型，并提供高质量的中文预训练模型可供直接使用。|
+| [Deep Biaffine Parsing](./examples/dependency_parsing/) | 实现经典的Deep Biaffine Parsing句法分析模型，并提供高质量的中文预训练模型可供直接使用。|
 
 #### 文本分类 (Text Classification)
 

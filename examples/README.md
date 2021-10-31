@@ -4,7 +4,7 @@ PaddleNLP旨在提供覆盖从研究到产业应用的丰富示例，助力开�
 
 PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
 
-## NLP基础任务 (NLP Basic Task)
+## NLP 基础技术 (NLP Basic Technique)
 
 | 目录 Folder  | 任务 Task    |
 | :--------------- | ------- |
@@ -21,7 +21,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 | semantic_indexing | [语义索引 (Semantic Indexing)](./semantic_indexing/)|
 | information_extraction | [信息抽取 (Information Extraction)](./information_extraction/) |
 
-## NLP系统应用 (NLP System Applications)
+## NLP 系统应用 (NLP System Applications)
 
 | 目录 Folder  | 任务 Task    |
 | :--------------- | ------- |
@@ -31,7 +31,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 | simultaneous_translation|[同声翻译 (Simultaneous Translation)](./simultaneous_translation/) |
 | machine_reading_comprehension | [阅读理解 (Machine Reading Comprehension)](./machine_reading_comprehension/) |
 
-## NLP拓展应用 (NLP Extented Applications)
+## NLP 拓展应用 (NLP Extented Applications)
 
 | 目录 Folder  | 任务 Task    |
 | :--------------- | ------- |
