@@ -144,12 +144,11 @@ class _BaseAutoTokenizerClass:
         else:
             for tokenizer_names, tokenizer_class in cls._tokenizer_mapping.items(
             ):
-                if type(tokenizer_names) == tuple:
-                    # From built-in pretrained models
-                    for pattern in tokenizer_names:
-                        if pattern == pretrained_model_name_or_path:
-                            return tokenizer_class.from_pretrained(
-                                pretrained_model_name_or_path, **kwargs)
+                # From built-in pretrained models
+                for pattern in tokenizer_names:
+                    if pattern == pretrained_model_name_or_path:
+                        return tokenizer_class.from_pretrained(
+                            pretrained_model_name_or_path, **kwargs)
 
             # Assuming from community-contributed pretrained models
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,

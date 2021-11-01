@@ -15,6 +15,7 @@
 import os
 import io
 import importlib
+import paddle
 import json
 from collections import OrderedDict
 from paddlenlp.transformers import *
@@ -635,32 +636,10 @@ if __name__ == '__main__':
     #model = AutoModelForPreTraining.from_pretrained('roformer-chinese-small')
     #model = AutoModelForPreTraining.from_pretrained('tinybert-4l-312d')
 
-    model = AutoModelForPreTraining.from_pretrained(
-        ('/Users/huhuiwen01/Untitled Folder/my_bert_model_for_pretraining'))
+    #model = AutoModelForPreTraining.from_pretrained(('/Users/huhuiwen01/Untitled Folder/my_bert_model_for_pretraining'))
 
     #3、lm_head test
     #model = AutoModelWithLMHead.from_pretrained('nezha-base-chinese')
-    '''
-    MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
-        # Model with LM heads mapping
-        ("AlbertForMaskedLM", "albert"),
-        ("BartForConditionalGeneration", "bart"),
-        ("BigBirdPretrainingHeads", "bigbird"),
-        ("ConvBertClassificationHead", "convbert"),
-        ("DistilBertForMaskedLM", "distilbert"),
-        ("BertPretrainingHeads", "bert"),
-        ("ElectraClassificationHead", "electra"),
-        ("GPTLMHeadModel", "gpt"),
-        ("MPNetForMaskedLM", "mpnet"),
-        ("NeZhaPretrainingHeads", "nezha"),
-        ("RoFormerPretrainingHeads", "roformer"),
-        ("UNIMOLMHeadModel", "unimo"),
-    ])
-    '''
-    # albert-base-v1  bart-base  bert-base-uncased  bigbird-base-uncased  convbert-base  distilbert-base-uncased
-    # electra-small   ernie-1.0  ernie-doc-base-zh  ernie-gen-base-en  ernie-gram-zh  gpt-cpm-large-cn  mpnet-base
-    # nezha-base-chinese  roberta-wwm-ext  rbt3  roformer-chinese-small  skep_ernie_1.0_large_ch  tinybert-4l-312d
-    # unified_transformer-12L-cn plato-mini  unimo-text-1.0  xlnet-base-cased
 
     # 4、masked lm test
     #model = AutoModelForMaskedLM.from_pretrained('albert-base-v1')
@@ -681,14 +660,15 @@ if __name__ == '__main__':
     #model = AutoModelForQuestionAnswering.from_pretrained('nezha-base-chinese')
     #model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
     #model = AutoModelForQuestionAnswering.from_pretrained('ernie-gram-zh')
-    print(model)
 
     #8、token_classification test
     #model = AutoModelForTokenClassification.from_pretrained('electra-small', num_classes = 2)
     #model = AutoModelForTokenClassification.from_pretrained('rbt3')
     #model = AutoModelForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
     #model = AutoModelForTokenClassification.from_pretrained('plato-mini')
-'''
+
+    print(model)
+
     tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -696,4 +676,3 @@ if __name__ == '__main__':
     print(outputs)
 
     logits = outputs[0]
-'''
