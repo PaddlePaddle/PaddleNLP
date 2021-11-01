@@ -14,7 +14,7 @@ function _set_params(){
     need_profile=${7:-"off"}
     gpt_repo=${8:-"gpt2"}
 
-    model_name=${model_name}_${gpt_repo}
+    model_name=${model_name}_${gpt_repo}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
     mission_name="语义表示"
     direction_id=1
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}
@@ -24,21 +24,21 @@ function _set_params(){
     num_gpu_devices=${#arr[*]}
 
 
-    log_file=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
-    log_folder=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}_logdir
-    log_profile=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}_model.profile
+    log_file=${run_log_path}/${model_name}
+    log_folder=${run_log_path}/${model_name}_logdir
+    log_profile=${run_log_path}/${model_name}_model.profile
     OUTPUT_PATH=${run_log_path}/output
 
 
     log_with_profiler=$log_file
     profiler_path=$log_profile
-    keyword="ips:" 
+    keyword="avg_batch_cost:" 
     keyword_loss=""
     separator=""
     position=""
     range=""
     skip_steps=20
-    model_mode=-1
+    model_mode=0
     ips_unit='seqs/s'
     index=""
     gpu_num=$num_gpu_devices 
