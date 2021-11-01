@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,11 +22,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-
-from utils import convert_example
+from paddlenlp.experimental import FasterErnieModel, FasterErnieForSequenceClassification, to_tensor
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -40,7 +38,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -54,38 +52,24 @@ def set_seed(seed):
 
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader):
-    """
-    Given a dataset, it evals model and computes the metric.
-
-    Args:
-        model(obj:`paddle.nn.Layer`): A model to classify texts.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
-        metric(obj:`paddle.metric.Metric`): The evaluation metric.
-    """
     model.eval()
     metric.reset()
     losses = []
     for batch in data_loader:
-        input_ids, token_type_ids, labels = batch
-        logits = model(input_ids, token_type_ids)
+        texts, labels = batch['text'], batch['label']
+        texts = to_tensor(texts, "texts")
+        logits, predictions = model(texts)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
-    accu = metric.accumulate()
+        accu = metric.accumulate()
     print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
     model.train()
     metric.reset()
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
+def create_dataloader(dataset, mode='train', batch_size=1):
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
@@ -95,11 +79,7 @@ def create_dataloader(dataset,
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=batch_size, shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler)
 
 
 def do_train():
@@ -111,31 +91,16 @@ def do_train():
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=len(train_ds.label_list))
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64")  # label
-    ): [data for data in fn(samples)]
+    model = FasterErnieForSequenceClassification.from_pretrained(
+        'ernie-1.0',
+        num_classes=len(train_ds.label_list),
+        max_seq_len=args.max_seq_length)
+
     train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+        train_ds, mode='train', batch_size=args.batch_size)
     dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+        dev_ds, mode='dev', batch_size=args.batch_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -166,11 +131,12 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
+            texts, labels = batch["text"], batch["label"]
+            texts = to_tensor(texts)
+            logits, predictions = model(texts)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
-            correct = metric.compute(probs, labels)
+            correct = metric.compute(logits, labels)
             metric.update(correct)
             acc = metric.accumulate()
 
@@ -191,7 +157,6 @@ def do_train():
                     os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
                 model._layers.save_pretrained(save_dir)
-                tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":
