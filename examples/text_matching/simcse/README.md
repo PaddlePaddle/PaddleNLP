@@ -98,7 +98,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
         --params_path "./checkpoints/model_4400/model_state.pdparams"\
         --batch_size 64 \
         --max_seq_length 64 \
-        --input_file 'test.tsv'
+        --text_pair_file 'test.tsv'
 ```
 
 输出预测结果如下:

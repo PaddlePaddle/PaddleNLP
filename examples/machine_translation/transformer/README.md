@@ -175,7 +175,7 @@ python predict.py --config ../configs/transformer.base.yaml
 
  需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
-## 使用 Faster Transformer 实现预测
+## 使用 FasterTransformer 实现预测
 
 具体的说明可以参考 `faster_transformer/README.md`。`cd faster_transformer/` 即可查看。
 

@@ -131,6 +131,25 @@ python predict.py --data_dir ./lexical_analysis_dataset_tiny \
 (什么, r)(是, v)(司法, n)(鉴定人, vn)
 ```
 
+### Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键分词，具体使用方法如下:
+
+```python
+from paddlenlp import Taskflow
+
+lac = Taskflow("lexical_analysis")
+lac("LAC是个优秀的分词工具")
+'''
+[{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']}]
+'''
+
+lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
+'''
+[{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']},
+ {'text': '三亚是一个美丽的城市', 'segs': ['三亚', '是', '一个', '美丽', '的', '城市'], 'tags': ['LOC', 'v', 'm', 'a', 'u', 'n']}
+]
+'''
+```
 
 ## 预训练模型
 

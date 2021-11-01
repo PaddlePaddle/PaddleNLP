@@ -26,7 +26,6 @@ def create_dataloader(dataset,
                       trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
-
     shuffle = True if mode == 'train' else False
     if mode == 'train':
         batch_sampler = paddle.io.DistributedBatchSampler(
@@ -42,7 +41,10 @@ def create_dataloader(dataset,
         return_list=True)
 
 
-def convert_example(example, tokenizer, max_seq_length=512):
+def convert_example(example,
+                    tokenizer,
+                    max_seq_length=512,
+                    pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
         
@@ -65,11 +67,13 @@ def convert_example(example, tokenizer, max_seq_length=512):
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
+        encoded_inputs = tokenizer(
+            text=text,
+            max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
-
     return result
 
 

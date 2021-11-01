@@ -16,15 +16,13 @@ import os
 import argparse
 
 import paddle
-
-from predictor import WordtagPredictor
+from paddlenlp import Taskflow
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     # yapf: disable
-    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain [train/test].json and [train/test]_metrics.json .")
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
     parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
@@ -36,10 +34,14 @@ def parse_args():
 
 def do_predict(args):
     paddle.set_device(args.device)
-    predictor = WordtagPredictor(term_linking=True)
+    wordtag = Taskflow(
+        "knowledge_mining",
+        model="wordtag",
+        batch_size=args.batch_size,
+        max_seq_length=args.max_seq_len,
+        linking=True)
     txts = ["《孤女》是2010年九州出版社出版的小说，作者是余兼羽。", "热梅茶是一道以梅子为主要原料制作的茶饮"]
-
-    res = predictor.run(txts)
+    res = wordtag(txts)
     print(res)
 
 

@@ -131,7 +131,8 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
 
         batch_indices = []
         for idx in range(self.consumed_samples + self.local_rank,
-                         self.remain_num_samples, self.nranks):
+                         self.consumed_samples + self.remain_total_size,
+                         self.nranks):
             batch_indices.append(idx)
             if len(batch_indices) == self.batch_size:
                 yield batch_indices

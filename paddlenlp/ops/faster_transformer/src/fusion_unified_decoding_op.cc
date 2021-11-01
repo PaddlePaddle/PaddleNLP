@@ -65,7 +65,10 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty) {
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act) {
   int batch_size = cache_k[0].shape()[0];
 
   std::vector<int64_t> output_dims;
@@ -148,7 +151,10 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       unk_id,
                                       mask_id,
                                       temperature,
-                                      len_penalty);
+                                      len_penalty,
+                                      normalize_before,
+                                      pos_bias,
+                                      hidden_act);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -200,7 +206,10 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty) {
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act) {
   int batch_size = cache_k_shapes[0][0];
 
   std::vector<int64_t> output_dims;
@@ -306,7 +315,10 @@ PD_BUILD_OP(fusion_unified_decoding)
             "unk_id: int",
             "mask_id: int",
             "temperature: float",
-            "len_penalty: float"})
+            "len_penalty: float",
+            "normalize_before: bool",
+            "pos_bias: bool",
+            "hidden_act: std::string"})
     .SetKernelFn(PD_KERNEL(UnifiedDecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(UnifiedDecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(UnifiedDecodingInferDtype));

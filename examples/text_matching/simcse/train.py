@@ -47,6 +47,7 @@ parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path o
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Step interval for saving checkpoint.")
+parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override ecpochs.")
 parser.add_argument('--eval_steps', type=int, default=10000, help="Step interval for evaluation.")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--test_set_file", type=str, required=True, help="The full path of test_set_file.")
@@ -160,7 +161,8 @@ def do_train():
 
     model = paddle.DataParallel(model)
 
-    num_training_steps = len(train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(
+        train_data_loader) * args.epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -214,6 +216,8 @@ def do_train():
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
+            if args.max_steps > 0 and global_step >= args.max_steps:
+                return
 
 if __name__ == "__main__":
     do_train()

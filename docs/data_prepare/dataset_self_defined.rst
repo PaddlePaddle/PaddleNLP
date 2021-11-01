@@ -135,7 +135,7 @@
                        #             '要', '件', '之', '一', '。']}
 
     hf_train_ds = load_dataset('cmrc2018', split='train')
-    train_ds = MapDataset(train_ds)
+    train_ds = MapDataset(hf_train_ds)
     print(train_ds[1818]) # {'answers': {'answer_start': [9], 'text': ['字仲可']}, 
                           #  'context': '徐珂（），原名昌，字仲可，浙江杭县（今属杭州市）人。光绪举人。
                           #              后任商务印书馆编辑。参加南社。1901年在上海担任了《外交报》、
@@ -147,9 +147,9 @@
                           #  'question': '徐珂字什么？'}
     
     hf_train_ds = load_dataset('glue', 'sst2', split='train')
-    train_ds = MapDataset(train_ds)
+    train_ds = MapDataset(hf_train_ds)
     print(train_ds[0]) # {'idx': 0, 'label': 0, 'sentence': 'hide new secretions from the parental units '}
 
     hf_train_ds = load_dataset('ptb_text_only', split='train')
-    train_ds = MapDataset(train_ds)
+    train_ds = MapDataset(hf_train_ds)
     print(train_ds[1]) # {'sentence': 'pierre <unk> N years old will join the board as a nonexecutive director nov. N'}

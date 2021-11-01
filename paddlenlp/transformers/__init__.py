@@ -13,11 +13,12 @@
 # limitations under the License.
 
 from .model_utils import PretrainedModel, register_base_model
-from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars
+from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char
 from .attention_utils import create_bigbird_rand_mask_idx_list
 
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert_japanese.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .gpt.modeling import *
@@ -55,7 +56,15 @@ from .bart.modeling import *
 from .bart.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
+from .blenderbot.modeling import *
+from .blenderbot.tokenizer import *
+from .blenderbot_small.modeling import *
+from .blenderbot_small.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
+from .convbert.modeling import *
+from .convbert.tokenizer import *
+from .mpnet.modeling import *
+from .mpnet.tokenizer import *
