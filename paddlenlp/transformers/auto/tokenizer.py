@@ -50,7 +50,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 ])
 
 
-def get_all_model_configurations():
+def get_all_configurations():
     albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
     bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
     bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
@@ -148,10 +148,6 @@ class _BaseAutoTokenizerClass:
                         if pattern == pretrained_model_name_or_path:
                             return tokenizer_class.from_pretrained(
                                 pretrained_model_name_or_path, **kwargs)
-                else:
-                    if tokenizer_names == pretrained_model_name_or_path:
-                        return tokenizer_class.from_pretrained(
-                            pretrained_model_name_or_path, **kwargs)
 
             # Assuming from community-contributed pretrained models
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
@@ -186,8 +182,7 @@ class _BaseAutoTokenizerClass:
 
 
 class AutoTokenizer(_BaseAutoTokenizerClass):
-    #_model_mapping = MODEL_MAPPING_NAMES
-    MAPPING_NAMES = get_all_model_configurations()
+    MAPPING_NAMES = get_all_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
 
