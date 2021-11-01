@@ -70,8 +70,10 @@ def get_all_configurations():
     mpnet = tuple(MPNetPretrainedModel.pretrained_init_configuration.keys())
     nezha = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
     roberta = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys())
-    roformer = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
-    tinybert = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
+    roformer = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys(
+    ))
+    tinybert = tuple(TinyBertPretrainedModel.pretrained_init_configuration.keys(
+    ))
     bert = tuple(BertPretrainedModel.pretrained_init_configuration.keys())
     unifiedtransformer = tuple(
         UnifiedTransformerModel.pretrained_init_configuration.keys())
