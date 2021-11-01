@@ -13,7 +13,7 @@ GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.
 ### 环境依赖
 
 - regex
-- sentencepiece
+- sentencepiece >= 0.1.94
 - tqdm
 - visualdl
 - paddlepaddle-gpu >= 2.2rc

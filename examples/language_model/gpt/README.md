@@ -27,7 +27,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ### 环境依赖
 
 - regex
-- sentencepiece
+- sentencepiece >= 0.1.94
 - tqdm
 - visualdl
 - paddlepaddle-gpu >= 2.2rc
