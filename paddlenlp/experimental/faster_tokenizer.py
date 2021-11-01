@@ -84,7 +84,7 @@ class FasterTokenizer(nn.Layer):
     def forward(self,
                 text,
                 text_pair=None,
-                max_seq_len=-1,
+                max_seq_len=0,
                 pad_to_max_seq_len=True):
         if in_dygraph_mode():
             input_ids, seg_ids = core.ops.faster_tokenizer(
