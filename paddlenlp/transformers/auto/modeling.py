@@ -297,8 +297,8 @@ MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     ("AlbertForPretraining", "albert"),
     #("BartForConditionalGeneration", "bart"),
     ("BigBirdForPretraining", "bigbird"),
-    ("ConvBertForTotalPretraining", "convbert"),
-    ("ElectraForTotalPretraining", "electra"),
+    #("ConvBertForTotalPretraining", "convbert"),
+    #("ElectraForTotalPretraining", "electra"),
     ("ErnieForPretraining", "ernie"),
     ("GPTForPretraining", "gpt"),
     ("NeZhaForPretraining", "nezha"),
@@ -328,9 +328,7 @@ MODEL_FOR_MASKED_LM_MAPPING_NAMES = OrderedDict([
     ("AlbertForMaskedLM", "albert"),
     ("BartForConditionalGeneration", "bart"),
     ("DistilBertForMaskedLM", "distilbert"),
-    #("electra", "ElectraForMaskedLM"),
     ("MPNetForMaskedLM", "mpnet"),
-    #("roberta", "RobertaForMaskedLM"),
 ])
 
 MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict([
@@ -464,8 +462,8 @@ def get_all_configurations(key):
             (albert, AlbertForPretraining),
             (bart, BartForConditionalGeneration),
             (bigbird, BigBirdForPretraining),
-            (convbert, ConvBertForTotalPretraining),
-            (electra, ElectraForTotalPretraining),
+            #(convbert, ConvBertForTotalPretraining),
+            #(electra, ElectraForTotalPretraining),
             (ernie, ErnieForPretraining),
             (gpt, GPTForPretraining),
             (nezha, NeZhaForPretraining),
@@ -548,7 +546,6 @@ def get_all_configurations(key):
             (skep, SkepForTokenClassification),
             (erniectm, ErnieCtmForTokenClassification),
             (erniedoc, ErnieDocForTokenClassification),
-            (erniegen, ErnieForGeneration),
             (erniegram, ErnieGramForTokenClassification),
             (ernie, ErnieForTokenClassification),
             (mpnet, MPNetForTokenClassification),
@@ -624,25 +621,75 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 #    AutoModelForMultipleChoice, head_doc="multiple choice")
 
 if __name__ == '__main__':
-    # model test
-    #tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+    # test
+    #1、 model test
     #model = AutoModel.from_pretrained('bert-base-uncased')
-
-    #model = ErnieForGeneration.from_pretrained('ernie-gen-base-en')
-    #model = AutoModel.from_pretrained('ernie-gen-base-en')
-    #model = AutoModel.from_pretrained('xlnet-base-cased')
     #model = AutoModel.from_pretrained('unimo-text-1.0')
     #model = AutoModel.from_pretrained('plato-mini')
-    #model = AutoModel.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
-    # pretraining test
+    model = AutoModel.from_pretrained(
+        ('/Users/huhuiwen01/Untitled Folder/my_bert_model'))
+
+    #2、pretraining test
     #model = AutoModelForPreTraining.from_pretrained('bert-base-cased')
-    #model = AutoModelForPreTraining.from_pretrained('albert-base-v1')
-    model = AutoModelForPreTraining.from_pretrained('bigbird-base-uncased')
-    #model = AutoModelForPreTraining.from_pretrained('bart-base')
-    model = AutoModelForPreTraining.from_pretrained('convbert-base')
-    model = AutoModelForPreTraining.from_pretrained('distilbert-base-uncased')
+    #model = AutoModelForPreTraining.from_pretrained('roformer-chinese-small')
+    #model = AutoModelForPreTraining.from_pretrained('tinybert-4l-312d')
+
+    model = AutoModelForPreTraining.from_pretrained(
+        ('/Users/huhuiwen01/Untitled Folder/my_bert_model_for_pretraining'))
+
+    #3、lm_head test
+    #model = AutoModelWithLMHead.from_pretrained('nezha-base-chinese')
+    '''
+    MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
+        # Model with LM heads mapping
+        ("AlbertForMaskedLM", "albert"),
+        ("BartForConditionalGeneration", "bart"),
+        ("BigBirdPretrainingHeads", "bigbird"),
+        ("ConvBertClassificationHead", "convbert"),
+        ("DistilBertForMaskedLM", "distilbert"),
+        ("BertPretrainingHeads", "bert"),
+        ("ElectraClassificationHead", "electra"),
+        ("GPTLMHeadModel", "gpt"),
+        ("MPNetForMaskedLM", "mpnet"),
+        ("NeZhaPretrainingHeads", "nezha"),
+        ("RoFormerPretrainingHeads", "roformer"),
+        ("UNIMOLMHeadModel", "unimo"),
+    ])
+    '''
+    # albert-base-v1  bart-base  bert-base-uncased  bigbird-base-uncased  convbert-base  distilbert-base-uncased
+    # electra-small   ernie-1.0  ernie-doc-base-zh  ernie-gen-base-en  ernie-gram-zh  gpt-cpm-large-cn  mpnet-base
+    # nezha-base-chinese  roberta-wwm-ext  rbt3  roformer-chinese-small  skep_ernie_1.0_large_ch  tinybert-4l-312d
+    # unified_transformer-12L-cn plato-mini  unimo-text-1.0  xlnet-base-cased
+
+    # 4、masked lm test
+    #model = AutoModelForMaskedLM.from_pretrained('albert-base-v1')
+    #model = AutoModelForMaskedLM.from_pretrained('bart-base')
+
+    #5、sequence_classification test
+    #model = AutoModelForSequenceClassification.from_pretrained('rbt3')
+    #model = AutoModelForSequenceClassification.from_pretrained('roberta-wwm-ext')
+    #model = AutoModelForSequenceClassification.from_pretrained('roformer-chinese-small')
+
+    #model = AutoModelForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+    #6、multiple choice test
+    #model = AutoModelForMultipleChoice.from_pretrained('albert-base-v1')
+    #model = AutoModelForMultipleChoice.from_pretrained('nezha-base-chinese')
+
+    #7、QA test
+    #model = AutoModelForQuestionAnswering.from_pretrained('nezha-base-chinese')
+    #model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
+    #model = AutoModelForQuestionAnswering.from_pretrained('ernie-gram-zh')
+    print(model)
+
+    #8、token_classification test
+    #model = AutoModelForTokenClassification.from_pretrained('electra-small', num_classes = 2)
+    #model = AutoModelForTokenClassification.from_pretrained('rbt3')
+    #model = AutoModelForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
+    #model = AutoModelForTokenClassification.from_pretrained('plato-mini')
 '''
+    tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
     outputs = model(**inputs)
