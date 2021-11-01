@@ -17,6 +17,8 @@ import paddle.fluid.core as core
 import paddle.nn as nn
 from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
+from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
 
 __all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
 
@@ -53,6 +55,24 @@ def to_vocab_buffer(vocab_dict, name):
 
 
 class FasterTokenizer(nn.Layer):
+    name_map = {
+        "bert-base-uncased": BertTokenizer,
+        "bert-large-uncased": BertTokenizer,
+        "bert-base-cased": BertTokenizer,
+        "bert-large-cased": BertTokenizer,
+        "bert-base-multilingual-uncased": BertTokenizer,
+        "bert-base-multilingual-cased": BertTokenizer,
+        "bert-base-chinese": BertTokenizer,
+        "bert-wwm-chinese": BertTokenizer,
+        "bert-wwm-ext-chinese": BertTokenizer,
+        "ernie-1.0": ErnieTokenizer,
+        "ernie-2.0-en": ErnieTokenizer,
+        "roberta-wwm-ext": RobertaTokenizer,
+        "roberta-wwm-ext-large": RobertaTokenizer,
+        "rbt3": RobertaTokenizer,
+        "rbtl3": RobertaTokenizer,
+    }
+
     def __init__(self, vocab, do_lower_case=False, is_split_into_words=False):
         super(FasterTokenizer, self).__init__()
         vocab_buffer = to_vocab_buffer(vocab, "vocab")
@@ -103,3 +123,15 @@ class FasterTokenizer(nn.Layer):
                          'SegmentIds': seg_ids},
                 attrs=attrs)
         return input_ids, seg_ids
+
+    @classmethod
+    def from_pretrained(cls, name):
+        if name in cls.name_map:
+            tokenizer_cls = cls.name_map[name]
+            tokenizer = tokenizer_cls.from_pretrained(name)
+            faster_tokenizer = cls(tokenizer.vocab.token_to_idx,
+                                   tokenizer.do_lower_case)
+            return faster_tokenizer
+        else:
+            raise ValueError("Unknown name %s. Now %s surports  %s" %
+                             (name, cls.__name__, list(name_map.keys())))

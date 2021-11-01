@@ -35,6 +35,15 @@ from paddlenlp.experimental import FasterTokenizer
 __all__ = ['FasterPretrainedModel']
 
 
+def load_vocabulary(filepath):
+    token_to_idx = {}
+    with io.open(filepath, 'r', encoding='utf-8') as f:
+        for index, line in enumerate(f):
+            token = line.rstrip('\n')
+            token_to_idx[token] = int(index)
+    return token_to_idx
+
+
 class FasterPretrainedModel(PretrainedModel):
     def to_static(self, output_path):
         self.eval()
@@ -280,26 +289,6 @@ class FasterPretrainedModel(PretrainedModel):
 
     @staticmethod
     def load_vocabulary(filepath):
-        """
-        Instantiate an instance of `Vocab` from a file reserving all tokens
-        by using `Vocab.from_dict`. The file contains a token per line, and the
-        line number would be the index of corresponding token.
-
-        Args:
-            filepath (str): path of file to construct vocabulary.
-            unk_token (str): special token for unknown token. If no need, it also
-                could be `None`. Defaults to `None`.
-            pad_token (str): special token for padding token. If no need, it also
-                could be `None`. Defaults to `None`.
-            bos_token (str): special token for bos token. If no need, it also
-                could be `None`. Defaults to `None`.
-            eos_token (str): special token for eos token. If no need, it also
-                could be `None`. Defaults to `None`.
-            **kwargs (dict): keyword arguments for `Vocab.from_dict`.
-
-        Returns:
-            Vocab: An instance of `Vocab`.
-        """
         token_to_idx = {}
         with io.open(filepath, 'r', encoding='utf-8') as f:
             for index, line in enumerate(f):

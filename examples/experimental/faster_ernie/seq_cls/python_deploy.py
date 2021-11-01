@@ -53,9 +53,11 @@ class Predictor(object):
         model_file = os.path.join(model_dir, "inference.pdmodel")
         params_file = os.path.join(model_dir, "inference.pdiparams")
         if not os.path.exists(model_file):
-            raise ValueError("not find model file path {}".format(model_file))
+            raise ValueError("The model file {} is not found.".format(
+                model_file))
         if not os.path.exists(params_file):
-            raise ValueError("not find params file path {}".format(params_file))
+            raise ValueError("The params file {} is not found.".format(
+                params_file))
         config = paddle.inference.Config(model_file, params_file)
 
         if device == "gpu":
