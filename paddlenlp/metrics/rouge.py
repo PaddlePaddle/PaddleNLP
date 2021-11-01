@@ -121,16 +121,29 @@ class RougeL(paddle.metric.Metric):
 
         P_{LCS} & = \frac{LCS(C,S)}{len(C)}
 
-        F_{LCS} & = \frac{(1 + \gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \gamma^2{R_{LCS}}
+        F_{LCS} & = \frac{(1 + \gamma^2)R_{LCS}P_{LCS}}{R_{LCS}} + \gamma^2{R_{LCS}}
 
-    where `C` is the candidate sentence, and 'S' is the refrence sentence.
+    where `C` is the candidate sentence, and `S` is the reference sentence.
 
     Args:
-        gamma (float): A hyperparameter to decide the weight of recall. Default: 1.2.
-    
-    Examples:(TODO: liujiaqi)
-        1. Using as a general evaluation object.
-        2. Using as an instance of `paddle.metric.Metric`.
+        trans_func (callable, optional): `trans_func` transforms the network
+            output to string to calculate.
+        vocab (dict|paddlenlp.data.vocab, optional): Vocab for target language.
+            If `trans_func` is None and RougeL is used as `paddle.metric.Metric`
+            instance, `default_trans_func` will be performed and `vocab` must
+            be provided.
+        gamma (float): A hyperparameter to decide the weight of recall. Defaults to 1.2.
+        name (str, optional): Name of `paddle.metric.Metric` instance. Defaults to "rouge-l".
+
+    Examples:
+        .. code-block:: python
+
+            from paddlenlp.metrics import RougeL
+            rougel = RougeL()
+            cand = ["The","cat","The","cat","on","the","mat"]
+            ref_list = [["The","cat","is","on","the","mat"], ["There","is","a","cat","on","the","mat"]]
+            rougel.add_inst(cand, ref_list)
+            print(rougel.score()) # 0.7800511508951408
 
     '''
 
@@ -151,6 +164,15 @@ class RougeL(paddle.metric.Metric):
     def lcs(self, string, sub):
         """
         Calculate the length of longest common subsequence of string and sub.
+
+        Args:
+            string (str):
+                The string to be calculated, usually longer the sub string.
+            sub (str):
+                The sub string to be calculated.
+
+        Returns:
+            float: Returns the length of the longest common subsequence of string and sub.
         """
         if len(string) < len(sub):
             sub, string = string, sub
@@ -226,6 +248,10 @@ class RougeLForDuReader(RougeL):
     Rouge-L metric with bonus for DuReader contest.
 
     Please refer to `DuReader Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for more details.
+
+    Args:
+        alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest. Defaults to 1.0.
+        beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest. Defaults to 1.0.
     '''
 
     def __init__(self, alpha=1.0, beta=1.0, gamma=1.2):

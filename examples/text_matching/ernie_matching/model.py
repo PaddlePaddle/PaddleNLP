@@ -37,9 +37,8 @@ class PointwiseMatching(nn.Layer):
 
         cls_embedding = self.dropout(cls_embedding)
         logits = self.classifier(cls_embedding)
-        probs = F.softmax(logits)
 
-        return probs
+        return logits
 
 
 class PairwiseMatching(nn.Layer):
