@@ -42,17 +42,17 @@ usage = r"""
            nptag = Taskflow("noun_phrase_tagging")
            nptag("糖醋排骨")
            '''
-           [{'text': '糖醋排骨', 'cls_label': '菜品'}]
+           [{'text': '糖醋排骨', 'label': '菜品'}]
            '''
            nptag(["糖醋排骨", "红曲霉菌"])
            '''
-           [{'text': '糖醋排骨', 'cls_label': '菜品'}, {'text': '红曲霉菌', 'cls_label': '微生物'}]
+           [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
            '''
 
            nptag = Taskflow("noun_phrase_tagging", linking=True)
            nptag(["糖醋排骨", "红曲霉菌"])
            '''
-           [{'text': '糖醋排骨', 'cls_label': '菜品', 'category': '饮食类_菜品'}, {'text': '红曲霉菌', 'cls_label': '微生物', 'category': '生物类_微生物'}]
+           [{'text': '糖醋排骨', 'label': '菜品', 'category': '饮食类_菜品'}, {'text': '红曲霉菌', 'label': '微生物', 'category': '生物类_微生物'}]
            '''
          """
 
@@ -65,7 +65,7 @@ class NPTagTask(Task):
         task(string): The name of task.
         model(string): The model name in the task.
         batch_size(int): Numbers of examples a batch.
-        linking(bool): Returns the categories. The fine-grained labels (cls_label) will link with the coarse-grained labels (category).
+        linking(bool): Returns the categories. If `linking` is True, the fine-grained label (label) will link with the coarse-grained label (category).
     """
     def __init__(self,
                  task,
@@ -256,7 +256,7 @@ class NPTagTask(Task):
 
             result = {
                 'text': inputs['texts'][i],
-                'cls_label': cls_label,
+                'label': cls_label,
             }
 
             if cls_label not in self._name_dict:
@@ -267,13 +267,13 @@ class NPTagTask(Task):
                 for labels in labels_can:
                     cls_label_can = self._decode(labels[0])
                     if cls_label_can in self._name_dict:
-                        result['cls_label'] = cls_label_can
+                        result['label'] = cls_label_can
                         break
                     else:
                         labels_can = self._tree.search_similar_word(cls_label)
-                        result['cls_label'] = labels_can[0][0]
+                        result['label'] = labels_can[0][0]
 
             if self._linking:
-                result['category'] = self._name_dict[result['cls_label']]
+                result['category'] = self._name_dict[result['label']]
             results.append(result)
         return results

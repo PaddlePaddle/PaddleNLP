@@ -513,26 +513,30 @@ def levenstein_distance(s1: str, s2: str) -> int:
     Returns:
         int: the minimal distance.
     """
-    m, n = len(s1), len(s2)
-    dp = np.zeros(shape=(m + 1, n + 1), dtype=np.int16)
+    m, n = len(s1) + 1, len(s2) + 1
+    
+    # Initialize
+    dp = [[0] * n for i in range(m)]
+    dp[0][0] = 0
+    for i in range(1, m):
+        dp[i][0] = dp[i - 1][0] + 1
+    for j in range(1, n):
+        dp[0][j] = dp[0][j - 1] + 1
 
-    dp[:, 0] = np.arange(m + 1)
-    dp[0, :] = np.arange(n + 1)
-
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
+    for i in range(1, m):
+        for j in range(1, n):
             if s1[i - 1] != s2[j - 1]:
-                if len(s1) == 1 or len(s2) == 1:
-                    dp[i, j] = min(dp[i - 1, j], dp[i, j - 1]) + 1
-                else:
-                    dp[i, j] = min(dp[i - 1, j], dp[i, j - 1], dp[i - 1, j - 1]) + 1
+                dp[i][j] = min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1
             else:
-                dp[i, j] = dp[i - 1, j - 1]
-    return dp[m, n]
+                dp[i][j] = dp[i - 1][j - 1]
+    return dp[m - 1][n - 1]
 
 
 class BurkhardKellerNode(object):
-    """Node implementation.
+    """Node implementatation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
+
+    Args:
+        word (str): word of current node.
     """
 
     def __init__(self, word: str):
