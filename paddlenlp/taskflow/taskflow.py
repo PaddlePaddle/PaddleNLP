@@ -39,7 +39,11 @@ TASKS = {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
                 "linking": True,
-            }
+            },
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'knowledge_mining-nptag',
+            },
         },
         "default": {
             "model": "wordtag"
@@ -161,17 +165,6 @@ TASKS = {
         },
         "default": {
             "model": "csc-ernie-1.0"
-        }
-    },
-    "noun_phrase_tagging": {
-        "models": {
-            "nptag": {
-                "task_class": NPTagTask,
-                "task_flag": 'noun_phrase_tagging',
-            }
-        },
-        "default": {
-            "model": "nptag"
         }
     },
 }
