@@ -35,7 +35,7 @@ def parse_args():
     # yapf: disable
     parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain train.json and dev.json.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
-    parser.add_argument("--output_dir", default="./outpout", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--output_dir", default="./output", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
     parser.add_argument("--max_seq_len", default=64, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument("--learning_rate", default=1e-6, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
@@ -43,12 +43,11 @@ def parse_args():
     parser.add_argument("--save_steps", default=100, type=int, help="Save checkpoint every X updates steps.")
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for training.", )
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
-    parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
@@ -136,9 +135,8 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
     
-    warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
+                                         args.warmup_proportion)
 
     decay_params = [
         p.name for n, p in model.named_parameters()
@@ -152,7 +150,6 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params)
 
     logger.info("Total steps: %s" % num_training_steps)
-    logger.info("WarmUp steps: %s" % warmup)
 
     metric = NPTagAccuracy()
     criterion = paddle.nn.CrossEntropyLoss()
