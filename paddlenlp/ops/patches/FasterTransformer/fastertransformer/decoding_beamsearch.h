@@ -490,16 +490,6 @@ public:
         from_id = layer & 0x1;
         out_id = 1 - from_id;
 
-        {
-          int dim = args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;
-          float *data = new float[dim];
-
-          cudaMemcpy(data,
-                     from_tensor_[0],
-                     sizeof(float) * dim,
-                     cudaMemcpyDeviceToHost);
-        }
-
         /*
           We use one decoder_ object to process multiple decoder layers.
 
@@ -532,8 +522,8 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
       }
-      float alpha = (float)1.0f;
-      float beta = (float)0.0f;
+      DataType_ alpha = (DataType_)1.0f;
+      DataType_ beta = (DataType_)0.0f;
 
       if (args_.normalization_before_) {
         layer_norm(from_tensor_[out_id],
@@ -607,8 +597,8 @@ public:
 #endif
 
       // Beamsearch
-      if (is_fuse_topk_softMax_ == true) {
-        if (keep_alive_beam_ == true) {
+      if (is_fuse_topk_softMax_) {
+        if (keep_alive_beam_) {
           // Use separated alive and finish beam queues to avoid the decrease of
           // alive beams.
           /*
