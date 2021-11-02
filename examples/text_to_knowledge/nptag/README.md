@@ -25,7 +25,7 @@ nptag/
 
 #### 数据准备
 
-我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
+执行以下命令，下载并解压示例数据集：
 
 ```bash
 wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/nptag_dataset.tar.gz && tar -zxvf nptag_dataset.tar.gz

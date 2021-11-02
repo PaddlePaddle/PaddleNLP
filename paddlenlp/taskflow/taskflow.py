@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask
+from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
