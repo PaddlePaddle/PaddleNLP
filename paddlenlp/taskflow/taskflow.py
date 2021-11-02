@@ -28,7 +28,6 @@ from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
-from .noun_phrase_tagging import NPTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
