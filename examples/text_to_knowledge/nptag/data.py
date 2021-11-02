@@ -22,6 +22,29 @@ def convert_example(example,
                     max_seq_len=512,
                     max_cls_len=5,
                     summary_num=2):
+    """
+    Builds model inputs from a sequence for noun phrase classification task.
+    A prompt template is added to the end of the sequence.
+
+    Prompt template:
+
+    - ``[是] + [MASK] * max_cls_len``
+
+    Model input example:
+
+    - ``[CLS0][CLS1] X [是][MASK]...[MASK][SEP]``
+    
+        where X is the input text.
+
+    Args:
+        example(obj:`list[str]`): List of input data, containing text and label if it have label.
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+            Sequences longer than this will be truncated, sequences shorter will be padded.
+        max_cls_len(obj:`int`): The maximum length of labels.
+        summary_num(obj:`int`): The number of summary tokens, e.g. `[CLS0]` and `[CLS1]`. 
+    """
 
     if len(example["text"]) + max_cls_len + 1 + summary_num + 1 > max_seq_len:
         example["text"] = example["text"][:(max_seq_len - (max_cls_len + 1 + summary_num + 1))]
@@ -71,7 +94,7 @@ def create_dataloader(dataset,
 
 
 def read_custom_data(filename):
-    """Reads data."""
+    """Reads data"""
     with open(filename, 'r', encoding='utf-8') as f:
         for line in f:
             text, label = line.strip().split('\t')
@@ -79,6 +102,7 @@ def read_custom_data(filename):
 
 
 def load_dict(dict_path):
+    """Loads label to dict"""
     vocab = {}
     i = 0
     with open(dict_path, 'r', encoding='utf-8') as f:

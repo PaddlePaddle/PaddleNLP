@@ -155,7 +155,6 @@ def do_train(args):
     logger.info("WarmUp steps: %s" % warmup)
 
     metric = NPTagAccuracy()
-    #metric = paddle.metric.Accuracy()
     criterion = paddle.nn.CrossEntropyLoss()
 
     global_step = 0
