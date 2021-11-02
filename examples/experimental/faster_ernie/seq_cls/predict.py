@@ -56,7 +56,10 @@ if __name__ == "__main__":
     data = [example["text"] for example in test_ds]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = FasterErnieForSequenceClassification.from_pretrained(args.save_path)
+    model = FasterErnieForSequenceClassification.from_pretrained(
+        args.save_path,
+        num_classes=len(test_ds.label_list),
+        max_seq_len=args.max_seq_length)
     results = predict(model, data, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Lable: {}'.format(text, results[idx]))
