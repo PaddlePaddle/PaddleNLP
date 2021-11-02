@@ -128,6 +128,11 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
 
+    if (decoding_strategy == "beam_search") {
+      params[i].request_batch_size = batch_size_ * beam_width_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    }
+
     // self attn
     params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
         self_layernorm_weight[i].data<data_t_>());
@@ -225,19 +230,10 @@ std::vector<paddle::Tensor> decoding_kernel(
   // for weight sharing matmul
   decoding_params.embedding_kernel =
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
-  // NOTE: the data type of the embedding bias for logits is different
-  // between decoding with beam search and top-k/top-p sampling in
-  // FasterTransformer when using float16.
-  if ("beam_search" == decoding_strategy ||
-      "beam_search_v2" == decoding_strategy) {
-    // for matmul bias
-    decoding_params.embedding_bias =
-        reinterpret_cast<const float*>(embedding_bias.data<float>());
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
-    decoding_params.embedding_bias_T =
-        reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
-  }
+  // for matmul bias
+  decoding_params.embedding_bias =
+      reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
+
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
 
@@ -277,8 +273,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true,  // is_fuse_topk_softMax_
-        true,  // keep_alive_beam_
+        true,   // is_fuse_topk_softMax
+        false,  // is_fuse_qkv
+        true,   // keep_alive_beam
         alpha);
 
     decoding_beam_search_->forward(params, decoding_params);
@@ -286,25 +283,25 @@ std::vector<paddle::Tensor> decoding_kernel(
     delete decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy) {
-    DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
-    decoding_sampling_ =
-        new DecodingSampling<DecodingTraits_::OpType>(allocator_,
-                                                      batch_size_,
-                                                      max_seq_len_,
-                                                      head_num_,
-                                                      size_per_head_,
-                                                      vocab_size,
-                                                      num_layer_,
-                                                      memory_hidden_dim,
-                                                      memory_max_seq_len,
-                                                      start_id_,
-                                                      end_id_,
-                                                      candidate_num_,
-                                                      probability_threshold_);
+    // DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
+    // decoding_sampling_ =
+    //     new DecodingSampling<DecodingTraits_::OpType>(allocator_,
+    //                                                   batch_size_,
+    //                                                   max_seq_len_,
+    //                                                   head_num_,
+    //                                                   size_per_head_,
+    //                                                   vocab_size,
+    //                                                   num_layer_,
+    //                                                   memory_hidden_dim,
+    //                                                   memory_max_seq_len,
+    //                                                   start_id_,
+    //                                                   end_id_,
+    //                                                   candidate_num_,
+    //                                                   probability_threshold_);
 
-    decoding_sampling_->forward(params, decoding_params);
+    // decoding_sampling_->forward(params, decoding_params);
 
-    delete decoding_sampling_;
+    // delete decoding_sampling_;
   } else {
     PD_THROW(
         "Only beam_search, topk_sampling and topp_sampling are supported for "

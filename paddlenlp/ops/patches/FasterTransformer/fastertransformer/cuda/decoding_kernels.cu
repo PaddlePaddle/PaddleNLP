@@ -18,13 +18,13 @@
 namespace fastertransformer {
 
 template <typename T, bool ALIVE = false>
-__global__ void init_kernel(bool* finished,
-                            int* sequence_length,
-                            int* word_ids,
-                            T* cum_log_probs,
-                            const int sentence_id,
-                            const int beam_width,
-                            const int batch_size) {
+__global__ void init_kernel_v2(bool* finished,
+                               int* sequence_length,
+                               int* word_ids,
+                               T* cum_log_probs,
+                               const int sentence_id,
+                               const int beam_width,
+                               const int batch_size) {
   const bool IS_FP16 = std::is_same<T, half>::value;
   const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : 1e20f;
   for (int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,13 +55,13 @@ void init_kernelLauncher_v2(bool* finished,
   dim3 grid((int)ceil(batch_size * beam_width * 1.0 / 256));
   dim3 block(256);
 
-  init_kernel<T, true><<<grid, block, 0, stream>>>(finished,
-                                                   sequence_length,
-                                                   word_ids,
-                                                   cum_log_probs,
-                                                   sentence_id,
-                                                   beam_width,
-                                                   batch_size);
+  init_kernel_v2<T, true><<<grid, block, 0, stream>>>(finished,
+                                                      sequence_length,
+                                                      word_ids,
+                                                      cum_log_probs,
+                                                      sentence_id,
+                                                      beam_width,
+                                                      batch_size);
 }
 
 template <typename T>

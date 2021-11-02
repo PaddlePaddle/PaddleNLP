@@ -21,11 +21,11 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include "fastertransformer/allocator.h"
-#include "fastertransformer/arguments.h"
-#include "fastertransformer/common.h"
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
+#include "fastertransformer/utils/allocator.h"
+#include "fastertransformer/utils/arguments.h"
+#include "fastertransformer/utils/common.h"
 
 namespace fastertransformer {
 

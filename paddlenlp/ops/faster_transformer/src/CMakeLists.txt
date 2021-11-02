@@ -1,4 +1,4 @@
-add_definitions(-DNDEBUG)
+#add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
 # Default is 1 in standard c++ when using gcc8.2
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
@@ -258,7 +258,7 @@ else(ON_INFER)
   endif()
 
   set(ft_lib_link
-    -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch
+    -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lnccl_utils -lnvtx_utils
   )
 
   add_definitions(-DPADDLE_WITH_CUDA)

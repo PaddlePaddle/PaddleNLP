@@ -473,8 +473,7 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
-            if not decoding_strategy.startswith("beam_search"):
-                linear.bias = transfer_param(linear.bias)
+            linear.bias = transfer_param(linear.bias)
 
             positional_embedding.weight = transfer_param(
                 positional_embedding.weight)

@@ -36,13 +36,15 @@ void update_logits_v2(float* logits,
                       cudaStream_t stream);
 
 // Encoder kernels
-template <typename T>
-void add_bias_input_kernelLauncher(T* out,
-                                   const T* input_tensor,
-                                   const T* bias,
-                                   int m,
-                                   int n,
-                                   cudaStream_t stream);
+#ifdef WITH_ENCODER
+// NOTE: Remove or replace this function.
+// template <typename T>
+// void add_bias_input_kernelLauncher(T* out,
+//                                    const T* input_tensor,
+//                                    const T* bias,
+//                                    int m,
+//                                    int n,
+//                                    cudaStream_t stream);
 
 template <typename T>
 void layernorm_kernelLauncher(T* out,
@@ -63,6 +65,7 @@ void add_bias_input_pre_layernorm_kernelLauncher(T* out,
                                                  int n,
                                                  cudaStream_t stream);
 // End of encoder kernels
+#endif
 
 template <typename T>
 void add_bias_act_kernelLauncher(

@@ -20,15 +20,15 @@ namespace fastertransformer {
 template <typename T>
 void topK_softMax_update(
     const T* log_probs,
-    const float* bias,  // NOTE: bias is float in V3.1
+    const T* bias,  // NOTE: bias is float in V3.1
     bool* finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
     int* output_word_ids,
-    int* output_parent_ids,   // for gather tree, include both alive and finish
-                              // beams
-    T* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    int* output_parent_ids,  // for gather tree, include both alive and finish
+                             // beams
+    float* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
     void* temp_storage,
     const int step,
     DecodingBeamsearchArguments args,
@@ -44,9 +44,9 @@ void topK_update_kernelLauncher(
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
     int* output_word_ids,
-    int* output_parent_ids,   // for gather tree, include both alive and finish
-                              // beams
-    T* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    int* output_parent_ids,  // for gather tree, include both alive and finish
+                             // beams
+    float* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
     const int step,
     DecodingBeamsearchArguments args,
     cudaStream_t stream);

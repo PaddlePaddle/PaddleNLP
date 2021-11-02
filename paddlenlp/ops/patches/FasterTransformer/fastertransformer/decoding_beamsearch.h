@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include "fastertransformer/allocator.h"
-#include "fastertransformer/arguments.h"
-#include "fastertransformer/common.h"
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
+#include "fastertransformer/utils/allocator.h"
+#include "fastertransformer/utils/arguments.h"
+#include "fastertransformer/utils/common.h"
+#include "fastertransformer/utils/functions.h"
 
 namespace fastertransformer {
 
@@ -41,7 +42,7 @@ private:
   const cudaDataType_t AType_ = Traits_::AType;
   const cudaDataType_t BType_ = Traits_::BType;
   const cudaDataType_t CType_ = Traits_::CType;
-  int cublasAlgo_[1] = {20};
+  std::map<std::string, cublasLtMatmulAlgo_info> cublasAlgoMap_;
 
   OpenDecoder<OpType_> *decoder_;
   DataType_ **K_cache_;
@@ -67,6 +68,11 @@ private:
 
   void *topK_kernel_workspace = nullptr;
   size_t topk_workspace_size_ = 0;
+  void *cublas_workspace_ = nullptr;
+
+  DataType_ *padded_embedding_kernel;
+  DataType_ *padded_embedding_bias;
+  DataType_ *tmp_logits_buf_;
 
 public:
   DecodingBeamsearch(const IAllocator &allocator,
@@ -83,6 +89,7 @@ public:
                      const int end_id,
                      const float beam_search_diversity_rate = -0.0f,
                      const bool is_fuse_topk_softMax = false,
+                     const bool is_fuse_qkv = false,
                      const bool keep_alive_beam = false,
                      const float alpha = 0.6,
                      const bool normalization_before = true,
@@ -105,6 +112,13 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
+    if (args_.beam_width_ > 16) is_fuse_topk_softMax_ = false;
+    args_.vocab_size_ = vocab_size;
+    if (std::is_same<DataType_, float>::value)
+      args_.vocab_size_padded_ = vocab_size;
+    else if (std::is_same<DataType_, half>::value)
+      args_.vocab_size_padded_ = (int)(ceil(vocab_size / 8.)) * 8;
+
     args_.alpha_ = alpha;
     args_.normalization_before_ = normalization_before;
     args_.pos_offset_ = pos_offset;
@@ -118,38 +132,57 @@ public:
 
     K_mem_cache_ = new DataType_ *[args_.decoder_layers_];
     V_mem_cache_ = new DataType_ *[args_.decoder_layers_];
-    decoder_ = new OpenDecoder<OpType_>(batch_size * beam_width,
-                                        memory_max_seq_len,
-                                        head_num,
+
+    decoder_ = new OpenDecoder<OpType_>(head_num,
                                         size_per_head,
                                         memory_hidden_units,
+                                        is_fuse_qkv,
                                         normalization_before,
                                         args_.act_);
+    decoder_->set_max_batch_size(batch_size * beam_width);
 
-    int from_tensor_size =
+    size_t from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
-    int decoder_workspace_size = decoder_->getWorkspaceSize();        // type T
-    int decoder_normed_result_buffer_size =
+    size_t decoder_workspace_size = decoder_->getWorkspaceSize();     // type T
+    size_t decoder_normed_result_buffer_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
-    int cache_size = args_.batch_size_ * args_.beam_width_ * args_.seq_len_ *
-                     args_.hidden_units_;  // type T
-    int mem_cache_size = args_.batch_size_ * args_.beam_width_ *
-                         memory_max_seq_len * args_.hidden_units_;  // type T
+    size_t cache_size = args_.batch_size_ * args_.beam_width_ * args_.seq_len_ *
+                        args_.hidden_units_;  // type T
+    size_t mem_cache_size = args_.batch_size_ * args_.beam_width_ *
+                            memory_max_seq_len * args_.hidden_units_;  // type T
 
-    int logits_buf_size = args_.batch_size_ * args_.beam_width_ *
-                          args_.vocab_size_;                       // type float
-    int cum_log_buf_size = args_.batch_size_ * args_.beam_width_;  // type float
-    int word_ids_buf_size = args_.batch_size_ * args_.beam_width_;  // type int
-    int parent_ids_buf_size =
-        keep_alive_beam_ ? word_ids_buf_size : 0;                   // type int
-    int finished_buf_size = args_.batch_size_ * args_.beam_width_;  // type bool
-    int finished_count_size = (int)(ceil(1 / 32.)) * 32;            // type int
+    size_t logits_buf_size = args_.batch_size_ * args_.beam_width_ *
+                             args_.vocab_size_padded_;  // type float
+    size_t cum_log_buf_size =
+        args_.batch_size_ * args_.beam_width_;  // type float
+    size_t word_ids_buf_size =
+        args_.batch_size_ * args_.beam_width_;  // type int
+    size_t parent_ids_buf_size =
+        keep_alive_beam_ ? word_ids_buf_size : 0;  // type int
+    size_t finished_buf_size =
+        args_.batch_size_ * args_.beam_width_;                  // type bool
+    size_t finished_count_size = (size_t)(ceil(1 / 32.)) * 32;  // type int
 
-    int storage_size_per_beam =
+    size_t storage_size_per_beam =
         2 * args_.beam_width_ +
         SMALL_TOP_K_SOFTMAX_MAX_VOC_PARTS * (2 * MAX_K + 2);
     args_.temp_storage_size_ = args_.batch_size_ * args_.beam_width_ *
                                storage_size_per_beam;  // type float
+    args_.temp_storage_size_ = (size_t)(
+        ceil(args_.batch_size_ * args_.beam_width_ * args_.beam_width_ / 4.) *
+            4 * 2 +
+        ceil(args_.batch_size_ * args_.beam_width_ *
+             SMALL_TOP_K_SOFTMAX_MAX_VOC_PARTS * (2 * MAX_K + 2) / 4.) *
+            4);
+    size_t padded_embedding_kernel_size =
+        args_.hidden_units_ * args_.vocab_size_padded_;
+    size_t padded_embedding_bias_size = args_.vocab_size_padded_;
+    if (std::is_same<DataType_, float>::value ||
+        (std::is_same<DataType_, half>::value &&
+         args_.vocab_size_padded_ == args_.vocab_size_)) {
+      padded_embedding_kernel_size = 0;
+      padded_embedding_bias_size = 0;
+    }
 
     // When using separated alive and finish beam queues, some buffers size need
     // to be doubled to restore beam search intermedia results of both alive and
@@ -173,14 +206,15 @@ public:
     }
 
     // prevent memory misalinged address
-    logits_buf_size = (int)(ceil(logits_buf_size / 4.)) * 4;
-    cum_log_buf_size = (int)(ceil(cum_log_buf_size / 4.)) * 4;
-    word_ids_buf_size = (int)(ceil(word_ids_buf_size / 4.)) * 4;
-    parent_ids_buf_size = (int)(ceil(parent_ids_buf_size / 4.)) * 4;
-    finished_buf_size = (int)(ceil(finished_buf_size / 32.)) * 32;
-    args_.temp_storage_size_ = (int)(ceil(args_.temp_storage_size_ / 4.)) * 4;
+    logits_buf_size = (size_t)(ceil(logits_buf_size / 4.)) * 4;
+    cum_log_buf_size = (size_t)(ceil(cum_log_buf_size / 4.)) * 4;
+    word_ids_buf_size = (size_t)(ceil(word_ids_buf_size / 4.)) * 4;
+    parent_ids_buf_size = (size_t)(ceil(parent_ids_buf_size / 4.)) * 4;
+    finished_buf_size = (size_t)(ceil(finished_buf_size / 32.)) * 32;
+    const size_t tmp_logits_buf_size = logits_buf_size;
+
     // get workspace size of topk kernel
-    if (keep_alive_beam_ == true)
+    if (keep_alive_beam_ == true) {
       topK_update_kernelLauncher(topK_kernel_workspace,
                                  topk_workspace_size_,
                                  logits_buf_,
@@ -194,27 +228,40 @@ public:
                                  0,
                                  args_,
                                  0);
-    else
+    } else {
       topK_kernelLauncher(topK_kernel_workspace,
                           topk_workspace_size_,
                           logits_buf_,
                           word_ids_buf_,
+                          finished_buf_,
                           args_,
                           0);
-    int datatype_buf_size =
+    }
+    size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
         (cache_size * 4 + mem_cache_size * 2) * args_.decoder_layers_ +
         decoder_normed_result_buffer_size;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
+        ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
         sizeof(DataType_) * datatype_buf_size +
         sizeof(float) * (logits_buf_size + cum_log_buf_size) +
+        sizeof(DataType_) * tmp_logits_buf_size +
+        sizeof(DataType_) * padded_embedding_kernel_size +
+        sizeof(float) * padded_embedding_bias_size +
         sizeof(int) * (word_ids_buf_size + parent_ids_buf_size) +
         sizeof(bool) * finished_buf_size + topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
         sizeof(int) * finished_count_size));
 
-    from_tensor_[0] = (DataType_ *)buf_;
+    if (sizeof(DataType_) == sizeof(half)) {
+      cublas_workspace_ = buf_;
+      from_tensor_[0] =
+          (DataType_ *)((char *)cublas_workspace_ + CUBLAS_WORKSPACE_SIZE);
+    } else {
+      cublas_workspace_ = nullptr;
+      from_tensor_[0] = (DataType_ *)(buf_);
+    }
     from_tensor_[1] = (DataType_ *)(from_tensor_[0] + from_tensor_size);
 
     for (int i = 0; i < args_.decoder_layers_; ++i) {
@@ -223,16 +270,26 @@ public:
       V_mem_cache_[i] = from_tensor_[1] + from_tensor_size +
                         i * mem_cache_size * 2 + mem_cache_size;
     }
-    /* We use two-way buffer since we have to update KV buf at the end of each
-     * step. */
-    K_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
-                  0 * cache_size * args_.decoder_layers_;
-    K_cache_[1] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
-                  1 * cache_size * args_.decoder_layers_;
-    V_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
-                  2 * cache_size * args_.decoder_layers_;
-    V_cache_[1] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
-                  3 * cache_size * args_.decoder_layers_;
+    if (args_.beam_width_ > 1) {
+      /* We use two-way buffer since we have to update KV buf at the end of each
+       * step. */
+      K_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    0 * cache_size * args_.decoder_layers_;
+      K_cache_[1] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    1 * cache_size * args_.decoder_layers_;
+      V_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    2 * cache_size * args_.decoder_layers_;
+      V_cache_[1] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    3 * cache_size * args_.decoder_layers_;
+    } else {
+      // if beam width is 1, we only need one buffer
+      K_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    0 * cache_size * args_.decoder_layers_;
+      K_cache_[1] = K_cache_[0];
+      V_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
+                    2 * cache_size * args_.decoder_layers_;
+      V_cache_[1] = V_cache_[0];
+    }
 
     decoder_buf_ = V_cache_[1] + cache_size * args_.decoder_layers_;
     decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
@@ -247,40 +304,42 @@ public:
     temp_storage_ = (float *)(finished_buf_ + finished_buf_size);
     finished_count_buf_ = (int *)(temp_storage_ + args_.temp_storage_size_);
     topK_kernel_workspace = (void *)(finished_count_buf_ + finished_count_size);
+    padded_embedding_kernel =
+        (DataType_ *)((char *)topK_kernel_workspace + topk_workspace_size_);
+    padded_embedding_bias =
+        (DataType_ *)(padded_embedding_kernel + padded_embedding_kernel_size);
+    tmp_logits_buf_ =
+        (DataType_ *)(padded_embedding_bias + padded_embedding_bias_size);
 
     h_finished_buf_ = new bool[finished_buf_size];
 
-    FILE *fd = fopen("decoding_gemm_config.in", "r");
-    int err = 0;
-    if (fd == NULL)
+    int isConfigExist = access("decoding_gemm_config.in", 0);
+    if (isConfigExist == -1) {
       printf("[WARNING] decoding_gemm_config.in is not found\n");
-    else {
-      err = fscanf(fd, "%d", &cublasAlgo_[0]);
-      fclose(fd);
-    }
-    if (err != 1) {
-      if (Traits_::OpType == OperationType::FP32) {
-        cublasAlgo_[0] = CUBLAS_GEMM_DEFAULT;
-      } else {
-        cublasAlgo_[0] = CUBLAS_GEMM_DEFAULT_TENSOR_OP;
-      }
     } else {
+      readAlgoFromConfig(cublasAlgoMap_, 1);
       // check that the gemm_config setting is runnable
-      if (Traits_::OpType == OperationType::FP32) {
-        if (cublasAlgo_[0] > CUBLAS_GEMM_ALGO23 ||
-            cublasAlgo_[0] < CUBLAS_GEMM_DEFAULT) {
-          // the algorithm is not for FP32
-          printf("[ERROR] cuBLAS Algorithm %d is not used in FP32. \n",
-                 (int)cublasAlgo_[0]);
-          exit(-1);
-        }
-      } else {
-        if (cublasAlgo_[0] > CUBLAS_GEMM_ALGO15_TENSOR_OP ||
-            cublasAlgo_[0] < CUBLAS_GEMM_DEFAULT_TENSOR_OP) {
-          // the algorithm is not for FP16
-          printf("[ERROR] cuBLAS Algorithm %d is not used in FP16. \n",
-                 (int)cublasAlgo_[0]);
-          exit(-1);
+      for (auto iter = cublasAlgoMap_.begin(); iter != cublasAlgoMap_.end();
+           iter++) {
+        int algoId = iter->second.algoId;
+        int stages = iter->second.stages;
+        // only check for cublas
+        if (stages != -1) continue;
+        if (Traits_::OpType == OperationType::FP32) {
+          if (algoId > CUBLAS_GEMM_ALGO23 || algoId < CUBLAS_GEMM_DEFAULT) {
+            // the algorithm is not for FP32
+            printf("[ERROR] cuBLAS Algorithm %d is not used in FP32. \n",
+                   algoId);
+            exit(-1);
+          }
+        } else {
+          if (algoId > CUBLAS_GEMM_ALGO15_TENSOR_OP ||
+              algoId < CUBLAS_GEMM_DEFAULT_TENSOR_OP) {
+            // the algorithm is not for FP16
+            printf("[ERROR] cuBLAS Algorithm %d is not used in FP16. \n",
+                   algoId);
+            exit(-1);
+          }
         }
       }
     }
@@ -293,7 +352,9 @@ public:
 #endif
     const int m = args_.batch_size_ * args_.beam_width_;
     const int k = args_.hidden_units_;
-    const int n = args_.vocab_size_;
+    const int n = args_.vocab_size_padded_;
+    const DataType_ *embedding_kernel_ptr = nullptr;
+    const DataType_ *embedding_bias_ptr = nullptr;
 
     /*
       sequence_length initialize to 0
@@ -338,9 +399,43 @@ public:
 //                   start_id_, batch_size_, beam_width_,
 //                   decoding_params.stream);
 #endif
+
+    if (std::is_same<DataType_, float>::value ||
+        (std::is_same<DataType_, half>::value &&
+         args_.vocab_size_padded_ == args_.vocab_size_)) {
+      embedding_kernel_ptr =
+          (const DataType_ *)decoding_params.embedding_kernel;
+      embedding_bias_ptr = (const DataType_ *)decoding_params.embedding_bias;
+    } else if (std::is_same<DataType_, half>::value) {
+      kernel_padding_kernelLauncher(padded_embedding_kernel,
+                                    decoding_params.embedding_kernel,
+                                    args_.hidden_units_,
+                                    args_.vocab_size_,
+                                    args_.vocab_size_padded_,
+                                    decoding_params.stream);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      bias_padding_kernelLauncher(padded_embedding_bias,
+                                  decoding_params.embedding_bias,
+                                  args_.vocab_size_,
+                                  args_.vocab_size_padded_,
+                                  decoding_params.stream);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+      embedding_kernel_ptr = padded_embedding_kernel;
+      embedding_bias_ptr = padded_embedding_bias;
+    }
+
     int cache_size = m * args_.seq_len_ * args_.hidden_units_;  // type T
 
-    for (int step = 1; step <= args_.seq_len_; ++step) {
+    for (uint step = 1; step <= args_.seq_len_; ++step) {
       // we use two-way buffer
       int kv_cache_id = step & 0x1;
       if (args_.normalization_before_) {
@@ -355,6 +450,7 @@ public:
             decoding_params.stream);
       } else {
         // TODO(gongenlei): Only support Bart temporarily.
+        /*
         embedding_position_lookups_bart_kernel_launcher(
             embedding_buf_,
             decoding_params.embedding_table,
@@ -376,6 +472,7 @@ public:
                                 from_tensor_[0],
                                 m,
                                 k);
+        */
       }
 
 #ifndef NDEBUG
@@ -393,6 +490,16 @@ public:
         from_id = layer & 0x1;
         out_id = 1 - from_id;
 
+        {
+          int dim = args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;
+          float *data = new float[dim];
+
+          cudaMemcpy(data,
+                     from_tensor_[0],
+                     sizeof(float) * dim,
+                     cudaMemcpyDeviceToHost);
+        }
+
         /*
           We use one decoder_ object to process multiple decoder layers.
 
@@ -401,7 +508,7 @@ public:
           with corresponding weights and decoder_buf_.
           The decoder_buf_ is reused.
         */
-        decoder_->initialize(param[layer], decoder_buf_);
+        decoder_->initialize(param[layer], decoder_buf_, cublas_workspace_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -416,7 +523,9 @@ public:
                           decoding_params.memory_sequence_length,
                           from_tensor_[out_id],
                           step,
-                          true);
+                          args_.seq_len_,
+                          true, /* is_cross_attention */
+                          finished_buf_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -427,43 +536,43 @@ public:
       float beta = (float)0.0f;
 
       if (args_.normalization_before_) {
-        decoder_->decoder_norm1(from_tensor_[out_id],
-                                decoding_params.layernorm.gamma,
-                                decoding_params.layernorm.beta,
-                                decoder_normed_result_buf_,
-                                m,
-                                k);
+        layer_norm(from_tensor_[out_id],
+                   decoding_params.layernorm.gamma,
+                   decoding_params.layernorm.beta,
+                   decoder_normed_result_buf_,
+                   m,
+                   k,
+                   decoding_params.stream);
+
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
 
+        cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                            decoding_params.cublas_handle,
+                                            CUBLAS_OP_N,
+                                            CUBLAS_OP_N,
+                                            n,
+                                            m,
+                                            k,
+                                            &alpha,
+                                            embedding_kernel_ptr,
+                                            AType_,
+                                            n,
+                                            decoder_normed_result_buf_,
+                                            BType_,
+                                            k,
+                                            &beta,
+                                            tmp_logits_buf_,
+                                            CType_,
+                                            n,
+                                            decoding_params.stream,
+                                            cublasAlgoMap_,
+                                            cublas_workspace_);
 
-        check_cuda_error(
-            cublasGemmEx(decoding_params.cublas_handle,
-                         CUBLAS_OP_N,
-                         CUBLAS_OP_N,
-                         n,
-                         m,
-                         k,
-                         &alpha,
-                         decoding_params.embedding_kernel,
-                         AType_,
-                         n,
-                         decoder_normed_result_buf_,
-                         BType_,
-                         k,
-                         &beta,
-                         logits_buf_,
-                         CUDA_R_32F,
-                         n,
-#ifdef CUDA11_MODE
-                         CUBLAS_COMPUTE_32F_PEDANTIC,
-#else
-                         CUDA_R_32F,
-#endif
-                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
       } else {
+        /*
         // Post-norm
         check_cuda_error(
             cublasGemmEx(decoding_params.cublas_handle,
@@ -489,6 +598,7 @@ public:
                          CUDA_R_32F,
 #endif
                          static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+        */
       }
 
 #ifndef NDEBUG
@@ -501,8 +611,9 @@ public:
         if (keep_alive_beam_ == true) {
           // Use separated alive and finish beam queues to avoid the decrease of
           // alive beams.
-          topK_softMax_update(logits_buf_,
-                              decoding_params.embedding_bias,
+          /*
+          topK_softMax_update(tmp_logits_buf_,
+                              embedding_bias_ptr,
                               finished_buf_,
                               decoding_params.sequence_length,
                               word_ids_buf_,
@@ -514,9 +625,10 @@ public:
                               step,
                               args_,
                               decoding_params.stream);
+          */
         } else {
-          topK_softMax(logits_buf_,
-                       decoding_params.embedding_bias,
+          topK_softMax(tmp_logits_buf_,
+                       embedding_bias_ptr,
                        finished_buf_,
                        cum_log_buf_,
                        word_ids_buf_,
@@ -544,6 +656,7 @@ public:
 
       } else {
         if (keep_alive_beam_ == true) {
+          /*
           update_logits_v2(logits_buf_,
                            decoding_params.embedding_bias,
                            args_.end_id_,
@@ -568,9 +681,11 @@ public:
               step,
               args_,
               decoding_params.stream);
+          */
         } else {
           update_logits(logits_buf_,
-                        decoding_params.embedding_bias,
+                        tmp_logits_buf_,
+                        embedding_bias_ptr,
                         args_.end_id_,
                         finished_buf_,
                         m,
@@ -595,7 +710,7 @@ public:
                                    cum_log_buf_,
                                    args_.batch_size_,
                                    args_.beam_width_,
-                                   args_.vocab_size_,
+                                   args_.vocab_size_padded_,
                                    decoding_params.stream);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -615,6 +730,7 @@ public:
                               topk_workspace_size_,
                               logits_buf_,
                               word_ids_buf_,
+                              finished_buf_,
                               args_,
                               decoding_params.stream);
 #ifndef NDEBUG
@@ -630,7 +746,7 @@ public:
                                 decoding_params.output_ids + (step - 1) * m,
                                 args_.batch_size_,
                                 args_.beam_width_,
-                                args_.vocab_size_,
+                                args_.vocab_size_padded_,
                                 decoding_params.stream,
                                 args_.end_id_,
                                 finished_count_buf_);
@@ -642,18 +758,27 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      update_KV_cache_kernelLauncher(
-          K_cache_,
-          V_cache_,
-          keep_alive_beam_ ? parent_ids_buf_
-                           : decoding_params.parent_ids + (step - 1) * m,
-          args_.batch_size_,
-          args_.beam_width_,
-          args_.hidden_units_,
-          step,
-          cache_size,
-          args_.decoder_layers_,
-          decoding_params.stream);
+      if (args_.beam_width_ > 1) {
+        // chose which self cache to use
+        int decoder_max_seq_len =
+            (decoder_->getCacheFormat() != 0) ? args_.seq_len_ : -1;
+
+        update_KV_cache_kernelLauncher(
+            K_cache_,
+            V_cache_,
+            keep_alive_beam_ ? parent_ids_buf_
+                             : decoding_params.parent_ids + (step - 1) * m,
+            finished_buf_,
+            args_.batch_size_,
+            args_.beam_width_,
+            args_.head_num_,
+            args_.size_per_head_,
+            step,
+            decoder_max_seq_len,
+            cache_size,
+            args_.decoder_layers_,
+            decoding_params.stream);
+      }
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());

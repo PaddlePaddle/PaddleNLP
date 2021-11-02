@@ -21,21 +21,21 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include "fastertransformer/allocator.h"
-#include "fastertransformer/arguments.h"
-#include "fastertransformer/common.h"
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
+#include "fastertransformer/utils/allocator.h"
+#include "fastertransformer/utils/arguments.h"
+#include "fastertransformer/utils/common.h"
 
 namespace fastertransformer {
 
 template <OperationType OpType_>
-class DecodingSampling {
+class TransformerSampling {
 private:
   typedef DecoderTransformerTraits<OpType_> Traits_;
   typedef typename Traits_::DataType DataType_;
   const IAllocator &allocator_;
-  struct DecodingSamplingArguments args_;
+  struct TransformerSamplingArguments args_;
 
   const cudaDataType_t computeType_ = Traits_::computeType;
   const cudaDataType_t AType_ = Traits_::AType;
@@ -43,15 +43,15 @@ private:
   const cudaDataType_t CType_ = Traits_::CType;
   int cublasAlgo_[1] = {20};
 
-  OpenDecoder<OpType_> *decoder_;
+  OpenTransformerDecoder<OpType_> *decoder_;
   DataType_ **K_cache_;
   DataType_ **V_cache_;
-  DataType_ **K_mem_cache_;
-  DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
+  DataType_ *trans_out_buf_;
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
+  DataType_ *lm_normed_result_buf_;
   DataType_ *logits_buf_;
   int *word_ids_buf_;
   bool *finished_buf_;
@@ -68,25 +68,30 @@ private:
   int *topp_offset_buf_;
 
 public:
-  DecodingSampling(const IAllocator &allocator,
-                   const int batch_size,
-                   const int seq_len,
-                   const int head_num,
-                   const int size_per_head,
-                   const int vocab_size,
-                   const int decoder_layers,
-                   const int memory_hidden_units,
-                   const int memory_max_seq_len,
-                   const int start_id,
-                   const int end_id,
-                   const int candidate_num = 0,
-                   const float probability_threshold = 0.0,
-                   const bool normalization_before = true,
-                   const int pos_offset = 0,
-                   const ActivationType act = ActivationType::RELU)
+  TransformerSampling(const IAllocator &allocator,
+                      const int batch_size,
+                      const int seq_len,
+                      const int head_num,
+                      const int size_per_head,
+                      const int vocab_size,
+                      const int decoder_layers,
+                      const int memory_hidden_units,
+                      const int memory_max_seq_len,
+                      const int start_id,
+                      const int end_id,
+                      const int candidate_num = 0,
+                      const float probability_threshold = 0.0,
+                      const bool normalization_before = true,
+                      const bool pos_bias = true,
+                      const ActivationType act = ActivationType::GELU,
+                      const int unk_id = -1,
+                      const int mask_id = -1,
+                      const float temperature = 1.0,
+                      const float repeat_penalty = 1.0)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
+    args_.start_len_ = memory_max_seq_len;
     args_.head_num_ = head_num;
     args_.size_per_head_ = size_per_head;
     args_.hidden_units_ = head_num * size_per_head;
@@ -96,9 +101,13 @@ public:
     args_.probability_threshold_ = probability_threshold;
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
+    args_.unk_id_ = unk_id;
+    args_.mask_id_ = mask_id;
+    args_.temperature_ = temperature;
     args_.normalization_before_ = normalization_before;
-    args_.pos_offset_ = pos_offset;
+    args_.pos_bias_ = pos_bias;
     args_.act_ = act;
+    args_.repeat_penalty = repeat_penalty;
 
     if (args_.candidate_num_ == 0 && args_.probability_threshold_ == 0.0) {
       printf(
@@ -118,26 +127,21 @@ public:
     K_cache_ = new DataType_ *[1];
     V_cache_ = new DataType_ *[1];
 
-    K_mem_cache_ = new DataType_ *[args_.decoder_layers_];
-    V_mem_cache_ = new DataType_ *[args_.decoder_layers_];
-
-    decoder_ = new OpenDecoder<OpType_>(batch_size,
-                                        memory_max_seq_len,
-                                        head_num,
-                                        size_per_head,
-                                        memory_hidden_units,
-                                        normalization_before,
-                                        args_.act_);
+    decoder_ = new OpenTransformerDecoder<OpType_>(batch_size,
+                                                   memory_max_seq_len,
+                                                   head_num,
+                                                   size_per_head,
+                                                   memory_hidden_units,
+                                                   normalization_before,
+                                                   args_.act_);
 
     int from_tensor_size = args_.batch_size_ * args_.hidden_units_;  // type T
     int decoder_workspace_size = decoder_->getWorkspaceSize();       // type T
     int decoder_normed_result_buffer_size =
         args_.batch_size_ * args_.hidden_units_;  // type T
-    int cache_size =
-        args_.batch_size_ * args_.seq_len_ * args_.hidden_units_;  // type T
-    int mem_cache_size =
-        args_.batch_size_ * memory_max_seq_len * args_.hidden_units_;  // type T
-    int logits_buf_size = args_.batch_size_ * args_.vocab_size_;       // type T
+    int cache_size = args_.batch_size_ * (args_.seq_len_ + args_.start_len_) *
+                     args_.hidden_units_;                         // type T
+    int logits_buf_size = args_.batch_size_ * args_.vocab_size_;  // type T
 
     int word_ids_buf_size = args_.batch_size_;            // type int
     int finished_buf_size = args_.batch_size_;            // type bool
@@ -176,10 +180,9 @@ public:
                                         args_,
                                         0);
 
-    int datatype_buf_size =
-        from_tensor_size * 2 + decoder_workspace_size +
-        (cache_size * 4 + mem_cache_size * 2) * args_.decoder_layers_ +
-        decoder_normed_result_buffer_size;
+    int datatype_buf_size = from_tensor_size * 2 + decoder_workspace_size +
+                            cache_size * 2 * args_.decoder_layers_ +
+                            decoder_normed_result_buffer_size * 3;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
         sizeof(DataType_) * (datatype_buf_size + logits_buf_size) +
@@ -191,26 +194,23 @@ public:
     from_tensor_[0] = (DataType_ *)buf_;
     from_tensor_[1] = (DataType_ *)(from_tensor_[0] + from_tensor_size);
 
-    for (int i = 0; i < args_.decoder_layers_; ++i) {
-      K_mem_cache_[i] =
-          from_tensor_[1] + from_tensor_size + i * mem_cache_size * 2;
-      V_mem_cache_[i] = from_tensor_[1] + from_tensor_size +
-                        i * mem_cache_size * 2 + mem_cache_size;
-    }
-
     /* We use two-way buffer since we have to update KV buf at the end of each
      * step. */
-    K_cache_[0] = V_mem_cache_[args_.decoder_layers_ - 1] + mem_cache_size +
+    K_cache_[0] = from_tensor_[1] + from_tensor_size +
                   0 * cache_size * args_.decoder_layers_;
-    V_cache_[0] = V_mem_cache_[args_.decoder_layers_ - 1] + mem_cache_size +
+    V_cache_[0] = from_tensor_[1] + from_tensor_size +
                   1 * cache_size * args_.decoder_layers_;
 
     decoder_buf_ = V_cache_[0] + cache_size * args_.decoder_layers_;
-    decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
-    // Used for post-norm.
-    embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
-    logits_buf_ =
-        decoder_normed_result_buf_ + decoder_normed_result_buffer_size;
+    trans_out_buf_ = (decoder_buf_ + decoder_workspace_size);
+    // Used for pre-norm.
+    decoder_normed_result_buf_ =
+        (trans_out_buf_ + decoder_normed_result_buffer_size);
+    // Same as decoder_normed_result_buf_. Used for post-norm.
+    embedding_buf_ = (trans_out_buf_ + decoder_normed_result_buffer_size);
+    lm_normed_result_buf_ =
+        (decoder_normed_result_buf_ + decoder_normed_result_buffer_size);
+    logits_buf_ = lm_normed_result_buf_ + decoder_normed_result_buffer_size;
     word_ids_buf_ = (int *)(logits_buf_ + logits_buf_size);
     finished_buf_ = (bool *)(word_ids_buf_ + word_ids_buf_size);
     finished_count_buf_ = (int *)(finished_buf_ + finished_buf_size);
@@ -223,14 +223,13 @@ public:
 
     FILE *fd = fopen("decoding_gemm_config.in", "r");
     int err = 0;
-    if (fd == NULL)
-      ;
-    else {
+    if (fd != NULL) {
+      // The file found.
       err = fscanf(fd, "%d", &cublasAlgo_[0]);
       fclose(fd);
     }
     if (err != 1) {
-      ;
+      // The file not found. Default algorithm will be used.
       if (Traits_::OpType == OperationType::FP32) {
         cublasAlgo_[0] = CUBLAS_GEMM_DEFAULT;
       } else {
@@ -258,7 +257,7 @@ public:
     }
   }
 
-  void forward(const DecoderInitParam<DataType_> *param,
+  void forward(const TransformerDecoderInitParam<DataType_> *param,
                DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
@@ -295,36 +294,60 @@ public:
     cudaDeviceSynchronize();
     check_cuda_error(cudaGetLastError());
 #endif
+    int cache_size = args_.batch_size_ * (args_.seq_len_ + args_.start_len_) *
+                     args_.hidden_units_;  // type T
 
-    int cache_size =
-        args_.batch_size_ * args_.seq_len_ * args_.hidden_units_;  // type T
+    for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+      init_cache_kernel_launcher(param[layer].k_cache,
+                                 param[layer].v_cache,
+                                 decoding_params.memory_sequence_length,
+                                 K_cache_[0] + layer * cache_size,
+                                 V_cache_[0] + layer * cache_size,
+                                 args_.head_num_,
+                                 args_.size_per_head_,
+                                 args_.start_len_,
+                                 args_.batch_size_,
+                                 1,
+                                 decoding_params.stream);
+    }
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
 
     for (int step = 1; step <= args_.seq_len_; ++step) {
       if (args_.normalization_before_) {
-        embedding_lookup_sine_position_encoding_kernel_launcher(
-            from_tensor_[0],
-            decoding_params.embedding_table,
-            decoding_params.position_encoding_table +
-                (step - 1) * args_.hidden_units_,
-            word_ids_buf_,
-            args_.batch_size_,
-            args_.hidden_units_,
-            decoding_params.stream);
+        embeddings_kernel_launcher(from_tensor_[0],
+                                   decoding_params.embedding_table,
+                                   decoding_params.position_encoding_table,
+                                   decoding_params.type_table,
+                                   decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
+                                   word_ids_buf_,
+                                   step,
+                                   args_.batch_size_,
+                                   args_.hidden_units_,
+                                   args_.pos_bias_,
+                                   decoding_params.stream);
       } else {
-        // TODO(gongenlei): Only support Bart temporarily.
-        embedding_position_lookups_bart_kernel_launcher(
-            embedding_buf_,
-            decoding_params.embedding_table,
-            decoding_params.position_encoding_table +
-                (step - 1 + args_.pos_offset_) * args_.hidden_units_,
-            word_ids_buf_,
-            args_.batch_size_,
-            args_.hidden_units_,
-            decoding_params.stream);
+        embeddings_kernel_launcher(embedding_buf_,
+                                   decoding_params.embedding_table,
+                                   decoding_params.position_encoding_table,
+                                   decoding_params.type_table,
+                                   decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
+                                   word_ids_buf_,
+                                   step,
+                                   args_.batch_size_,
+                                   args_.hidden_units_,
+                                   args_.pos_bias_,
+                                   decoding_params.stream);
+
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+
         decoder_->initialize_stream(decoding_params.stream);
         decoder_->decoder_norm1(embedding_buf_,
                                 decoding_params.layernorm.gamma,
@@ -364,15 +387,16 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
         decoder_->forward(from_tensor_[from_id],
-                          decoding_params.memory_tensor,
+                          nullptr,
                           K_cache_[0] + layer * cache_size,
                           V_cache_[0] + layer * cache_size,
-                          K_mem_cache_[layer],
-                          V_mem_cache_[layer],
+                          nullptr,
+                          nullptr,
                           decoding_params.memory_sequence_length,
                           from_tensor_[out_id],
                           step,
-                          true);
+                          args_.start_len_,
+                          false);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -382,6 +406,7 @@ public:
 
       DataType_ alpha = (DataType_)1.0f;
       DataType_ beta = (DataType_)0.0f;
+
       if (args_.normalization_before_) {
         decoder_->decoder_norm1(from_tensor_[out_id],
                                 decoding_params.layernorm.gamma,
@@ -395,49 +420,98 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
+        // trans here
         check_cuda_error(
             cublasGemmEx(decoding_params.cublas_handle,
                          CUBLAS_OP_N,
                          CUBLAS_OP_N,
-                         n,
+                         k,
                          m,
                          k,
                          &alpha,
-                         decoding_params.embedding_kernel,
+                         decoding_params.trans_kernel,
                          AType_,
-                         n,
+                         k,
                          decoder_normed_result_buf_,
                          BType_,
                          k,
                          &beta,
-                         logits_buf_,
+                         trans_out_buf_,
                          CType_,
-                         n,
+                         k,
                          computeType_,
                          static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
       } else {
-        // Post-norm
+        // trans here
         check_cuda_error(
             cublasGemmEx(decoding_params.cublas_handle,
                          CUBLAS_OP_N,
                          CUBLAS_OP_N,
-                         n,
+                         k,
                          m,
                          k,
                          &alpha,
-                         decoding_params.embedding_kernel,
+                         decoding_params.trans_kernel,
                          AType_,
-                         n,
+                         k,
                          from_tensor_[out_id],
                          BType_,
                          k,
                          &beta,
-                         logits_buf_,
+                         trans_out_buf_,
                          CType_,
-                         n,
+                         k,
                          computeType_,
                          static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
       }
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+      // add bias decoding_params.trans_bias
+      decoder_->add_bias_act(trans_out_buf_,
+                             decoding_params.trans_bias,
+                             m,
+                             k,
+                             decoding_params.stream,
+                             args_.act_);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      decoder_->decoder_norm1(trans_out_buf_,
+                              decoding_params.lm_layernorm.gamma,
+                              decoding_params.lm_layernorm.beta,
+                              lm_normed_result_buf_,
+                              m,
+                              k);
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+      check_cuda_error(
+          cublasGemmEx(decoding_params.cublas_handle,
+                       CUBLAS_OP_N,
+                       CUBLAS_OP_N,
+                       n,
+                       m,
+                       k,
+                       &alpha,
+                       decoding_params.embedding_kernel,
+                       AType_,
+                       n,
+                       lm_normed_result_buf_,
+                       BType_,
+                       k,
+                       &beta,
+                       logits_buf_,
+                       CType_,
+                       n,
+                       computeType_,
+                       static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
@@ -452,6 +526,23 @@ public:
                                       m,
                                       n,
                                       decoding_params.stream);
+
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 finished_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 1.0,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 decoding_params.logits_mask_T);
 
         topK_sampling_kernel_kernelLauncher(
             topk_workspace_,
@@ -472,6 +563,23 @@ public:
                                m,
                                n,
                                decoding_params.stream);
+
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 finished_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 1.0,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 decoding_params.logits_mask_T);
 
         topP_sampling_kernel_kernelLauncher(
             topp_workspace_,
@@ -509,11 +617,9 @@ public:
     }
   }
 
-  virtual ~DecodingSampling() {
+  virtual ~TransformerSampling() {
     delete[] K_cache_;
     delete[] V_cache_;
-    delete[] K_mem_cache_;
-    delete[] V_mem_cache_;
     delete[] h_finished_buf_;
     delete decoder_;
     allocator_.free(buf_);

@@ -136,6 +136,7 @@ __global__ void add_bias_input_generalize(T* out,
 }
 
 // Encoder kernels
+#ifdef WITH_ENCODER
 template <typename T>
 __global__ void encoder_layernorm_generalize(
     T* out, const T* input, const T* gamma, const T* beta, int n) {
@@ -191,18 +192,19 @@ void add_bias_input_pre_layernorm_kernelLauncher(T* out,
       out, bias_and_input, input, bias, gamma, beta, n);
 }
 
-template <typename T>
-void add_bias_input_kernelLauncher(T* out,
-                                   const T* bias_and_input,
-                                   const T* bias,
-                                   int m,
-                                   int n,
-                                   cudaStream_t stream) {
-  dim3 grid(m);
-  dim3 block(n);
-  add_bias_input_generalize<T><<<grid, block, 0, stream>>>(
-      out, bias_and_input, bias, n);
-}
+// NOTE: Remove or replace this function.
+// template <typename T>
+// void add_bias_input_kernelLauncher(T* out,
+//                                    const T* bias_and_input,
+//                                    const T* bias,
+//                                    int m,
+//                                    int n,
+//                                    cudaStream_t stream) {
+//   dim3 grid(m);
+//   dim3 block(n);
+//   add_bias_input_generalize<T><<<grid, block, 0, stream>>>(
+//       out, bias_and_input, bias, n);
+// }
 
 template <typename T>
 void layernorm_kernelLauncher(T* out,
@@ -243,6 +245,7 @@ template void layernorm_kernelLauncher(float* out,
                                        int n,
                                        cudaStream_t stream);
 // End of encoder kernels
+#endif
 
 template <typename T>
 __global__ void add_bias_relu_encoder(T* out, const T* bias, int m, int n) {
@@ -272,6 +275,8 @@ __global__ void add_bias_relu_encoder(half* out,
   }
 }
 
+#ifdef BUILD_ENCODER
+
 template void add_bias_act_kernelLauncher<float>(float* out,
                                                  const float* bias,
                                                  int m,
@@ -297,5 +302,7 @@ void add_bias_act_kernelLauncher(
   else
     add_bias_relu_encoder<T><<<grid, block, 0, stream>>>(out, bias, m, n);
 }
+
+#endif
 
 }  // namespace fastertransformer
