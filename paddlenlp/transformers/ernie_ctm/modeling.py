@@ -600,8 +600,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
                 input_ids=None,
                 token_type_ids=None,
                 attention_mask=None,
-                position_ids=None,
-                tag_labels=None):
+                position_ids=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -612,10 +611,6 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
                 See :class:`ErnieCtmModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieCtmModel`.
-            tag_labels (Tensor, optional):
-                The input predicted tensor.
-                Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-                Defaults to `None`.
 
         Returns:
             tuple: Returns tensor `logits`, the scores of masked token prediction.
