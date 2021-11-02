@@ -24,6 +24,8 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding)
+
+from .encoder import enable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (
@@ -1039,13 +1041,14 @@ class FasterBART(BartPretrainedModel):
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
         self._decode_strategy = decode_strategy
-
         self.generate = self.forward
+
         self.decoding = InferBartDecoding(
             model=self._model,
             decoding_strategy=decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
+        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
 
     def get_encoder(self):
         return self.encoder

@@ -475,8 +475,14 @@ class GenerationMixin(object):
         if kwargs['min_length'] != 0:
             # not support for min_length yet in the faster version
             return
-        if kwargs['repetition_penalty'] != 0:
+        if kwargs['repetition_penalty'] != 1.0:
             # not support for repetition_penalty yet in the faster version
+            return
+        if kwargs['num_beam_groups'] != 1:
+            # not support for group_beam_search yet in the faster version
+            return
+        if kwargs['early_stopping'] != False:
+            # not support for early_stopping yet in the faster version
             return
         if not self.get_faster_entry(kwargs):
             # 2. try general convert
@@ -557,9 +563,10 @@ class GenerationMixin(object):
                 None.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
-            diversity_rate (float, optional): The diversity_rate for Diverse 
-                Siblings Search. See `this paper https://arxiv.org/abs/1611.08562`__
-                 for more details. 
+            diversity_rate (float, optional): If num_beam_groups is 1, this is the 
+                diversity_rate for Diverse Siblings Search. See 
+                `this paper https://arxiv.org/abs/1611.08562`__ for more details. 
+                If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether or not use the model cache to 
                 speed up decoding. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
@@ -970,13 +977,12 @@ class GenerationMixin(object):
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
 
             # beam search
             # [batch_size * num_beams, vocab_size]
             next_scores = F.softmax(logits)
             next_scores = paddle.log(next_scores)
-
+            next_scores = logits_processors(input_ids, next_scores)
             next_scores = next_scores + beam_scores.unsqueeze(-1)
 
             vocab_size = next_scores.shape[-1]
