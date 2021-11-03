@@ -474,19 +474,24 @@ class GenerationMixin(object):
         self._faster_entry = False
         if kwargs['min_length'] != 0:
             # not support for min_length yet in the faster version
-            return
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         if kwargs['repetition_penalty'] != 1.0:
             # not support for repetition_penalty yet in the faster version
-            return
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
         if kwargs['num_beam_groups'] != 1:
             # not support for group_beam_search yet in the faster version
-            return
+            raise AttributeError(
+                "'num_beam_groups != 1' is not supported yet in the faster version"
+            )
         if kwargs['early_stopping'] != False:
             # not support for early_stopping yet in the faster version
-            return
-        if not self.get_faster_entry(kwargs):
-            # 2. try general convert
-            self._convert_to_faster(kwargs)
+            raise AttributeError(
+                "'early_stopping != False' is not supported yet in the faster version"
+            )
+        self.get_faster_entry(kwargs)
 
     @paddle.no_grad()
     def generate(self,
@@ -671,14 +676,22 @@ class GenerationMixin(object):
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
-            if not hasattr(self, '_faster_entry'):
-                self._build_faster(args)
-            if self._faster_entry:
-                model_kwargs = args.pop('model_kwargs')
-                output_ids = self._faster_entry(**args, **model_kwargs)
-                # make result and faster result oneconsistent
-                dummy_srore = None
-                return output_ids, dummy_srore
+            try:
+                if not hasattr(self, '_faster_entry'):
+                    self._build_faster(args)
+                if self._faster_entry:
+                    model_kwargs = args.pop('model_kwargs')
+                    output_ids = self._faster_entry(**args, **model_kwargs)
+                    # make result and faster result oneconsistent
+                    dummy_srore = None
+                    return output_ids, dummy_srore
+            except Exception as e:
+                args['model_kwargs'] = model_kwargs
+                self._convert_to_faster(args)
+                logger.warning(e)
+                logger.warning(
+                    "FasterGenerate is not available, "
+                    "and the original version would be used instead.")
 
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(

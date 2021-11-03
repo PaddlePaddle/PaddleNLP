@@ -1090,7 +1090,9 @@ class GPTLMHeadModel(GPTPretrainedModel):
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
         if decode_strategy == "beam_search":
-            return False
+            AttributeError(
+                "'beam_search' is not supported yet in the faster version of GPT"
+            )
         self._faster_entry = FasterGPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry

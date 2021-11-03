@@ -72,7 +72,7 @@ def parse_args():
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
         "--top_p",
-        default=1.0,
+        default=0.5,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
@@ -83,25 +83,14 @@ def parse_args():
         type=float,
         help="The diversity of beam search. ")
     parser.add_argument(
-        "--n_best",
-        default=1,
-        type=int,
-        help="The number of decoded sentences to output. ")
-    parser.add_argument(
         "--length_penalty",
         default=0.6,
         type=float,
-        help="The power number in length penalty calculation. Only works in `v2` temporarily."
-    )
+        help="The power number in length penalty calculation")
     parser.add_argument(
         "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
-    parser.add_argument(
-        "--decoding_lib",
-        default="../../build/lib/libdecoding_op.so",
-        type=str,
-        help="Path of libdecoding_op.so. ")
     args = parser.parse_args()
     return args
 
@@ -127,7 +116,6 @@ def do_predict(args):
     eos_id = model.bart.config['eos_token_id']
     pad_id = model.bart.config['pad_token_id']
     input_ids = prepare_input(tokenizer, sentences, pad_id)
-    print("input_ids", input_ids)
     # Define model
     faster_bart = model
 
@@ -150,7 +138,6 @@ def do_predict(args):
                 num_beams=args.beam_size,
                 diversity_rate=args.diversity_rate,
                 length_penalty=args.length_penalty,
-                num_return_sequences=2,
                 use_fast=True)
 
         paddle.device.cuda.synchronize()

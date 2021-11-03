@@ -457,8 +457,10 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
         if decode_strategy == 'sampling' and kwargs.get(
-                'top_k') > 1 and kwargs.get('top_p') != 1:
-            return False
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
         self._faster_entry = FasterUNIMOText(
             self,
             decode_strategy=decode_strategy,

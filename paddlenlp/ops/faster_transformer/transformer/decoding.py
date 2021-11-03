@@ -1077,9 +1077,9 @@ class InferUnifiedDecoding(nn.Layer):
             elif topp > 0 and topk == 0:
                 self._decoding_strategy = "topp_sampling"
             else:
-                raise ValueError(
+                raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
-                    "Topk sampling and topp sampling cannot be both applied. ")
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -1150,11 +1150,6 @@ class InferBartDecoding(nn.Layer):
             decoding_strategy="beam_search_v2",
             decoding_lib=None,
             use_fp16_decoding=False, ):
-        # if decoding_lib is None:
-        #     raise ValueError(
-        #         "The args decoding_lib must be set to use FasterTransformer. ")
-        # elif not os.path.exists(decoding_lib):
-        #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
@@ -1358,9 +1353,9 @@ class InferBartDecoding(nn.Layer):
             elif top_p > 0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"
             else:
-                raise ValueError(
+                raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
-                    "Topk sampling and topp sampling cannot be both applied. ")
+                    "Topk sampling and topp sampling cannot be both applied in the faster version. ")
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,

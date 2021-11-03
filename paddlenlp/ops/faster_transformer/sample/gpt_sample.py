@@ -125,7 +125,6 @@ def do_predict(args):
                 num_beam=4,
                 decode_strategy="beam_search",
                 use_fast=True)
-            #print(out_seq)
             output_sequence = out_seq.numpy()
 
         paddle.fluid.core._cuda_synchronize(place)
