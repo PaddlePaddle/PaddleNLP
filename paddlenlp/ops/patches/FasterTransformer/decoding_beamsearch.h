@@ -723,7 +723,7 @@ public:
 // hidden_units_, step, cache_size, decoder_layers_, decoding_params.stream);
 #endif
 
-      if (step > min_trg_len) {
+      if (step > max_trg_len) {
         // TODO Find a better method to check the is_finished
         int finish_size = (keep_alive_beam_) ? m * 2 : m;
         cudaMemcpy(h_finished_buf_,

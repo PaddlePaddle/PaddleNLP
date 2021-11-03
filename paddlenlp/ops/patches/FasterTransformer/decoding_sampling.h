@@ -538,7 +538,7 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (step > min_trg_len) {
+      if (step > max_trg_len) {
         // TODO Find a better method to check the is_finished
         cudaMemcpy(h_finished_buf_,
                    finished_buf_,
