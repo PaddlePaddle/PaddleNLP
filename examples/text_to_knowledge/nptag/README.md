@@ -21,8 +21,11 @@ NPTag使用[ERNIE-CTM](../ernie-ctm)+prompt训练而成，使用启发式搜索�
 
 ```text
 nptag/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── data.py # 训练数据处理脚本
-├── me.py # 模型效果验证指标脚本
+├── export_model.py # 模型导出脚本
 ├── metric.py # 模型效果验证指标脚本
 ├── predict.py # 预测脚本
 ├── README.md # 使用说明

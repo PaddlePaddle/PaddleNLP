@@ -71,11 +71,7 @@ def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=
 
         input_ids = paddle.to_tensor(input_ids)
         token_type_ids = paddle.to_tensor(token_type_ids)
-        print(input_ids)
-        print(token_type_ids)
         logits = model(input_ids, token_type_ids).numpy()
-        print(logits)
-        print(label_indices)
         for i, l in zip(label_indices, logits):
             score = l[i[0]: i[-1] + 1, vocab_ids]
             # Find topk candidates of scores and predicted indices.
@@ -84,11 +80,8 @@ def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=
             all_scores_can.extend([score_can.tolist()])
             all_preds_can.extend([pred_id_can.tolist()])
             pred_ids.extend([pred_id_can[:, 0].tolist()])
-        print(pred_ids)
-        exit()
 
     results = []
-
     for i, d in enumerate(data):
         label = decode(pred_ids[i], id_vocabs)
 
