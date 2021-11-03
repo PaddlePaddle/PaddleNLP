@@ -710,6 +710,8 @@ int BertTokenizer::BatchEncode(
   }
 
   size_t batch_size = batch_text.size();
+  batch_encode_inputs->clear();
+  batch_encode_inputs->resize(batch_size);
   for (size_t i = 0; i < batch_size; i++) {
     if (stride > 0 && has_text_pair) {
       // TODO(Steffy-zxf): add processing for qa-task.
@@ -730,7 +732,7 @@ int BertTokenizer::BatchEncode(
                            return_overflowing_tokens,
                            return_special_tokens_mask);
       if (status) {
-        batch_encode_inputs->push_back(res);
+        batch_encode_inputs->at(i) = std::move(res);
       } else {
         return 0;
       }
@@ -749,7 +751,7 @@ int BertTokenizer::BatchEncode(
                            return_overflowing_tokens,
                            return_special_tokens_mask);
       if (status) {
-        batch_encode_inputs->push_back(res);
+        batch_encode_inputs->at(i) = std::move(res);
       } else {
         return 0;
       }

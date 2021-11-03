@@ -45,8 +45,6 @@ void GetOutput(Predictor* predictor,
 
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
-  LOG(INFO) << FLAGS_model_file << " " << FLAGS_vocab_file << " "
-            << FLAGS_params_file;
   tokenizer::Vocab vocab;
   tokenizer::LoadVocab(FLAGS_vocab_file, &vocab);
   tokenizer::BertTokenizer tokenizer(vocab, false);
