@@ -84,9 +84,9 @@ def main(args):
         detect_f1 = 2. * detect_precision * detect_recall / (
             detect_precision + detect_recall + eps)
     else:
-        detect_precision = float('nan')
-        detect_recall = float('nan')
-        detect_f1 = float('nan')
+        detect_precision = 0
+        detect_recall = 0
+        detect_f1 = 0
 
     # Correction level
     correct_pos = correct_tp + fp
@@ -96,9 +96,9 @@ def main(args):
         correct_f1 = 2. * correct_precision * correct_recall / (
             correct_precision + correct_recall + eps)
     else:
-        correct_precision = float('nan')
-        correct_recall = float('nan')
-        correct_f1 = float('nan')
+        correct_precision = 0
+        correct_recall = 0
+        correct_f1 = 0
 
     print("==========================================================")
     print("Overall Performance")
