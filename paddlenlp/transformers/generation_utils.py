@@ -463,7 +463,7 @@ class GenerationMixin(object):
 
         return logits
 
-    def get_faster_entry(self, kwargs):
+    def prepare_faster_entry(self, kwargs):
         return False
 
     def _convert_to_faster(self, kwargs):
@@ -491,7 +491,7 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'early_stopping != False' is not supported yet in the faster version"
             )
-        self.get_faster_entry(kwargs)
+        self.prepare_faster_entry(kwargs)
 
     @paddle.no_grad()
     def generate(self,
@@ -1189,7 +1189,7 @@ class GenerationMixin(object):
                         beam_next_tokens.unsqueeze(-1)
                     ],
                     axis=-1)
-                current_tokens[batch_group_indices] = group_input_ids[:, -1]
+                current_tokens[batch_group_indices] = beam_next_tokens
 
                 reordering_indices[batch_group_indices] = (
                     num_beams * (beam_idx // group_size) + group_start_idx +

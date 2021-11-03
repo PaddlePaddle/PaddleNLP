@@ -1085,7 +1085,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         else:
             return logits
 
-    def get_faster_entry(self, kwargs):
+    def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')

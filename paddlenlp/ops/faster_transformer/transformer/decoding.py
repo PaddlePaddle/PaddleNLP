@@ -714,10 +714,7 @@ class InferGptDecoding(nn.Layer):
                 pad_token_id=None,
                 max_out_len=256,
                 temperature=1):
-        self.topk = topk
-        self.topp = topp
-        self.max_out_len = max_out_len
-        self.temperature = temperature
+
         output_ids = infer_gpt_decoding(
             input=[input_ids],
             word_emb=self.word_emb,
@@ -741,15 +738,15 @@ class InferGptDecoding(nn.Layer):
             decoder_ln_bias=self.decoder_ln_bias,
             pos_emb=self.pos_emb,
             linear_weight=self.linear_weight,
-            topk=self.topk,
-            topp=self.topp,
-            max_out_len=self.max_out_len,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
             head_num=self.head_num,
             size_per_head=self.size_per_head,
             num_layer=self.num_layer,
             bos_id=bos_token_id,
             eos_id=eos_token_id,
-            temperature=self.temperature,
+            temperature=temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
         output_ids = output_ids.transpose([1, 0])
