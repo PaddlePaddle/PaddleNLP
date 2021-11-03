@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright (c) 2020 TsinghuaAI Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
