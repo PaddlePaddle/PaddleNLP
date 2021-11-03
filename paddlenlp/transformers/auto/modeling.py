@@ -32,167 +32,11 @@ __all__ = [
     "AutoModelForTokenClassification",
     "AutoModelForQuestionAnswering",
     "AutoModelForMultipleChoice",
+    "AutoEncoder",
+    "AutoDecoder",
+    "AutoGenerator",
+    "AutoDiscriminator",
 ]
-"""
-__all__ = [
-    "AlbertPretrainedModel", 
-    "AlbertModel",
-    "AlbertForPretraining",
-    "AlbertForMaskedLM",
-    "AlbertForSequenceClassification",
-    "AlbertForTokenClassification",
-    "AlbertForMultipleChoice",
-]
-
-__all__ = [
-    'BartModel', 'BartPretrainedModel', 'BartEncoder', 'BartDecoder',
-    'BartClassificationHead', 'BartForSequenceClassification',
-    'BartForQuestionAnswering', 'BartForConditionalGeneration'
-]
-
-__all__ = [
-    'BertModel',
-    "BertPretrainedModel",
-    'BertForPretraining',
-    'BertPretrainingCriterion',
-    'BertPretrainingHeads',
-    'BertForSequenceClassification',
-    'BertForTokenClassification',
-    'BertForQuestionAnswering',
-]
-
-__all__ = [
-    'BigBirdModel',
-    'BigBirdPretrainedModel',
-    'BigBirdForPretraining',
-    'BigBirdPretrainingCriterion',
-    'BigBirdForSequenceClassification',
-    'BigBirdPretrainingHeads',
-]
-
-__all__ = [
-    "ConvBertModel", "ConvBertPretrainedModel", "ConvBertForTotalPretraining",
-    "ConvBertDiscriminator", "ConvBertGenerator", "ConvBertClassificationHead",
-    "ConvBertForSequenceClassification", "ConvBertForTokenClassification",
-    "ConvBertPretrainingCriterion", "ConvBertForQuestionAnswering",
-    "ConvBertForMultipleChoice"
-]
-
-__all__ = [
-    'DistilBertModel',
-    'DistilBertPretrainedModel',
-    'DistilBertForSequenceClassification',
-    'DistilBertForTokenClassification',
-    'DistilBertForQuestionAnswering',
-    'DistilBertForMaskedLM',
-]
-
-__all__ = [
-    'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
-    'ElectraDiscriminator', 'ElectraGenerator', 'ElectraClassificationHead',
-    'ElectraForSequenceClassification', 'ElectraForTokenClassification',
-    'ElectraPretrainingCriterion'
-]
-
-__all__ = [
-    'ErnieModel', 'ErniePretrainedModel', 'ErnieForSequenceClassification',
-    'ErnieForTokenClassification', 'ErnieForQuestionAnswering',
-    'ErnieForPretraining', 'ErniePretrainingCriterion'
-]
-
-__all__ = [
-    'ErnieCtmPretrainedModel', 'ErnieCtmModel', 'ErnieCtmWordtagModel',
-    'ErnieCtmForTokenClassification'
-]
-
-__all__ = [
-    'ErnieDocModel',
-    'ErnieDocPretrainedModel',
-    'ErnieDocForSequenceClassification',
-    'ErnieDocForTokenClassification',
-    'ErnieDocForQuestionAnswering',
-]
-
-__all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration"]
-
-__all__ = [
-    'ErnieGramModel',
-    'ErnieGramForSequenceClassification',
-    'ErnieGramForTokenClassification',
-    'ErnieGramForQuestionAnswering',
-]
-
-__all__ = [
-    'GPTModel',
-    "GPTPretrainedModel",
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
-    'GPTForGreedyGeneration',
-    'GPTLMHeadModel',
-]
-
-__all__ = [
-    "MPNetModel",
-    "MPNetPretrainedModel",
-    "MPNetForMaskedLM",
-    "MPNetForSequenceClassification",
-    "MPNetForMultipleChoice",
-    "MPNetForTokenClassification",
-    "MPNetForQuestionAnswering",
-]
-
-__all__ = [
-    'NeZhaModel', "NeZhaPretrainedModel", 'NeZhaForPretraining',
-    'NeZhaForSequenceClassification', 'NeZhaPretrainingHeads',
-    'NeZhaForTokenClassification', 'NeZhaForQuestionAnswering',
-    'NeZhaForMultipleChoice'
-]
-
-__all__ = [
-    'RobertaModel',
-    'RobertaPretrainedModel',
-    'RobertaForSequenceClassification',
-    'RobertaForTokenClassification',
-    'RobertaForQuestionAnswering',
-]
-
-__all__ = [
-    "RoFormerModel",
-    "RoFormerPretrainedModel",
-    "RoFormerForPretraining",
-    "RoFormerPretrainingCriterion",
-    "RoFormerPretrainingHeads",
-    "RoFormerForSequenceClassification",
-    "RoFormerForTokenClassification",
-    "RoFormerForQuestionAnswering",
-]
-
-__all__ = [
-    'SkepModel', 'SkepPretrainedModel', 'SkepForSequenceClassification',
-    'SkepForTokenClassification', 'SkepCrfForTokenClassification'
-]
-
-__all__ = [
-    'TinyBertModel',
-    'TinyBertPretrainedModel',
-    'TinyBertForPretraining',
-    'TinyBertForSequenceClassification',
-]
-
-__all__ = [
-    "UNIMOPretrainedModel",
-    'UNIMOModel',
-    'UNIMOLMHeadModel',
-]
-
-__all__ = [
-    "XLNetPretrainedModel",
-    "XLNetModel",
-    "XLNetForSequenceClassification",
-    "XLNetForTokenClassification",
-]
-
-"""
 
 
 class _BaseAutoModelClass:
@@ -290,16 +134,15 @@ MODEL_MAPPING_NAMES = OrderedDict([
     ("TinyBertModel", "tinybert"),
     ("BertModel", "bert"),
     ("UNIMOModel", "unimo"),
+    ("UnifiedTransformerModel", "unifiedtransformer"),
     ("XLNetModel", "xlnet"),
 ])
 
 MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     # Model for pre-training mapping
     ("AlbertForPretraining", "albert"),
-    #("BartForConditionalGeneration", "bart"),
+    ("BartForConditionalGeneration", "bart"),
     ("BigBirdForPretraining", "bigbird"),
-    #("ConvBertForTotalPretraining", "convbert"),
-    #("ElectraForTotalPretraining", "electra"),
     ("ErnieForPretraining", "ernie"),
     ("GPTForPretraining", "gpt"),
     ("NeZhaForPretraining", "nezha"),
@@ -311,16 +154,10 @@ MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
 MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
     # Model with LM heads mapping
     ("AlbertForMaskedLM", "albert"),
-    ("BartForConditionalGeneration", "bart"),
-    ("BigBirdPretrainingHeads", "bigbird"),
-    ("ConvBertClassificationHead", "convbert"),
     ("DistilBertForMaskedLM", "distilbert"),
-    ("BertPretrainingHeads", "bert"),
-    ("ElectraClassificationHead", "electra"),
     ("GPTLMHeadModel", "gpt"),
     ("MPNetForMaskedLM", "mpnet"),
-    ("NeZhaPretrainingHeads", "nezha"),
-    ("RoFormerPretrainingHeads", "roformer"),
+    ("UnifiedTransformerLMHeadModel", "unifiedtransformer"),
     ("UNIMOLMHeadModel", "unimo"),
 ])
 
@@ -395,8 +232,30 @@ MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES = OrderedDict([
     ("NeZhaForMultipleChoice", "nezha"),
 ])
 
+ENCODER_MAPPING_NAMES = OrderedDict([
+    # Model for Encoder mapping
+    ("BartEncoder", "bart"),
+])
 
-def get_all_configurations(key):
+DECODER_MAPPING_NAMES = OrderedDict([
+    # Model for Decoder mapping
+    ("BartDeocder", "bart"),
+])
+
+GENERATOR_MAPPING_NAMES = OrderedDict([
+    # Model for Generator mapping
+    ("ConvBertGenerator", "convbert"),
+    ("ElectraGenerator", "electra"),
+])
+
+DISCRIMINATOR_MAPPING_NAMES = OrderedDict([
+    # Model for Discriminator mapping
+    ("ConvBertDiscriminator", "convbert"),
+    ("ElectraDiscriminator", "electra"),
+])
+
+
+def get_configurations(key):
     albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
     bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
     bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
@@ -428,10 +287,8 @@ def get_all_configurations(key):
     xlnet = tuple(XLNetPretrainedModel.pretrained_init_configuration.keys())
 
     mapping_key = key
-
-    if mapping_key == "model":
-        # Base model mapping
-        MAPPING_NAMES = OrderedDict([
+    key_dict = {
+        "model": OrderedDict([
             (albert, AlbertModel),
             (bart, BartModel),
             (bigbird, BigBirdModel),
@@ -454,12 +311,8 @@ def get_all_configurations(key):
             (unifiedtransformer, UnifiedTransformerModel),
             (unimo, UNIMOModel),
             (xlnet, XLNetModel),
-        ])
-
-    if mapping_key == "pretraining":
-        # Model for pre-training mapping
-        #print(bert)
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "pretraining": OrderedDict([
             (albert, AlbertForPretraining),
             (bart, BartForConditionalGeneration),
             (bigbird, BigBirdForPretraining),
@@ -471,11 +324,8 @@ def get_all_configurations(key):
             (roformer, RoFormerForPretraining),
             (tinybert, TinyBertForPretraining),
             (bert, BertForPretraining),
-        ])
-
-    if mapping_key == "lm_head":
-        # Model with LM heads mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "lm_head": OrderedDict([
             (albert, AlbertForMaskedLM),
             (bart, BartForConditionalGeneration),
             (bigbird, BigBirdPretrainingHeads),
@@ -487,21 +337,16 @@ def get_all_configurations(key):
             (nezha, NeZhaPretrainingHeads),
             (roformer, RoFormerPretrainingHeads),
             (bert, BertPretrainingHeads),
+            (unifiedtransformer, UnifiedTransformerLMHeadModel),
             (unimo, UNIMOLMHeadModel),
-        ])
-
-    if mapping_key == "masked_lm":
-        # Model for masked lm mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "masked_lm": OrderedDict([
             (albert, AlbertForMaskedLM),
             (bart, BartForConditionalGeneration),
             (distilbert, DistilBertForMaskedLM),
             (mpnet, MPNetForMaskedLM),
-        ])
-
-    if mapping_key == "sequence_classification":
-        # Model for Sequence Classification mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "sequence_classification": OrderedDict([
             (albert, AlbertForSequenceClassification),
             (bart, BartForSequenceClassification),
             (bigbird, BigBirdForSequenceClassification),
@@ -519,11 +364,8 @@ def get_all_configurations(key):
             (tinybert, TinyBertForSequenceClassification),
             (bert, BertForSequenceClassification),
             (xlnet, XLNetForSequenceClassification),
-        ])
-
-    if mapping_key == "question_answering":
-        # Model for Question Answering mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "question_answering": OrderedDict([
             (bart, BartForQuestionAnswering),
             (convbert, ConvBertForQuestionAnswering),
             (distilbert, DistilBertForQuestionAnswering),
@@ -535,11 +377,8 @@ def get_all_configurations(key):
             (roberta, RobertaForQuestionAnswering),
             (roformer, RoFormerForQuestionAnswering),
             (bert, BertForQuestionAnswering),
-        ])
-
-    if mapping_key == "token_classification":
-        # Model for Token Classification mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "token_classification": OrderedDict([
             (albert, AlbertForTokenClassification),
             (convbert, ConvBertForTokenClassification),
             (distilbert, DistilBertForTokenClassification),
@@ -555,71 +394,100 @@ def get_all_configurations(key):
             (roformer, RoFormerForTokenClassification),
             (bert, BertForTokenClassification),
             (xlnet, XLNetForTokenClassification),
-        ])
-
-    if mapping_key == "multiple_choice":
-        # # Model for Multiple Choice mapping
-        MAPPING_NAMES = OrderedDict([
+        ]),
+        "multiple_choice": OrderedDict([
             (albert, AlbertForMultipleChoice),
             (convbert, ConvBertForMultipleChoice),
             (mpnet, MPNetForMultipleChoice),
             (nezha, NeZhaForMultipleChoice),
-        ])
+        ]),
+        "encoder": OrderedDict([(bart, BartEncoder), ]),
+        "decoder": OrderedDict([(bart, BartDecoder), ]),
+        "generator": OrderedDict([
+            (convbert, ConvBertGenerator),
+            (electra, ElectraGenerator),
+        ]),
+        "discriminator": OrderedDict([
+            (convbert, ConvBertDiscriminator),
+            (electra, ElectraDiscriminator),
+        ]),
+    }
 
+    MAPPING_NAMES = key_dict.get(mapping_key)
     return MAPPING_NAMES
 
 
 class AutoModel(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("model")
+    MAPPING_NAMES = get_configurations("model")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
 
 
 class AutoModelForPreTraining(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("pretraining")
+    MAPPING_NAMES = get_configurations("pretraining")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_PRETRAINING_MAPPING_NAMES
 
 
-# Private on purpose, the public class will add the deprecation warnings.
 class AutoModelWithLMHead(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("lm_head")
+    MAPPING_NAMES = get_configurations("lm_head")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_WITH_LM_HEAD_MAPPING_NAMES
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("masked_lm")
+    MAPPING_NAMES = get_configurations("masked_lm")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_MASKED_LM_MAPPING_NAMES
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("sequence_classification")
+    MAPPING_NAMES = get_configurations("sequence_classification")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("question_answering")
+    MAPPING_NAMES = get_configurations("question_answering")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("token_classification")
+    MAPPING_NAMES = get_configurations("token_classification")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
-    MAPPING_NAMES = get_all_configurations("multiple_choice")
+    MAPPING_NAMES = get_configurations("multiple_choice")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES
 
 
-#AutoModelForMultipleChoice = auto_class_update(
-#    AutoModelForMultipleChoice, head_doc="multiple choice")
+class AutoEncoder(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations("encoder")
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = ENCODER_MAPPING_NAMES
+
+
+class AutoDecoder(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations("decoder")
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = DECODER_MAPPING_NAMES
+
+
+class AutoGenerator(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations("generator")
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = GENERATOR_MAPPING_NAMES
+
+
+class AutoDiscriminator(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations("discriminator")
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = DISCRIMINATOR_MAPPING_NAMES
+
 
 if __name__ == '__main__':
     # test
@@ -627,23 +495,29 @@ if __name__ == '__main__':
     #model = AutoModel.from_pretrained('bert-base-uncased')
     #model = AutoModel.from_pretrained('unimo-text-1.0')
     #model = AutoModel.from_pretrained('plato-mini')
+    #model = AutoModel.from_pretrained('unified_transformer-12L-cn')
 
-    model = AutoModel.from_pretrained(
-        ('/Users/huhuiwen01/Untitled Folder/my_bert_model'))
+    #model = AutoModel.from_pretrained(('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
 
     #2、pretraining test
-    #model = AutoModelForPreTraining.from_pretrained('bert-base-cased')
+    #model = AutoModelForPreTraining.from_pretrained('bart-base')
     #model = AutoModelForPreTraining.from_pretrained('roformer-chinese-small')
     #model = AutoModelForPreTraining.from_pretrained('tinybert-4l-312d')
 
-    #model = AutoModelForPreTraining.from_pretrained(('/Users/huhuiwen01/Untitled Folder/my_bert_model_for_pretraining'))
+    #model = AutoModelForPreTraining.from_pretrained(('/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
 
     #3、lm_head test
-    #model = AutoModelWithLMHead.from_pretrained('nezha-base-chinese')
+    #model = AutoModelWithLMHead.from_pretrained('gpt-cpm-large-cn')
+    #model = AutoModelWithLMHead.from_pretrained('unified_transformer-12L-cn')
+    #model = AutoModelWithLMHead.from_pretrained('unimo-text-1.0')
 
     # 4、masked lm test
-    #model = AutoModelForMaskedLM.from_pretrained('albert-base-v1')
-    #model = AutoModelForMaskedLM.from_pretrained('bart-base')
+    '''
+    model = AutoModelForMaskedLM.from_pretrained('albert-base-v1')
+    model = AutoModelForMaskedLM.from_pretrained('bart-base')
+    model = AutoModelForMaskedLM.from_pretrained('distilbert-base-uncased')
+    model = AutoModelForMaskedLM.from_pretrained('mpnet-base')
+    '''
 
     #5、sequence_classification test
     #model = AutoModelForSequenceClassification.from_pretrained('rbt3')
@@ -667,12 +541,23 @@ if __name__ == '__main__':
     #model = AutoModelForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
     #model = AutoModelForTokenClassification.from_pretrained('plato-mini')
 
-    print(model)
+    # encoder decoder test
+    #model = AutoDecoder.from_pretrained("bart-base", vocab_size = 20000)
+    #model = AutoEncoder.from_pretrained("bart-base", vocab_size = 20000)
 
-    tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+    # discriminator generotor test
+    #model = AutoGenerator.from_pretrained("convbert-base")
+    #model = AutoGenerator.from_pretrained("electra-small")
+    model = AutoDiscriminator.from_pretrained("convbert-base")
+    model = AutoDiscriminator.from_pretrained("electra-small")
+
+    print(model)
+'''
+    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
     outputs = model(**inputs)
     print(outputs)
 
     logits = outputs[0]
+'''

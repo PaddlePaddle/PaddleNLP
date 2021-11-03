@@ -17,10 +17,12 @@ import io
 import importlib
 import json
 from collections import OrderedDict
+
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+#from .. import MODEL_MAPPING_NAMES
 
 __all__ = ["AutoTokenizer", ]
 
@@ -50,7 +52,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 ])
 
 
-def get_all_configurations():
+def get_configurations():
     albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
     bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
     bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
@@ -70,7 +72,7 @@ def get_all_configurations():
     mpnet = tuple(MPNetPretrainedModel.pretrained_init_configuration.keys())
     nezha = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
     roberta = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys())
-    roformer = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys(
+    roformer = tuple(RoFormerPretrainedModel.pretrained_init_configuration.keys(
     ))
     tinybert = tuple(TinyBertPretrainedModel.pretrained_init_configuration.keys(
     ))
@@ -183,27 +185,26 @@ class _BaseAutoTokenizerClass:
 
 
 class AutoTokenizer(_BaseAutoTokenizerClass):
-    MAPPING_NAMES = get_all_configurations()
+    MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
 
 
 if __name__ == '__main__':
     # From local dir path
+
     tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/Untitled Folder/my_bert'))
+        ('/Users/huhuiwen01/notebook/saved_model/my_bert'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
     tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/Untitled Folder/my_bart'))
+        ('/Users/huhuiwen01/notebook/saved_model/my_bart'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
     tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/Untitled Folder/my_bigbird'))
+        ('/Users/huhuiwen01/notebook/saved_model/my_bigbird'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
     # From built-in pretrained models
     tokenizer = AutoTokenizer.from_pretrained(('bert-base-cased'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(('rbt3'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
     tokenizer = AutoTokenizer.from_pretrained(('plato-mini'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
