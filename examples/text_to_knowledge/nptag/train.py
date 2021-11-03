@@ -23,31 +23,31 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Stack, Pad, Tuple
+from paddlenlp.data import Stack, Tuple
 from paddlenlp.datasets import load_dataset
 
-from data import convert_example, create_dataloader, read_custom_data, load_dict
+from data import convert_example, create_dataloader, read_custom_data
 from metric import NPTagAccuracy
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     # yapf: disable
-    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain train.json and dev.json.")
-    parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
-    parser.add_argument("--output_dir", default="./output", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
-    parser.add_argument("--max_seq_len", default=64, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument("--learning_rate", default=1e-6, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
-    parser.add_argument("--logging_steps", default=10, type=int, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", default=100, type=int, help="Save checkpoint every X updates steps.")
-    parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over total steps.")
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
-    parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
-    parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain train.json and dev.json.")
+    parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+    parser.add_argument("--output_dir", type=str, default="./output", help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument("--learning_rate", type=float, default=1e-6, help="The initial learning rate for Adam.")
+    parser.add_argument("--num_train_epochs", type=int, default=3, help="Total number of training epochs to perform.", )
+    parser.add_argument("--logging_steps", type=int, default=10, help="Log every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size per GPU/CPU for training.", )
+    parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay if we apply some.")
+    parser.add_argument("--warmup_proportion", type=float, default=0.0, help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon", type=float, default=1e-8, help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_steps", type=int, default=-1, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
+    parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
@@ -97,7 +97,6 @@ def do_train(args):
         args.data_dir, "train.txt"), is_test=False, lazy=False)
     dev_ds = load_dataset(read_custom_data, filename=os.path.join(
         args.data_dir, "dev.txt"), is_test=False, lazy=False)
-    labels_to_idx = load_dict(os.path.join(args.data_dir, "labels.txt"))
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("nptag")
     model = ErnieCtmNptagModel.from_pretrained("nptag")
@@ -182,7 +181,7 @@ def do_train(args):
             if (global_step % args.save_steps == 0 or global_step ==
                     num_training_steps) and rank == 0:
                 output_dir = os.path.join(args.output_dir,
-                                          "nptag_ft_model_%d.pdparams" %
+                                          "nptag_ft_model_%d" %
                                           (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)

@@ -1,12 +1,17 @@
-# 解语：NPTag（名词短语标注工具）
+# 解语：NPTag（中文名词性短语分类工具）
 
+NPTag（中文名词性短语分类工具）是首个能够覆盖所有中文名词性词汇及短语的细粒度知识标注工具，旨在解决NLP中，名词性短语收录不足，导致的OOV（out-of-vocabulary，超出收录词表）问题。可直接应用构造知识特征，辅助NLP任务。
 
 ## NPTag特点
 
+- 包含2000+细粒度类别，覆盖所有中文名词性短语的词类体系，更丰富的知识标注结果
+    - NPTag试用的词类体系未覆盖所有中文名词性短语的词类体系，对所有类目做了更细类目的识别（如注射剂、鱼类、博物馆等），共包含2000+细粒度类别，且可以直接关联百科知识树。
+- 可自由定制的分类框架
+    - NPTag开源版标注使用的词类体系是我们在实践中对**百科词条**分类应用较好的一个版本，用户可以自由定制自己的词类体系和训练样本，构建自己的NPTag，以获得更好的适配效果。例如，可按照自定义的类别构造训练样本，使用小学习率、短训练周期微调NPTag模型，即可获得自己定制的NPTag工具
 
 ## NPTag模型介绍
 
-模型使用[ERNIE-CTM](../ernie-ctm)+Prompt方式对名词短语进行分类，基于Prompt学习机制，可以方便地扩充小样本细粒度类别。
+NPTag使用[ERNIE-CTM](../ernie-ctm)+prompt训练而成，使用启发式搜索解码，保证分类结果都在标签体系之内。
 
 ### finetune任务
 
@@ -17,10 +22,12 @@
 ```text
 nptag/
 ├── data.py # 训练数据处理脚本
-├── predictor.py # 预测脚本
+├── me.py # 模型效果验证指标脚本
 ├── metric.py # 模型效果验证指标脚本
+├── predict.py # 预测脚本
 ├── README.md # 使用说明
-└── train.py  # 训练脚本
+├── train.py # 训练脚本
+└── utils.py  # 工具函数
 ```
 
 #### 数据准备
@@ -34,9 +41,8 @@ wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/nptag_dataset.tar.gz && 
 解压之后
 ```text
 data/
-├── name_category_map_v1.0.json # 文件包含粗粒度与细粒度类别标签的映射关系
+├── name_category_map.json # NPTag一二级标签（粗粒度与细粒度类别标签）
 ├── dev.txt # 验证集
-├── labels.txt # 细粒度类别标签
 └── train.txt  # 训练集
 ```
 

@@ -21,7 +21,8 @@ def convert_example(example,
                     tokenzier,
                     max_seq_len=512,
                     max_cls_len=5,
-                    summary_num=2):
+                    summary_num=2,
+                    is_test=False):
     """
     Builds model inputs from a sequence for noun phrase classification task.
     A prompt template is added to the end of the sequence.
@@ -44,6 +45,8 @@ def convert_example(example,
             Sequences longer than this will be truncated, sequences shorter will be padded.
         max_cls_len(obj:`int`): The maximum length of labels.
         summary_num(obj:`int`): The number of summary tokens, e.g. `[CLS0]` and `[CLS1]`. 
+        is_test(obj:`bool`): If True, it will not return the label.
+
     """
 
     if len(example["text"]) + max_cls_len + 1 + summary_num + 1 > max_seq_len:
@@ -52,21 +55,22 @@ def convert_example(example,
     tokens = list(example["text"]) + ["是"] + ["[MASK]"] * max_cls_len
     inputs = tokenzier(
         tokens,
+        return_length=True,
         is_split_into_words=True,
         pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
     label_indices = list(
         range(
-            len(example["text"]) + 1 + summary_num,
-            len(example["text"]) + 1 + max_cls_len + summary_num
-        )
-    )
+            inputs["seq_len"] - 1 - max_cls_len,
+            inputs["seq_len"] - 1))
+
+    if is_test:
+        return inputs["input_ids"], inputs["token_type_ids"], label_indices
 
     label_tokens = list(example["label"]) + ["[PAD]"] * (max_cls_len - len(example["label"]))
     labels = np.full([max_seq_len], fill_value=-100, dtype=np.int64)
     labels[label_indices] = tokenzier.convert_tokens_to_ids(label_tokens)
-
     return inputs["input_ids"], inputs["token_type_ids"], labels
 
 
@@ -99,14 +103,3 @@ def read_custom_data(filename):
         for line in f:
             text, label = line.strip().split('\t')
             yield {'text': text, 'label': label}
-
-
-def load_dict(dict_path):
-    """Loads label to dict"""
-    vocab = {}
-    i = 0
-    with open(dict_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            vocab[line.strip()] = i
-            i += 1
-    return vocab

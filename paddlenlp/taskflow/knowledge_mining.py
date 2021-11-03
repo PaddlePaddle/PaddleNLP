@@ -540,15 +540,19 @@ class NPTagTask(Task):
                  task,
                  model,
                  batch_size=1,
+                 max_seq_len=64,
                  linking=False,
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
         self._static_mode = True
         self._batch_size = batch_size
+        self._max_seq_len = max_seq_len
         self._linking = linking
         self._construct_tokenizer(model)
         self._name_dict = None
+        self._summary_num = 2
+        self._max_cls_len = 5
         name_dict_path = download_file(self._task_path,
                                     "name_category_map.json",
                                     URLS["name_category_map.json"][0],
@@ -559,6 +563,13 @@ class NPTagTask(Task):
         else:
             self._construct_model(model)
 
+    @property
+    def summary_num(self):
+        """
+        Number of model summary token
+        """
+        return self._summary_num
+
     def _construct_dict_map(self, name_dict_path):
         """
         Construct dict map for the predictor.
@@ -566,10 +577,9 @@ class NPTagTask(Task):
         with open(name_dict_path, encoding="utf-8") as fp:
             self._name_dict = json.load(fp)
         self._tree = BurkhardKellerTree()
-        for k in self._name_dict:
-            self._tree.add(k)
         self._cls_vocabs = OrderedDict()
         for k in self._name_dict:
+            self._tree.add(k)
             for c in k:
                 if c not in self._cls_vocabs:
                     self._cls_vocabs[c] = len(self._cls_vocabs)
@@ -634,7 +644,7 @@ class NPTagTask(Task):
                 name="input_ids"), # input_ids
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64",
-                name="token_type_ids"), # segment_ids
+                name="token_type_ids"), # token_type_ids
         ]
 
     def _construct_model(self, model):
@@ -657,28 +667,40 @@ class NPTagTask(Task):
         Create the dataset and dataloader for the predict.
         """
         inputs = self._check_input_text(inputs)
-        self._cls_seq_length = 5
+        self._max_cls_len = 5
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
         lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
 
         # Prompt template: input_text + "是" + "[MASK]" * cls_seq_length
-        prompt_template = ["是"] + ["[MASK]"] * self._cls_seq_length
-        prompt_template_ids = self._tokenizer.vocab.to_indices(prompt_template)
+        prompt_template = ["是"] + ["[MASK]"] * self._max_cls_len
 
         def read(inputs):
             for text in inputs:
-                input_id = self._tokenizer.vocab.to_indices(list(text))
-                input_id += prompt_template_ids
-                input_id = self._tokenizer.build_inputs_with_special_tokens(input_id)
-                token_type_id = [self._tokenizer.pad_token_type_id] * len(input_id)
-                yield input_id, token_type_id
+                if len(text) + self._max_cls_len + 1 + self._summary_num + 1 > self._max_seq_len:
+                    text = text[:(self._max_seq_len - (self._max_cls_len + 1 + self._summary_num + 1))]
+                
+                tokens = list(text) + prompt_template
+                tokenized_output = self._tokenizer(
+                    tokens,
+                    return_length=True,
+                    is_split_into_words=True,
+                    pad_to_max_seq_len=True,
+                    max_seq_len=self._max_seq_len)
+                label_indices = list(
+                    range(
+                        tokenized_output["seq_len"] - 1 - self._max_cls_len,
+                        tokenized_output["seq_len"] - 1))
+                
+                yield tokenized_output["input_ids"], tokenized_output[
+                    "token_type_ids"], label_indices
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id), # input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id) # token_type_ids
+            Stack(dtype='int64'),  # input_ids
+            Stack(dtype='int64'),  # token_type_ids
+            Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 
         infer_data_loader = paddle.io.DataLoader(
@@ -700,17 +722,19 @@ class NPTagTask(Task):
         pred_ids = []
 
         for batch in inputs['data_loader']:
-            input_ids, token_type_ids = batch
+            input_ids, token_type_ids, label_indices = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.predictor.run()
             logits = self.output_handle[0].copy_to_cpu()
-            logits = logits.squeeze()[-(self._cls_seq_length + 1): -1, self._vocab_ids]
-            # Find topk candidates of scores and predicted indices.
-            scores_can, pred_ids_can = self._find_topk(logits, k=4, axis=-1)
-            all_scores_can.extend([scores_can.tolist()])
-            all_preds_can.extend([pred_ids_can.tolist()])
-            pred_ids.extend([pred_ids_can[:, 0].tolist()])                
+            for i, l in zip(label_indices, logits):
+                score = l[i[0]: i[-1] + 1, self._vocab_ids]
+                # Find topk candidates of scores and predicted indices.
+                score_can, pred_id_can = self._find_topk(score, k=4, axis=-1)
+
+                all_scores_can.extend([score_can.tolist()])
+                all_preds_can.extend([pred_id_can.tolist()])
+                pred_ids.extend([pred_id_can[:, 0].tolist()])            
 
         inputs['all_scores_can'] = all_scores_can
         inputs['all_preds_can'] = all_preds_can
