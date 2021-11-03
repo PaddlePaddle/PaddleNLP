@@ -136,7 +136,7 @@ def parse_args():
     parser.add_argument(
         "--save_steps",
         type=int,
-        default=500,
+        default=50,
         help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
@@ -450,10 +450,13 @@ def do_train(args):
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
-                if global_step % args.save_steps == 0:
+                #if global_step % args.save_steps == 0:
+                if global_step % 50 == 0:
+                    print("save..")
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
+                        print(output_dir)
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
                         # need better way to get inner model of DataParallel

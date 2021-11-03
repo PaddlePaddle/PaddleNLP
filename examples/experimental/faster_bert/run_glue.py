@@ -30,7 +30,9 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+#from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import BertTokenizer
+from static.modeling import BertForSequenceClassification
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -244,6 +246,125 @@ def convert_example(example,
     else:
         return example['input_ids'], example['token_type_ids']
 
+def fused_weight(weight, num_head):
+    a = paddle.transpose(weight, perm=[1, 0])
+    return paddle.reshape(a, shape=[1, num_head, int(a.shape[0]/num_head), a.shape[1]])
+
+def fused_qkv(qkv_weight, num_head):
+    q = qkv_weight['q']
+    k = qkv_weight['k']
+    v = qkv_weight['v']
+
+    fq = fused_weight(q, num_head)
+    fk = fused_weight(k, num_head)
+    fv = fused_weight(v, num_head)
+    a = paddle.concat(x=[fq, fk, fv], axis=0)
+    return a
+
+def convert_base_to_fused(state_to_load):
+    base_to_fused = dict()
+    base_to_fused["weight"] = "scale"
+    base_to_fused["bias"] = "bias"
+
+    fused_state_to_load = dict()
+    qkv_weight = dict()
+    qkv_bias = dict()
+    qkv_count = 0
+    num_head = 16
+    layer_index = 0
+    for key, value in state_to_load.items():
+        array = key.split('.')
+        fused_array = list(array)
+        if len(array) == 6:#linear or layer_norm
+            if 'linear' in array[4]:
+                #linear1.weight -> ffn._linear1_weight
+                #linear1.bias -> ffn._linear1_bias
+                fused_array[5] = "_" + array[4] + "_" + array[5]
+                fused_array[4] = "ffn"
+                fused_key = '.'.join(fused_array)
+                fused_state_to_load[fused_key] = value
+                #print(key, fused_key)
+                #if array[3] == "0":
+                #    np.savetxt(key+".txt", value)
+
+            elif 'norm' in array[4]:
+                if array[4][-1] == '1':
+                    #norm1.weight -> fused_atten.pre_ln_scale
+                    #norm2.weight -> fused_atten.ln_scale
+                    fused_array[4] = "fused_attn"
+                    fused_array[5] = "ln_" + base_to_fused[array[5]]
+                    fused_key = '.'.join(fused_array)
+                    fused_state_to_load[fused_key] = value
+                    #print(key, fused_key)
+                    #if array[3] == "0":
+                    #    np.savetxt(key+".txt", value)
+                else:
+                    #norm1.weight -> ffn._ln1_scale
+                    fused_array[4] = "ffn"
+                    fused_array[5] = "_ln" + array[4][-1] + "_" + base_to_fused[array[5]]
+                    fused_key = '.'.join(fused_array)
+                    fused_state_to_load[fused_key] = value
+                    #print(key, fused_key)
+                    #if array[3] == "0":
+                    #    np.savetxt(key+".txt", value)
+        elif len(array) == 7:#self_atten
+            if 'q' in array[5]:
+                if array[6] == "weight":
+                    qkv_weight['q'] = value
+                else:
+                    qkv_bias['q'] = value
+                qkv_count += 1
+            elif 'k' in array[5]:
+                if array[6] == "weight":
+                    qkv_weight['k'] = value
+                else:
+                    qkv_bias['k'] = value
+                qkv_count += 1
+            elif 'v' in array[5]:
+                if array[6] == "weight":
+                    qkv_weight['v'] = value
+                else:
+                    qkv_bias['v'] = value
+                qkv_count += 1
+            else:
+                fused_array.pop()
+                fused_array[4] = "fused_attn"
+                if array[6] == "weight":
+                    fused_array[5] = "linear_weight"
+                else:
+                    fused_array[5] = "linear_bias"
+                fused_key = '.'.join(fused_array)
+                fused_state_to_load[fused_key] = value
+                #print(key, fused_key)
+                #if array[3] == "0":
+                #    np.savetxt(key+".txt", value)
+
+            if qkv_count == 6:
+                qkv_count = 0
+                fused_array.pop()
+
+                fused_array[4] = "fused_attn"
+                fused_array[5] = "qkv_weight"
+                fused_key = '.'.join(fused_array)
+                fused_state_to_load[fused_key] = fused_qkv(qkv_weight, num_head)
+                #print(key, fused_key)
+
+                fused_array[4] = "fused_attn"
+                fused_array[5] = "qkv_bias"
+                fused_key = '.'.join(fused_array)
+                a = paddle.concat(x=[qkv_bias['q'], qkv_bias['k'], qkv_bias['v']], axis=0)
+                tmp_bias = paddle.reshape(a, shape=[3, num_head, int(a.shape[0]/3/num_head)])
+                fused_state_to_load[fused_key] = tmp_bias
+                #print(key, fused_key, tmp_bias.numpy().shape)
+                #if array[3] == "0":
+                #    np.savetxt("fused_bias.txt", tmp_bias.numpy().flatten())
+                    #if array[3] == "0":
+
+        else:
+            fused_state_to_load[key] = value
+    return fused_state_to_load
+
+
 
 def do_train(args):
     paddle.set_device(args.device)
@@ -303,7 +424,7 @@ def do_train(args):
             return_list=True)
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
-        dev_ds = dev_ds.map(trans_func, lazy=True)
+        dhidden_dropout_probev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
@@ -314,8 +435,18 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
+    base_model, base_state_to_load = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
+    fused_model, fused_state_to_load  = model_class.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
+####convert model to fused model
+    fused_state_to_load = convert_base_to_fused(base_state_to_load)
+    fused_model.set_state_dict(fused_state_to_load)
+####convert model to fused model
+    model = fused_model
+    #model = base_model
+    #model.set_state_dict(state_to_load)
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -357,7 +488,7 @@ def do_train(args):
             input_ids, segment_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=["layer_norm", "softmax", "gelu"]):
+                    custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention"]):
                 logits = model(input_ids, segment_ids)
                 loss = loss_fct(logits, labels)
             if args.use_amp:

@@ -188,6 +188,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
+        print("call from pretrained:", pretrained_model_name_or_path)
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
@@ -356,7 +357,7 @@ class PretrainedModel(Layer, GenerationMixin):
                         format(model.__class__.__name__, unexpected_keys))
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
-            return model
+            return model, state_to_load
         return model, state_to_load
 
     def save_model_config(self, save_dir):
