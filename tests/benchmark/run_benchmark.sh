@@ -6,15 +6,16 @@ set -xe
 
 function _set_params(){
     run_mode=${1:-"sp"}         # sp or mp
-    base_batch_size=${2:-"2"}
+    batch_size=${2:-"2"}
     fp_item=${3:-"fp32"}        # fp32 or fp16
     max_iter=${4:-"100"}
     model_name=${5:-"model_name"}
     dygraph_name=${6:-"static"}
     need_profile=${7:-"off"}
     gpt_repo=${8:-"gpt2"}
-
-    model_name=${model_name}_${gpt_repo}
+    
+    base_batch_size=$(($batch_size*1024))
+    model_name=${model_name}_${gpt_repo}_${run_mode}_bs${batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
     mission_name="语义表示"
     direction_id=1
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}
@@ -24,22 +25,22 @@ function _set_params(){
     num_gpu_devices=${#arr[*]}
 
 
-    log_file=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
-    log_folder=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}_logdir
-    log_profile=${run_log_path}/${model_name}_${run_mode}_bs${base_batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}_model.profile
+    log_file=${run_log_path}/${model_name}
+    log_folder=${run_log_path}/${model_name}_logdir
+    log_profile=${run_log_path}/${model_name}_model.profile
     OUTPUT_PATH=${run_log_path}/output
 
 
     log_with_profiler=$log_file
     profiler_path=$log_profile
-    keyword="ips:" 
+    keyword="avg_batch_cost:" 
     keyword_loss=""
     separator=""
     position=""
     range=""
     skip_steps=20
-    model_mode=-1
-    ips_unit='seqs/s'
+    model_mode=0
+    ips_unit='tokens/s'
     index=""
     gpu_num=$num_gpu_devices 
 }
@@ -47,7 +48,7 @@ function _set_params(){
 
 function _train(){
     echo "Train on ${num_gpu_devices} GPUs"
-    echo "current CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES, gpus=$num_gpu_devices, batch_size=$base_batch_size"
+    echo "current CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES, gpus=$num_gpu_devices, batch_size=$batch_size"
 
     if [ -d $OUTPUT_PATH ]; then
         rm -rf $OUTPUT_PATH
@@ -78,8 +79,8 @@ function _train(){
     data_path=$(pwd)"/data"
 
     train_cmd="${profiler_cmd}\
-               --micro_batch_size=${base_batch_size} \
-               --global_batch_size=$((${base_batch_size}*${num_gpu_devices})) \
+               --micro_batch_size=${batch_size} \
+               --global_batch_size=$((${batch_size}*${num_gpu_devices})) \
                --model_type="gpt"\
                --model_name_or_path="gpt2-en"\
                --input_dir=${data_path}\
@@ -132,7 +133,7 @@ function _train(){
 #     # gpu_num is 1, because we multiplied gpu num in the log
 #     python analysis.py --filename ${log_file} \
 #         --keyword "ips:" \
-#         --base_batch_size $(($base_batch_size*1024)) \
+#         --base_batch_size $(($batch_size*1024)) \
 #         --skip_steps 20 \
 #         --model_mode -1 \
 #         --model_name ${model_name}\
