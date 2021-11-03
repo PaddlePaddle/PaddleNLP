@@ -14,8 +14,6 @@ function _set_params(){
     need_profile=${7:-"off"}
     gpt_repo=${8:-"gpt2"}
     
-    base_batch_size=$(($batch_size*1024))
-    model_name=${model_name}_${gpt_repo}_${run_mode}_bs${batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
     mission_name="语义表示"
     direction_id=1
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}
@@ -24,7 +22,8 @@ function _set_params(){
     arr=(${device})
     num_gpu_devices=${#arr[*]}
 
-
+    base_batch_size=$(($batch_size*1024))
+    model_name=${model_name}_${gpt_repo}_${run_mode}_bs${batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
     log_file=${run_log_path}/${model_name}
     log_folder=${run_log_path}/${model_name}_logdir
     log_profile=${run_log_path}/${model_name}_model.profile
