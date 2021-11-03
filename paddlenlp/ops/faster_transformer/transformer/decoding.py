@@ -752,7 +752,9 @@ class InferGptDecoding(nn.Layer):
             temperature=self.temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
-        return output_ids.transpose([1, 0])
+        output_ids = output_ids.transpose([1, 0])
+        output_ids = output_ids[:, input_ids.shape[-1]:]
+        return output_ids
 
 
 class InferUnifiedDecoding(nn.Layer):

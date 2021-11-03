@@ -677,12 +677,14 @@ class FasterGPT(GPTPretrainedModel):
             self._model, 'eos_token_id', None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(
             self._model, 'pad_token_id', None)
-        if input_ids.dtype == "int64":
-            paddle.cast(input_ids, "int32")
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
         # change top_p to zero if not using top_p sampling for FT
         if decode_strategy == "greedy_search":
             top_p = 0.0
             top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
         if num_return_sequences > 1:
             input_ids, _ = self.expand_inputs_for_generation(
                 input_ids, expand_size=num_return_sequences)
