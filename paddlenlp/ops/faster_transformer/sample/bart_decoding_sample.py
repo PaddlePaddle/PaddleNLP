@@ -72,7 +72,7 @@ def parse_args():
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
         "--top_p",
-        default=0.5,
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(

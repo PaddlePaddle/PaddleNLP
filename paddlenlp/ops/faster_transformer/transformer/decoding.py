@@ -355,11 +355,7 @@ def finalize(beam_size,
     if decoding_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
             beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
-        ids = paddle.nn.functional.gather_tree(ids, parent_ids).transpose(
-            [1, 2, 0])
-        ids = ids[:, :num_return_sequences, :].reshape([-1, ids.shape[-1]])
-    else:
-        ids = ids.transpose([1, 0])
+        ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
 

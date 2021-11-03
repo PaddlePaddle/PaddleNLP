@@ -682,6 +682,13 @@ class GenerationMixin(object):
                 if self._faster_entry:
                     model_kwargs = args.pop('model_kwargs')
                     output_ids = self._faster_entry(**args, **model_kwargs)
+                    if decode_strategy == "beam_search":
+                        output_ids = output_ids.transpose([1, 2, 0])
+                        output_ids = output_ids[:, :
+                                                num_return_sequences, :].reshape(
+                                                    [-1, output_ids.shape[-1]])
+                    else:
+                        output_ids = output_ids.transpose([1, 0])
                     # make result and faster result oneconsistent
                     dummy_srore = None
                     return output_ids, dummy_srore
