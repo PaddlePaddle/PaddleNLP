@@ -30,22 +30,21 @@ DEFINE_int32(threads,
 DEFINE_string(model_dir,
               "./infer_model/",
               "The directory to the inference model. ");
-DEFINE_string(vocab_dir,
+DEFINE_string(vocab_file,
               "./vocab_all.bpe.33708",
-              "The directory to the vocabulary file. ");
-DEFINE_string(data_dir,
+              "The path to the vocabulary file. ");
+DEFINE_string(data_file,
               "./newstest2014.tok.bpe.33708.en",
-              "The directory to the input data. ");
+              "The path to the input data file. ");
 
 using namespace paddle_infer;
 
 std::string model_dir = "";
-std::string vocab_dir = "";
-std::string data_dir = "";
+std::string vocab_file = "";
+std::string data_file = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
-const int BEAM_SIZE = 5;
 const int MAX_LENGTH = 256;
 const int N_BEST = 1;
 
@@ -68,6 +67,7 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::unordered_map<int, std::string>& num2word_dict) {
   std::vector<int> output_shape = seq_ids->shape();
   int batch_size = output_shape[0];
+  int beam_num = output_shape[2];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   std::vector<int64_t> seq_ids_out;
@@ -77,18 +77,18 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   dataresultvec.resize(batch_size * N_BEST);
   auto max_output_length = output_shape[1];
 
-  for (int bsz = 0; bsz < output_shape[0]; ++bsz) {
+  for (int bsz = 0; bsz < batch_size; ++bsz) {
     for (int k = 0; k < N_BEST; ++k) {
       dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
-        if (seq_ids_out[bsz * max_output_length * BEAM_SIZE + len * BEAM_SIZE +
+        if (seq_ids_out[bsz * max_output_length * beam_num + len * beam_num +
                         k] == EOS_IDX) {
           break;
         }
         dataresultvec[bsz * N_BEST + k].result_q =
             dataresultvec[bsz * N_BEST + k].result_q +
-            num2word_dict[seq_ids_out[bsz * max_output_length * BEAM_SIZE +
-                                      len * BEAM_SIZE + k]] +
+            num2word_dict[seq_ids_out[bsz * max_output_length * beam_num +
+                                      len * beam_num + k]] +
             " ";
       }
     }
@@ -140,7 +140,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(vocab_dir);
+    std::ifstream fin(vocab_file);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -234,8 +234,12 @@ void Main(
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
+  // When using fp16, fc_elementwise_layernorm_fuse_pass causes a little
+  // different translation results with original dygraph prediction, maybe you
+  // can turn off the IR optimization for same results as following:
+  // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
-  DataReader reader(data_dir);
+  DataReader reader(data_file);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -277,8 +281,8 @@ int main(int argc, char** argv) {
   gpu_id = FLAGS_gpu_id;
 
   model_dir = FLAGS_model_dir;
-  vocab_dir = FLAGS_vocab_dir;
-  data_dir = FLAGS_data_dir;
+  vocab_file = FLAGS_vocab_file;
+  data_file = FLAGS_data_file;
 
   paddle::inference::Main(
       batch_size, FLAGS_device, gpu_id, FLAGS_use_mkl, FLAGS_threads);

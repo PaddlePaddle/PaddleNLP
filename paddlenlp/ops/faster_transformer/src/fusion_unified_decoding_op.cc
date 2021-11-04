@@ -22,6 +22,7 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
@@ -61,11 +62,13 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const int& type_id,
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty) {
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act) {
   int batch_size = cache_k[0].shape()[0];
 
   std::vector<int64_t> output_dims;
@@ -78,7 +81,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     output_dims = {max_len, batch_size, beam_size};
     parent_ids_dims = output_dims;
   } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling") {
+             decoding_strategy == "topp_sampling" ||
+             decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     parent_ids_dims = {1};
   } else {
@@ -90,17 +94,18 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
       paddle::Tensor(cache_k[0].place(), sequence_length_dims);
 
   if (cache_k[0].place() == paddle::PlaceType::kGPU) {
-    auto sequence_length = paddle::Tensor(paddle::PlaceType::kGPU);
+    auto mem_seq_length = paddle::Tensor(paddle::PlaceType::kGPU);
 
     if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
-      sequence_length = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
+      mem_seq_length = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
     } else {
-      sequence_length = mem_seq_len;
+      mem_seq_length = mem_seq_len;
     }
 
     return UnifiedDecodingCUDAForward(cache_k,
                                       cache_v,
-                                      sequence_length,
+                                      mem_seq_length,
+                                      type_id,
                                       logits_mask,
                                       word_embedding,
                                       self_ln_weight,
@@ -143,11 +148,13 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       eos_id,
                                       max_len,
                                       beam_search_diversity_rate,
-                                      type_id,
                                       unk_id,
                                       mask_id,
                                       temperature,
-                                      len_penalty);
+                                      len_penalty,
+                                      normalize_before,
+                                      pos_bias,
+                                      hidden_act);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -196,11 +203,13 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const int& type_id,
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty) {
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act) {
   int batch_size = cache_k_shapes[0][0];
 
   std::vector<int64_t> output_dims;
@@ -212,7 +221,8 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     output_dims = {max_len, batch_size, beam_size};
     return {output_dims, output_dims, sequence_length_dims};
   } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling") {
+             decoding_strategy == "topp_sampling" ||
+             decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     return {output_dims, {1}, sequence_length_dims};
   } else {
@@ -261,6 +271,7 @@ PD_BUILD_OP(fusion_unified_decoding)
     .Inputs({paddle::Vec("CacheK"),
              paddle::Vec("CacheV"),
              "MemSeqLen",
+             "TypeId",
              "LogitsMask",
              "WordEmbedding",
              paddle::Vec("SelfLayernormWeight"),
@@ -301,11 +312,13 @@ PD_BUILD_OP(fusion_unified_decoding)
             "eos_id: int",
             "max_len: int64_t",
             "beam_search_diversity_rate: float",
-            "type_id: int",
             "unk_id: int",
             "mask_id: int",
             "temperature: float",
-            "len_penalty: float"})
+            "len_penalty: float",
+            "normalize_before: bool",
+            "pos_bias: bool",
+            "hidden_act: std::string"})
     .SetKernelFn(PD_KERNEL(UnifiedDecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(UnifiedDecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(UnifiedDecodingInferDtype));

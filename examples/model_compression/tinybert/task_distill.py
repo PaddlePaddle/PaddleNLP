@@ -342,8 +342,13 @@ def do_train(args):
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     student = model_class.from_pretrained(
         args.student_model_name_or_path, num_classes=num_classes)
+    teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
+    teacher = teacher_model_class.from_pretrained(
+        args.teacher_path, num_classes=num_classes)
+
     if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+        student = paddle.DataParallel(student, find_unused_parameters=True)
+        teacher = paddle.DataParallel(teacher, find_unused_parameters=True)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
@@ -378,16 +383,17 @@ def do_train(args):
 
     metric = metric_class()
 
-    teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
-    teacher = teacher_model_class.from_pretrained(
-        args.teacher_path, num_classes=num_classes)
-
-    teacher.to_distill = to_distill
-    student.to_distill = to_distill
-
-    teacher = teacher.to_distill(teacher)
-    student = student.to_distill(student)
-
+    teacher = to_distill(
+        teacher,
+        return_attentions=True,
+        return_qkv=False,
+        return_layer_outputs=True)
+    student = to_distill(
+        student,
+        return_attentions=True,
+        return_qkv=False,
+        return_layer_outputs=True)
+    pad_token_id = 0
     global_step = 0
     tic_train = time.time()
     best_res = 0.0
@@ -399,8 +405,12 @@ def do_train(args):
             # While using tinybert-4l-312d, tinybert-6l-768d, tinybert-4l-312d-zh, tinybert-6l-768d-zh
             # student_hidden = student.tinybert.fit_dense(student.outputs.hidden_states[i])
             # While using tinybert-4l-312d-v2, tinybert-6l-768d-v2
-            student_hidden = student.tinybert.fit_denses[i](
-                student.outputs.hidden_states[i])
+            if isinstance(student, paddle.DataParallel):
+                student_hidden = student._layers.tinybert.fit_denses[i](
+                    student.outputs.hidden_states[i])
+            else:
+                student_hidden = student.tinybert.fit_denses[i](
+                    student.outputs.hidden_states[i])
             loss_hidden += mse_loss_fct(student_hidden,
                                         teacher.outputs.hidden_states[2 * i])
         for i in range(len(student.outputs.attentions)):
@@ -416,7 +426,6 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, labels = batch
-
             logits = student(input_ids, segment_ids)
             with paddle.no_grad():
                 teacher_logits = teacher(input_ids, segment_ids)

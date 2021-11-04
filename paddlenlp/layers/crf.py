@@ -35,11 +35,11 @@ class LinearChainCrf(nn.Layer):
     See https://repository.upenn.edu/cgi/viewcontent.cgi?article=1162&context=cis_papers for reference.
 
     Args:
-        num_labels (`int`): 
+        num_labels (int):
             The label number.
-        crf_lr (`float`, optional): 
+        crf_lr (float, optional):
             The crf layer learning rate. Defaults to ``0.1``.
-        with_start_stop_tag (`bool`, optional): 
+        with_start_stop_tag (bool, optional):
             If set to True, the start tag and stop tag will be considered, the transitions params will be a tensor with a shape of `[num_labels+2, num_labels+2]`.
             Else, the transitions params will be a tensor with a shape of `[num_labels, num_labels]`.
     """
@@ -105,14 +105,13 @@ class LinearChainCrf(nn.Layer):
         Further, We can get F(n) is a recursive formula with F(n-1).
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            norm_score (`Tensor`): 
-                The normalizers tensor. Its dtype is float32 and has a shape of `[batch_size]`.
+            Tensor: Returns the normalizers tensor `norm_score`. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         batch_size, seq_len, n_labels = inputs.shape
         inputs_t_exp = inputs.transpose([1, 0, 2]).unsqueeze(-1)
@@ -154,16 +153,15 @@ class LinearChainCrf(nn.Layer):
         $$ score(x,y) = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i) $$
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            labels (`Tensor`) : 
+            labels (Tensor):
                 The input label tensor. Its dtype is int64 and has a shape of `[batch_size, sequence_length]`
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            unnorm_score (`Tensor`): 
-                The unnormalized sequence scores tensor. Its dtype is float32 and has a shape of `[batch_size]`.
+            Tensor: Returns the unnormalized sequence scores tensor `unnorm_score`. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         unnorm_score = self._point_score(
             inputs, labels, lengths) + self._trans_score(labels, lengths)
@@ -268,7 +266,7 @@ class LinearChainCrfLoss(nn.Layer):
     The negative log-likelihood for linear chain Conditional Random Field (CRF).
 
     Args:
-        crf (`LinearChainCrf`): 
+        crf (LinearChainCrf):
             The `LinearChainCrf` network object. Its parameter will be used to calculate the loss.
     """
 
@@ -286,16 +284,16 @@ class LinearChainCrfLoss(nn.Layer):
         then we have $$ loss = -logp(y|x) = -log(exp(score(x,y))/Z(x)) = -score(x,y) + logZ(x) $$
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
-            labels (`Tensor`) : 
+            labels (Tensor) :
                 The input label tensor. Its dtype is int64 and has a shape of `[batch_size, sequence_length]`
-            old_version_labels (`Tensor`, optional): Unnecessary parameter for compatibility with older versions. Defaults to ``None``.
+            old_version_labels (Tensor, optional): Unnecessary parameter for compatibility with older versions. Defaults to ``None``.
 
         Returns:
-            loss (`Tensor`): The crf loss. Its dtype is float32 and has a shape of `[batch_size]`.
+            Tensor: The crf loss. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         # Note: When closing to convergence, the loss could be a small negative number. This may caused by underflow when calculating exp in logsumexp.
         #       We add relu here to avoid negative loss. In theory, the crf loss must be greater than or equal to 0, relu will not impact on it.
@@ -318,9 +316,9 @@ class ViterbiDecoder(nn.Layer):
     ViterbiDecoder can decode the highest scoring sequence of tags, it should only be used at test time.
 
     Args:
-        transitions (`Tensor`): 
+        transitions (Tensor):
             The transition matrix.  Its dtype is float32 and has a shape of `[num_tags, num_tags]`.
-        with_start_stop_tag (`bool`, optional): 
+        with_start_stop_tag (bool, optional):
             If set to True, the last row and the last column of transitions will be considered as start tag,
             the the penultimate row and the penultimate column of transitions will be considered as stop tag.
             Else, all the rows and columns will be considered as the real tag. Defaults to ``None``.
@@ -363,15 +361,16 @@ class ViterbiDecoder(nn.Layer):
         Decode the highest scoring sequence of tags.
 
         Args:
-            inputs (`Tensor`):  
+            inputs (Tensor):
                 The unary emission tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            length (`Tensor`):  
+            length (Tensor):
                 The input length tensor storing real length of each sequence for correctness. Its dtype is int64 and has a shape of `[batch_size]`.
+
         Returns:
-            scores(`Tensor`): 
-                The scores tensor containing the score for the Viterbi sequence. Its dtype is float32 and has a shape of `[batch_size]`.
-            paths(`Tensor`): 
-                The paths tensor containing the highest scoring tag indices. Its dtype is int64 and has a shape of `[batch_size, sequence_length`].
+            tuple: Returns tuple (scores, paths). The `scores` tensor containing the score for the Viterbi sequence.
+            Its dtype is float32 and has a shape of `[batch_size]`.
+            The `paths` tensor containing the highest scoring tag indices.
+            Its dtype is int64 and has a shape of `[batch_size, sequence_length]`.
         """
         input_shape = paddle.shape(inputs)
         batch_size = input_shape[0]
@@ -392,14 +391,11 @@ class ViterbiDecoder(nn.Layer):
             alpha = self._initialize_alpha(batch_size)
         else:
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
-        # avoid call fill_constant in iteration
-        zeros = paddle.zeros([1], dtype='int64')
-        ones = paddle.ones([1], dtype='int64')
         for i, logit in enumerate(inputs_t[:max_seq_len]):
             # if not with_start_stop_tag, the first label has not antecedent tag.
             if i == 0 and not self.with_start_stop_tag:
                 alpha = logit
-                left_length = left_length - ones
+                left_length = left_length - 1
                 continue
             alpha_exp = alpha.unsqueeze(2)
             # alpha_trn_sum: batch_size, n_labels, n_labels
@@ -416,22 +412,24 @@ class ViterbiDecoder(nn.Layer):
             # Now add the emission scores
             alpha_nxt = alpha_max + logit
 
-            mask = paddle.cast((left_length > zeros), dtype='float32')
-            alpha = mask * alpha_nxt + (ones - mask) * alpha
+            mask = paddle.cast((left_length > 0), dtype='float32')
+            alpha = mask * alpha_nxt + (1 - mask) * alpha
 
             if self.with_start_stop_tag:
-                mask = paddle.cast((left_length == ones), dtype='float32')
+                mask = paddle.cast((left_length == 1), dtype='float32')
                 alpha += mask * trans_exp[:, self.stop_idx]
 
-            left_length = left_length - ones
+            left_length = left_length - 1
 
         # last_ids: batch_size
         scores, last_ids = alpha.max(1), alpha.argmax(1)
+        if max_seq_len == 1:
+            return scores, last_ids.unsqueeze(1)
         # Trace back the best path
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
         left_length = left_length[:, 0]
-        tag_mask = paddle.cast((left_length >= zeros), 'int64')
+        tag_mask = paddle.cast((left_length >= 0), 'int64')
         last_ids_update = last_ids * tag_mask
 
         batch_path = [last_ids_update]
@@ -439,13 +437,17 @@ class ViterbiDecoder(nn.Layer):
         historys = paddle.reverse(historys, [0])
         for hist in historys:
             # hist: batch_size, n_labels
-            left_length = left_length + ones
+            left_length = left_length + 1
             gather_idx = batch_offset + last_ids
-            tag_mask = paddle.cast((left_length >= zeros), 'int64')
+            tag_mask = paddle.cast((left_length > 0), 'int64')
             last_ids_update = paddle.gather(hist.flatten(),
                                             gather_idx) * tag_mask
+            zero_len_mask = paddle.cast((left_length == 0), 'int64')
+            last_ids_update = last_ids_update * (1 - zero_len_mask
+                                                 ) + last_ids * zero_len_mask
             batch_path.append(last_ids_update)
-            last_ids = last_ids_update + last_ids * (ones - tag_mask)
+            tag_mask = paddle.cast((left_length >= 0), 'int64')
+            last_ids = last_ids_update + last_ids * (1 - tag_mask)
         batch_path = paddle.reverse(paddle.stack(batch_path, 1), [1])
         return scores, batch_path
 
