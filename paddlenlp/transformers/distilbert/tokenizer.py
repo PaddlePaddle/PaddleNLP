@@ -19,9 +19,9 @@ __all__ = ['DistilBertTokenizer']
 
 class DistilBertTokenizer(BertTokenizer):
     """
-    Constructs a DistilBertTokenizer.
-    The usage of DistilBertTokenizer is the same as
+    Constructs a DistilBert tokenizer. The usage of DistilBertTokenizer is the same as
     `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
+    For more information regarding those methods, please refer to this superclass.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
