@@ -27,8 +27,6 @@ import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.experimental import FasterModelForTokenClassification
-
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 from paddlenlp.data import Stack, Tuple, Pad, Dict
@@ -36,7 +34,8 @@ from paddlenlp.data import Stack, Tuple, Pad, Dict
 parser = argparse.ArgumentParser()
 
 # yapf: disable
-parser.add_argument("--output_dir", default="test", type=str, help="The output directory where the model predictions and checkpoints will be written.")
+parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
@@ -68,7 +67,7 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
             length, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
-    precision, recall, f1_score = metric.accumulate()
+        precision, recall, f1_score = metric.accumulate()
     print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (avg_loss, precision, recall, f1_score))
     model.train()
@@ -102,23 +101,20 @@ def do_train(args):
     train_ds, test_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
 
-    model = FasterModelForTokenClassification.from_pretrained(
-        "ernie-1.0", num_classes=len(train_ds.label_list))
+    tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
+    #tokenizer = ErnieCtmTokenizer.from_pretrained("ernie-ctm")
 
-    # tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
-    # #tokenizer = ErnieCtmTokenizer.from_pretrained("ernie-ctm")
+    label_list = train_ds.label_list
+    label_num = len(label_list)
+    no_entity_id = label_num - 1
 
-    # label_list = train_ds.label_list
-    # label_num = len(label_list)
-    # no_entity_id = label_num - 1
+    trans_func = partial(
+        tokenize_and_align_labels,
+        tokenizer=tokenizer,
+        no_entity_id=no_entity_id,
+        max_seq_len=args.max_seq_length)
 
-    # trans_func = partial(
-    #     tokenize_and_align_labels,
-    #     tokenizer=tokenizer,
-    #     no_entity_id=no_entity_id,
-    #     max_seq_len=args.max_seq_length)
-
-    # train_ds = train_ds.map(trans_func)
+    train_ds = train_ds.map(trans_func)
 
     ignore_label = -100
 
@@ -134,6 +130,7 @@ def do_train(args):
 
     train_data_loader = DataLoader(
         dataset=train_ds,
+        collate_fn=batchify_fn,
         num_workers=0,
         batch_sampler=train_batch_sampler,
         return_list=True)
@@ -142,10 +139,16 @@ def do_train(args):
 
     test_data_loader = DataLoader(
         dataset=test_ds,
+        collate_fn=batchify_fn,
         num_workers=0,
         batch_size=args.batch_size,
         return_list=True)
 
+    # Define the model netword and its loss
+    model = BertForTokenClassification.from_pretrained(
+        args.model_name_or_path, num_classes=label_num)
+    #model = ErnieCtmForTokenClassification.from_pretrained(
+    #    args.model_name_or_path, num_classes=label_num)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
