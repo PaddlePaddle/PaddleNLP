@@ -133,6 +133,7 @@ class ErnieTokenizer(PretrainedTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
