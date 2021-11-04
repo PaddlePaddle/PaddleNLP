@@ -14,16 +14,17 @@
 # limitations under the License.
 
 import copy
-import io
-import json
 import os
-import six
 import unicodedata
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
 
-__all__ = ['BasicTokenizer', 'BertTokenizer', 'WordpieceTokenizer']
+__all__ = [
+    'BasicTokenizer',
+    'BertTokenizer',
+    'WordpieceTokenizer',
+]
 
 
 class BasicTokenizer(object):
@@ -290,9 +291,9 @@ class BertTokenizer(PretrainedTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import BertTokenizer
-            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-            inputs = berttokenizer.tokenize('He was a puppeteer')
+            inputs = tokenizer('He was a puppeteer')
             print(inputs)
 
             '''
@@ -384,6 +385,7 @@ class BertTokenizer(PretrainedTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
@@ -554,7 +556,7 @@ class BertTokenizer(PretrainedTokenizer):
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
-        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
+        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
 
         Args:
             token_ids_0 (List[int]):

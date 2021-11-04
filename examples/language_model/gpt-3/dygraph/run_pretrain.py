@@ -25,6 +25,7 @@ from visualdl import LogWriter
 from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
@@ -126,8 +127,9 @@ def do_train(args):
         "sharding_degree": args.sharding_degree
     }
 
+    accumulate_steps = args.local_batch_size // args.micro_batch_size
     strategy.pipeline_configs = {
-        "accumulate_steps": args.local_batch_size // args.micro_batch_size,
+        "accumulate_steps": accumulate_steps,
         "micro_batch_size": args.micro_batch_size
     }
 
@@ -160,8 +162,8 @@ def do_train(args):
     # Define log writer
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
-        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_amp,
+        "{}_globalbsz_{}_pure_fp16_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16,
             False, global_rank).lower())
 
     if os.path.exists(log_writer_path):
@@ -246,15 +248,24 @@ def do_train(args):
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params)
+            apply_decay_param_fun=lambda x: x in decay_params,
+            # TODO: remove 'multi_precision' in definition of optimizer
+            # and add it to 'paddle.amp.decorate'
+            multi_precision=args.use_pure_fp16)
+
+    if args.use_pure_fp16:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        scaler = fleet.distributed_scaler(scaler)
+        # level O2 means converting the network to FP16
+        model, optimizer = paddle.amp.decorate(
+            models=model,
+            optimizers=optimizer,
+            level='O2',
+            save_dtype='float32')
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -285,7 +296,14 @@ def do_train(args):
             valid_data_loader = valid_data_loader()
             test_data_loader = test_data_loader()
 
+            # time count
+            train_reader_cost = 0.0
+            train_run_cost = 0.0
+            reader_start = time.time()
             for step, batch in enumerate(train_data_loader()):
+                train_reader_cost += time.time() - reader_start
+                train_start = time.time()
+
                 global_step += 1
                 tokens, loss_mask, position_ids, labels = batch
 
@@ -294,23 +312,36 @@ def do_train(args):
                 position_ids.stop_gradient = True
 
                 if args.pp_degree == 1:
-                    with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
-                            custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
-                        preds = model(tokens, position_ids)
-                        loss = criterion(preds, labels, loss_mask)
+                    # In ParallelMode of DataParallel, 'no_sync' can be used for improving
+                    # performance of model by gradient accumulation.
+                    loss = 0.0
+                    for i in range(accumulate_steps):
+                        start_index = i * args.micro_batch_size
+                        end_index = start_index + args.micro_batch_size
+                        with paddle.amp.auto_cast(
+                                args.use_pure_fp16,
+                                custom_black_list=[
+                                    "reduce_sum",
+                                    "c_softmax_with_cross_entropy",
+                                    "elementwise_div"
+                                ],
+                                level='O2'):
+                            preds = model(
+                                tokens[start_index:end_index, :],
+                                position_ids[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :],
+                                loss_mask[start_index:end_index, :])
+                        loss_mbs = loss_mbs / accumulate_steps
+                        if args.use_pure_fp16:
+                            scaler.scale(loss_mbs).backward()
+                        else:
+                            loss_mbs.backward()
+                        loss = loss + loss_mbs
 
-                    if args.use_amp:
-                        scaler.scale(loss).backward()
+                    if args.use_pure_fp16:
                         scaler.minimize(optimizer, loss)
                     else:
-                        loss.backward()
                         optimizer.step()
 
                     if lr_scheduler is not None:
@@ -320,32 +351,42 @@ def do_train(args):
                 else:
                     data = [(tokens, position_ids), (labels, loss_mask)]
                     with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
+                            args.use_pure_fp16,
                             custom_black_list=[
                                 "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
+                                "elementwise_div"
+                            ],
+                            level='O2'):
                         loss = model.train_batch(
                             data,
                             optimizer=optimizer,
                             lr_scheduler=lr_scheduler,
-                            scaler=scaler if args.use_amp else None)
+                            scaler=scaler if args.use_pure_fp16 else None)
+
+                # Sync for profile time, delete it may be a little faster
+                paddle.device.cuda.synchronize()
+                train_run_cost += time.time() - train_start
+                # Profile for model benchmark
+                profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()
-                    speed = args.logging_freq / (time.time() - tic_train)
+                    speed = args.logging_freq / (
+                        train_reader_cost + train_run_cost)
+                    avg_reader_cost = train_reader_cost / args.logging_freq
+
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, avg_loss, speed, speed *
-                           default_global_tokens_num, optimizer.get_lr()))
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        % (global_step, epoch, step, avg_loss, avg_reader_cost,
+                           1. / speed, speed, speed * default_global_tokens_num,
+                           optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate",
                                           optimizer.get_lr(), global_step)
 
                     tic_train = time.time()
+                    train_reader_cost = 0.0
+                    train_run_cost = 0.0
 
                 if args.check_accuracy:
                     if global_step >= args.max_steps:
@@ -400,6 +441,8 @@ def do_train(args):
                     logger.info("The training process is complete.")
                     del train_data_loader
                     return
+
+                reader_start = time.time()
 
             del train_data_loader
 

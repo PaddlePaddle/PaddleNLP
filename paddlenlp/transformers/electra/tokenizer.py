@@ -93,7 +93,7 @@ class ElectraTokenizer(PretrainedTokenizer):
         },
         "chinese-electra-small": {
             "do_lower_case": True
-        }
+        },
     }
 
     def __init__(self,

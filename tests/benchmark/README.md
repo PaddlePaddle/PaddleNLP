@@ -12,9 +12,16 @@ run_cmd="set -xe;
         cd /workspace ;
         bash -x tests/benchmark/run_all.sh"
 
-nvidia-docker run --name test_paddle_gpt -it  \
+nvidia-docker run --name test_paddle_gpt -i  \
     --net=host \
     --shm-size=1g \
     -v $PWD:/workspace \
     ${ImageName}  /bin/bash -c "${run_cmd}"
+```
+
+如果需要打开profile选项，可以直接替换`run_cmd`为：
+```
+run_cmd="set -xe;
+        cd /workspace ;
+        bash -x tests/benchmark/run_all.sh on"
 ```

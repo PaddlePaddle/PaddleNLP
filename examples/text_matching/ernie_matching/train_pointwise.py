@@ -73,10 +73,10 @@ def evaluate(model, criterion, metric, data_loader, phase="dev"):
     losses = []
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch
-        probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-        loss = criterion(probs, labels)
+        logits = model(input_ids=input_ids, token_type_ids=token_type_ids)
+        loss = criterion(logits, labels)
         losses.append(loss.numpy())
-        correct = metric.compute(probs, labels)
+        correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
     print("eval {} loss: {:.5}, accu: {:.5}".format(phase,
@@ -162,9 +162,9 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-            loss = criterion(probs, labels)
-            correct = metric.compute(probs, labels)
+            logits = model(input_ids=input_ids, token_type_ids=token_type_ids)
+            loss = criterion(logits, labels)
+            correct = metric.compute(logits, labels)
             metric.update(correct)
             acc = metric.accumulate()
 
@@ -190,6 +190,13 @@ def do_train():
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
+
+    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+    paddle.save(model.state_dict(), save_param_path)
+    tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":

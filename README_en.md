@@ -77,14 +77,14 @@ ddp("百度是一家高科技公司")
 # Sentiment Analysis
 senta = Taskflow("sentiment_analysis")
 senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
->>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
+>>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
 ```
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
 
 ### Transformer API: Awesome Pre-trained Model Ecosystem
 
-We provide **22** network architectures and over **90** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
+We provide **24** network architectures and over **100** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -154,7 +154,7 @@ For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zo
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-##  Wide-range NLP Task Support
+## Wide-range NLP Task Support
 
 PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
 
@@ -162,6 +162,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 
 - [Word Embedding](./examples/word_embedding/)
 - [Lexical Analysis](./examples/lexical_analysis/)
+- [Dependency Parsing](./examples/dependency_parsing/)
 - [Language Model](./examples/language_model/)
 - [Semantic Parsing (Text to SQL)](./examples/text_to_sql):star:
 - [Text Classification](./examples/text_classification/)
@@ -220,6 +221,10 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 ## ChangeLog
 
 For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
+
+## Acknowledge
+
+We have borrowed from Hugging Face's [Transformer](https://github.com/huggingface/transformers)🤗 excellent design on pretrained models usage, and we would like to express our gratitude to the authors of Hugging Face and its open source community.
 
 ## License
 
