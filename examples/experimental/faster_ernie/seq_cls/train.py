@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.experimental import FasterErnieModel, FasterErnieForSequenceClassification, to_tensor
+from paddlenlp.experimental import FasterErnieForSequenceClassification, to_tensor
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -84,9 +84,6 @@ def create_dataloader(dataset, mode='train', batch_size=1):
 
 def do_train():
     paddle.set_device(args.device)
-    rank = paddle.distributed.get_rank()
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
 
@@ -105,7 +102,6 @@ def do_train():
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
-    model = paddle.DataParallel(model)
 
     num_training_steps = len(train_data_loader) * args.epochs
 
@@ -141,7 +137,7 @@ def do_train():
             acc = metric.accumulate()
 
             global_step += 1
-            if global_step % 10 == 0 and rank == 0:
+            if global_step % 10 == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -156,7 +152,7 @@ def do_train():
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
-                model._layers.save_pretrained(save_dir)
+                model.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":

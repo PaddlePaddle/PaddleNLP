@@ -115,13 +115,7 @@ class Predictor(object):
         self.predictor.run()
         logits = self.output_handle[0].copy_to_cpu()
         preds = self.output_handle[1].copy_to_cpu()
-
-        # probs = softmax(logits, axis=1)
-        # idx = np.argmax(probs, axis=1)
-        # idx = idx.tolist()
-        # labels = [label_map[i] for i in idx]
-
-        # return labels
+        return preds
 
 
 if __name__ == "__main__":
@@ -131,20 +125,30 @@ if __name__ == "__main__":
                           args.enable_mkldnn)
 
     # test_ds = load_dataset("chnsenticorp", splits=["test"])
-    text = '小说是文学的一种样式，一般描写人物故事，塑造多种多样的人物形象，但亦有例外。它是拥有不完整布局、发展及主题的文学作品。而对话是不是具有鲜明的个性，每个人物说的没有独特的语言风格，是衡量小说水准的一个重要标准。与其他文学样式相比，小说的容量较大，它可以细致的展现人物性格和命运，可以表现错综复杂的矛盾冲突，同时还可以描述人物所处的社会生活环境。小说一词，最早见于《庄子·外物》：“饰小说以干县令，其于大达亦远矣。”这里所说的小说，是指琐碎的言谈、小的道理，与现时所说的小说相差甚远。文学中，小说通常指长篇小说、中篇、短篇小说和诗的形式。小说是文学的一种样式，一般描写人物故事，塑造多种多样的人物形象，但亦有例外。它是拥有不完整布局、发展及主题的文学作品。而对话是不是具有鲜明的个性，每个人物说的没有独特的语言风格，是衡量小说水准的一个重要标准。与其他文学样式相比，小说的容量较大，它可以细致的展现人物性格和命运，可以表现错综复杂的矛盾冲突，同时还可以描述人物所处的社会生活环境。小说一词，最早见于《庄子·外物》：“饰小说以干县令，其于大达亦远矣。”这里所说的小说，是指琐碎的言谈、小的道理，与现时所说的小说相差甚远。文学中'
+    text = '他老老实实告诉船员，他没有钱依照原租船者的合同按时发工资，但他愿意救急，先付给那些因生活困难、子女就学或其他原因特别需要钱的水手工资。'
     data = [text[:args.max_seq_length]] * 1000
     batches = [
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
     ]
+
+    label_map = {
+        0: 'B-PER',
+        1: 'I-PER',
+        2: 'B-ORG',
+        3: 'I-ORG',
+        4: 'B-LOC',
+        5: 'I-LOC',
+        6: 'O'
+    }
     for _ in range(10):
-        predictor.predict(batches[0], label_map=None)
+        predictor.predict(batches[0], label_map=label_map)
 
     import time
     start = time.time()
     for _ in range(10):
         for batch_data in batches:
-            predictor.predict(batch_data, label_map=None)
+            predictor.predict(batch_data, label_map=label)
     end = time.time()
 
     print("num data: %d, batch_size: %d, cost time: %.5f" %
