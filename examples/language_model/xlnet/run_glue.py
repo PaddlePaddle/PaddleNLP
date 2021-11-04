@@ -121,6 +121,7 @@ def convert_example(example,
                     tokenizer,
                     label_list,
                     max_seq_length=512,
+                    pad_to_max_seq_len=False,
                     is_test=False):
     """convert a glue example into necessary features"""
     if not is_test:
@@ -134,12 +135,14 @@ def convert_example(example,
         example = tokenizer(
             example['sentence'],
             max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
             return_attention_mask=True)
     else:
         example = tokenizer(
             example['sentence1'],
             text_pair=example['sentence2'],
             max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
             return_attention_mask=True)
 
     if not is_test:

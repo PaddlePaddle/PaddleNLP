@@ -38,10 +38,10 @@ function _train(){
     case ${run_mode} in
     sp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
+        examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
     mp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}"
+        examples/language_model/xlnet/run_glue.py ${train_cmd}"
         log_parse_file="mylog/workerlog.0" ;;
     *) echo "choose run_mode(sp or mp)"; exit 1;
     esac
