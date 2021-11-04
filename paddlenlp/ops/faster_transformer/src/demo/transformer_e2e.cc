@@ -183,6 +183,15 @@ private:
     src_word_t->Reshape({batch_size, max_len});
     src_word_t->CopyFromCpu(src_word_vec.data());
 
+    // NOTE: If the saved model supports force decoding, a nullptr must be
+    // given to trg_word to ensure predictor work properly when not
+    // using force decoding.
+    /*
+     * auto trg_word_t = predictor->GetInputHandle("trg_word");
+     * trg_word_t->Reshape({0, 0});
+     * trg_word_t->CopyFromCpu((int*)nullptr);
+     */
+
     return true;
   }
 };
