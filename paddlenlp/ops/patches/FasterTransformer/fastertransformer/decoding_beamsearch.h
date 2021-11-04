@@ -765,70 +765,69 @@ public:
                                   args_.end_id_,
                                   finished_count_buf_);
           }
-
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-        }
-
-        if (step <= max_trg_len) {
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-
-          update_with_force_deocdingLauncher<float>(
-              decoding_params.trg_word,
-              decoding_params.trg_length,
-              finished_buf_,
-              word_ids_buf_,
-              (step > min_trg_len) ? nullptr : decoding_params.sequence_length,
-              (keep_alive_beam_) ? parent_ids_buf_ : nullptr,
-              (keep_alive_beam_)
-                  ? decoding_params.parent_ids + (step - 1) * m * 2
-                  : decoding_params.parent_ids + (step - 1) * m,
-              (keep_alive_beam_)
-                  ? decoding_params.output_ids + (step - 1) * m * 2
-                  : decoding_params.output_ids + (step - 1) * m,
-              cum_log_buf_,
-              keep_alive_beam_,
-              args_.batch_size_,
-              (keep_alive_beam_) ? args_.beam_width_ * 2 : args_.beam_width_,
-              max_trg_len,
-              step,
-              decoding_params.stream);
         }
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+      }
 
-        if (args_.beam_width_ > 1) {
-          // chose which self cache to use
-          int decoder_max_seq_len =
-              (decoder_->getCacheFormat() != 0) ? args_.seq_len_ : -1;
+      if (step <= max_trg_len) {
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
 
-          update_KV_cache_kernelLauncher(
-              K_cache_,
-              V_cache_,
-              keep_alive_beam_ ? parent_ids_buf_
+        update_with_force_decodingLauncher<float>(
+            decoding_params.trg_word,
+            decoding_params.trg_length,
+            finished_buf_,
+            word_ids_buf_,
+            (step > min_trg_len) ? nullptr : decoding_params.sequence_length,
+            (keep_alive_beam_) ? parent_ids_buf_ : nullptr,
+            (keep_alive_beam_) ? decoding_params.parent_ids + (step - 1) * m * 2
                                : decoding_params.parent_ids + (step - 1) * m,
-              finished_buf_,
-              args_.batch_size_,
-              args_.beam_width_,
-              args_.head_num_,
-              args_.size_per_head_,
-              step,
-              decoder_max_seq_len,
-              cache_size,
-              args_.decoder_layers_,
-              decoding_params.stream);
-        }
+            (keep_alive_beam_) ? decoding_params.output_ids + (step - 1) * m * 2
+                               : decoding_params.output_ids + (step - 1) * m,
+            cum_log_buf_,
+            keep_alive_beam_,
+            args_.batch_size_,
+            (keep_alive_beam_) ? args_.beam_width_ * 2 : args_.beam_width_,
+            max_trg_len,
+            step,
+            decoding_params.stream);
+      }
+
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      if (args_.beam_width_ > 1) {
+        // chose which self cache to use
+        int decoder_max_seq_len =
+            (decoder_->getCacheFormat() != 0) ? args_.seq_len_ : -1;
+
+        update_KV_cache_kernelLauncher(
+            K_cache_,
+            V_cache_,
+            keep_alive_beam_ ? parent_ids_buf_
+                             : decoding_params.parent_ids + (step - 1) * m,
+            finished_buf_,
+            args_.batch_size_,
+            args_.beam_width_,
+            args_.head_num_,
+            args_.size_per_head_,
+            step,
+            decoder_max_seq_len,
+            cache_size,
+            args_.decoder_layers_,
+            decoding_params.stream);
+      }
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
 
 /*
   User can check the update_KV_cache by update_KV_cache_kernel_check.
@@ -841,32 +840,32 @@ public:
 // hidden_units_, step, cache_size, decoder_layers_, decoding_params.stream);
 #endif
 
-        if (step > max_trg_len) {
-          // TODO Find a better method to check the is_finished
-          int finish_size = (keep_alive_beam_) ? m * 2 : m;
-          cudaMemcpy(h_finished_buf_,
-                     finished_buf_,
-                     sizeof(bool) * finish_size,
-                     cudaMemcpyDeviceToHost);
-          int sum = 0;
-          for (int i = 0; i < finish_size; i++) {
-            sum += (int)h_finished_buf_[i];
-          }
-          if (sum == finish_size) break;
+      if (step > max_trg_len) {
+        // TODO Find a better method to check the is_finished
+        int finish_size = (keep_alive_beam_) ? m * 2 : m;
+        cudaMemcpy(h_finished_buf_,
+                   finished_buf_,
+                   sizeof(bool) * finish_size,
+                   cudaMemcpyDeviceToHost);
+        int sum = 0;
+        for (int i = 0; i < finish_size; i++) {
+          sum += (int)h_finished_buf_[i];
         }
-      }  // end for decoding step for llop
-    }    // end of forward
+        if (sum == finish_size) break;
+      }
+    }  // end for decoding step for llop
+  }    // end of forward
 
-    virtual ~DecodingBeamsearch() {
-      delete[] K_cache_;
-      delete[] V_cache_;
-      delete[] K_mem_cache_;
-      delete[] V_mem_cache_;
-      delete[] h_finished_buf_;
-      delete[] h_trg_length_;
-      delete decoder_;
-      allocator_.free(buf_);
-    }
-  };
+  virtual ~DecodingBeamsearch() {
+    delete[] K_cache_;
+    delete[] V_cache_;
+    delete[] K_mem_cache_;
+    delete[] V_mem_cache_;
+    delete[] h_finished_buf_;
+    delete[] h_trg_length_;
+    delete decoder_;
+    allocator_.free(buf_);
+  }
+};
 
 }  // namespace fastertransformer

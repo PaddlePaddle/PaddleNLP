@@ -515,7 +515,7 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        update_with_force_deocdingLauncher(
+        update_with_force_decodingLauncher(
             decoding_params.trg_word,
             decoding_params.trg_length,
             finished_buf_,

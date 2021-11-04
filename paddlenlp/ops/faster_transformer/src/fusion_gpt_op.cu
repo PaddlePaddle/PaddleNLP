@@ -69,6 +69,8 @@ std::vector<paddle::Tensor> gpt2_kernel(
   decoding_params.stream = stream;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
+  const int hidden_unit = size_per_head * n_head;
+
   TensorParallelParam tensor_parallel_param;
   LayerParallelParam layer_parallel_param;
   // TODO: multi-cards supports.
@@ -79,7 +81,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
   // TODO: multi-cards supports.
   // tensor_parallel_param.nccl_comm = tensor_para_nccl_comm;
   tensor_parallel_param.local_head_num_ = n_head;
-  tensor_parallel_param.local_hidden_units_ = size_per_head * n_head;
+  tensor_parallel_param.local_hidden_units_ = hidden_unit;
 
   layer_parallel_param.rank = 0;
   layer_parallel_param.world_size = 1;
@@ -122,7 +124,6 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer];
-  const int hidden_unit = size_per_head * n_head;
 
   for (int i = 0; i < num_layer; ++i) {
     // TODO: multi-cards supports.

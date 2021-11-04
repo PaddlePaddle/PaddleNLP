@@ -64,12 +64,13 @@ void add_bias_input_pre_layernorm_kernelLauncher(T* out,
                                                  int m,
                                                  int n,
                                                  cudaStream_t stream);
-// End of encoder kernels
-#endif
 
 template <typename T>
 void add_bias_act_kernelLauncher(
     T* out, const T* bias, int m, int n, cudaStream_t stream, bool is_gelu);
+
+// End of encoder kernels
+#endif
 
 template <typename T>
 void embedding_position_lookups_bart_kernel_launcher(
@@ -80,5 +81,22 @@ void embedding_position_lookups_bart_kernel_launcher(
     const int batch_size,
     const int hidden_units,
     cudaStream_t stream);
+
+template <typename T>
+void update_with_force_decodingLauncher(const int* trg_word,
+                                        const int* trg_length,
+                                        bool* finished,
+                                        int* word_ids,
+                                        int* sequence_length,
+                                        int* parent_ids_buf,
+                                        int* parent_ids,
+                                        int* output_ids,
+                                        T* scores,
+                                        bool keep_alive_beam,
+                                        const int batch_size,
+                                        const int beam_width,
+                                        const int max_trg_len,
+                                        const int step,
+                                        cudaStream_t stream);
 
 }  // namespace fastertransformer

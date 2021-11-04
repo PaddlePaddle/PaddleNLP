@@ -104,6 +104,106 @@ void embedding_position_lookups_bart_kernel_launcher(T* from_tensor,
       hidden_units);
 }
 
+template <typename T>
+__global__ void update_with_force_decoding_kernel(const int* trg_word,
+                                                  const int* trg_length,
+                                                  bool* finished,
+                                                  int* word_ids,
+                                                  int* sequence_length,
+                                                  int* parent_ids_buf,
+                                                  int* parent_ids,
+                                                  int* output_ids,
+                                                  T* scores,
+                                                  bool keep_alive_beam,
+                                                  const int batch_size,
+                                                  const int beam_width,
+                                                  const int max_trg_len,
+                                                  const int step) {
+  int bid = blockIdx.x;   // batch_size
+  int tid = threadIdx.x;  // beam_width
+
+  const T MAX_T_VAL = (sizeof(T) == 2) ? HALF_FLT_MAX : 1e20f;
+  if (step <= trg_length[bid]) {
+    finished[bid * beam_width + tid] = false;
+
+    int word_id = trg_word[bid * max_trg_len + step - 1];
+
+    if (keep_alive_beam) {
+      if (tid >= beam_width / 2) {
+        word_ids[bid * beam_width / 2 + tid - beam_width / 2] = word_id;
+      }
+    } else {
+      word_ids[bid * beam_width + tid] = word_id;
+    }
+
+    output_ids[bid * beam_width + tid] = word_id;
+    if (sequence_length) {
+      sequence_length[bid * beam_width + tid]++;
+    }
+
+    if (parent_ids && scores) {
+      if (keep_alive_beam) {
+        parent_ids[bid * beam_width + tid] = bid * beam_width + beam_width / 2;
+        if (tid >= beam_width / 2) {
+          parent_ids_buf[bid * beam_width / 2 + tid - beam_width / 2] =
+              bid * beam_width / 2;
+        }
+
+        if (tid == beam_width / 2) {
+          scores[bid * beam_width + tid] = 0;
+        } else {
+          scores[bid * beam_width + tid] = -MAX_T_VAL;
+        }
+      } else {
+        parent_ids[bid * beam_width + tid] = bid * beam_width;
+
+        if (tid == 0) {
+          scores[bid * beam_width + tid] = 0;
+        } else {
+          scores[bid * beam_width + tid] = -MAX_T_VAL;
+        }
+      }
+    }
+  }
+}
+
+template <typename T>
+void update_with_force_decodingLauncher(const int* trg_word,
+                                        const int* trg_length,
+                                        bool* finished,
+                                        int* word_ids,
+                                        int* sequence_length,
+                                        int* parent_ids_buf,
+                                        int* parent_ids,
+                                        int* output_ids,
+                                        T* scores,
+                                        bool keep_alive_beam,
+                                        const int batch_size,
+                                        const int beam_width,
+                                        const int max_trg_len,
+                                        const int step,
+                                        cudaStream_t stream) {
+  if (trg_word == nullptr) {
+    return;
+  }
+
+  update_with_force_decoding_kernel<<<batch_size, beam_width, 0, stream>>>(
+      trg_word,
+      trg_length,
+      finished,
+      word_ids,
+      sequence_length,
+      parent_ids_buf,
+      parent_ids,
+      output_ids,
+      scores,
+      keep_alive_beam,
+      batch_size,
+      beam_width,
+      max_trg_len,
+      step);
+}
+
 template void init_kernelLauncher_v2(bool* finished,
                                      int* sequence_length,
                                      int* word_ids,
@@ -139,5 +239,37 @@ template void embedding_position_lookups_bart_kernel_launcher(
     const int batch_size,
     const int hidden_units,
     cudaStream_t stream);
+
+template void update_with_force_decodingLauncher(const int* trg_word,
+                                                 const int* trg_length,
+                                                 bool* finished,
+                                                 int* word_ids,
+                                                 int* sequence_length,
+                                                 int* parent_ids_buf,
+                                                 int* parent_ids,
+                                                 int* output_ids,
+                                                 float* scores,
+                                                 bool keep_alive_beam,
+                                                 const int batch_size,
+                                                 const int beam_width,
+                                                 const int max_trg_len,
+                                                 const int step,
+                                                 cudaStream_t stream);
+
+template void update_with_force_decodingLauncher(const int* trg_word,
+                                                 const int* trg_length,
+                                                 bool* finished,
+                                                 int* word_ids,
+                                                 int* sequence_length,
+                                                 int* parent_ids_buf,
+                                                 int* parent_ids,
+                                                 int* output_ids,
+                                                 half* scores,
+                                                 bool keep_alive_beam,
+                                                 const int batch_size,
+                                                 const int beam_width,
+                                                 const int max_trg_len,
+                                                 const int step,
+                                                 cudaStream_t stream);
 
 }  // end of name space fastertransformer
