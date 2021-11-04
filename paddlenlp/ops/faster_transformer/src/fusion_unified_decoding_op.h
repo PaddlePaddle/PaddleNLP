@@ -32,6 +32,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
@@ -74,8 +75,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const int& type_id,
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty);
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act);

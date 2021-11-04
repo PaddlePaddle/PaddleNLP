@@ -10,5 +10,4 @@ paddlenlp.embeddings
 .. toctree::
    :maxdepth: 4
 
-   paddlenlp.embeddings.constant
    paddlenlp.embeddings.token_embedding
