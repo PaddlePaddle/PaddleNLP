@@ -436,10 +436,11 @@ class XLNetLayer(Layer):
 
 class XLNetPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained XLNet models. It provides XLNet related `model_config_file`,
-    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
-    `base_model_prefix` for downloading and loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    An abstract class for pretrained XLNet models. It provides XLNet related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
