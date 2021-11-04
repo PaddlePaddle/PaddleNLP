@@ -19,24 +19,18 @@ limitations under the License. */
 
 #include "paddle/include/paddle_inference_api.h"
 
-using paddle_infer::Config;
-using paddle_infer::Predictor;
-using paddle_infer::CreatePredictor;
-
 DEFINE_string(model_file, "", "Directory of the inference model.");
 DEFINE_string(params_file, "", "Directory of the inference model.");
 DEFINE_bool(use_gpu, true, "enable gpu");
 
 template <typename T>
-void GetOutput(Predictor* predictor,
+void GetOutput(paddle_infer::Predictor* predictor,
                std::string output_name,
                std::vector<T>* out_data,
                int* max_seq_len) {
   auto output = predictor->GetOutputHandle(output_name);
   std::vector<int> output_shape = output->shape();
   *max_seq_len = output_shape[1];
-  std::cout << "output_shape.size() =  " << output_shape.size() << " "
-            << output_shape[0] << " " << output_shape[1] << std::endl;
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   out_data->resize(out_num);
@@ -46,12 +40,12 @@ void GetOutput(Predictor* predictor,
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  Config config;
+  paddle_infer::Config config;
   config.SetModel(FLAGS_model_file, FLAGS_params_file);
   if (FLAGS_use_gpu) {
     config.EnableUseGpu(100, 0);
   }
-  auto predictor = CreatePredictor(config);
+  auto predictor = paddle_infer::CreatePredictor(config);
 
   std::vector<std::string> data{
       "本能地感知到民主与其切身利益的关系，因而对投票选举表现出极大的热情和认真"
