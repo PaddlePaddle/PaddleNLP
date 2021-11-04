@@ -98,7 +98,8 @@ class BertPretrainedModel(PretrainedModel):
     An abstract class for pretrained BERT models. It provides BERT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -982,7 +983,7 @@ class BertPretrainingCriterion(paddle.nn.Layer):
 class BertForMultipleChoice(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the hidden-states output layer,
-    designed for multiple choice tasks like RocStories/SWAG tasks .
+    designed for multiple choice tasks like RocStories/SWAG tasks.
     
     Args:
         bert (:class:`BertModel`):

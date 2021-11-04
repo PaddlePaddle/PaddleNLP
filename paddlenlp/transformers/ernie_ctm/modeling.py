@@ -97,11 +97,11 @@ class ErnieCtmPooler(Layer):
 
 class ErnieCtmPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained ErnieCtm models. It provides ErnieCtm related `model_config_file`,
-    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
-    `base_model_prefix` for downloading and loading pretrained models.
-
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    An abstract class for pretrained ErnieCtm models. It provides ErnieCtm related
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading
+     and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
@@ -171,7 +171,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
 @register_base_model
 class ErnieCtmModel(ErnieCtmPretrainedModel):
     """
-    The bare ErnieCtm Model transformer outputting raw hidden-states without any specific head on top.
+    The bare ErnieCtm Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -531,9 +531,8 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
     r"""
-    ERNIECtm Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
-
+    ERNIECtm Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         ernie (`ErnieModel`):
