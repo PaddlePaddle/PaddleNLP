@@ -221,10 +221,10 @@ void BasicTokenizer::run_split_on_punc(const wstring& text,
   while (i < text.size()) {
     wchar_t ch = text[i];
     if (IsPunctuation(ch)) {
-      output->push_back(wstring(&ch, 1));
+      output->emplace_back(wstring(&ch, 1));
       start_new_word = true;
     } else {
-      if (start_new_word) output->push_back(wstring());
+      if (start_new_word) output->emplace_back(wstring());
       start_new_word = false;
       output->at(output->size() - 1) += ch;
     }
@@ -252,7 +252,7 @@ void BasicTokenizer::Tokenize(const string& text, vector<wstring>* res) const {
     vector<wstring> tokens;
     run_split_on_punc(token, &tokens);
     for (size_t i = 0; i < tokens.size(); ++i) {
-      split_tokens.push_back(tokens[i]);
+      split_tokens.emplace_back(tokens[i]);
     }
   }
   WhiteSpaceTokenize(boost::join(split_tokens, L" "), res);
@@ -273,7 +273,7 @@ void WordPieceTokenizer::Tokenize(const wstring& text,
   WhiteSpaceTokenize(text, &tokens);
   for (auto& token : tokens) {
     if (token.size() > max_input_chars_per_word_) {
-      output_tokens->push_back(unk_token_);
+      output_tokens->emplace_back(unk_token_);
     }
     bool is_bad = false;
     size_t start = 0;
@@ -296,14 +296,14 @@ void WordPieceTokenizer::Tokenize(const wstring& text,
         is_bad = true;
         break;
       }
-      sub_tokens.push_back(cur_sub_str);
+      sub_tokens.emplace_back(cur_sub_str);
       start = end;
     }
     if (is_bad) {
-      output_tokens->push_back(unk_token_);
+      output_tokens->emplace_back(unk_token_);
     } else {
       for (size_t i = 0; i < sub_tokens.size(); ++i)
-        output_tokens->push_back(sub_tokens[i]);
+        output_tokens->emplace_back(sub_tokens[i]);
     }
   }
 }
@@ -368,7 +368,7 @@ void BertTokenizer::Tokenize(const string& text,
     vector<wstring> sub_tokens;
     word_piece_tokenizer_.Tokenize(token, &sub_tokens);
     for (size_t i = 0; i < sub_tokens.size(); ++i) {
-      split_tokens->push_back(sub_tokens[i]);
+      split_tokens->emplace_back(sub_tokens[i]);
     }
   }
 }
@@ -379,20 +379,20 @@ void BertTokenizer::BuildInputsWithSpecialTokens(
     const vector<int64_t>& token_ids_1 /* = vector<int64_t>() */) const {
   if (token_ids_1.size() == 0) {
     inputs->clear();
-    inputs->push_back(cls_token_id_);
+    inputs->emplace_back(cls_token_id_);
     for (auto& token_id : token_ids_0) {
-      inputs->push_back(token_id);
+      inputs->emplace_back(token_id);
     }
-    inputs->push_back(sep_token_id_);
+    inputs->emplace_back(sep_token_id_);
   } else {
     inputs->clear();
-    inputs->push_back(cls_token_id_);
+    inputs->emplace_back(cls_token_id_);
     for (auto& token_id : token_ids_0) {
-      inputs->push_back(token_id);
+      inputs->emplace_back(token_id);
     }
-    inputs->push_back(sep_token_id_);
+    inputs->emplace_back(sep_token_id_);
     for (auto& token_id : token_ids_1) {
-      inputs->push_back(token_id);
+      inputs->emplace_back(token_id);
     }
   }
 }
