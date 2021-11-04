@@ -80,4 +80,21 @@ void update_KV_cache_kernelLauncher(T** key_cache,
                                     const int cache_size,
                                     const int decoder_layers,
                                     cudaStream_t stream);
+
+template <typename T>
+void update_with_force_deocdingLauncher(const int* trg_word,
+                                        const int* trg_length,
+                                        bool* finished,
+                                        int* word_ids,
+                                        int* sequence_length,
+                                        int* parent_ids_buf,
+                                        int* parent_ids,
+                                        int* output_ids,
+                                        T* scores,
+                                        bool keep_alive_beam,
+                                        const int batch_size,
+                                        const int beam_width,
+                                        const int max_trg_len,
+                                        const int step,
+                                        cudaStream_t stream);
 }
