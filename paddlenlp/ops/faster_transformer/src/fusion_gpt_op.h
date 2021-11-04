@@ -16,6 +16,8 @@
 
 std::vector<paddle::Tensor> GPT2CUDAForward(
     const paddle::Tensor& input,
+    const paddle::Tensor& attn_mask,
+    const paddle::Tensor& start_length,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,

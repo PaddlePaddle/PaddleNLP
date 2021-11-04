@@ -640,6 +640,7 @@ class FasterGPT(nn.Layer):
                  use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
+        self.bos_id = bos_id
         self.decoding = InferGptDecoding(
             model=model,
             topk=topk,
@@ -651,8 +652,8 @@ class FasterGPT(nn.Layer):
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
-    def forward(self, input_ids):
-        return self.decoding(input_ids)
+    def forward(self, input_ids, mem_seq_len, attn_mask=None):
+        return self.decoding(input_ids, mem_seq_len, attn_mask)
 
     def export_params(self, state_to_load, place):
         for item in state_to_load:

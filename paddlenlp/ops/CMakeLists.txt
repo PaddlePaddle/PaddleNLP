@@ -25,7 +25,7 @@ option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."               
 option(WITH_MKL         "Compile with MKL. Only works when ON_INFER is ON."         ON)
 option(USE_TENSORRT     "Compiled with TensorRT."                                   OFF)
 option(WITH_TRANSFORMER "Compiled with Transformer."                                ON)
-option(WITH_GPT         "Compiled with GPT."                                        OFF)
+option(WITH_GPT         "Compiled with GPT."                                        ON)
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        OFF)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." OFF)
 option(WITH_DECODER     "Compile with Transformer Decoder"                          OFF)
@@ -287,6 +287,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/decoding_sampling.h decoding_sampling_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/decoding_sampling.h decoding_sampling_h_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/gpt.h gpt_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/gpt.h gpt_h_dst)
+
 # TODO(ENCODER)
 # set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
 
@@ -317,6 +320,7 @@ set(FT_PATCH_COMMAND
   # TODO(ENCODER)
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
 
+  && cp ${gpt_h_src} ${gpt_h_dst}
   && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst}
   && cat blank_lines ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${trans_decoder_h_src} >> ${open_decoder_h_dst}
@@ -339,8 +343,9 @@ ExternalProject_Add(
   UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DBUILD_GPT=${WITH_GPT} -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=OFF
 )
+# -DBUILD_GPT=${WITH_GPT} 
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_SUBDIR)

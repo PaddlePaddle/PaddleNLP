@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
-        default=4,
+        default=1,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
@@ -118,13 +118,15 @@ def do_predict(args):
             [args.batch_size, 1])
     input_ids = paddle.to_tensor(input_ids)
 
+    mem_seq_len = paddle.ones([args.batch_size], dtype="int32")
+
     with paddle.no_grad():
         for i in range(100):
             # For warmup. 
             if 50 == i:
                 paddle.fluid.core._cuda_synchronize(place)
                 start = time.time()
-            out_seq = gpt(input_ids)
+            out_seq = gpt(input_ids, mem_seq_len)
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
