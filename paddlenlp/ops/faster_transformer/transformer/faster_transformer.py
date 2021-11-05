@@ -652,7 +652,6 @@ class FasterGPT(GPTPretrainedModel):
         super(FasterGPT, self).__init__()
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
-        self.generate = self.forward
         self.decoding = InferGptDecoding(
             model=model,
             decoding_lib=decoding_lib,
@@ -724,6 +723,8 @@ class FasterGPT(GPTPretrainedModel):
         elif isinstance(tokenizer, GPTChineseTokenizer):
             tokenizer.save_resources(path)
 
+    generate = forward
+
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self,
@@ -746,7 +747,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
         self._hidden_act = self._model.hidden_act
-        self.generate = self.forward
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -870,9 +870,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
-            num_return_sequences=num_return_sequences,
             decoding_type_id=decoding_type_id,
             pos_bias=True)
+
+    generate = forward
 
 
 class FasterUNIMOText(UNIMOPretrainedModel):
@@ -897,7 +898,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
         self._hidden_act = self._model.hidden_act
-        self.generate = self.forward
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -1019,9 +1019,10 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
-            num_return_sequences=num_return_sequences,
             decoding_type_id=decoding_type_id,
             pos_bias=False)
+
+    generate = forward
 
 
 class FasterBART(BartPretrainedModel):
@@ -1043,7 +1044,6 @@ class FasterBART(BartPretrainedModel):
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
         self._decode_strategy = decode_strategy
-        self.generate = self.forward
 
         self.decoding = InferBartDecoding(
             model=self._model,
@@ -1115,5 +1115,6 @@ class FasterBART(BartPretrainedModel):
             top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,
-            alpha=length_penalty,
-            num_return_sequences=num_return_sequences)
+            alpha=length_penalty)
+
+    generate = forward

@@ -694,6 +694,8 @@ class GenerationMixin(object):
                     return output_ids, dummy_srore
             except Exception as e:
                 args['model_kwargs'] = model_kwargs
+                #TODO
+                # Prevent self._convert_to_faster to throw Exception
                 self._convert_to_faster(args)
                 logger.warning(e)
                 logger.warning(

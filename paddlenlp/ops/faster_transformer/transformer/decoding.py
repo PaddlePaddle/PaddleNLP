@@ -346,7 +346,6 @@ def finalize(beam_size,
              parent_ids,
              out_seq_lens,
              max_seq_len=None,
-             num_return_sequences=1,
              decoding_strategy="beam_search"):
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
@@ -354,7 +353,7 @@ def finalize(beam_size,
 
     if decoding_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
-            beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
+            beam_size * 2)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -745,8 +744,7 @@ class InferGptDecoding(nn.Layer):
             temperature=temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
-        output_ids = output_ids.transpose([1, 0])
-        output_ids = output_ids[:, input_ids.shape[-1]:]
+        output_ids = output_ids[input_ids.shape[-1]:, :]
         return output_ids
 
 
@@ -1055,20 +1053,20 @@ class InferUnifiedDecoding(nn.Layer):
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
-                num_return_sequences=1,
                 pos_bias=True):
-        if self._decoding_strategy == "greedy_search":
-            self._decoding_strategy = "topk_sampling"
+        decoding_strategy = self._decoding_strategy
+        if decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
             topk = 1
             topp = 0
-        elif self._decoding_strategy in [
+        elif decoding_strategy in [
                 "sampling", "topk_sampling", "topp_sampling"
         ]:
             if topp == 1 and topk > 0:
-                self._decoding_strategy = "topk_sampling"
+                decoding_strategy = "topk_sampling"
                 topp = 0
             elif topp > 0 and topk == 0:
-                self._decoding_strategy = "topp_sampling"
+                decoding_strategy = "topp_sampling"
             else:
                 raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
@@ -1106,7 +1104,7 @@ class InferUnifiedDecoding(nn.Layer):
             linear_bias=self.sub_modules["linear_bias"],
             pos_emb=self.sub_modules["pos_emb"],
             type_emb=self.sub_modules["type_emb"],
-            _decoding_strategy=self._decoding_strategy,
+            _decoding_strategy=decoding_strategy,
             _beam_size=beam_size,
             _topk=topk,
             _topp=topp,
@@ -1130,7 +1128,6 @@ class InferUnifiedDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            num_return_sequences=num_return_sequences,
             decoding_strategy=self._decoding_strategy)
 
         return ids
@@ -1328,23 +1325,23 @@ class InferBartDecoding(nn.Layer):
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
-                num_return_sequences=1,
                 alpha=0.6):
         # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
-        if self._decoding_strategy.startswith("beam_search"):
-            self._decoding_strategy = "beam_search_v2"
-        elif self._decoding_strategy == "greedy_search":
-            self._decoding_strategy = "topk_sampling"
+        decoding_strategy = self._decoding_strategy
+        if decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v2"
+        elif decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
             top_k = 1
             top_p = 0.0
-        elif self._decoding_strategy in [
+        elif decoding_strategy in [
                 "sampling", "topk_sampling", "topp_sampling"
         ]:
             if top_p == 1 and top_k > 0:
-                self._decoding_strategy = "topk_sampling"
+                decoding_strategy = "topk_sampling"
                 top_p = 0.0
             elif top_p > 0 and top_k == 0:
-                self._decoding_strategy = "topp_sampling"
+                decoding_strategy = "topp_sampling"
             else:
                 raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
@@ -1362,7 +1359,7 @@ class InferBartDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, beam_size, top_k, top_p, self._n_head,
+            decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
             alpha)
@@ -1372,6 +1369,5 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            num_return_sequences=num_return_sequences,
             decoding_strategy=self._decoding_strategy)
         return ids
