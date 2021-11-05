@@ -15,7 +15,7 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.incubate.nn import FusedTransformerEncoderLayer 
+from paddle.incubate.nn import FusedTransformerEncoderLayer
 from paddle.nn import Layer
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
@@ -738,7 +738,7 @@ class BertForTokenClassification(BertPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                
+
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 13, 2]
@@ -985,7 +985,7 @@ class BertForMultipleChoice(BertPretrainedModel):
     """
     Bert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
     softmax) e.g. for RocStories/SWAG tasks.
-    
+
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
@@ -1173,7 +1173,7 @@ class BertForMaskedLM(BertPretrainedModel):
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 model = BertForMaskedLM.from_pretrained('bert-base-uncased')
-                
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
