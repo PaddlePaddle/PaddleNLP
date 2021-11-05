@@ -1,3 +1,18 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 Salesforce and The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import os
 import shutil
@@ -68,6 +83,11 @@ CONTROL_CODES = {
 
 
 def get_pairs(word):
+    """
+    Return set of symbol pairs in a word.
+
+    Word is represented as tuple of symbols (symbols being variable-length strings).
+    """
     pairs = set()
     prev_char = word[0]
     for char in word[1:]:
@@ -79,6 +99,26 @@ def get_pairs(word):
 
 
 class CTRLTokenizer(PretrainedTokenizer):
+    """
+    Constructs a CTRL tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            Path to the vocab file.
+            The vocab file contains a mapping from vocabulary strings to indices.
+        merges_file (str):
+            Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
+        max_len (int, optional):
+            The maximum value of the input sequence length.
+            Defaults to `None`.
+
+    """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt",
@@ -97,14 +137,7 @@ class CTRLTokenizer(PretrainedTokenizer):
             "sshleifer-tiny-ctrl": ctrl_merges_link,
         },
     }
-    pretrained_init_configuration = {
-        "ctrl": {
-            "max_len": 256
-        },
-        "sshleifer-tiny-ctrl": {
-            "max_len": 256
-        }
-    }
+    pretrained_init_configuration = {"ctrl": {}, "sshleifer-tiny-ctrl": {}}
 
     CONTROL_CODES = CONTROL_CODES
 
@@ -180,9 +213,29 @@ class CTRLTokenizer(PretrainedTokenizer):
         return word
 
     def tokenize(self, text):
+        """
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            List[str]: A list of string representing converted tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('ctrl')
+                print(tokenizer.tokenize('Welcome to use PaddlePaddle and PaddleNLP'))
+                # ['Welcome', 'to', 'use', 'Padd@@', 'le@@', 'Padd@@', 'le', 'and', 'Padd@@', 'le@@', 'N@@', 'LP']
+
+        """
         return self._tokenize(text)
 
     def _tokenize(self, text):
+        """ Tokenize a string. """
         split_tokens = []
         re = try_import("regex")
         words = re.findall(r"\S+\n?", text)
@@ -191,16 +244,58 @@ class CTRLTokenizer(PretrainedTokenizer):
         return split_tokens
 
     def _convert_token_to_id(self, token):
+        """Converts a token (str) to an id using the vocab. """
         return self.encoder.get(token, self.encoder.get(self.unk_token))
 
     def _convert_id_to_token(self, index):
+        """Converts an index (integer) to a token (str) using the vocab."""
         return self.decoder.get(index, self.unk_token)
 
     def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (list of string) to a single string.
+
+        Args:
+            tokens (List[str]): A sequence of tokens.
+
+        Returns:
+            str: Converted string.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('crtl')
+                print(tokenizer.convert_tokens_to_string(['Welcome', 'to', 'use', 'Padd@@', 'le@@', 'Padd@@', 'le', 'and', 'Padd@@', 'le@@', 'N@@', 'LP']))
+                # 'Welcome to use PaddlePaddle and PaddleNLP'
+
+        """
         out_string = " ".join(tokens).replace("@@ ", "").strip()
         return out_string
 
     def convert_tokens_to_ids(self, tokens):
+        """
+        Converts a single token or a sequence of tokens to an index or a
+        sequence of indices using the vocab.
+
+        Args:
+            tokens (str|List[str]|tuple(str)):
+                A single token or a sequence of tokens.
+
+        Returns:
+            int|List[int]: The converted token id or token ids.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('crtl')
+                print(tokenizer.convert_tokens_to_ids(['Welcome', 'to', 'use', 'Padd@@', 'le@@', 'Padd@@', 'le', 'and', 'Padd@@', 'le@@', 'N@@', 'LP']))
+                # [41116, 3, 191, 40324, 1162, 40324, 992, 2, 40324, 1162, 633, 11135]
+
+        """
         ids = []
         if isinstance(tokens, str):
             return self._convert_token_to_id(tokens)
@@ -215,6 +310,30 @@ class CTRLTokenizer(PretrainedTokenizer):
         return ids
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        """
+        Converts an index or a sequence indices to a single
+        token or a sequence of tokens.
+
+        Args:
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
+            skip_special_tokens (bool, optional):
+                Whether or not to skip the special tokens.
+                Defaults to `False`, which means we don't skip the special tokens.
+
+        Returns:
+            str|List[str]: The converted token or the sequence of tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('ctrl')
+                print(tokenizer.convert_ids_to_tokens([41116, 3, 191, 40324, 1162, 40324, 992, 2, 40324, 1162, 633, 11135]))
+                # ['Welcome', 'to', 'use', 'Padd@@', 'le@@', 'Padd@@', 'le', 'and', 'Padd@@', 'le@@', 'N@@', 'LP']
+
+        """
         if isinstance(ids, int):
             return self._convert_id_to_token(ids)
         tokens = []
@@ -228,8 +347,10 @@ class CTRLTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         """
         Save tokenizer related resources to files under `save_directory`.
+
         Args:
             save_directory (str): Directory to save files into.
+            
         """
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)

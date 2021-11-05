@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Salesforce and HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
@@ -14,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" paddle2.x CTRL model."""
 
 import numpy as np
 import paddle
@@ -23,19 +21,19 @@ import paddle.nn.functional as F
 from paddle.nn import CrossEntropyLoss, MSELoss
 from .. import PretrainedModel, register_base_model
 
-from .utils import (
-    BaseModelOutputWithPast,
-    CausalLMOutputWithPast,
-    Config,
-    SequenceClassifierOutput, )
-
 __all__ = [
-    'CTRLModel', "CTRLLMHeadModel", 'CTRLForSequenceClassification',
-    'SinusoidalPositionalEmbedding'
+    'CTRLModel',
+    "CTRLLMHeadModel",
+    'CTRLForSequenceClassification',
+    'SinusoidalPositionalEmbedding',
 ]
 
 
 class SinusoidalPositionalEmbedding(nn.Embedding):
+    """
+    This module produces sinusoidal positional embeddings of any length.
+    """
+
     def __init__(self, num_embeddings, embedding_dim):
         super().__init__(num_embeddings, embedding_dim)
         self.weight = self._init_weight(self.weight)
@@ -83,33 +81,39 @@ def scaled_dot_product_attention(q, k, v, mask, attention_mask=None):
 
 
 class MultiHeadAttention(nn.Layer):
-    def __init__(self, d_model_size, num_heads):
+    """
+    Attention mapps queries and a set of key-value pairs to outputs, and
+    Multi-Head Attention performs multiple parallel attention to jointly attending
+    to information from different representation subspaces.
+
+    """
+
+    def __init__(self, hidden_size, num_heads):
         super().__init__()
         self.num_heads = num_heads
-        self.d_model_size = d_model_size
+        self.hidden_size = hidden_size
 
-        self.depth = d_model_size // self.num_heads
+        self.depth = hidden_size // self.num_heads
 
-        self.Wq = nn.Linear(d_model_size, d_model_size)
-        self.Wk = nn.Linear(d_model_size, d_model_size)
-        self.Wv = nn.Linear(d_model_size, d_model_size)
+        self.Wq = nn.Linear(hidden_size, hidden_size)
+        self.Wk = nn.Linear(hidden_size, hidden_size)
+        self.Wv = nn.Linear(hidden_size, hidden_size)
 
-        self.dense = nn.Linear(d_model_size, d_model_size)
+        self.dense = nn.Linear(hidden_size, hidden_size)
 
     def split_into_heads(self, x, batch_size):
         x = x.reshape([batch_size, -1, self.num_heads, self.depth])
         return x.transpose(perm=[0, 2, 1, 3])
 
-    def forward(
-            self,
-            v,
-            k,
-            q,
-            mask,
-            layer_past=None,
-            attention_mask=None,
-            use_cache=False,
-            output_attentions=False, ):
+    def forward(self,
+                v,
+                k,
+                q,
+                mask,
+                layer_past=None,
+                attention_mask=None,
+                use_cache=False,
+                output_attentions=False):
         batch_size = q.shape[0]
 
         q = self.Wq(q)
@@ -134,7 +138,7 @@ class MultiHeadAttention(nn.Layer):
         scaled_attention = scaled_attention.transpose([0, 2, 1, 3])
 
         original_size_attention = scaled_attention.reshape(
-            shape=[batch_size, -1, self.d_model_size])
+            shape=[batch_size, -1, self.hidden_size])
         output = self.dense(original_size_attention)
 
         outputs = (output, present)
@@ -144,27 +148,31 @@ class MultiHeadAttention(nn.Layer):
 
 
 class EncoderLayer(nn.Layer):
-    def __init__(self, d_model_size, num_heads, dff, rate=0.1, epsilon=1e-6):
+    def __init__(self,
+                 hidden_size,
+                 num_heads,
+                 intermediate_size,
+                 rate=0.1,
+                 epsilon=1e-6):
         super().__init__()
 
-        self.multi_head_attention = MultiHeadAttention(d_model_size, num_heads)
+        self.multi_head_attention = MultiHeadAttention(hidden_size, num_heads)
         self.ffn = nn.Sequential(
-            nn.Linear(d_model_size, dff),
-            nn.ReLU(), nn.Linear(dff, d_model_size))
-        self.layernorm1 = nn.LayerNorm(d_model_size, epsilon=epsilon)
-        self.layernorm2 = nn.LayerNorm(d_model_size, epsilon=epsilon)
+            nn.Linear(hidden_size, intermediate_size),
+            nn.ReLU(), nn.Linear(intermediate_size, hidden_size))
+        self.layernorm1 = nn.LayerNorm(hidden_size, epsilon=epsilon)
+        self.layernorm2 = nn.LayerNorm(hidden_size, epsilon=epsilon)
 
         self.dropout1 = nn.Dropout(rate)
         self.dropout2 = nn.Dropout(rate)
 
-    def forward(
-            self,
-            x,
-            mask,
-            layer_past=None,
-            attention_mask=None,
-            use_cache=False,
-            output_attentions=False, ):
+    def forward(self,
+                x,
+                mask,
+                layer_past=None,
+                attention_mask=None,
+                use_cache=False,
+                output_attentions=False):
         normed = self.layernorm1(x)
         attn_outputs = self.multi_head_attention(
             normed,
@@ -189,44 +197,41 @@ class EncoderLayer(nn.Layer):
 
 
 class CTRLPreTrainedModel(PretrainedModel):
-    base_model_prefix = "transformer"
+    """
+    An abstract class for pretrained CTRL models. It provides CTRL related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models. See `PretrainedModel` for more details.
+    """
+
+    base_model_prefix = "ctrl"
     model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "ctrl": {
-            "output_hidden_states": False,
-            "output_attentions": False,
-            "use_cache": True,
-            "use_return_dict": True,
             "tie_word_embeddings": True,
-            "attn_pdrop": 0.1,
-            "dff": 8192,
+            "intermediate_size": 8192,
             "embd_pdrop": 0.1,
             "initializer_range": 0.02,
             "layer_norm_epsilon": 1e-06,
-            "n_embd": 1280,
-            "n_head": 16,
-            "n_layer": 48,
-            "n_positions": 50000,
+            "hidden_size": 1280,
+            "num_attention_heads": 16,
+            "num_hidden_layers": 48,
+            "max_position_embeddings": 50000,
             "resid_pdrop": 0.1,
             "vocab_size": 246534,
             "pad_token_id": None
         },
         "sshleifer-tiny-ctrl": {
-            "output_hidden_states": False,
-            "output_attentions": False,
-            "use_cache": True,
-            "use_return_dict": True,
             "tie_word_embeddings": True,
-            "attn_pdrop": 0.1,
-            "dff": 2,
+            "intermediate_size": 2,
             "embd_pdrop": 0.1,
             "initializer_range": 0.02,
             "layer_norm_epsilon": 1e-06,
-            "n_embd": 16,
-            "n_head": 2,
-            "n_layer": 2,
-            "n_positions": 50000,
+            "hidden_size": 16,
+            "num_attention_heads": 2,
+            "num_hidden_layers": 2,
+            "max_position_embeddings": 50000,
             "resid_pdrop": 0.1,
             "vocab_size": 246534,
             "pad_token_id": None
@@ -250,7 +255,9 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.pd_config.initializer_range,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range") else self.ctrl.config[
+                        "initializer_range"],
                     shape=layer.weight.shape, ))
             if layer.bias is not None:
                 layer.bias.set_value(paddle.zeros_like(layer.bias))
@@ -260,7 +267,9 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.pd_config.initializer_range,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range") else self.ctrl.config[
+                        "initializer_range"],
                     shape=layer.weight.shape, ))
             if layer._padding_idx is not None:
                 emb_weight = layer.weight.numpy()
@@ -271,195 +280,95 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(paddle.ones_like(layer.weight))
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
-    def greedy_search(
-            self,
-            input_ids,
-            logits_processors,
-            max_length,
-            pad_token_id,
-            eos_token_id,
-            **model_kwargs, ):
-        batch_size, cur_len = input_ids.shape
-        origin_len = cur_len
-
-        unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        scores = paddle.full(
-            [batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-
-        while cur_len < max_length:
-            # prepare model inputs & get model output
-            model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                              **model_kwargs)
-            outputs = self(**model_inputs)
-            logits = outputs.logits
-            # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
-
-            # pre-process distribution
-            logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
-            # greedy
-            probs = F.softmax(logits)
-            probs = paddle.log(probs)
-            next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs, next_tokens)
-
-            if eos_token_id is not None:
-                next_tokens = paddle.where(
-                    unfinished_flag,
-                    next_tokens,
-                    paddle.full_like(next_tokens, pad_token_id), )
-
-            scores = self.update_scores_for_generation(
-                scores, next_scores, cur_len - origin_len, unfinished_flag)
-
-            cur_len += 1
-            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
-
-            if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(
-                    unfinished_flag, next_tokens != eos_token_id)
-
-            # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
-                break
-
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
-        return input_ids[:, origin_len:], scores
-
-    def beam_search(
-            self,
-            input_ids,
-            beam_scorer,
-            logits_processors,
-            max_length,
-            pad_token_id,
-            eos_token_id,
-            **model_kwargs, ):
-        batch_size = len(beam_scorer._beam_hyps)
-        num_beams = beam_scorer.num_beams
-
-        batch_beam_size, cur_len = input_ids.shape
-        origin_len = cur_len
-
-        assert (
-            num_beams * batch_size == batch_beam_size
-        ), "Batch dimension of `input_ids` should be {}, but received {}.".format(
-            num_beams * batch_size, batch_beam_size)
-
-        beam_scores = paddle.zeros(
-            (batch_size, num_beams), dtype=paddle.get_default_dtype())
-        beam_scores[:, 1:] = -1e9
-        beam_scores = paddle.reshape(beam_scores, [-1])
-
-        while cur_len < max_length:
-            # prepare model inputs & get model output
-            model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                              **model_kwargs)
-            outputs = self(**model_inputs)
-            logits = outputs.logits
-            # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
-
-            # pre-process distribution
-            logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
-
-            # beam search
-            # [batch_size * num_beams, vocab_size]
-            next_scores = F.softmax(logits)
-            next_scores = paddle.log(next_scores)
-
-            next_scores = next_scores + beam_scores.unsqueeze(-1)
-            # reshape for beam search
-            vocab_size = next_scores.shape[-1]
-            next_scores = next_scores.reshape(
-                [batch_size, num_beams * vocab_size])
-
-            next_scores, next_tokens = paddle.topk(
-                next_scores, 2 * num_beams, axis=1)
-
-            next_indices = next_tokens // vocab_size
-            next_tokens = next_tokens % vocab_size
-
-            # stateless
-            beam_outputs = beam_scorer.process(
-                input_ids,
-                next_scores,
-                next_tokens,
-                next_indices,
-                origin_len=origin_len,
-                pad_token_id=pad_token_id,
-                eos_token_id=eos_token_id, )
-            beam_scores = beam_outputs["next_beam_scores"]
-            beam_next_tokens = beam_outputs["next_beam_tokens"]
-            beam_idx = beam_outputs["next_beam_indices"]
-
-            cur_len += 1
-            input_ids = paddle.concat(
-                [
-                    paddle.index_select(input_ids, beam_idx),
-                    beam_next_tokens.unsqueeze(-1),
-                ],
-                axis=-1, )
-
-            if beam_scorer.is_done:
-                break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
-            if model_kwargs["past"] is not None:
-                model_kwargs["past"] = self._reorder_cache(model_kwargs["past"],
-                                                           beam_idx)
-
-        pred_ids, scores = beam_scorer.finalize(
-            input_ids,
-            beam_scores,
-            next_tokens,
-            next_indices,
-            pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id, )
-        return pred_ids[:, origin_len:], scores
-
-    def update_model_kwargs_for_generation(self, outputs, model_kwargs):
-        # update past
-        if "past_key_values" in outputs:
-            model_kwargs["past"] = outputs.past_key_values
-        elif "mems" in outputs:
-            model_kwargs["past"] = outputs.mems
-        elif "past_buckets_states" in outputs:
-            model_kwargs["past"] = outputs.past_buckets_states
-        else:
-            model_kwargs["past"] = None
-
-        return model_kwargs
-
 
 @register_base_model
 class CTRLModel(CTRLPreTrainedModel):
-    def __init__(self, **kwargs):
+    """
+    The bare CTRL Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int, optional):
+            Vocabulary size of `inputs_ids` in `CTRLModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `CTRLModel`.
+            Defaults to `246534`.
+        max_position_embeddings (int, optional):
+            The maximum sequence length that this model might ever be used with. Typically set this to something large just in case (e.g., 512 or 1024 or 2048 or 50000). 
+            Defaults to `50000`.
+        hidden_size (int, optional):
+            Dimensionality of the embeddings and hidden states.
+            Defaults to `1280`.
+        intermediate_size (int, optional):
+            Dimensionality of the inner dimension of the feed forward networks (FFN). 
+            Defaults to `8192`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder.
+            Defaults to `48`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `16`.
+        resid_pdrop (float, optional):
+            The dropout ratio for all fully connected layers in the encoder.
+            Defaults to `0.1`.
+        embd_pdrop (float, optional):
+            The dropout ratio for the embeddings.
+            Defaults to `0.1`.
+        layer_norm_epsilon  (float, optional):
+            The epsilon to use in the layer normalization layers. 
+            Defaults to `1e-6`.
+        tie_word_embeddings (bool, optional):
+            Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the model has a output word embedding layer.
+            Defaults to `True`.
+        pad_token_id (bool, optional):
+            The id of the `padding` token.
+            Defaults to `None`.
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`CTRLPreTrainedModel._init_weights()` for how weights are initialized in `CTRLModel`.
+
+    """
+
+    def __init__(self,
+                 vocab_size=246534,
+                 max_position_embeddings=50000,
+                 hidden_size=1280,
+                 intermediate_size=8192,
+                 num_hidden_layers=48,
+                 num_attention_heads=16,
+                 resid_pdrop=0.1,
+                 embd_pdrop=0.1,
+                 layer_norm_epsilon=1e-6,
+                 tie_word_embeddings=True,
+                 pad_token_id=None,
+                 initializer_range=0.02):
         super().__init__()
-        self.pd_config = pd_config = Config(**kwargs)
-        self.d_model_size = pd_config.n_embd
-        self.num_layers = pd_config.n_layer
 
-        self.pos_encoding = SinusoidalPositionalEmbedding(pd_config.n_positions,
-                                                          self.d_model_size)
+        self.hidden_size = hidden_size
+        self.num_layers = num_hidden_layers
+        self.initializer_range = initializer_range
 
-        self.w = nn.Embedding(pd_config.vocab_size, pd_config.n_embd)
+        self.pos_encoding = SinusoidalPositionalEmbedding(
+            max_position_embeddings, self.hidden_size)
 
-        self.dropout = nn.Dropout(pd_config.embd_pdrop)
+        self.w = nn.Embedding(vocab_size, hidden_size)
+
+        self.dropout = nn.Dropout(embd_pdrop)
         self.h = nn.LayerList([
-            EncoderLayer(
-                pd_config.n_embd,
-                pd_config.n_head,
-                pd_config.dff,
-                pd_config.resid_pdrop,
-                pd_config.layer_norm_epsilon, )
-            for _ in range(pd_config.n_layer)
+            EncoderLayer(hidden_size, num_attention_heads, intermediate_size,
+                         resid_pdrop, layer_norm_epsilon)
+            for _ in range(self.num_layers)
         ])
-        self.layernorm = nn.LayerNorm(
-            pd_config.n_embd, epsilon=pd_config.layer_norm_epsilon)
+        self.layernorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_epsilon)
 
         self.init_weights()
 
@@ -469,36 +378,103 @@ class CTRLModel(CTRLPreTrainedModel):
     def set_input_embeddings(self, new_embeddings):
         self.w = new_embeddings
 
-    def forward(
-            self,
-            input_ids=None,
-            past_key_values=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None, ):
+    def forward(self,
+                input_ids=None,
+                cache=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False):
+        r'''
+        The CTRLModel forward method, overrides the `__call__()` special method.
 
-        output_attentions = (output_attentions if output_attentions is not None
-                             else self.pd_config.output_attentions)
-        use_cache = use_cache if use_cache is not None else self.pd_config.use_cache
-        output_hidden_states = (output_hidden_states
-                                if output_hidden_states is not None else
-                                self.pd_config.output_hidden_states)
-        return_dict = (return_dict if return_dict is not None else
-                       self.pd_config.use_return_dict)
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            cache (Tuple[Tuple[Tensor]], optional):
+                Contains pre-computed hidden-states (key and values in the attention blocks) as computed by the model. Can be used to speed up sequential decoding. The `input_ids` which have their past given to this model should not be passed as input ids as they have already been computed.
+                Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions, usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range `[0, type_vocab_size - 1]`.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
+                max_position_embeddings - 1]`.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            use_cache (bool, optional):
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and can be used to speed up decoding.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the output of all hidden layers.
+                Defaults to `False`.
+
+        Returns:
+            tuple: Returns tuple (`last_hidden_state`, `caches`, `hidden_states`, `attentions`)
+
+            With the fields:
+
+            - `last_hidden_state` (Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `caches` (tuple(tuple(Tensor), optional):
+                returned when `use_cache=True` is passed.
+                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+
+            - `hidden_states` (tuple(Tensor), optional):
+                returned when `output_hidden_states=True` is passed.
+                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `attentions` (tuple(Tensor), optional):
+                returned when `output_attentions=True` is passed.
+                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import CTRLModel, CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('ctrl')
+                model = CTRLModel.from_pretrained('ctrl')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+
+        '''
 
         seq_len = input_ids.shape[-1]
         input_ids = input_ids.reshape([-1, seq_len])
         batch_size = input_ids.shape[0]
 
-        if past_key_values is None:
+        if cache is None:
             past_length = 0
-            past_key_values = tuple([None] * len(self.h))
+            cache = tuple([None] * len(self.h))
         else:
-            past_length = past_key_values[0][0].shape[-2]
+            past_length = cache[0][0].shape[-2]
 
         if position_ids is None:
             position_ids = paddle.arange(past_length, seq_len + past_length)
@@ -528,11 +504,11 @@ class CTRLModel(CTRLPreTrainedModel):
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(shape=[-1, seq_len])
             token_type_embeds = self.w(token_type_ids) * np.sqrt(
-                self.d_model_size)
+                self.hidden_size)
         else:
             token_type_embeds = 0.0
 
-        inputs_embeds = self.w(input_ids) * np.sqrt(self.d_model_size)
+        inputs_embeds = self.w(input_ids) * np.sqrt(self.hidden_size)
         pos_embeds = self.pos_encoding(position_ids)
 
         hidden_states = inputs_embeds + pos_embeds + token_type_embeds
@@ -545,7 +521,7 @@ class CTRLModel(CTRLPreTrainedModel):
         presents = () if use_cache else None
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
-        for i, (h, layer_past) in enumerate(zip(self.h, past_key_values)):
+        for i, (h, layer_past) in enumerate(zip(self.h, cache)):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states, )
             outputs = h(
@@ -566,35 +542,35 @@ class CTRLModel(CTRLPreTrainedModel):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states, )
 
-        if not return_dict:
-            return tuple(
-                v
-                for v in
-                [hidden_states, presents, all_hidden_states, all_attentions]
-                if v is not None)
-
-        return BaseModelOutputWithPast(
-            last_hidden_state=hidden_states,
-            past_key_values=presents,
-            hidden_states=all_hidden_states,
-            attentions=all_attentions, )
+        return tuple(
+            v
+            for v in
+            [hidden_states, presents, all_hidden_states, all_attentions]
+            if v is not None)
 
 
 class CTRLLMHeadModel(CTRLPreTrainedModel):
-    def __init__(self, transformer):
-        super().__init__()
-        self.transformer = transformer
-        self.pd_config = transformer.pd_config
+    """
+    The CTRL Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
 
-        if self.pd_config.tie_word_embeddings:
-            self.lm_head = self.transformer.w
+    Args:
+        ctrl (:class:`CTRLModel`):
+            An instance of :class:`CTRLModel`.
+
+    """
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        if self.ctrl.config["tie_word_embeddings"]:
+            self.lm_head = self.ctrl.w
             self.lm_head_bias = self.create_parameter(
-                shape=[self.pd_config.vocab_size],
+                shape=[self.ctrl.config["vocab_size"]],
                 dtype=self.lm_head.weight.dtype,
                 is_bias=True, )
         else:
-            self.lm_head = nn.Linear(self.pd_config.n_embd,
-                                     self.pd_config.vocab_size)
+            self.lm_head = nn.Linear(self.ctrl.config["hidden_size"],
+                                     self.ctrl.config["vocab_size"])
 
         self.init_weights()
 
@@ -606,48 +582,104 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
-                                      past=None,
-                                      use_cache=None,
+                                      use_cache=False,
+                                      cache=None,
                                       **kwargs):
-        # only last token for inputs_ids if past is defined in kwargs
-        if past:
+        # only last token for inputs_ids if cache is defined in kwargs
+        if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
 
-        return {
-            "input_ids": input_ids,
-            "past_key_values": past,
-            "use_cache": use_cache
-        }
+        return {"input_ids": input_ids, "use_cache": use_cache, "cache": cache}
 
-    def forward(
-            self,
-            input_ids=None,
-            past_key_values=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            labels=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None, ):
-        return_dict = (return_dict if return_dict is not None else
-                       self.pd_config.use_return_dict)
+    def forward(self,
+                input_ids=None,
+                cache=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                labels=None,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False):
+        r"""
 
-        transformer_outputs = self.transformer(
+        Args:
+            input_ids (Tensor):
+                See :class:`CTRLModel`.
+            cache (Tensor, optional):
+                See :class:`CTRLModel`.
+            attention_mask (Tensor, optional):
+                See :class:`CTRLModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`CTRLModel`.
+            position_ids (Tensor, optional):
+                See :class:`CTRLModel`.
+            labels (Tensor, optional):
+                Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
+                Shape is [batch_size, sequence_length] and dtype is int64.
+            use_cache (bool, optional):
+                See :class:`CTRLModel`.
+            output_attentions (bool, optional):
+                See :class:`CTRLModel`.
+            output_hidden_states (bool, optional):
+                See :class:`CTRLModel`.
+
+        Returns:
+            tuple: Returns tuple `(loss, logits, caches, hidden_states, attentions)`.
+            With the fields:
+
+            - `loss` (Tensor):
+                returned when `labels` is provided.
+                Language modeling loss (for next-token prediction).
+                It's data type should be float32 and its shape is [1,].
+
+            - `logits` (Tensor):
+                Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+                It's data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+
+            - `caches` (tuple(tuple(Tensor), optional):
+                returned when `use_cache=True` is passed.
+                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+
+            - `hidden_states` (tuple(Tensor), optional):
+                returned when `output_hidden_states=True` is passed.
+                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `attentions` (tuple(Tensor), optional):
+                returned when `output_attentions=True` is passed.
+                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import CTRLLMHeadModel, CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('ctrl')
+                model = CTRLLMHeadModel.from_pretrained('ctrl')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs, labels=inputs["input_ids"])
+
+                loss = output[0]
+                logits = output[1]
+
+        """
+
+        ctrl_outputs = self.ctrl(
             input_ids,
-            past_key_values=past_key_values,
+            cache=cache,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             use_cache=use_cache,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict, )
+            output_hidden_states=output_hidden_states)
 
-        hidden_states = transformer_outputs[0]
+        hidden_states = ctrl_outputs[0]
 
-        if self.pd_config.tie_word_embeddings:
+        if self.ctrl.config["tie_word_embeddings"]:
             lm_logits = (paddle.matmul(
                 hidden_states, self.lm_head.weight, transpose_y=True) +
                          self.lm_head_bias)
@@ -665,100 +697,154 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
                 shift_logits.reshape([-1, shift_logits.shape[-1]]),
                 shift_labels.flatten(), )
 
-        if not return_dict:
-            output = (lm_logits, ) + transformer_outputs[1:]
-            return ((loss, ) + output) if loss is not None else output
-
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=lm_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions, )
-
-    @staticmethod
-    def _reorder_cache(past, beam_idx):
-        return tuple(
-            tuple(
-                past_state.index_select(beam_idx) for past_state in layer_past)
-            for layer_past in past)
+        output = (lm_logits, ) + ctrl_outputs[1:]
+        return ((loss, ) + output) if loss is not None else output
 
 
 class CTRLForSequenceClassification(CTRLPreTrainedModel):
-    def __init__(self, transformer, num_labels=2):
+    """
+    The CTRL Model transformer with a sequence classification head on top (linear layer).
+    `CTRLForSequenceClassification` uses the last token in order to do the classification, as other causal models (e.g. GPT-2) do. Since it does classification on the last token, it requires to know the position of the last token. If a `pad_token_id` is defined in the configuration, it finds the last token that is not a padding token in each row. If no `pad_token_id` is defined, it simply takes the last value in each row of the batch. 
+
+    Args:
+        ctrl (:class:`CTRLModel`):
+            An instance of :class:`CTRLModel`.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of CTRL.
+            If None, use the same value as `hidden_dropout_prob` of `CTRLModel`
+            instance `ctrl`. Defaults to None.
+
+    """
+
+    def __init__(self, ctrl, num_classes=2, dropout=None):
         super().__init__()
-        self.num_labels = num_labels
-        self.transformer = transformer
-        self.pd_config = transformer.pd_config
+        self.num_classes = num_classes
+        self.ctrl = ctrl
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.ctrl.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(
-            self.pd_config.n_embd, self.num_labels, bias_attr=False)
+            self.ctrl.config["hidden_size"], num_classes, bias_attr=False)
 
         self.init_weights()
 
-    def forward(
-            self,
-            input_ids=None,
-            past_key_values=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            labels=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None, ):
+    def forward(self,
+                input_ids=None,
+                cache=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                labels=None,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False):
+        r"""
 
-        return_dict = (return_dict if return_dict is not None else
-                       self.pd_config.use_return_dict)
+        Args:
+            input_ids (Tensor):
+                See :class:`CTRLModel`.
+            cache (Tensor, optional):
+                See :class:`CTRLModel`.
+            attention_mask (Tensor, optional):
+                See :class:`CTRLModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`CTRLModel`.
+            position_ids (Tensor, optional):
+                See :class:`CTRLModel`.
+            labels (Tensor, optional):
+                Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression loss is computed (Mean-Square loss), If `num_classes > 1` a classification loss is computed (Cross-Entropy).
+                Shape is [batch_size,] and dtype is int64.
+            use_cache (bool, optional):
+                See :class:`CTRLModel`.
+            output_attentions (bool, optional):
+                See :class:`CTRLModel`.
+            output_hidden_states (bool, optional):
+                See :class:`CTRLModel`.
 
-        transformer_outputs = self.transformer(
+        Returns:
+            tuple: Returns tuple `(loss, logits, caches, hidden_states, attentions)`.
+            With the fields:
+
+            - `loss` (Tensor):
+                returned when `labels` is provided.
+                Language modeling loss (for next-token prediction).
+                It's data type should be float32 and its shape is [1,].
+
+            - `logits` (Tensor):
+                Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+                It's data type should be float32 and its shape is [batch_size, num_classes].
+
+            - `caches` (tuple(tuple(Tensor), optional):
+                returned when `use_cache=True` is passed.
+                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+
+            - `hidden_states` (tuple(Tensor), optional):
+                returned when `output_hidden_states=True` is passed.
+                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `attentions` (tuple(Tensor), optional):
+                returned when `output_attentions=True` is passed.
+                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import CTRLLMHeadModel, CTRLTokenizer
+
+                tokenizer = CTRLTokenizer.from_pretrained('ctrl')
+                model = CTRLLMHeadModel.from_pretrained('ctrl')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs, labels=inputs["input_ids"])
+
+                loss = output[0]
+                logits = output[1]
+
+        """
+        ctrl_outputs = self.ctrl(
             input_ids,
-            past_key_values=past_key_values,
+            cache=cache,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             use_cache=use_cache,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict, )
+            output_hidden_states=output_hidden_states)
 
-        hidden_states = transformer_outputs[0]
+        hidden_states = ctrl_outputs[0]
         logits = self.classifier(hidden_states)
         batch_size = input_ids.shape[0]
 
         assert (
-            self.pd_config.pad_token_id is not None or batch_size == 1
+            self.ctrl.config["pad_token_id"] is not None or batch_size == 1
         ), "Cannot handle batch sizes > 1 if no padding token is defined."
 
-        if self.pd_config.pad_token_id is None:
+        if self.ctrl.config["pad_token_id"] is None:
             sequence_lengths = -1
         else:
-            sequence_lengths = (
-                paddle.not_equal(input_ids, self.pd_config.pad_token_id)
-                .astype(paddle.int64).sum(-1).item() - 1)
+            sequence_lengths = paddle.not_equal(
+                input_ids, self.ctrl.config["pad_token_id"]
+                .astype(paddle.int64).sum(-1) - 1)
 
-        pooled_logits = logits[:, sequence_lengths]
+        pooled_logits = logits.gather_nd(
+            paddle.stack(
+                [paddle.arange(batch_size), sequence_lengths], axis=-1))
 
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
+            if self.num_classes == 1:
                 #  We are doing regression
                 loss_fct = MSELoss()
-                loss = loss_fct(
-                    pooled_logits.flatten(),
-                    labels.astype(pooled_logits.dtype).flatten(), )
+                loss = loss_fct(pooled_logits.flatten(),
+                                labels.astype(pooled_logits.dtype).flatten())
             else:
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(
-                    pooled_logits.reshape([-1, self.num_labels]),
+                    pooled_logits.reshape([-1, self.num_classes]),
                     labels.flatten())
 
-        if not return_dict:
-            output = (pooled_logits, ) + transformer_outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
-
-        return SequenceClassifierOutput(
-            loss=loss,
-            logits=pooled_logits,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions, )
+        output = (pooled_logits, ) + ctrl_outputs[1:]
+        return ((loss, ) + output) if loss is not None else output
