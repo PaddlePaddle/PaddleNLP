@@ -36,6 +36,7 @@ parser.add_argument('--device', type=str, choices=['cpu', 'gpu'], default="gpu",
 args = parser.parse_args()
 # yapf: enable
 
+
 def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=2):
     examples = []
     for text in data:

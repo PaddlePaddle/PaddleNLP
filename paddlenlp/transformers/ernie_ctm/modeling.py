@@ -635,8 +635,8 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
         """
         outputs = self.ernie_ctm(
             input_ids=input_ids,
-            attention_mask=attention_mask,
             token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
             position_ids=position_ids)
         sequence_output = outputs[0]
         logits = self.predictions(sequence_output)

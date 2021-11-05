@@ -161,7 +161,6 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, labels = batch
-
             logits = model(input_ids, token_type_ids)
             loss = criterion(logits.reshape([-1, vocab_size]), labels.reshape([-1]))
 

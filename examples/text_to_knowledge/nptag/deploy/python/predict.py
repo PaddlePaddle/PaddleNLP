@@ -31,10 +31,10 @@ from utils import construct_dict_map, decode, search, find_topk
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
 parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain name_category_map.json.")
-parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--batch_size", type=int, default=3, help="Batch size per GPU/CPU for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -49,9 +49,11 @@ class Predictor(object):
         if not os.path.exists(params_file):
             raise ValueError("not find params file path {}".format(params_file))
         config = paddle.inference.Config(model_file, params_file)
+
         if device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
+            config.switch_ir_optim(False)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -99,8 +101,21 @@ class Predictor(object):
         all_preds_can = []
         pred_ids = []
 
+        # paddle.enable_static()
+        # executor = paddle.static.Executor(paddle.get_device())
+        # static_program, static_feed_names, static_fetch_targets = \
+        #     paddle.static.load_inference_model("./export/inference", executor)
+        
+
         for batch in batches:
             input_ids, token_type_ids, label_indices = batchify_fn(batch)
+            # data_dict = dict()
+            # t = [input_ids, token_type_ids]
+            # for name, value in zip(static_feed_names, t):
+            #     data_dict[name] = value
+            # results = executor.run(static_program, feed=data_dict, fetch_list=static_fetch_targets)
+            # print(results)
+            # exit()
             self.input_handles[0].copy_from_cpu(input_ids)
             self.input_handles[1].copy_from_cpu(token_type_ids)
             self.predictor.run()

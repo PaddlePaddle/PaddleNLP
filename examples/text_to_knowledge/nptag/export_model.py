@@ -16,7 +16,7 @@ import argparse
 import os
 
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import ErnieCtmNptagModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -25,8 +25,9 @@ parser.add_argument("--output_path", type=str, default='./export', help="The pat
 args = parser.parse_args()
 # yapf: enable
 
+
 if __name__ == "__main__":
-    model = ppnlp.transformers.ErnieCtmNptagModel.from_pretrained("nptag")
+    model = ErnieCtmNptagModel.from_pretrained("nptag")
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

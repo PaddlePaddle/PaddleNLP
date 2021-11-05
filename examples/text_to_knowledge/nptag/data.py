@@ -17,6 +17,7 @@ import json
 import numpy as np
 import paddle
 
+
 def convert_example(example,
                     tokenzier,
                     max_seq_len=512,
