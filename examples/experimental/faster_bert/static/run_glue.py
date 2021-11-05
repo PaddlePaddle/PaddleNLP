@@ -28,11 +28,14 @@ from paddlenlp.datasets import load_dataset
 from paddle.metric import Accuracy
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import BertTokenizer
+from modeling import BertForSequenceClassification
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import Mcc, PearsonAndSpearman
 from paddlenlp.utils.log import logger
+
+from model_convert_util import convert_base_to_fused
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -168,7 +171,7 @@ def create_data_holder(task_name):
 
 def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
     """
-    Initialize the parameter from the bert config, and set the parameter by 
+    Initialize the parameter from the bert config, and set the parameter by
     reseting the state dict."
     """
     reset_state_dict = {}
@@ -176,6 +179,7 @@ def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
         else getattr(model, args.model_type).config["initializer_range"]
     reset_parameter_names = []
     for n, p in state_dict.items():
+        print(n)
         if n in pretrained_state_dict:
             reset_state_dict[p.name] = np.array(pretrained_state_dict[n])
             reset_parameter_names.append(n)
@@ -208,7 +212,7 @@ def set_seed(args):
 def evaluate(exe, metric, loss, correct, dev_program, data_loader,
              phase="eval"):
     """
-    The evaluate process, calcluate the eval loss and metric. 
+    The evaluate process, calcluate the eval loss and metric.
     """
     metric.reset()
     returns = [loss]
@@ -295,7 +299,7 @@ def do_train(args):
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type 
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
 
@@ -357,8 +361,14 @@ def do_train(args):
     with paddle.static.program_guard(main_program, startup_program):
         num_class = 1 if train_ds.label_list is None else len(
             train_ds.label_list)
-        model, pretrained_state_dict = model_class.from_pretrained(
+        base_model, pretrained_state_dict = model_class.from_pretrained(
             args.model_name_or_path, num_classes=num_class)
+
+        fused_model, fused_pretrained_state_dict = model_class.from_pretrained(
+            args.model_name_or_path, num_classes=num_class)
+
+        model = fused_model
+
         loss_fct = paddle.nn.loss.CrossEntropyLoss(
         ) if train_ds.label_list else paddle.nn.loss.MSELoss()
         logits = model(input_ids, token_type_ids)
@@ -395,11 +405,16 @@ def do_train(args):
     # Initialize the fine-tuning parameter, we will load the parameters in
     # pre-training model. And initialize the parameter which not in pre-training model
     # by the normal distribution.
+
+####convert model to fused model
+    fused_pretrained_state_dict = convert_base_to_fused(pretrained_state_dict)
+####convert model to fused model
+
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     state_dict = model.state_dict()
     reset_state_dict = reset_program_state_dict(args, model, state_dict,
-                                                pretrained_state_dict)
+                                                fused_pretrained_state_dict)
     paddle.static.set_program_state(main_program, reset_state_dict)
 
     global_step = 0
