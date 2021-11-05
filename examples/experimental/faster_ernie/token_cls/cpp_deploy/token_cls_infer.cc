@@ -26,9 +26,11 @@ DEFINE_bool(use_gpu, true, "enable gpu");
 template <typename T>
 void GetOutput(paddle_infer::Predictor* predictor,
                std::string output_name,
-               std::vector<T>* out_data) {
+               std::vector<T>* out_data,
+               int* max_seq_len) {
   auto output = predictor->GetOutputHandle(output_name);
   std::vector<int> output_shape = output->shape();
+  *max_seq_len = output_shape[1];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   out_data->resize(out_num);
@@ -46,22 +48,38 @@ int main(int argc, char* argv[]) {
   auto predictor = paddle_infer::CreatePredictor(config);
 
   std::vector<std::string> data{
-      "这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般",
-      "请问：有些字打错了，我怎么样才可以回去编辑一下啊？",
-      "本次入住酒店的网络不是很稳定，断断续续，希望能够改进。"};
-  auto input_names = predictor->GetInputNames();
-  auto text = predictor->GetInputHandle(input_names[0]);
+      "本能地感知到民主与其切身利益的关系，因而对投票选举表现出极大的热情和认真"
+      "。",
+      "记票板上出现了左金文的名字，而且票数扶摇直上，远远超过另外两名候选人。",
+      "片中，人们看到在民主选举之前，村民的心态是漠然的。"};
+  auto input_name = predictor->GetInputNames()[0];
+  auto text = predictor->GetInputHandle(input_name);
   text->ReshapeStrings(data.size());
   text->CopyStringsFromCpu(&data);
   predictor->Run();
 
   std::vector<float> logits;
   std::vector<int64_t> preds;
+  int max_seq_len = 0;
   auto output_names = predictor->GetOutputNames();
-  GetOutput(predictor.get(), output_names[0], &logits);
-  GetOutput(predictor.get(), output_names[1], &preds);
+  GetOutput(predictor.get(), output_names[0], &logits, &max_seq_len);
+  GetOutput(predictor.get(), output_names[1], &preds, &max_seq_len);
+  std::unordered_map<int64_t, std::string> label_map{{0, "B-PER"},
+                                                     {1, "I-PER"},
+                                                     {2, "B-ORG"},
+                                                     {3, "I-ORG"},
+                                                     {4, "B-LOC"},
+                                                     {5, "I-LOC"},
+                                                     {6, "O"}};
   for (size_t i = 0; i < data.size(); i++) {
-    std::cout << data[i] << " : " << preds[i] << std::endl;
+    size_t seq_len = data[i].size();
+    size_t start = i * max_seq_len;
+    size_t end = start + seq_len;
+    std::cout << data[i] << " : ";
+    for (size_t j = start; j < end; j++) {
+      std::cout << label_map[preds[j]];
+    }
+    std::cout << std::endl;
   }
   return 0;
 }

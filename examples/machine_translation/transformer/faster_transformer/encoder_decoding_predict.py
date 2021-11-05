@@ -44,7 +44,7 @@ def parse_args():
         choices=["beam_search", "topk_sampling", "topp_sampling"],
         help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
     )
-    parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
+    parser.add_argument("--beam_size", default=4, type=int, help="Beam size. ")
     parser.add_argument(
         "--diversity_rate",
         default=0.0,

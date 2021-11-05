@@ -190,7 +190,7 @@ class FasterTransformer(TransformerModel):
             rel_len=self.rel_len,
             alpha=self.alpha)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
@@ -215,7 +215,7 @@ class FasterTransformer(TransformerModel):
             src_word != self.bos_id, dtype="int32"),
                                   dtype="int32",
                                   axis=1)
-        ids = self.decoding(enc_output, mem_seq_lens)
+        ids = self.decoding(enc_output, mem_seq_lens, trg_word=trg_word)
 
         return ids
 
@@ -590,6 +590,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 The ids of source sequence words. It is a tensor with shape
                 `[batch_size, source_sequence_length]` and its data type can be
                 int or int64.
+            trg_word (Tensor):
+                The ids of target sequence words. Normally, it should NOT be
+                given. If it's given, force decoding with previous output token
+                will be trigger. Defaults to None. 
         
         Returns:
             Tensor:
@@ -627,7 +631,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 transformer(
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        out = self.transformer(src_word, trg_word)
+        out = self.transformer(src_word, trg_word=trg_word)
         # TODO(guosheng): FasterTransformer has an output with layout
         # `[seq_len, batch_size, beam_size]`. While the output layout of
         # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
