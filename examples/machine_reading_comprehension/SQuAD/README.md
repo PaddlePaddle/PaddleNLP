@@ -153,7 +153,7 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 即可完成预测，预测的答案保存在`prediction.json`中。
 
-### 模型导出
+### 静态图预测
 
 在Fine-tune完成后，我们可以使用如下方式导出希望用来预测的模型：
 
