@@ -128,7 +128,7 @@ class Predictor(object):
 
                 all_scores_can.extend([score_can.tolist()])
                 all_preds_can.extend([pred_id_can.tolist()])
-                pred_ids.extend([pred_id_can[:, 0].tolist()])      
+                pred_ids.extend([pred_id_can[:, 0].tolist()])  
 
         results = []
         for i, d in enumerate(data):

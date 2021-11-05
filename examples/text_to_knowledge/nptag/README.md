@@ -105,7 +105,7 @@ nptag(["糖醋排骨", "红曲霉菌"])
 [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
 '''
 
-# 输出粗粒度类别标签，category为WordTag的词汇标签，可结合WordTag使用，将词汇类别细化。
+# 输出粗粒度类别标签`category`，即WordTag的词汇标签。
 nptag = Taskflow("knowledge_mining", model="nptag", linking=True)
 nptag(["糖醋排骨", "红曲霉菌"])
 

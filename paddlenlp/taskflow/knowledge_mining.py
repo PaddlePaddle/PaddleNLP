@@ -145,7 +145,7 @@ usage = r"""
           [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
           '''
 
-          # 输出粗粒度类别标签`category`，即WordTag的词汇标签，可结合WordTag使用，将词汇类别细化。
+          # 输出粗粒度类别标签`category`，即WordTag的词汇标签。
           nptag = Taskflow("knowledge_mining", model="nptag", linking=True)
           nptag(["糖醋排骨", "红曲霉菌"])
           '''
@@ -734,7 +734,7 @@ class NPTagTask(Task):
 
                 all_scores_can.extend([score_can.tolist()])
                 all_preds_can.extend([pred_id_can.tolist()])
-                pred_ids.extend([pred_id_can[:, 0].tolist()])            
+                pred_ids.extend([pred_id_can[:, 0].tolist()])
 
         inputs['all_scores_can'] = all_scores_can
         inputs['all_preds_can'] = all_preds_can
