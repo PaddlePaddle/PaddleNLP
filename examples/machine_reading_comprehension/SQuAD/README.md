@@ -124,7 +124,7 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
  'paragraphs': [
                  {'qas': [{'question': 'When did Beyonce start becoming popular?',
                          'id': '56be85543aeaaa14008c9063',
-                         'answers': [{'text': 'in the late 1990s', 'answer_start': 269}],
+                         'answers': [],
                       'is_impossible': False}]],
                              'context':'Beyoncé Giselle Knowles-Carter(biːˈjɒnseɪ/ bee-YON-say) (born September 4, 1981) is an American singer, songwriter, record producer and actress. Born and raised in Houston, Texas, she.'}
      }]
@@ -151,7 +151,14 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --version_2_with_negative
  ```
 
-即可完成预测，预测的答案保存在`prediction.json`中。
+即可完成预测，预测的答案保存在`prediction.json`中。数据格式如下所示，左边的id与输入中的id对应。
+
+```text
+{
+    "56be4db0acb8001400a502ec": "Denver Broncos",
+    "56be4db0acb8001400a502ed": "Carolina Panthers",
+}
+```
 
 ### 静态图预测
 
@@ -169,7 +176,7 @@ python -u ./export_model.py \
 - `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
 - `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
 
-然后按照如下的方式对阅读理解任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+然后按照如下的方式对阅读理解任务进行预测：
 
 ```shell
 python -u deploy/python/predict.py \
