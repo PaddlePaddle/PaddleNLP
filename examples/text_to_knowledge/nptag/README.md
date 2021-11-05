@@ -78,6 +78,14 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 - `seed`: 随机种子，默认为1000。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
+### 模型预测
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch --gpus "0" predict.py \
+    --device=gpu \
+    --params_path ./output/nptag_ft_model_100/model_state.pdparams
+```
 
 ## Taskflow一键预测
 
