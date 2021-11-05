@@ -41,13 +41,17 @@ public:
   const T *embedding_bias_T = nullptr;
   const float *embedding_bias = nullptr;
 
-  // Used for unilm
+  // Used for unilm.
   const T *trans_kernel = nullptr;
   const T *trans_bias = nullptr;
 
   const T *memory_tensor = nullptr;
   const int *type_id = nullptr;
   const int *memory_sequence_length = nullptr;
+
+  // Used for force decoding.
+  const int *trg_word = nullptr;
+  const int *trg_length = nullptr;
 
   const T *position_encoding_table = nullptr;
 

@@ -702,7 +702,7 @@ class BigBirdPretrainingHeads(Layer):
 
 class BigBirdForPretraining(BigBirdPretrainedModel):
     """
-    BigBird Model for pretraining tasks.
+    BigBird Model with pretraining tasks on top.
 
     Args:
         bigbird (:class:`BigBirdModel`):
@@ -967,9 +967,8 @@ class BigBirdOutput(Layer):
 
 class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
     """
-    BigBird Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    BigBird Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         bigbird (:class:`BigBirdModel`):
@@ -1057,8 +1056,8 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
 
 class BigBirdForTokenClassification(BigBirdPretrainedModel):
     """
-    BigBird Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    BigBird Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         bigbird (:class:`BigBirdModel`):
@@ -1132,8 +1131,8 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
 
 class BigBirdForMultipleChoice(BigBirdPretrainedModel):
     """
-    BigBird Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
-    softmax) e.g. for RocStories/SWAG tasks.
+    BigBird Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks .
 
     Args:
         bigbird (:class:`BigBirdModel`):
@@ -1218,7 +1217,7 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
 
 class BigBirdForMaskedLM(BigBirdPretrainedModel):
     """
-    BigBird Model with pretraining tasks on top.
+    BigBird Model with a `language modeling` head on top.
 
     Args:
         BigBird (:class:`BigBirdModel`):
@@ -1291,7 +1290,7 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
 
 class BigBirdForCausalLM(BigBirdPretrainedModel):
     """
-    BigBird Model for casual language model task.
+    BigBird Model for casual language model tasks.
 
     Args:
         BigBird (:class:`BigBirdModel`):
