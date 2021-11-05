@@ -1,4 +1,19 @@
 # coding=utf-8
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The SqueezeBert authors and The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import math
 import paddle
 from paddle import nn
@@ -20,28 +35,34 @@ def _convert_attention_mask(attention_mask, inputs):
     elif attention_mask.dim() == 2:
         # extended_attention_mask = attention_mask[:, None, None, :]
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
-    extended_attention_mask = paddle.cast(extended_attention_mask, inputs.dtype)  # fp16 compatibility
+    extended_attention_mask = paddle.cast(extended_attention_mask,
+                                          inputs.dtype)  # fp16 compatibility
     extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
     return extended_attention_mask
 
 
 class SqueezeBertEmbeddings(nn.Layer):
-    def __init__(self, vocab_size,
+    def __init__(self,
+                 vocab_size,
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  layer_norm_eps=1e-12):
         super().__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=None)
+        self.word_embeddings = nn.Embedding(
+            vocab_size, hidden_size, padding_idx=None)
 
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings,
+                                                hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
 
         self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids",
+                             paddle.arange(max_position_embeddings).expand(
+                                 (1, -1)))
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None):
         input_shape = input_ids.shape
@@ -51,7 +72,9 @@ class SqueezeBertEmbeddings(nn.Layer):
             position_ids = self.position_ids[:, :seq_length]
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64, )
+            token_type_ids = paddle.zeros(
+                input_shape,
+                dtype=paddle.int64, )
 
         inputs_embeds = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
@@ -78,8 +101,9 @@ class MatMulWrapper(nn.Layer):
 
 class SqueezeBertLayerNorm(nn.LayerNorm):
     def __init__(self, hidden_size, epsilon=1e-12):
-        nn.LayerNorm.__init__(self, normalized_shape=hidden_size,
-                              epsilon=epsilon)  # instantiates self.{weight, bias, eps}
+        nn.LayerNorm.__init__(
+            self, normalized_shape=hidden_size,
+            epsilon=epsilon)  # instantiates self.{weight, bias, eps}
 
     def forward(self, x):
         x = x.transpose((0, 2, 1))
@@ -91,7 +115,8 @@ class ConvDropoutLayerNorm(nn.Layer):
     def __init__(self, cin, cout, groups, dropout_prob):
         super().__init__()
 
-        self.conv1d = nn.Conv1D(in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
+        self.conv1d = nn.Conv1D(
+            in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
         self.layernorm = SqueezeBertLayerNorm(cout)
         self.dropout = nn.Dropout(dropout_prob)
 
@@ -106,7 +131,8 @@ class ConvDropoutLayerNorm(nn.Layer):
 class ConvActivation(nn.Layer):
     def __init__(self, cin, cout, groups, act):
         super().__init__()
-        self.conv1d = nn.Conv1D(in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
+        self.conv1d = nn.Conv1D(
+            in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
         self.act = ACT2FN[act]
 
     def forward(self, x):
@@ -115,7 +141,13 @@ class ConvActivation(nn.Layer):
 
 
 class SqueezeBertSelfAttention(nn.Layer):
-    def __init__(self, num_attention_heads, attention_probs_dropout_prob, cin, q_groups=1, k_groups=1, v_groups=1):
+    def __init__(self,
+                 num_attention_heads,
+                 attention_probs_dropout_prob,
+                 cin,
+                 q_groups=1,
+                 k_groups=1,
+                 v_groups=1):
         super().__init__()
         if cin % num_attention_heads != 0:
             raise ValueError(
@@ -125,9 +157,12 @@ class SqueezeBertSelfAttention(nn.Layer):
         self.attention_head_size = int(cin / num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=q_groups)
-        self.key = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=k_groups)
-        self.value = nn.Conv1D(in_channels=cin, out_channels=cin, kernel_size=1, groups=v_groups)
+        self.query = nn.Conv1D(
+            in_channels=cin, out_channels=cin, kernel_size=1, groups=q_groups)
+        self.key = nn.Conv1D(
+            in_channels=cin, out_channels=cin, kernel_size=1, groups=k_groups)
+        self.value = nn.Conv1D(
+            in_channels=cin, out_channels=cin, kernel_size=1, groups=v_groups)
 
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
         self.softmax = nn.Softmax(axis=-1)
@@ -140,7 +175,8 @@ class SqueezeBertSelfAttention(nn.Layer):
         - input: [N, C, W]
         - output: [N, C1, W, C2] where C1 is the head index, and C2 is one head's contents
         """
-        new_x_shape = (x.shape[0], self.num_attention_heads, self.attention_head_size, x.shape[-1])  # [N, C1, C2, W]
+        new_x_shape = (x.shape[0], self.num_attention_heads,
+                       self.attention_head_size, x.shape[-1])  # [N, C1, C2, W]
         x = x.reshape(new_x_shape)
         return x.transpose((0, 1, 3, 2))  # [N, C1, C2, W] --> [N, C1, W, C2]
 
@@ -149,7 +185,8 @@ class SqueezeBertSelfAttention(nn.Layer):
         - input: [N, C, W]
         - output: [N, C1, C2, W] where C1 is the head index, and C2 is one head's contents
         """
-        new_x_shape = (x.shape[0], self.num_attention_heads, self.attention_head_size, x.shape[-1])  # [N, C1, C2, W]
+        new_x_shape = (x.shape[0], self.num_attention_heads,
+                       self.attention_head_size, x.shape[-1])  # [N, C1, C2, W]
         x = x.reshape(new_x_shape)
         return x
 
@@ -199,9 +236,10 @@ class SqueezeBertSelfAttention(nn.Layer):
 
 
 class SqueezeBertLayer(nn.Layer):
-    def __init__(self, hidden_size, intermediate_size, num_attention_heads, attention_probs_dropout_prob, q_groups,
-                 k_groups, v_groups, output_groups, intermediate_groups, post_attention_groups, hidden_dropout_prob,
-                 hidden_act):
+    def __init__(self, hidden_size, intermediate_size, num_attention_heads,
+                 attention_probs_dropout_prob, q_groups, k_groups, v_groups,
+                 output_groups, intermediate_groups, post_attention_groups,
+                 hidden_dropout_prob, hidden_act):
         """
         - hidden_size = input chans = output chans for Q, K, V (they are all the same ... for now) = output chans for
           the module
@@ -217,22 +255,31 @@ class SqueezeBertLayer(nn.Layer):
         c3 = hidden_size
 
         self.attention = SqueezeBertSelfAttention(
-            num_attention_heads, attention_probs_dropout_prob, cin=c0, q_groups=q_groups, k_groups=k_groups,
-            v_groups=v_groups
-        )
+            num_attention_heads,
+            attention_probs_dropout_prob,
+            cin=c0,
+            q_groups=q_groups,
+            k_groups=k_groups,
+            v_groups=v_groups)
         self.post_attention = ConvDropoutLayerNorm(
-            cin=c0, cout=c1, groups=post_attention_groups, dropout_prob=hidden_dropout_prob
-        )
-        self.intermediate = ConvActivation(cin=c1, cout=c2, groups=intermediate_groups, act=hidden_act)
+            cin=c0,
+            cout=c1,
+            groups=post_attention_groups,
+            dropout_prob=hidden_dropout_prob)
+        self.intermediate = ConvActivation(
+            cin=c1, cout=c2, groups=intermediate_groups, act=hidden_act)
         self.output = ConvDropoutLayerNorm(
-            cin=c2, cout=c3, groups=output_groups, dropout_prob=hidden_dropout_prob
-        )
+            cin=c2,
+            cout=c3,
+            groups=output_groups,
+            dropout_prob=hidden_dropout_prob)
 
     def forward(self, hidden_states, attention_mask, output_attentions):
         att = self.attention(hidden_states, attention_mask, output_attentions)
         attention_output = att["context_layer"]
 
-        post_attention_output = self.post_attention(attention_output, hidden_states)
+        post_attention_output = self.post_attention(attention_output,
+                                                    hidden_states)
         intermediate_output = self.intermediate(post_attention_output)
         layer_output = self.output(intermediate_output, post_attention_output)
 
@@ -244,28 +291,29 @@ class SqueezeBertLayer(nn.Layer):
 
 
 class SqueezeBertEncoder(nn.Layer):
-    def __init__(self, embedding_size, hidden_size, intermediate_size, num_attention_heads,
-                 attention_probs_dropout_prob, q_groups, k_groups, v_groups, output_groups, intermediate_groups,
-                 post_attention_groups, hidden_dropout_prob, hidden_act, num_hidden_layers):
+    def __init__(self, embedding_size, hidden_size, intermediate_size,
+                 num_attention_heads, attention_probs_dropout_prob, q_groups,
+                 k_groups, v_groups, output_groups, intermediate_groups,
+                 post_attention_groups, hidden_dropout_prob, hidden_act,
+                 num_hidden_layers):
         super().__init__()
         assert embedding_size == hidden_size, (
             "If you want embedding_size != intermediate hidden_size,"
             "please insert a Conv1D layer to adjust the number of channels "
-            "before the first SqueezeBertLayer."
-        )
+            "before the first SqueezeBertLayer.")
         self.layers = nn.LayerList(
-            SqueezeBertLayer(hidden_size, intermediate_size, num_attention_heads, attention_probs_dropout_prob,
-                             q_groups,
-                             k_groups, v_groups, output_groups, intermediate_groups, post_attention_groups,
-                             hidden_dropout_prob,
-                             hidden_act) for _ in range(num_hidden_layers))
+            SqueezeBertLayer(hidden_size, intermediate_size,
+                             num_attention_heads, attention_probs_dropout_prob,
+                             q_groups, k_groups, v_groups, output_groups,
+                             intermediate_groups, post_attention_groups,
+                             hidden_dropout_prob, hidden_act)
+            for _ in range(num_hidden_layers))
 
-    def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            output_attentions=False,
-            output_hidden_states=False):
+    def forward(self,
+                hidden_states,
+                attention_mask=None,
+                output_attentions=False,
+                output_hidden_states=False):
 
         hidden_states = hidden_states.transpose((0, 2, 1))
         all_hidden_states = () if output_hidden_states else None
@@ -274,23 +322,26 @@ class SqueezeBertEncoder(nn.Layer):
         for layer in self.layers:
             if output_hidden_states:
                 hidden_states = hidden_states.transpose((0, 2, 1))
-                all_hidden_states += (hidden_states,)
+                all_hidden_states += (hidden_states, )
                 hidden_states = hidden_states.transpose((0, 2, 1))
 
-            layer_output = layer.forward(hidden_states, attention_mask, output_attentions)
+            layer_output = layer.forward(hidden_states, attention_mask,
+                                         output_attentions)
 
             hidden_states = layer_output["feature_map"]
 
             if output_attentions:
-                all_attentions += (layer_output["attention_score"],)
+                all_attentions += (layer_output["attention_score"], )
 
         # [batch_size, hidden_size, sequence_length] --> [batch_size, sequence_length, hidden_size]
         hidden_states = hidden_states.transpose((0, 2, 1))
 
         if output_hidden_states:
-            all_hidden_states += (hidden_states,)
+            all_hidden_states += (hidden_states, )
 
-        return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
+        return tuple(
+            v for v in [hidden_states, all_hidden_states, all_attentions]
+            if v is not None)
 
 
 class SqueezeBertPooler(nn.Layer):
@@ -326,9 +377,11 @@ class SqueezeBertPredictionHeadTransform(nn.Layer):
 class SqueezeBertLMPredictionHead(nn.Layer):
     def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
         super().__init__()
-        self.transform = SqueezeBertPredictionHeadTransform(hidden_size, hidden_act, layer_norm_eps)
+        self.transform = SqueezeBertPredictionHeadTransform(
+            hidden_size, hidden_act, layer_norm_eps)
         self.decoder = nn.Linear(hidden_size, vocab_size, bias_attr=False)
-        self.bias = paddle.create_parameter([vocab_size], dtype='float32', is_bias=True)
+        self.bias = paddle.create_parameter(
+            [vocab_size], dtype='float32', is_bias=True)
         self.decoder.bias = self.bias
 
     def forward(self, hidden_states):
@@ -340,7 +393,8 @@ class SqueezeBertLMPredictionHead(nn.Layer):
 class SqueezeBertPreTrainingHeads(nn.Layer):
     def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
         super().__init__()
-        self.predictions = SqueezeBertLMPredictionHead(hidden_size, hidden_act, layer_norm_eps, vocab_size)
+        self.predictions = SqueezeBertLMPredictionHead(
+            hidden_size, hidden_act, layer_norm_eps, vocab_size)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
@@ -431,18 +485,17 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
             "pad_token_id": 0,
             'layer_norm_eps': 1e-12
         }
-
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
 
     pretrained_resource_files_map = {
         "model_state": {
             "squeezebert-uncased":
-                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
             "squeezebert-mnli":
-                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
             "squeezebert-mnli-headless":
-                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
         }
     }
 
@@ -521,24 +574,37 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
                 See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
     """
 
-    def __init__(self, vocab_size, embedding_size, hidden_size, num_hidden_layers, num_attention_heads,
-                 intermediate_size, hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
-                 max_position_embeddings, type_vocab_size, q_groups, k_groups, v_groups, output_groups,
-                 intermediate_groups, post_attention_groups, initializer_range=0.02, layer_norm_eps=1e-12,
+    def __init__(self,
+                 vocab_size,
+                 embedding_size,
+                 hidden_size,
+                 num_hidden_layers,
+                 num_attention_heads,
+                 intermediate_size,
+                 hidden_act,
+                 hidden_dropout_prob,
+                 attention_probs_dropout_prob,
+                 max_position_embeddings,
+                 type_vocab_size,
+                 q_groups,
+                 k_groups,
+                 v_groups,
+                 output_groups,
+                 intermediate_groups,
+                 post_attention_groups,
+                 initializer_range=0.02,
+                 layer_norm_eps=1e-12,
                  **kwargs):
         super().__init__()
         self.initializer_range = initializer_range
-        self.embeddings = SqueezeBertEmbeddings(vocab_size,
-                                                hidden_size,
-                                                hidden_dropout_prob,
-                                                max_position_embeddings,
-                                                type_vocab_size,
-                                                layer_norm_eps)
-        self.encoder = SqueezeBertEncoder(embedding_size, hidden_size, intermediate_size, num_attention_heads,
-                                          attention_probs_dropout_prob, q_groups,
-                                          k_groups, v_groups, output_groups, intermediate_groups, post_attention_groups,
-                                          hidden_dropout_prob,
-                                          hidden_act, num_hidden_layers)
+        self.embeddings = SqueezeBertEmbeddings(
+            vocab_size, hidden_size, hidden_dropout_prob,
+            max_position_embeddings, type_vocab_size, layer_norm_eps)
+        self.encoder = SqueezeBertEncoder(
+            embedding_size, hidden_size, intermediate_size, num_attention_heads,
+            attention_probs_dropout_prob, q_groups, k_groups, v_groups,
+            output_groups, intermediate_groups, post_attention_groups,
+            hidden_dropout_prob, hidden_act, num_hidden_layers)
         self.pooler = SqueezeBertPooler(hidden_size)
 
         self.apply(self.init_weights)
@@ -549,14 +615,13 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
     def set_input_embeddings(self, new_embeddings):
         self.embeddings.word_embeddings = new_embeddings
 
-    def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            output_attentions=None,
-            output_hidden_states=None):
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                output_attentions=None,
+                output_hidden_states=None):
         r'''
         The  forward method, overrides the `__call__()` special method.
         Args:
@@ -616,14 +681,16 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
 
         embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids)
-        extended_attention_mask = _convert_attention_mask(attention_mask, embedding_output)
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids)
+        extended_attention_mask = _convert_attention_mask(attention_mask,
+                                                          embedding_output)
         encoder_outputs = self.encoder(
             hidden_states=embedding_output,
             attention_mask=extended_attention_mask,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-        )
+            output_hidden_states=output_hidden_states, )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
 
@@ -649,8 +716,8 @@ class SqueezeBertForSequenceClassification(SqueezeBertPreTrainedModel):
         super().__init__()
         self.num_classes = num_classes
         self.squeezebert = squeezebert
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.squeezebert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  squeezebert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.squeezebert.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -755,8 +822,8 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
         super().__init__()
         self.num_classes = num_classes
         self.squeezebert = squeezebert
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.squeezebert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  squeezebert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.squeezebert.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
