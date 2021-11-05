@@ -435,7 +435,8 @@ class GPTPretrainedModel(PretrainedModel):
     An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -585,7 +586,7 @@ class GPTPretrainedModel(PretrainedModel):
 @register_base_model
 class GPTModel(GPTPretrainedModel):
     r"""
-    The bare GPT Model transformer outputting raw hidden-states without any specific head on top.
+    The bare GPT Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -796,7 +797,7 @@ class GPTModel(GPTPretrainedModel):
 
 class GPTForPretraining(GPTPretrainedModel):
     """
-    The pretraining model of GPT. It returns some logits and cached_kvs.
+    GPT Model with pretraining tasks on top.
 
     Args:
         gpt (:class:`GPTModel`):
@@ -1023,8 +1024,7 @@ class GPTLMHead(nn.Layer):
 
 class GPTLMHeadModel(GPTPretrainedModel):
     """
-    The GPT Model with a language modeling head on top (linear layer with weights tied to the input
-    embeddings).
+    The GPT Model with a `language modeling` head on top.
 
     Args:
         gpt (:class:`GPTModel`):

@@ -85,10 +85,10 @@ class RobertaPooler(nn.Layer):
 class RobertaPretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained RoBerta models. It provides RoBerta related
-    `model_config_file`, `pretrained_resource_files_map`, `resource_files_names`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
 
@@ -351,8 +351,8 @@ class RobertaModel(RobertaPretrainedModel):
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
     r"""
-    Roberta Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
+    Roberta Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         roberta (:class:`RobertaModel`):

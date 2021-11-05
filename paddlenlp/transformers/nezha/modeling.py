@@ -336,9 +336,10 @@ class NeZhaPooler(nn.Layer):
 class NeZhaPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained NeZha models. It provides NeZha related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -798,12 +799,11 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
 class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     """
-    NeZha Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    NeZha with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        nezha (:class:`BertModel`):
+        nezha (:class:`NeZhaModel`):
             An instance of NeZhaModel.
         dropout (float, optional):
             The dropout probability for output of NeZha.
@@ -1006,7 +1006,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
 class NeZhaForMultipleChoice(NeZhaPretrainedModel):
     """
-    NeZha Model with a multiple choice classification head on top.
+    NeZha Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):
