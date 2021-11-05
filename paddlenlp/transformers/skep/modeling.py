@@ -235,7 +235,7 @@ class SkepModel(SkepPretrainedModel):
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`SkepPretrainedModel.init_weights()` for how weights are initialized in `SkepModel`.
 
-        pad_token_id(`int`, optional):
+        pad_token_id(int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
 
