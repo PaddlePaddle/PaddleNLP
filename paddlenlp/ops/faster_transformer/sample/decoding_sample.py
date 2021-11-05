@@ -27,6 +27,9 @@ from paddlenlp.ops import FasterTransformer
 
 from paddlenlp.utils.log import logger
 
+paddle.seed(2)
+np.random.seed(2)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
