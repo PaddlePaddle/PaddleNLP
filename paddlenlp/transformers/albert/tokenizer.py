@@ -29,7 +29,11 @@ SPIECE_UNDERLINE = "▁"
 
 class AlbertTokenizer(PretrainedTokenizer):
     """
-    Constructs a Albert tokenizer based on SentencePiece or `BertTokenizer`.
+    Constructs an Albert tokenizer based on SentencePiece or `BertTokenizer`.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
@@ -196,13 +200,11 @@ class AlbertTokenizer(PretrainedTokenizer):
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
                 vocab_file=vocab_file,
-                do_lower_case=False,
-            )
+                do_lower_case=False, )
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
-                do_lower_case=True,
-            )
+                do_lower_case=True, )
         else:
             raise ValueError(
                 "You should only specify either one(not both) of 'vocal_file'"

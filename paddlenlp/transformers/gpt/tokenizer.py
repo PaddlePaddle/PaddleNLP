@@ -73,7 +73,7 @@ def get_pairs(word):
 
 class GPTChineseTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT Chinese tokenizerbased on `SentencePiece <https://github.com/google/sentencepiece>`__.
+    Constructs a GPT Chinese tokenizer based on `SentencePiece <https://github.com/google/sentencepiece>`__.
 
     This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
     which contains most of the main methods. For more information regarding those methods,

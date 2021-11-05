@@ -19,9 +19,8 @@ __all__ = ['MPNetTokenizer']
 
 class MPNetTokenizer(BertTokenizer):
     """
-    Construct a MPNet tokenizer. `MPNetTokenizer` is almost identical to `BertTokenizer` and runs end-to-end 
-    tokenization: punctuation splitting and wordpiece. Refer to superclass `BertTokenizer` for usage examples 
-    and documentation concerning parameters.
+    Construct a MPNet tokenizer which is almost identical to `BertTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {

@@ -43,8 +43,8 @@ def shift_tokens_right(input_ids, decoder_start_token_id):
 class BartPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained Bart models. It provides Bart related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
@@ -533,7 +533,7 @@ class BartModel(BartPretrainedModel):
 
 class BartClassificationHead(Layer):
     """
-    Head for sentence-level classification tasks.
+    Perform sentence-level classification tasks.
     """
 
     def __init__(self,
@@ -732,8 +732,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
 
 class BartForConditionalGeneration(BartPretrainedModel):
     r"""
-    Bart Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+    Bart Model with a `language modeling` head on top.
 
     Args:
         bart (:class:`BartModel`):

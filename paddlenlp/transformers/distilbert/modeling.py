@@ -65,9 +65,10 @@ class BertEmbeddings(nn.Layer):
 class DistilBertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained DistilBert models. It provides DistilBert related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -132,7 +133,7 @@ class DistilBertPretrainedModel(PretrainedModel):
 @register_base_model
 class DistilBertModel(DistilBertPretrainedModel):
     """
-    The bare DistilBert Model transformer outputting raw hidden-states without any specific head on top.
+    The bare DistilBert Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -342,8 +343,8 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
 class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
     """
-    DistilBert Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
+    DistilBert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         distilbert (:class:`DistilBertModel`):

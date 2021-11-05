@@ -20,9 +20,8 @@ __all__ = ['ConvBertTokenizer', ]
 
 class ConvBertTokenizer(ElectraTokenizer):
     """
-    Construct a ConvBERT tokenizer. `ConvBertTokenizer` is identical to `ElectraTokenizer` and runs end-to-end 
-    tokenization: punctuation splitting and wordpiece. Refer to superclass `ElectraTokenizer` for usage examples 
-    and documentation concerning parameters.
+    Construct a ConvBERT tokenizer. `ConvBertTokenizer` is identical to `ElectraTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
