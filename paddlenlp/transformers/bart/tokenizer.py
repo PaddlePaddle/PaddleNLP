@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The Facebook AI Research Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,15 +91,15 @@ class BartTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "bart-base":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-vocab.json",
             "bart-large":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-vocab.json",
         },
         "merges_file": {
             "bart-base":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-merges.txt",
             "bart-large":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-merges.txt",
         }
     }
     pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
@@ -116,8 +117,7 @@ class BartTokenizer(GPTTokenizer):
             sep_token="</s>",
             unk_token="<unk>",
             pad_token="<pad>",
-            mask_token="<mask>",
-    ):
+            mask_token="<mask>", ):
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
                                             max_len, special_tokens, pad_token,
                                             eos_token)
@@ -190,13 +190,11 @@ class BartTokenizer(GPTTokenizer):
                 text_list = tokenized_text
 
             return list(
-                itertools.chain.from_iterable(
-                    (
-                        self._bpe_encode(token) if token not in self.all_special_tokens else [token]
-                        for token in tokenized_text
-                    )
-                )
-            )
+                itertools.chain.from_iterable((self._bpe_encode(
+                    token) if token not in self.all_special_tokens else [
+                        token
+                    ] for token in tokenized_text)))
+
         tokenized_text = split_on_tokens(self.all_special_tokens, text)
         return tokenized_text
 
@@ -211,20 +209,27 @@ class BartTokenizer(GPTTokenizer):
             return _cls + token_ids_0 + _sep
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
-    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is
         called when adding special tokens using the tokenizer ``encode`` methods.
         """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
-            )
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=True)
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
+                                                          ) + [1]
 
-    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
         """
