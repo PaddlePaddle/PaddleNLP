@@ -75,10 +75,12 @@ class SQuAD(DatasetBuilder):
                         is_impossible = qa["is_impossible"]
 
                     answer_starts = [
-                        answer["answer_start"] for answer in qa["answers"]
+                        answer["answer_start"]
+                        for answer in qa.get("answers", [])
                     ]
                     answers = [
-                        answer["text"].strip() for answer in qa["answers"]
+                        answer["text"].strip()
+                        for answer in qa.get("answers", [])
                     ]
 
                     yield {
