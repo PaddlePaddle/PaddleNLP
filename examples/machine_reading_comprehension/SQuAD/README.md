@@ -117,7 +117,7 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 ### 预测
 
-如需使用训练好的模型预测并输出结果，只需将自己的数据集改成SQuAD格式（以下示例为SQuAD2.0）。
+如需使用训练好的模型预测并输出结果，需将自己的数据集改成SQuAD格式（以下示例为SQuAD2.0）。
 
 ```text
 {"data": [{'title': 'Beyoncé',
@@ -130,7 +130,7 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
      }]
 ```
 
-并参考[以内置数据集格式读取本地数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#id4)中的方法创建自己的数据集。并运行以下脚本：
+并参考[以内置数据集格式读取本地数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#id4)中的方法创建自己的数据集并修改`run_squad.py`中对应的数据集读取代码。再运行以下脚本：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
