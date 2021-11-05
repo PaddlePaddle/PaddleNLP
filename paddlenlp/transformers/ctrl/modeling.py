@@ -420,7 +420,7 @@ class CTRLModel(CTRLPreTrainedModel):
             position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
                 max_position_embeddings - 1]`.
-                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+                Shape as [batch_size, num_tokens] and dtype as int64. Defaults to `None`.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and can be used to speed up decoding.
             output_attentions (bool, optional):
