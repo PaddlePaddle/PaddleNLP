@@ -137,7 +137,8 @@ class XLNetRelativeAttention(Layer):
         if seg_mat is None:
             ef = 0
         else:
-            ef = einsum('ibnd,snd->ibns', q_head + self.r_s_bias, self.seg_embed)
+            ef = einsum('ibnd,snd->ibns', q_head + self.r_s_bias,
+                        self.seg_embed)
             ef = einsum('ijbs,ibns->bnij', seg_mat, ef)
 
         # Merge attention scores and perform masking
@@ -268,7 +269,8 @@ class XLNetRelativeAttention(Layer):
                     attn_vec_g, attn_prob_g = attn_vec_g
 
                 # Compute attn_vec_g = einsum4x4("lbnd,mlb->mbnd", attn_vec_g, target_mapping)
-                attn_vec_g = einsum("lbnd,mlb->mbnd", attn_vec_g, target_mapping)
+                attn_vec_g = einsum("lbnd,mlb->mbnd", attn_vec_g,
+                                    target_mapping)
 
             else:
                 attn_vec_g = self.rel_attn_core(
@@ -434,11 +436,11 @@ class XLNetLayer(Layer):
 
 class XLNetPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained XLNet models. It provides XLNet related `model_config_file`,
-    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
-    `base_model_prefix` for downloading and loading pretrained models.
-
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    An abstract class for pretrained XLNet models. It provides XLNet related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -609,7 +611,7 @@ class XLNetPretrainedModel(PretrainedModel):
 @register_base_model
 class XLNetModel(XLNetPretrainedModel):
     """
-    The bare XLNet Model outputting raw hidden-states without any specific head on top.
+    The bare XLNet Model outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -1212,8 +1214,8 @@ class XLNetClassificationHead(Layer):
 
 class XLNetForSequenceClassification(XLNetPretrainedModel):
     """
-    XLNet Model with a sequence classification/regression head on top
-    (a linear layer on top of the pooled output) e.g. for GLUE tasks.
+    XLNet Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         xlnet (:class:`XLNetModel`):
@@ -1337,8 +1339,8 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
 
 class XLNetForTokenClassification(XLNetPretrainedModel):
     """
-    XLNet Model with a token classification head on top (a linear layer on top of the hidden-states output)
-    e.g. for Named-Entity-Recognition (NER) tasks.
+    XLNet Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         xlnet (:class:`XLNetModel`):
@@ -1369,7 +1371,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             inputs_embeds=None,
             use_mems_train=False,
             use_mems_eval=False,
-            return_dict=False,):
+            return_dict=False, ):
         r"""
         The XLNetForTokenClassification forward method, overrides the `__call__()` special method.
 

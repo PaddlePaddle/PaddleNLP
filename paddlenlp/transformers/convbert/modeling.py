@@ -334,9 +334,10 @@ class ConvBertGeneratorPredictions(nn.Layer):
 class ConvBertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ConvBert models. It provides ConvBert related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     base_model_prefix = "convbert"
@@ -501,7 +502,7 @@ class ConvBertPretrainedModel(PretrainedModel):
 @register_base_model
 class ConvBertModel(ConvBertPretrainedModel):
     """
-    The bare ConvBert Model transformer outputting raw hidden-states without any specific head on top.
+    The bare ConvBert Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -895,7 +896,9 @@ class ConvBertGenerator(ConvBertPretrainedModel):
 
 
 class ConvBertClassificationHead(nn.Layer):
-    """Head for sentence-level classification tasks."""
+    """
+    ConvBert head for sentence-level classification tasks.
+    """
 
     def __init__(self, hidden_size, hidden_dropout_prob, num_classes):
         super(ConvBertClassificationHead, self).__init__()
@@ -916,8 +919,8 @@ class ConvBertClassificationHead(nn.Layer):
 
 class ConvBertForSequenceClassification(ConvBertPretrainedModel):
     """
-    ConvBert Model with a sequence classification/regression head on top (a linear layer on top of the hidden-states output) e.g.
-    for GLUE tasks.
+    ConvBert Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         convbert (:class:`ConvBertModel`):
@@ -989,8 +992,8 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
 
 class ConvBertForTokenClassification(ConvBertPretrainedModel):
     """
-    ConvBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    ConvBert Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         convbert (:class:`ConvBertModel`):
@@ -1395,8 +1398,8 @@ class ConvBertPooler(Layer):
 
 class ConvBertForMultipleChoice(ConvBertPretrainedModel):
     """
-    ConvBert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
-    softmax) e.g. for RocStories/SWAG tasks.
+    ConvBert Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks .
 
     Args:
         convbert (:class:`ConvBertModel`):
@@ -1479,9 +1482,8 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
 
 class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
     """
-    ConvBert Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    ConvBert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         convbert (:class:`ConvBertModel`):
