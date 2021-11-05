@@ -117,6 +117,44 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 ### 预测
 
+如需使用训练好的模型预测并输出结果，只需将自己的数据集改成SQuAD格式（以下示例为SQuAD2.0）。
+
+```text
+{"data": [{'title': 'Beyoncé',
+ 'paragraphs': [
+                 {'qas': [{'question': 'When did Beyonce start becoming popular?',
+                         'id': '56be85543aeaaa14008c9063',
+                         'answers': [{'text': 'in the late 1990s', 'answer_start': 269}],
+                      'is_impossible': False}]],
+                             'context':'Beyoncé Giselle Knowles-Carter(biːˈjɒnseɪ/ bee-YON-say) (born September 4, 1981) is an American singer, songwriter, record producer and actress. Born and raised in Houston, Texas, she.'}
+     }]
+```
+
+并参考[以内置数据集格式读取本地数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#id4)中的方法创建自己的数据集。并运行以下脚本：
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_squad.py \
+    --model_type bert \
+    --model_name_or_path your-best-model \
+    --max_seq_length 384 \
+    --batch_size 12 \
+    --learning_rate 3e-5 \
+    --num_train_epochs 2 \
+    --logging_steps 1000 \
+    --save_steps 1000 \
+    --warmup_proportion 0.1 \
+    --weight_decay 0.01 \
+    --output_dir ./tmp/squad/ \
+    --device gpu \
+    --do_predict \
+    --version_2_with_negative
+ ```
+
+即可完成预测，预测的答案保存在`prediction.json`中。
+
+### 模型导出
+
 在Fine-tune完成后，我们可以使用如下方式导出希望用来预测的模型：
 
 ```shell
