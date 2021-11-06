@@ -22,4 +22,3 @@ class VisualBertTokenizer(BertTokenizer):
     tokenization: punctuation splitting and wordpiece. Refer to superclass `BertTokenizer` for usage examples 
     and documentation concerning parameters.
     """
-    # TODO link visual embeddings here
