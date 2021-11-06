@@ -227,7 +227,7 @@ std::vector<paddle::Tensor> decoding_kernel(
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
   // NOTE: the data type of the embedding bias for logits is different
   // between decoding with beam search and top-k/top-p sampling in
-  // Faster Transformer when using float16.
+  // FasterTransformer when using float16.
   if ("beam_search" == decoding_strategy ||
       "beam_search_v2" == decoding_strategy) {
     // for matmul bias
@@ -242,8 +242,8 @@ std::vector<paddle::Tensor> decoding_kernel(
       position_encoding_table.data<data_t_>());
 
   if ("beam_search" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beam_search_;
+    decoding_beam_search_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -258,12 +258,12 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_);
 
-    decoding_beamsearch_->forward(params, decoding_params);
+    decoding_beam_search_->forward(params, decoding_params);
 
-    delete decoding_beamsearch_;
+    delete decoding_beam_search_;
   } else if ("beam_search_v2" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beam_search_;
+    decoding_beam_search_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -281,9 +281,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         true,  // keep_alive_beam_
         alpha);
 
-    decoding_beamsearch_->forward(params, decoding_params);
+    decoding_beam_search_->forward(params, decoding_params);
 
-    delete decoding_beamsearch_;
+    delete decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
@@ -308,7 +308,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   } else {
     PD_THROW(
         "Only beam_search, topk_sampling and topp_sampling are supported for "
-        "Faster Transformer. ");
+        "FasterTransformer. ");
   }
   delete[] params;
 

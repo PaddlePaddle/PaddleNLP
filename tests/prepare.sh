@@ -5,7 +5,9 @@ if [ ${MODE} = "lite_train_infer" ]; then
     # The whole procedure of lite_train_infer should be less than 15min.
     # Hence, set maximum output length is 16. 
     sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.base.yaml
+    sed -i "s/^batch_size.*/batch_size: 3072/g" configs/transformer.base.yaml
     sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.big.yaml
+    sed -i "s/^batch_size.*/batch_size: 3072/g" configs/transformer.big.yaml
 
     sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
     sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
@@ -56,7 +58,9 @@ if [ ${MODE} = "lite_train_infer" ]; then
 elif [ ${MODE} = "whole_infer" ]; then
     cd ../examples/machine_translation/transformer/
     sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
     sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
 
     sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
     sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
@@ -68,9 +72,9 @@ elif [ ${MODE} = "whole_infer" ]; then
 
     # Trained transformer base model checkpoint. 
     # For infer. 
-    if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
-        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+    if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
+        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
     fi
     # For train. 
@@ -120,7 +124,9 @@ elif [ ${MODE} = "whole_infer" ]; then
 elif [ ${MODE} = "whole_train_infer" ]; then
     cd ../examples/machine_translation/transformer/
     sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
     sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
 
     sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
     sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
@@ -172,7 +178,9 @@ elif [ ${MODE} = "whole_train_infer" ]; then
 else # infer
     cd ../examples/machine_translation/transformer/
     sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
     sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+    sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
 
     sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
     sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
@@ -183,10 +191,15 @@ else # infer
     sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
 
     # Trained transformer base model checkpoint. 
-    if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
-        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+    if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
+        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
+    fi
+    # Whole data set prepared. 
+    if [ ! -f WMT14.en-de.tar.gz ]; then
+        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz
+        tar -zxf WMT14.en-de.tar.gz
     fi
     # Set soft link.
     if [ -f test.en ]; then

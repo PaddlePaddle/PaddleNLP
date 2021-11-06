@@ -63,6 +63,7 @@ usage = r"""
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
+
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
            ddp("百度是一家高科技公司")
            '''
@@ -412,15 +413,15 @@ def convert_example(example, vocabs, fix_len=20):
     return [
         pad_sequence(
             [np.array(
-                ids[:fix_len], dtype=int) for ids in words],
+                ids[:fix_len], dtype=np.int64) for ids in words],
             fix_len=fix_len)
     ]
 
 
 def flat_words(words, pad_index=0):
     mask = words != pad_index
-    lens = np.sum(mask.astype(int), axis=-1)
-    position = np.cumsum(lens + (lens == 0).astype(int), axis=1) - 1
+    lens = np.sum(mask.astype(np.int64), axis=-1)
+    position = np.cumsum(lens + (lens == 0).astype(np.int64), axis=1) - 1
     lens = np.sum(lens, -1)
     words = words.ravel()[np.flatnonzero(words)]
 
@@ -433,7 +434,7 @@ def flat_words(words, pad_index=0):
 
     max_len = words.shape[1]
 
-    mask = (position >= max_len).astype(int)
+    mask = (position >= max_len).astype(np.int64)
     position = position * np.logical_not(mask) + mask * (max_len - 1)
     return words, position
 

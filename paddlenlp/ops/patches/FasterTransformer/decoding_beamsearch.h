@@ -51,6 +51,7 @@ private:
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
   DataType_ *decoder_normed_result_buf_;
+  DataType_ *embedding_buf_;
   float *logits_buf_;
   float *cum_log_buf_;
   int *word_ids_buf_;
@@ -59,6 +60,7 @@ private:
   void *buf_;
   int *finished_count_buf_;
   bool *h_finished_buf_;
+  int *h_trg_length_;
   float *temp_storage_;
 
   bool is_fuse_topk_softMax_;
@@ -83,7 +85,10 @@ public:
                      const float beam_search_diversity_rate = -0.0f,
                      const bool is_fuse_topk_softMax = false,
                      const bool keep_alive_beam = false,
-                     const float alpha = 0.6)
+                     const float alpha = 0.6,
+                     const bool normalization_before = true,
+                     const int pos_offset = 0,
+                     const ActivationType act = ActivationType::RELU)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -102,6 +107,10 @@ public:
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     args_.alpha_ = alpha;
+    args_.normalization_before_ = normalization_before;
+    args_.pos_offset_ = pos_offset;
+    args_.act_ = act;
+
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
 
@@ -110,12 +119,13 @@ public:
 
     K_mem_cache_ = new DataType_ *[args_.decoder_layers_];
     V_mem_cache_ = new DataType_ *[args_.decoder_layers_];
-
     decoder_ = new OpenDecoder<OpType_>(batch_size * beam_width,
                                         memory_max_seq_len,
                                         head_num,
                                         size_per_head,
-                                        memory_hidden_units);
+                                        memory_hidden_units,
+                                        normalization_before,
+                                        args_.act_);
 
     int from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
@@ -170,7 +180,6 @@ public:
     parent_ids_buf_size = (int)(ceil(parent_ids_buf_size / 4.)) * 4;
     finished_buf_size = (int)(ceil(finished_buf_size / 32.)) * 32;
     args_.temp_storage_size_ = (int)(ceil(args_.temp_storage_size_ / 4.)) * 4;
-
     // get workspace size of topk kernel
     if (keep_alive_beam_ == true)
       topK_update_kernelLauncher(topK_kernel_workspace,
@@ -193,7 +202,6 @@ public:
                           word_ids_buf_,
                           args_,
                           0);
-
     int datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
         (cache_size * 4 + mem_cache_size * 2) * args_.decoder_layers_ +
@@ -216,7 +224,6 @@ public:
       V_mem_cache_[i] = from_tensor_[1] + from_tensor_size +
                         i * mem_cache_size * 2 + mem_cache_size;
     }
-
     /* We use two-way buffer since we have to update KV buf at the end of each
      * step. */
     K_cache_[0] = V_mem_cache_[decoder_layers - 1] + mem_cache_size +
@@ -230,6 +237,8 @@ public:
 
     decoder_buf_ = V_cache_[1] + cache_size * args_.decoder_layers_;
     decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
+    // Used for post-norm.
+    embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
     logits_buf_ = (float *)(decoder_normed_result_buf_ +
                             decoder_normed_result_buffer_size);
     cum_log_buf_ = (float *)(logits_buf_ + logits_buf_size);
@@ -241,6 +250,7 @@ public:
     topK_kernel_workspace = (void *)(finished_count_buf_ + finished_count_size);
 
     h_finished_buf_ = new bool[finished_buf_size];
+    h_trg_length_ = new int[args_.batch_size_];
 
     FILE *fd = fopen("decoding_gemm_config.in", "r");
     int err = 0;
@@ -287,6 +297,23 @@ public:
     const int k = args_.hidden_units_;
     const int n = args_.vocab_size_;
 
+    int min_trg_len = 0;
+    int max_trg_len = 0;
+
+    if (decoding_params.trg_word) {
+      cudaMemcpy(h_trg_length_,
+                 decoding_params.trg_length,
+                 sizeof(int) * args_.batch_size_,
+                 cudaMemcpyDeviceToHost);
+      min_trg_len = h_trg_length_[0];
+      max_trg_len = h_trg_length_[0];
+
+      for (int i = 1; i < args_.batch_size_; ++i) {
+        min_trg_len = std::min(min_trg_len, h_trg_length_[i]);
+        max_trg_len = std::max(max_trg_len, h_trg_length_[i]);
+      }
+    }
+
     /*
       sequence_length initialize to 0
       finished: false
@@ -295,7 +322,6 @@ public:
       -inf][0 -inf -inf -inf]
       cum_log_probs: If keep_alive_beam_ is true, the first alive element is 0.
     */
-
     if (keep_alive_beam_ == true) {
       init_kernelLauncher_v2(finished_buf_,
                              decoding_params.sequence_length,
@@ -331,22 +357,50 @@ public:
 //                   start_id_, batch_size_, beam_width_,
 //                   decoding_params.stream);
 #endif
-
     int cache_size = m * args_.seq_len_ * args_.hidden_units_;  // type T
 
     for (int step = 1; step <= args_.seq_len_; ++step) {
       // we use two-way buffer
       int kv_cache_id = step & 0x1;
+      if (args_.normalization_before_) {
+        embedding_lookup_sine_position_encoding_kernel_launcher(
+            from_tensor_[0],
+            decoding_params.embedding_table,
+            decoding_params.position_encoding_table +
+                (step - 1) * args_.hidden_units_,
+            word_ids_buf_,
+            m,
+            args_.hidden_units_,
+            decoding_params.stream);
+      } else {
+        // TODO(gongenlei): Only support Bart temporarily.
+        embedding_position_lookups_bart_kernel_launcher(
+            embedding_buf_,
+            decoding_params.embedding_table,
+            decoding_params.position_encoding_table +
+                (step - 1 + args_.pos_offset_) * args_.hidden_units_,
+            word_ids_buf_,
+            m,
+            args_.hidden_units_,
+            decoding_params.stream);
 
-      embedding_lookup_sine_position_encoding_kernel_launcher(
-          from_tensor_[0],
-          decoding_params.embedding_table,
-          decoding_params.position_encoding_table +
-              (step - 1) * args_.hidden_units_,
-          word_ids_buf_,
-          m,
-          args_.hidden_units_,
-          decoding_params.stream);
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+        decoder_->initialize_stream(decoding_params.stream);
+        decoder_->decoder_norm1(embedding_buf_,
+                                decoding_params.layernorm.gamma,
+                                decoding_params.layernorm.beta,
+                                from_tensor_[0],
+                                m,
+                                k);
+      }
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
 
       int from_id, out_id;
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
@@ -388,130 +442,165 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
       }
-      decoder_->decoder_norm1(from_tensor_[out_id],
-                              decoding_params.layernorm.gamma,
-                              decoding_params.layernorm.beta,
-                              decoder_normed_result_buf_,
-                              m,
-                              k);
+      if (step > min_trg_len) {
+        float alpha = (float)1.0f;
+        float beta = (float)0.0f;
 
-      float alpha = (float)1.0f;
-      float beta = (float)0.0f;
+        if (args_.normalization_before_) {
+          decoder_->decoder_norm1(from_tensor_[out_id],
+                                  decoding_params.layernorm.gamma,
+                                  decoding_params.layernorm.beta,
+                                  decoder_normed_result_buf_,
+                                  m,
+                                  k);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
 
-      check_cuda_error(
-          cublasGemmEx(decoding_params.cublas_handle,
-                       CUBLAS_OP_N,
-                       CUBLAS_OP_N,
-                       n,
-                       m,
-                       k,
-                       &alpha,
-                       decoding_params.embedding_kernel,
-                       AType_,
-                       n,
-                       decoder_normed_result_buf_,
-                       BType_,
-                       k,
-                       &beta,
-                       logits_buf_,
-                       CUDA_R_32F,
-                       n,
+
+          check_cuda_error(
+              cublasGemmEx(decoding_params.cublas_handle,
+                           CUBLAS_OP_N,
+                           CUBLAS_OP_N,
+                           n,
+                           m,
+                           k,
+                           &alpha,
+                           decoding_params.embedding_kernel,
+                           AType_,
+                           n,
+                           decoder_normed_result_buf_,
+                           BType_,
+                           k,
+                           &beta,
+                           logits_buf_,
+                           CUDA_R_32F,
+                           n,
 #ifdef CUDA11_MODE
-                       CUBLAS_COMPUTE_32F_PEDANTIC,
+                           CUBLAS_COMPUTE_32F_PEDANTIC,
 #else
-                       CUDA_R_32F,
+                           CUDA_R_32F,
 #endif
-                       static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-
-      // Beamsearch
-      if (is_fuse_topk_softMax_ == true) {
-        if (keep_alive_beam_ == true) {
-          // Use separated alive and finish beam queues to avoid the decrease of
-          // alive beams.
-          topK_softMax_update(logits_buf_,
-                              decoding_params.embedding_bias,
-                              finished_buf_,
-                              decoding_params.sequence_length,
-                              word_ids_buf_,
-                              parent_ids_buf_,
-                              decoding_params.output_ids + (step - 1) * m * 2,
-                              decoding_params.parent_ids + (step - 1) * m * 2,
-                              cum_log_buf_,
-                              reinterpret_cast<void *>(temp_storage_),
-                              step,
-                              args_,
-                              decoding_params.stream);
+                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
         } else {
-          topK_softMax(logits_buf_,
-                       decoding_params.embedding_bias,
-                       finished_buf_,
-                       cum_log_buf_,
-                       word_ids_buf_,
-                       reinterpret_cast<void *>(temp_storage_),
-                       args_,
-                       decoding_params.stream);
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+          // Post-norm
+          check_cuda_error(
+              cublasGemmEx(decoding_params.cublas_handle,
+                           CUBLAS_OP_N,
+                           CUBLAS_OP_N,
+                           n,
+                           m,
+                           k,
+                           &alpha,
+                           decoding_params.embedding_kernel,
+                           AType_,
+                           n,
+                           from_tensor_[out_id],
+                           BType_,
+                           k,
+                           &beta,
+                           logits_buf_,
+                           CUDA_R_32F,
+                           n,
+#ifdef CUDA11_MODE
+                           CUBLAS_COMPUTE_32F_PEDANTIC,
+#else
+                           CUDA_R_32F,
 #endif
-
-          update_kernelLauncher_v2(finished_buf_,
-                                   decoding_params.parent_ids + (step - 1) * m,
-                                   decoding_params.sequence_length,
-                                   word_ids_buf_,
-                                   decoding_params.output_ids + (step - 1) * m,
-                                   finished_count_buf_,
-                                   args_,
-                                   decoding_params.stream);
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
+                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
         }
 
-      } else {
-        if (keep_alive_beam_ == true) {
-          update_logits_v2(logits_buf_,
-                           decoding_params.embedding_bias,
-                           args_.end_id_,
-                           finished_buf_,
-                           m,
-                           n,
-                           decoding_params.stream);
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
 
-          // Use separated alive and finish beam queues to avoid the decrease of
-          // alive beams.
-          topK_update_kernelLauncher(
-              topK_kernel_workspace,
-              topk_workspace_size_,
-              logits_buf_,
-              finished_buf_,
-              decoding_params.sequence_length,
-              word_ids_buf_,
-              parent_ids_buf_,
-              decoding_params.output_ids + (step - 1) * m * 2,
-              decoding_params.parent_ids + (step - 1) * m * 2,
-              cum_log_buf_,
-              step,
-              args_,
-              decoding_params.stream);
+        // Beamsearch
+        if (is_fuse_topk_softMax_ == true) {
+          if (keep_alive_beam_ == true) {
+            // Use separated alive and finish beam queues to avoid the decrease
+            // of alive beams.
+            topK_softMax_update(logits_buf_,
+                                decoding_params.embedding_bias,
+                                finished_buf_,
+                                decoding_params.sequence_length,
+                                word_ids_buf_,
+                                parent_ids_buf_,
+                                decoding_params.output_ids + (step - 1) * m * 2,
+                                decoding_params.parent_ids + (step - 1) * m * 2,
+                                cum_log_buf_,
+                                reinterpret_cast<void *>(temp_storage_),
+                                step,
+                                args_,
+                                decoding_params.stream);
+          } else {
+            topK_softMax(logits_buf_,
+                         decoding_params.embedding_bias,
+                         finished_buf_,
+                         cum_log_buf_,
+                         word_ids_buf_,
+                         reinterpret_cast<void *>(temp_storage_),
+                         args_,
+                         decoding_params.stream);
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+            update_kernelLauncher_v2(
+                finished_buf_,
+                decoding_params.parent_ids + (step - 1) * m,
+                decoding_params.sequence_length,
+                word_ids_buf_,
+                decoding_params.output_ids + (step - 1) * m,
+                finished_count_buf_,
+                args_,
+                decoding_params.stream);
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+          }
+
         } else {
-          update_logits(logits_buf_,
-                        decoding_params.embedding_bias,
-                        args_.end_id_,
-                        finished_buf_,
-                        m,
-                        n,
-                        decoding_params.stream);
+          if (keep_alive_beam_ == true) {
+            update_logits_v2(logits_buf_,
+                             decoding_params.embedding_bias,
+                             args_.end_id_,
+                             finished_buf_,
+                             m,
+                             n,
+                             decoding_params.stream);
+
+            // Use separated alive and finish beam queues to avoid the decrease
+            // of alive beams.
+            topK_update_kernelLauncher(
+                topK_kernel_workspace,
+                topk_workspace_size_,
+                logits_buf_,
+                finished_buf_,
+                decoding_params.sequence_length,
+                word_ids_buf_,
+                parent_ids_buf_,
+                decoding_params.output_ids + (step - 1) * m * 2,
+                decoding_params.parent_ids + (step - 1) * m * 2,
+                cum_log_buf_,
+                step,
+                args_,
+                decoding_params.stream);
+          } else {
+            update_logits(logits_buf_,
+                          decoding_params.embedding_bias,
+                          args_.end_id_,
+                          finished_buf_,
+                          m,
+                          n,
+                          decoding_params.stream);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
 
 /*
   User can check the update_logits by update_logits_kernel_check.
@@ -522,16 +611,17 @@ public:
 // update_logits_kernel_check(logits_buf_, decoding_params.embedding_bias,
 // args_.end_id_, finished_buf_, m, n, decoding_params.stream);
 #endif
-          /* adding cum_log_buf_ to logits_buf_ */
-          broadcast_kernelLauncher(logits_buf_,
-                                   cum_log_buf_,
-                                   args_.batch_size_,
-                                   args_.beam_width_,
-                                   args_.vocab_size_,
-                                   decoding_params.stream);
+
+            /* adding cum_log_buf_ to logits_buf_ */
+            broadcast_kernelLauncher(logits_buf_,
+                                     cum_log_buf_,
+                                     args_.batch_size_,
+                                     args_.beam_width_,
+                                     args_.vocab_size_,
+                                     decoding_params.stream);
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
 
 /*
   User can check the broadcast_kernel by broadcast_kernel_check.
@@ -543,30 +633,62 @@ public:
 // vocab_size_, decoding_params.stream);
 #endif
 
-          topK_kernelLauncher(topK_kernel_workspace,
-                              topk_workspace_size_,
-                              logits_buf_,
-                              word_ids_buf_,
-                              args_,
-                              decoding_params.stream);
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-          update_kernelLauncher(logits_buf_,
-                                cum_log_buf_,
-                                finished_buf_,
-                                decoding_params.parent_ids + (step - 1) * m,
-                                decoding_params.sequence_length,
+            topK_kernelLauncher(topK_kernel_workspace,
+                                topk_workspace_size_,
+                                logits_buf_,
                                 word_ids_buf_,
-                                decoding_params.output_ids + (step - 1) * m,
-                                args_.batch_size_,
-                                args_.beam_width_,
-                                args_.vocab_size_,
-                                decoding_params.stream,
-                                args_.end_id_,
-                                finished_count_buf_);
+                                args_,
+                                decoding_params.stream);
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+            update_kernelLauncher(logits_buf_,
+                                  cum_log_buf_,
+                                  finished_buf_,
+                                  decoding_params.parent_ids + (step - 1) * m,
+                                  decoding_params.sequence_length,
+                                  word_ids_buf_,
+                                  decoding_params.output_ids + (step - 1) * m,
+                                  args_.batch_size_,
+                                  args_.beam_width_,
+                                  args_.vocab_size_,
+                                  decoding_params.stream,
+                                  args_.end_id_,
+                                  finished_count_buf_);
+          }
         }
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+      }
+
+      if (step <= max_trg_len) {
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        update_with_force_deocdingLauncher<float>(
+            decoding_params.trg_word,
+            decoding_params.trg_length,
+            finished_buf_,
+            word_ids_buf_,
+            (step > min_trg_len) ? nullptr : decoding_params.sequence_length,
+            (keep_alive_beam_) ? parent_ids_buf_ : nullptr,
+            (keep_alive_beam_) ? decoding_params.parent_ids + (step - 1) * m * 2
+                               : decoding_params.parent_ids + (step - 1) * m,
+            (keep_alive_beam_) ? decoding_params.output_ids + (step - 1) * m * 2
+                               : decoding_params.output_ids + (step - 1) * m,
+            cum_log_buf_,
+            keep_alive_beam_,
+            args_.batch_size_,
+            (keep_alive_beam_) ? args_.beam_width_ * 2 : args_.beam_width_,
+            max_trg_len,
+            step,
+            decoding_params.stream);
       }
 
 #ifndef NDEBUG
@@ -601,17 +723,19 @@ public:
 // hidden_units_, step, cache_size, decoder_layers_, decoding_params.stream);
 #endif
 
-      // TODO Find a better method to check the is_finished
-      int finish_size = keep_alive_beam_ == true ? m * 2 : m;
-      cudaMemcpy(h_finished_buf_,
-                 finished_buf_,
-                 sizeof(bool) * finish_size,
-                 cudaMemcpyDeviceToHost);
-      int sum = 0;
-      for (int i = 0; i < finish_size; i++) {
-        sum += (int)h_finished_buf_[i];
+      if (step > max_trg_len) {
+        // TODO Find a better method to check the is_finished
+        int finish_size = (keep_alive_beam_) ? m * 2 : m;
+        cudaMemcpy(h_finished_buf_,
+                   finished_buf_,
+                   sizeof(bool) * finish_size,
+                   cudaMemcpyDeviceToHost);
+        int sum = 0;
+        for (int i = 0; i < finish_size; i++) {
+          sum += (int)h_finished_buf_[i];
+        }
+        if (sum == finish_size) break;
       }
-      if (sum == finish_size) break;
     }  // end for decoding step for llop
   }    // end of forward
 
@@ -621,6 +745,7 @@ public:
     delete[] K_mem_cache_;
     delete[] V_mem_cache_;
     delete[] h_finished_buf_;
+    delete[] h_trg_length_;
     delete decoder_;
     allocator_.free(buf_);
   }

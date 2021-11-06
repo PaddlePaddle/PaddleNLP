@@ -31,7 +31,7 @@ DOC_FORMAT = r"""
 DOWNLOAD_CHECK = False
 
 
-def download_file(save_dir, filename, url, md5=None, task=None):
+def download_file(save_dir, filename, url, md5=None):
     """
     Download the file from the url to specified directory. 
     Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use 
@@ -44,12 +44,6 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
     logger.disable()
-    global DOWNLOAD_CHECK
-    if not DOWNLOAD_CHECK:
-        DOWNLOAD_CHECK = True
-        checker = DownloaderCheck(task)
-        checker.start()
-        checker.join()
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
@@ -58,6 +52,23 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         get_path_from_url(url, save_dir, md5)
     logger.enable()
     return fullname
+
+
+def download_check(task):
+    """
+    Check the resource statuc in the specified task.
+
+    Args:
+        task(string): The name of specified task. 
+    """
+    logger.disable()
+    global DOWNLOAD_CHECK
+    if not DOWNLOAD_CHECK:
+        DOWNLOAD_CHECK = True
+        checker = DownloaderCheck(task)
+        checker.start()
+        checker.join()
+    logger.enable()
 
 
 def add_docstrings(*docstr):
@@ -262,7 +273,7 @@ class TermTree(object):
         return self._root
 
     def __load_type(self, file_path: str):
-        with open(file_path, "rt", newline="") as csvfile:
+        with open(file_path, "rt", newline="", encoding="utf8") as csvfile:
             file_handler = csv.DictReader(csvfile, delimiter="\t")
             for row in file_handler:
                 if row["type-1"] not in self:
@@ -420,18 +431,19 @@ class TermTree(object):
                 else:
                     return False, None
 
-    def build_from_dir(self, term_schema_path, term_data_path):
+    def build_from_dir(self, term_schema_path, term_data_path, linking=True):
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
             dir ([type]): [description]
         """
         self.__load_type(term_schema_path)
-        self.__load_file(term_data_path)
-        self.__build_sons()
+        if linking:
+            self.__load_file(term_data_path)
+            self.__build_sons()
 
     @classmethod
-    def from_dir(cls, term_schema_path, term_data_path) -> "TermTree":
+    def from_dir(cls, term_schema_path, term_data_path, linking) -> "TermTree":
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
@@ -441,7 +453,7 @@ class TermTree(object):
             TermTree: [description]
         """
         term_tree = cls()
-        term_tree.build_from_dir(term_schema_path, term_data_path)
+        term_tree.build_from_dir(term_schema_path, term_data_path, linking)
         return term_tree
 
     def __dfs(self,

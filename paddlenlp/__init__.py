@@ -23,4 +23,6 @@ from . import metrics
 from . import seq2vec
 from . import transformers
 from . import utils
+from . import losses
+from . import experimental
 from .taskflow import Taskflow
