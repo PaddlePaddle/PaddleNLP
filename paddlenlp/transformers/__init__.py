@@ -62,14 +62,11 @@ from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
-<<<<<<< HEAD
 from .visualbert.modeling import *
 from .visualbert.tokenizer import *
-=======
 from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
 from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
->>>>>>> origin/develop

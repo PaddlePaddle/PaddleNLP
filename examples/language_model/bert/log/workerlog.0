@@ -1,0 +1,101 @@
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/__init__.py:107: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import MutableMapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/rcsetup.py:20: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Iterable, Mapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/colors.py:53: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Sized
+/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/transformer/modeling.py:85: DeprecationWarning: invalid escape sequence \_
+  """
+[32m[2021-09-18 19:08:01,965] [    INFO][0m - Already cached /home/chenkangyang/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt[0m
+W0918 19:08:01.991430  1940 device_context.cc:404] Please NOTE: device: 8, GPU Compute Capability: 6.1, Driver API Version: 10.2, Runtime API Version: 10.2
+W0918 19:08:01.996919  1940 device_context.cc:422] device: 8, cuDNN Version: 7.6.
+Traceback (most recent call last):
+  File "run_pretrain.py", line 478, in <module>
+    do_train(args)
+  File "run_pretrain.py", line 372, in do_train
+    remainder = paddle.distributed.get_world_size() % num_files
+ZeroDivisionError: integer division or modulo by zero
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/__init__.py:107: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import MutableMapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/rcsetup.py:20: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Iterable, Mapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/colors.py:53: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Sized
+/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/transformer/modeling.py:85: DeprecationWarning: invalid escape sequence \_
+  """
+[32m[2021-09-18 19:08:29,691] [    INFO][0m - Already cached /home/chenkangyang/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt[0m
+W0918 19:08:29.717998  2325 device_context.cc:404] Please NOTE: device: 0, GPU Compute Capability: 6.1, Driver API Version: 10.2, Runtime API Version: 10.2
+W0918 19:08:29.723604  2325 device_context.cc:422] device: 0, cuDNN Version: 7.6.
+Traceback (most recent call last):
+  File "run_pretrain.py", line 478, in <module>
+    do_train(args)
+  File "run_pretrain.py", line 372, in do_train
+    remainder = paddle.distributed.get_world_size() % num_files
+ZeroDivisionError: integer division or modulo by zero
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/__init__.py:107: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import MutableMapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/rcsetup.py:20: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Iterable, Mapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/colors.py:53: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Sized
+/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/transformer/modeling.py:85: DeprecationWarning: invalid escape sequence \_
+  """
+[32m[2021-09-18 19:09:23,685] [    INFO][0m - Already cached /home/chenkangyang/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt[0m
+W0918 19:09:23.712203  3015 device_context.cc:404] Please NOTE: device: 0, GPU Compute Capability: 6.1, Driver API Version: 10.2, Runtime API Version: 10.2
+W0918 19:09:23.717162  3015 device_context.cc:422] device: 0, cuDNN Version: 7.6.
+Traceback (most recent call last):
+  File "run_pretrain.py", line 478, in <module>
+    do_train(args)
+  File "run_pretrain.py", line 424, in do_train
+    masked_positions=masked_lm_positions)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/bert/modeling.py", line 911, in forward
+    attention_mask=attention_mask)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/bert/modeling.py", line 513, in forward
+    sequence_output = self.encoder(embedding_output, attention_mask)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/transformer.py", line 683, in forward
+    output = mod(output, src_mask=src_mask)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/transformer.py", line 567, in forward
+    src = self.self_attn(src, src, src, src_mask)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/transformer.py", line 394, in forward
+    q, k, v = self._prepare_qkv(query, key, value, cache)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/transformer.py", line 228, in _prepare_qkv
+    k, v = self.compute_kv(key, value)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/transformer.py", line 262, in compute_kv
+    k = self.k_proj(key)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph/layers.py", line 902, in __call__
+    outputs = self.forward(*inputs, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/layer/common.py", line 129, in forward
+    x=input, weight=self.weight, bias=self.bias, name=self.name)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/nn/functional/common.py", line 1453, in linear
+    pre_bias, bias, axis=len(x.shape) - 1)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/decorator.py", line 232, in fun
+    return caller(func, *(extras + args), **kw)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/wrapped_decorator.py", line 25, in __impl__
+    return wrapped_func(*args, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/framework.py", line 227, in __impl__
+    return func(*args, **kwargs)
+  File "/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/paddle/fluid/dygraph_utils.py", line 63, in _append_bias_in_dygraph
+    use_mkldnn)
+SystemError: (Fatal) Operator elementwise_add raises an paddle::memory::allocation::BadAlloc exception.
+The exception content is
+:ResourceExhaustedError: 
+
+Out of memory error on GPU 0. Cannot allocate 12.000244MB memory on GPU 0, 10.906738GB memory has been allocated and available memory is only 10.000000MB.
+
+Please check whether there is any other process using GPU 0.
+1. If yes, please stop them, or start PaddlePaddle on another GPU.
+2. If no, please decrease the batch size of your model. 
+
+ (at /paddle/paddle/fluid/memory/allocation/cuda_allocator.cc:79)
+. (at /paddle/paddle/fluid/imperative/tracer.cc:192)
+

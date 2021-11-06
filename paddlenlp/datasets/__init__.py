@@ -35,11 +35,8 @@ from .seabsa16 import *
 from .cote import *
 from .clue import *
 from .nlpcc14_sc import *
-<<<<<<< HEAD
 from .coco_captions import *
 from .nlvr2 import *
 from .vqa2 import *
-=======
 from .nlpcc13_evsam05_thu import *
 from .nlpcc13_evsam05_hit import *
->>>>>>> origin/develop
