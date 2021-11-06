@@ -1,5 +1,4 @@
 #include <pthread.h>
-#include <sentencepiece_processor.h>
 #include <algorithm>
 #include <atomic>
 #include <codecvt>
@@ -11,6 +10,10 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+
+#ifdef GPT_ON_SENTENCEPIECE
+#include <sentencepiece_processor.h>
+#endif
 
 #include "helper.h"
 
@@ -26,16 +29,16 @@ DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
 DEFINE_string(model_dir,
               "./infer_model/",
               "The directory to the inference model. ");
-DEFINE_string(vocab_dir,
-              "./infer_model/",
-              "The directory to the vocabulary file. ");
+DEFINE_string(vocab_file,
+              "./infer_model/vocab.txt",
+              "The path to the vocabulary file. ");
 DEFINE_string(start_token, "<|endoftext|>", "The start token of GPT.");
 DEFINE_string(end_token, "<|endoftext|>", "The end token of GPT.");
 
 using namespace paddle_infer;
 
 std::string model_dir = "";
-std::string vocab_dir = "";
+std::string vocab_file = "";
 
 const int BOS_IDX = 50256;
 const int EOS_IDX = 50256;
@@ -165,7 +168,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(vocab_dir);
+    std::ifstream fin(vocab_file);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -191,7 +194,8 @@ private:
                        std::vector<DataInput>& data_input_vec,
                        int max_len,
                        int batch_size) {
-    auto ids_t = predictor->GetInputHandle("ids");
+    auto ids_name = predictor->GetInputNames();
+    auto ids_t = predictor->GetInputHandle(ids_name[0]);
     std::vector<int> ids_vec;
     ids_vec.resize(max_len * batch_size);
     for (int i = 0; i < batch_size; ++i) {
@@ -292,7 +296,7 @@ int main(int argc, char** argv) {
   gpu_id = FLAGS_gpu_id;
 
   model_dir = FLAGS_model_dir;
-  vocab_dir = FLAGS_vocab_dir;
+  vocab_file = FLAGS_vocab_file;
 
   paddle::inference::Main(batch_size,
                           gpu_id,

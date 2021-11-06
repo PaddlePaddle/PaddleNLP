@@ -15,12 +15,17 @@
 
 import time
 import os
+import sys
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader, Dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+
+# Used to load data_tools path.
+sys.path.insert(0, "../")
 
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
@@ -74,15 +79,27 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                 separate_last_epoch = (
                     last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
             # Note. len(doc_idx) = num_epochs * len(doc)
+            start_time = time.time()
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
                                      separate_last_epoch)
             np.save(doc_idx_filename, doc_idx, allow_pickle=True)
-
+            print(' > elasped time to build and save doc-idx mapping '
+                  '(seconds): {:4f}'.format(time.time() - start_time))
             # sample-idx. pos of each seq_len of data.
+            start_time = time.time()
             assert doc_idx.dtype == np.int32
-            sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
-                                           num_epochs, tokens_per_epoch)
+            assert sizes.dtype == np.int32
+
+            import data_tools.helpers as helpers
+
+            sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length,
+                                                  num_epochs, tokens_per_epoch)
             np.save(sample_idx_filename, sample_idx, allow_pickle=True)
+            print(' > elasped time to build and save sample-idx mapping '
+                  '(seconds): {:4f}'.format(time.time() - start_time))
+
+            # shuffle-idx.
+            start_time = time.time()
 
             if separate_last_epoch:
                 num_samples_ = num_samples_from_epochs_minus_one
@@ -93,6 +110,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
             shuffle_idx = _build_shuffle_idx(num_samples_,
                                              sample_idx.shape[0] - 1, np_rng)
             np.save(shuffle_idx_filename, shuffle_idx, allow_pickle=True)
+            print(' > elasped time to build and save shuffle-idx mapping'
+                  ' (seconds): {:4f}'.format(time.time() - start_time))
+
     else:
         while True:
             if (not os.path.isfile(doc_idx_filename)) or \
@@ -100,7 +120,19 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                (not os.path.isfile(shuffle_idx_filename)):
                 time.sleep(3)
             else:
-                break
+                try:
+                    np.load(
+                        shuffle_idx_filename, allow_pickle=True, mmap_mode='r')
+                    break
+                except Exception as e:
+                    print(
+                        "%s file is still writing or damaged, please wait a moment."
+                        % shuffle_idx_filename)
+                    time.sleep(3)
+
+    if paddle.distributed.get_world_size() > 1:
+        if paddle.fluid.framework.in_dygraph_mode():
+            paddle.distributed.barrier()
 
     # Load mappings.
     doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode='r')
@@ -227,6 +259,7 @@ def get_train_valid_test_split_(splits_string, size):
 def create_pretrained_dataset(
         args,
         input_path,
+        local_rank,
         data_world_rank,
         data_world_size,
         eos_id,
@@ -235,6 +268,17 @@ def create_pretrained_dataset(
         places=None,
         data_holders=None,
         pipeline_mode=False, ):
+
+    if local_rank == 0:
+        start_time = time.time()
+        print('> compiling dataset index builder ...')
+        from data_tools.dataset_utils import compile_helper
+        compile_helper()
+        print(
+            '>>> done with dataset index builder. Compilation time: {:.3f} '
+            'seconds'.format(time.time() - start_time),
+            flush=True)
+
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
 
@@ -242,12 +286,31 @@ def create_pretrained_dataset(
         "The distributed run, total device num:{}, distinct dataflow num:{}.".
         format(device_world_size, data_world_size))
 
-    process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
-    sample_ids = process_datas["ids"]
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_datas["lens"]
+    assert len(input_path) == 1, "GPT only support one dataset for now."
+
+    input_prefix = input_path[0]
+
+    if os.path.isfile(input_prefix + "_ids.npz"):
+        logger.warning(
+            "You are using compatible dataset, please make new dataset as the readme!"
+        )
+        process_datas = np.load(
+            input_prefix + "_ids.npz", mmap_mode="r+", allow_pickle=True)
+        sample_ids = process_datas["ids"]
+        sample_lens = process_datas["lens"].astype("int32")
+    else:
+        for suffix in ["_ids.npy", "_idx.npz"]:
+            if not os.path.isfile(input_prefix + suffix):
+                raise ValueError("File Not found, %s" % (path + suffix))
+
+        sample_ids = np.load(
+            input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        # All documment ids, extend as 1-D array.
+
+        process_datas = np.load(input_prefix + "_idx.npz")
+        # The len(sample_lens) num of docs
+        # The sum(sample_lens) should equal len(sample_ids)
+        sample_lens = process_datas["lens"]
 
     splits = get_train_valid_test_split_(args.split, len(sample_lens))
     assert len(sample_lens) >= splits[
@@ -256,8 +319,8 @@ def create_pretrained_dataset(
 
     def build_dataset(index, name, num_samples):
         dataset = GPTDataset(
-            file_path=input_path,
-            build_data_file=device_world_rank == 0,
+            file_prefix=input_prefix,
+            build_data_file=local_rank == 0,
             micro_batch_size=args.micro_batch_size,
             name="gpt_" + name,
             max_seq_len=max_seq_len,
@@ -267,7 +330,7 @@ def create_pretrained_dataset(
             sample_lens=sample_lens,
             eos_id=eos_id,
             seed=args.seed)
-        batch_sampler = paddle.io.DistributedBatchSampler(
+        batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
             num_replicas=data_world_size,
@@ -316,7 +379,7 @@ def create_pretrained_dataset(
 
 class GPTDataset(paddle.io.Dataset):
     def __init__(self,
-                 file_path,
+                 file_prefix,
                  micro_batch_size,
                  num_samples,
                  eos_id,
@@ -327,7 +390,7 @@ class GPTDataset(paddle.io.Dataset):
                  name="gpt",
                  max_seq_len=1024,
                  seed=1234):
-        self.file_path = file_path
+        self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
         self.eos_id = eos_id
@@ -341,7 +404,7 @@ class GPTDataset(paddle.io.Dataset):
             document_ids = documents
 
         self.doc_idx, self.sample_idx, self.shuffle_idx = \
-            construct_samples_and_shuffle_data(self.name, self.file_path, document_ids,\
+            construct_samples_and_shuffle_data(self.name, self.file_prefix, document_ids,\
                 self.sample_lens, num_samples, max_seq_len, seed, build_data_file)
 
         # The doc cumsum start pos
@@ -363,6 +426,7 @@ class GPTDataset(paddle.io.Dataset):
 
         attention_mask = (attention_mask - 1.0) * 1e9
         attention_mask = attention_mask.astype("float32")
+        labels = np.array(labels, dtype="int64")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,

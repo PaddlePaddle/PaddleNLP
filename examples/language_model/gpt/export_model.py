@@ -58,8 +58,11 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     # Suild model and load trained parameters
-    model = model_class.from_pretrained(args.model_path, max_predict_len=32)
     tokenizer = tokenizer_class.from_pretrained(args.model_path)
+    model = model_class.from_pretrained(
+        args.model_path,
+        max_predict_len=32,
+        eol_token_id=tokenizer.eol_token_id)
     # Switch to eval model
     model.eval()
     # Convert to static graph with specific input description
@@ -68,8 +71,6 @@ def main():
         input_spec=[
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[1], dtype="int32"),  # end_id
         ])
 
     # Save converted static graph model

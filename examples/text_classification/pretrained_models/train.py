@@ -21,11 +21,12 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+
+from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -39,7 +40,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -72,47 +73,10 @@ def evaluate(model, criterion, metric, data_loader):
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
-        accu = metric.accumulate()
+    accu = metric.accumulate()
     print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
     model.train()
     metric.reset()
-
-
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    """
-    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
-    to be used in a sequence-pair classification task.
-        
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-
-    It returns the first portion of the mask (0's).
-
-
-    Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
-    """
-    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    if not is_test:
-        label = np.array([example["label"]], dtype="int64")
-        return input_ids, token_type_ids, label
-    else:
-        return input_ids, token_type_ids
 
 
 def create_dataloader(dataset,
@@ -147,21 +111,9 @@ def do_train():
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
-
-    # If you wanna use bert/roberta/electra pretrained model,
-    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
-    # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-tiny', num_classes=len(train_ds.label_list))
-
-    # If you wanna use bert/roberta/electra pretrained model,
-    # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained('chinese-electra-small', num_classes=2)
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+        'ernie-1.0', num_classes=len(train_ds.label_list))
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
         convert_example,

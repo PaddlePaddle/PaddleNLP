@@ -34,21 +34,20 @@ limitations under the License. */
 using namespace paddle_infer;
 
 DEFINE_int32(batch_size, 1, "Batch size to do inference. ");
-DEFINE_int32(beam_size, 5, "Beam size to do inference. ");
 DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
 DEFINE_string(model_dir,
               "./infer_model/",
               "The directory to the inference model. ");
-DEFINE_string(vocab_dir,
+DEFINE_string(vocab_file,
               "./vocab_all.bpe.33708",
-              "The directory to the vocabulary file. ");
-DEFINE_string(data_dir,
+              "The path to the vocabulary file. ");
+DEFINE_string(data_file,
               "./newstest2014.tok.bpe.33708.en",
-              "The directory to the input data. ");
+              "The path to the input data file. ");
 
 std::string model_dir = "";
-std::string vocab_dir = "";
-std::string data_dir = "";
+std::string vocab_file = "";
+std::string data_file = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
@@ -57,7 +56,6 @@ const int N_BEST = 1;
 
 int batch_size = 1;
 int gpu_id = 0;
-int beam_size = 5;
 
 namespace paddle {
 namespace inference {
@@ -75,6 +73,7 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::unordered_map<int, std::string>& num2word_dict) {
   std::vector<int> output_shape = seq_ids->shape();
   int batch_size = output_shape[1];
+  int beam_num = output_shape[2];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   std::vector<int> seq_ids_out;
@@ -88,13 +87,13 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
     for (int k = 0; k < N_BEST; ++k) {
       dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
-        if (seq_ids_out[len * batch_size * beam_size + bsz * beam_size + k] ==
+        if (seq_ids_out[len * batch_size * beam_num + bsz * beam_num + k] ==
             EOS_IDX)
           break;
         dataresultvec[bsz * N_BEST + k].result_q =
             dataresultvec[bsz * N_BEST + k].result_q +
-            num2word_dict[seq_ids_out[len * batch_size * beam_size +
-                                      bsz * beam_size + k]] +
+            num2word_dict[seq_ids_out[len * batch_size * beam_num +
+                                      bsz * beam_num + k]] +
             " ";
       }
     }
@@ -146,7 +145,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(vocab_dir);
+    std::ifstream fin(vocab_file);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -184,6 +183,15 @@ private:
     src_word_t->Reshape({batch_size, max_len});
     src_word_t->CopyFromCpu(src_word_vec.data());
 
+    // NOTE: If the saved model supports force decoding, a nullptr must be
+    // given to trg_word to ensure predictor work properly when not
+    // using force decoding.
+    /*
+     * auto trg_word_t = predictor->GetInputHandle("trg_word");
+     * trg_word_t->Reshape({0, 0});
+     * trg_word_t->CopyFromCpu((int*)nullptr);
+     */
+
     return true;
   }
 };
@@ -215,8 +223,12 @@ void Main(int batch_size, int gpu_id) {
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
+  // When using fp16, fc_elementwise_layernorm_fuse_pass causes a little
+  // different translation results with original dygraph prediction, maybe you
+  // can turn off the IR optimization for same results as following:
+  // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
-  DataReader reader(data_dir);
+  DataReader reader(data_file);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -258,11 +270,10 @@ int main(int argc, char** argv) {
 
   batch_size = FLAGS_batch_size;
   gpu_id = FLAGS_gpu_id;
-  beam_size = FLAGS_beam_size;
 
   model_dir = FLAGS_model_dir;
-  vocab_dir = FLAGS_vocab_dir;
-  data_dir = FLAGS_data_dir;
+  vocab_file = FLAGS_vocab_file;
+  data_file = FLAGS_data_file;
 
   paddle::inference::Main(batch_size, gpu_id);
 

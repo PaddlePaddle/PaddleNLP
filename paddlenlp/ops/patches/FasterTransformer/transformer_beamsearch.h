@@ -82,6 +82,8 @@ public:
                         const float beam_search_diversity_rate = -0.0f,
                         const bool is_fuse_topk_softMax = false,
                         const bool normalization_before = true,
+                        const bool pos_bias = true,
+                        const ActivationType act = ActivationType::GELU,
                         const int unk_id = -1,
                         const int mask_id = -1,
                         const float temperature = 1.0,
@@ -104,6 +106,8 @@ public:
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     args_.normalization_before_ = normalization_before;
+    args_.pos_bias_ = pos_bias;
+    args_.act_ = act;
     args_.unk_id_ = unk_id;
     args_.mask_id_ = mask_id;
     args_.temperature_ = temperature;
@@ -118,7 +122,8 @@ public:
                                                    head_num,
                                                    size_per_head,
                                                    memory_hidden_units,
-                                                   normalization_before);
+                                                   normalization_before,
+                                                   args_.act_);
 
     int from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
@@ -304,6 +309,7 @@ public:
                                    step,
                                    m,
                                    args_.hidden_units_,
+                                   args_.pos_bias_,
                                    decoding_params.stream);
       } else {
         embeddings_kernel_launcher(embedding_buf_,
@@ -316,6 +322,7 @@ public:
                                    step,
                                    m,
                                    args_.hidden_units_,
+                                   args_.pos_bias_,
                                    decoding_params.stream);
 
 #ifndef NDEBUG
@@ -452,7 +459,7 @@ public:
                              m,
                              k,
                              decoding_params.stream,
-                             ActivationType::GELU);
+                             args_.act_);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();

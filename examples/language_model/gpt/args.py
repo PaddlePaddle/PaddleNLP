@@ -130,16 +130,10 @@ def parse_args(MODEL_CLASSES):
 
     # Training steps config
     parser.add_argument(
-        "--num_train_epochs",
-        default=1,
-        type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
         "--max_steps",
         default=500000,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
-    )
+        help="set total number of training steps to perform.")
     parser.add_argument(
         "--save_steps",
         type=int,
@@ -217,7 +211,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--scale_loss",
         type=float,
-        default=128,
+        default=32768,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
     parser.add_argument(
@@ -251,6 +245,13 @@ def parse_args(MODEL_CLASSES):
         default="cosine",
         choices=["cosine", "none"],
         help="Learning rate decay style.")
+    parser.add_argument(
+        '-p',
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 

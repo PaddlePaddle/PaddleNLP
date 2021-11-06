@@ -145,8 +145,9 @@ if(ON_INFER)
     set(DEPS ${DEPS} shlwapi.lib)
   endif(NOT WIN32)
 
-  cuda_add_library(pd_infer_custom_op ${decoding_op_files} ${decoder_op_files} SHARED)
-  add_dependencies(pd_infer_custom_op extern_${THIRD_PARTY_NAME})
+  cuda_add_library(decoding_infer_op ${decoding_op_files} SHARED)
+  add_dependencies(decoding_infer_op extern_${THIRD_PARTY_NAME} boost)
+
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
 
   list(LENGTH DEMO_PATH PATH_LEN)
@@ -156,10 +157,11 @@ if(ON_INFER)
   string(REPLACE "." ";" DEMO_NAME ${DEMO_NAME})
   list(GET DEMO_NAME 0 DEMO_NAME)
   add_executable(${DEMO_NAME} ${DEMO})
-  set(DEPS pd_infer_custom_op ${ft_lib_link} boost ${DEPS} cublas cudart)
+  set(DEPS decoding_infer_op ${ft_lib_link} boost ${DEPS} cublas cudart)
 
-  if(WITH_GPT)
+  if(WITH_GPT AND WITH_SP)
     set(DEPS ${DEPS} sentencepiece)
+    add_dependencies(decoding_infer_op extern_sentencepiece)
   endif()
 
   if(WIN32)
@@ -268,9 +270,5 @@ else(ON_INFER)
 
   add_library(decoding_op SHARED ${decoding_op_files})
   add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
-  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
-
-  add_library(decoder_op SHARED ${decoder_op_files})
-  add_dependencies(decoder_op extern_${THIRD_PARTY_NAME} boost)
-  target_link_libraries(decoder_op PRIVATE -lcublas -lcudart -ldecoder ${lib_link})
+  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link} -lencoder)
 endif()

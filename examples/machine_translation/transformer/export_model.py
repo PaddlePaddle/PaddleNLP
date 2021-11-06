@@ -24,6 +24,28 @@ def parse_args():
         action="store_true",
         help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+    )
+    parser.add_argument(
+        "--unk_token",
+        default=None,
+        type=str,
+        help="The unknown token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--bos_token",
+        default=None,
+        type=str,
+        help="The bos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--eos_token",
+        default=None,
+        type=str,
+        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -46,7 +68,10 @@ def do_export(args):
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
-        max_out_len=args.max_out_len)
+        max_out_len=args.max_out_len,
+        beam_search_version=args.beam_search_version,
+        rel_len=args.use_rel_len,
+        alpha=args.alpha)
 
     # Load the trained model
     assert args.init_from_params, (
@@ -71,7 +96,10 @@ def do_export(args):
         input_spec=[
             # src_word
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")
+                shape=[None, None], dtype="int64"),
+            # trg_word
+            # paddle.static.InputSpec(
+            #     shape=[None, None], dtype="int64")
         ])
 
     # Save converted static graph model
@@ -87,6 +115,10 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
     args.benchmark = ARGS.benchmark
+    args.vocab_file = ARGS.vocab_file
+    args.unk_token = ARGS.unk_token
+    args.bos_token = ARGS.bos_token
+    args.eos_token = ARGS.eos_token
     pprint(args)
 
     do_export(args)
