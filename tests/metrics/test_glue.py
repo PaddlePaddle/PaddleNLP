@@ -43,7 +43,6 @@ class TestMultiLabelsMetric(unittest.TestCase):
 
     def test_compute(self):
         for i in range(29):
-            # i = 16
             numpy.random.seed(i)
             self.metrics.reset()
             label, pred, np_label, np_pred, average_type, pos_label = self.get_multi_labels_random_case(
@@ -104,6 +103,42 @@ class TestMultiLabelsMetric(unittest.TestCase):
             np_pred = np.concatenate((np_pred, cur_np_pred))
             precision, recall, f, _ = precision_recall_fscore_support(
                 np_label, np_pred, average=average_type, pos_label=pos_label)
+            args = self.metrics.compute(
+                paddle.to_tensor(pred), paddle.to_tensor(label))
+            self.metrics.update(args)
+            result = self.metrics.accumulate(
+                average=average_type, pos_label=pos_label)
+            self.assertEqual(precision, result[0])
+            self.assertEqual(recall, result[1])
+            self.assertEqual(f, result[2])
+
+    def get_binary_labels_random_case(self):
+        label = np.random.randint(
+            self.cls_num, size=self.label_shape).astype("int64")
+        pred = np.random.uniform(0.1, 1.0,
+                                 self.shape).astype(paddle.get_default_dtype())
+        average_type = 'binary'
+        pos_label = np.random.randint(0, self.cls_num)
+
+        np_label = label.reshape(-1)
+        selection = pos_label == np_label
+        np_label = np.zeros_like(np_label)
+        np_label[selection] = 1
+
+        np_pred = pred.reshape(-1, self.cls_num).argmax(axis=1)
+        selection = pos_label == np_pred
+        np_pred = np.zeros_like(np_pred)
+        np_pred[selection] = 1
+        return label, pred, np_label, np_pred, average_type, pos_label
+
+    def test_binary_compute(self):
+        for i in range(29):
+            numpy.random.seed(i)
+            self.metrics.reset()
+            label, pred, np_label, np_pred, average_type, pos_label = self.get_binary_labels_random_case(
+            )
+            precision, recall, f, _ = precision_recall_fscore_support(
+                np_label, np_pred, average=average_type)
             args = self.metrics.compute(
                 paddle.to_tensor(pred), paddle.to_tensor(label))
             self.metrics.update(args)
