@@ -480,6 +480,10 @@ class MultiLabelsMetric(Metric):
             result7 = m.accumulate(average='weighted')
             # (0.75, 0.5, 0.5833333333333333)
 
+    Note: When zero_division is encountered (details as followed), the corresponding metrics will be set to 0.0
+        precision is zero_division if there are no positive predictions
+        recall is zero_division if there are no positive labels
+        fscore is zero_division if all labels AND predictions are negative
     """
 
     def __init__(self, num_labels, name='multi_labels_metric'):
