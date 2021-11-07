@@ -110,6 +110,5 @@ class VQA2(DatasetBuilder):
         # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
             'filepath': en_vocab_fullname,
-            
         }
         return vocab_info

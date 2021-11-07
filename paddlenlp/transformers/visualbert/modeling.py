@@ -575,23 +575,23 @@ class VisualBertPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "visualbert-vqa":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa/model_state.pdparams",
             "visualbert-vqa-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-pre/model_state.pdparams",
             "visualbert-vqa-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-coco-pre/model_state.pdparams",
             "visualbert-vcr":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr/model_state.pdparams",
             "visualbert-vcr-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-pre/model_state.pdparams",
             "visualbert-vcr-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-coco-pre/model_state.pdparams",
             "visualbert-nlvr2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2/model_state.pdparams",
             "visualbert-nlvr2-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-pre/model_state.pdparams",
             "visualbert-nlvr2-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-coco-pre/model_state.pdparams",
         }
     }
 
