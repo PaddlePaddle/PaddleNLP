@@ -638,16 +638,13 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
                 It's data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
 
             - `caches` (tuple(tuple(Tensor), optional):
-                returned when `use_cache=True` is passed.
-                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+                See :class:`CTRLModel`.
 
             - `hidden_states` (tuple(Tensor), optional):
-                returned when `output_hidden_states=True` is passed.
-                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+                See :class:`CTRLModel`.
 
             - `attentions` (tuple(Tensor), optional):
-                returned when `output_attentions=True` is passed.
-                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+                See :class:`CTRLModel`.
 
         Example:
             .. code-block::
@@ -776,29 +773,26 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
                 It's data type should be float32 and its shape is [batch_size, num_classes].
 
             - `caches` (tuple(tuple(Tensor), optional):
-                returned when `use_cache=True` is passed.
-                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+                See :class:`CTRLModel`.
 
             - `hidden_states` (tuple(Tensor), optional):
-                returned when `output_hidden_states=True` is passed.
-                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+                See :class:`CTRLModel`.
 
             - `attentions` (tuple(Tensor), optional):
-                returned when `output_attentions=True` is passed.
-                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+                See :class:`CTRLModel`.
 
         Example:
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import CTRLLMHeadModel, CTRLTokenizer
+                from paddlenlp.transformers import CTRLForSequenceClassification, CTRLTokenizer
 
                 tokenizer = CTRLTokenizer.from_pretrained('ctrl')
-                model = CTRLLMHeadModel.from_pretrained('ctrl')
+                model = CTRLForSequenceClassification.from_pretrained('ctrl', pad_token_id=0)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs, labels=inputs["input_ids"])
+                output = model(**inputs, labels=paddle.to_tensor([1]))
 
                 loss = output[0]
                 logits = output[1]

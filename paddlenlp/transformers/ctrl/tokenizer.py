@@ -117,7 +117,11 @@ class CTRLTokenizer(PretrainedTokenizer):
         max_len (int, optional):
             The maximum value of the input sequence length.
             Defaults to `None`.
-
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            Defaults to "<unk>".
+            
     """
     resource_files_names = {
         "vocab_file": "vocab.json",
