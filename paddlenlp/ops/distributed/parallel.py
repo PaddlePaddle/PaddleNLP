@@ -45,7 +45,23 @@ def guard(device):
 
 class ParallelEmbedding(nn.Layer):
     """
-    Parallel Embedding
+    Parallel Embedding.
+
+    Args:
+        num_embeddings (int):
+            The size of embedding dictionary which dictates the maximum value of the input id.
+        embedding_dim (int):
+            The dimensions of each embedding vector.
+        rank (int):
+            The rank of the current part, which determines the start index of the vocab.
+        world_size (int):
+            The number of trainers.
+        weight_attr (Tensor, optional):
+            Specify the weight parameter property, including the initialization method.
+            Defaults to None which means the default weight parameter property will be used.
+        name (str, optional):
+            Normally there is no need for user to set this property.
+            Defaults to None.
     """
 
     def __init__(self,
@@ -85,6 +101,15 @@ class ParallelEmbedding(nn.Layer):
         main_block.vars[self.weight.name].is_distributed = True
 
     def forward(self, x):
+        """
+        Args:
+            x (Tensor):
+                A Tensor contains the id information.
+                Its data type should be int32 or int64, and the value of the input id should be in [0, weight.shape[0]] .
+
+        Returns:
+            Tensor: Returns the embedding Tensor mapped by x.
+        """
         if self.is_mp:
             output_parallel = paddle.distributed.collective._c_lookup_table(
                 self.weight,
@@ -108,7 +133,25 @@ class ParallelEmbedding(nn.Layer):
 
 class ColumnParallelLiner(nn.Layer):
     """
-    Parallel Linear, axis=1
+    Parallel Linear, axis=1.
+
+    Args:
+        size (int):
+            The size of embedding vector.
+        num_partitions (int, optional):
+            The number of parts within a model parallel group. Defaults to 1.
+        gather_out (bool, optional):
+            Whether to gather the output tensor. Defaults to True.
+        param_attr (Tensor, optional):
+            Specify the parameter property, including the initialization method.
+            Defaults to None which means the default parameter property will be used.
+        bias_attr (Tensor, optional):
+            Specify the bias property.
+            Defaults to None which means the default parameter property will be used.
+        name (str, optional):
+            Normally there is no need for user to set this property.
+            Defaults to None.
+
     """
 
     def __init__(self,
@@ -170,7 +213,14 @@ class ColumnParallelLiner(nn.Layer):
             self.bias = self.linear.bias
 
     def forward(self, x):
-        # TODO(wangxi): dynamic group
+        """
+        Args:
+            x (Tensor):
+                The input tensor. Its data type can be int or float.
+
+        Returns:
+            Tensor: Returns the embedding Tensor mapped by x.
+        """
         group = None
         x = paddle.distributed.collective._c_identity(x, group=group)
         output_parallel = self.linear(x)
@@ -183,7 +233,25 @@ class ColumnParallelLiner(nn.Layer):
 
 class RowParallelLiner(nn.Layer):
     """
-    Parallel Linear, axis=0
+    Parallel Linear, axis=0.
+
+    Args:
+        size (int):
+            The size of embedding vector.
+        num_partitions (int, optional):
+            The number of parts within a model parallel group. Defaults to 1.
+        input_is_parallel (bool, optional):
+            Whether the input is parallel. Defaults to `False`.
+        param_attr (Tensor, optional):
+            Specify the parameter property, including the initialization method.
+            Defaults to None which means the default parameter property will be used.
+        bias_attr (Tensor, optional):
+            Specify the bias property.
+            Defaults to None which means the default parameter property will be used.
+        name (str, optional):
+            Normally there is no need for user to set this property.
+            Defaults to None.
+
     """
 
     def __init__(self,
@@ -251,7 +319,14 @@ class RowParallelLiner(nn.Layer):
             self.bias = None
 
     def forward(self, x):
-        # TODO(wangxi): dynamic group
+        """
+        Args:
+            x (Tensor):
+                The input tensor. Its data type can be int or float.
+
+        Returns:
+            Tensor: Returns the embedding Tensor mapped by x.
+        """
         group = None
         if self.input_is_parallel:
             assert x.shape[-1] == self.per_part_size, (

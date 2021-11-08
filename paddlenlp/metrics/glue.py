@@ -125,15 +125,15 @@ class AccuracyAndF1(Metric):
 
             With the fields:
 
-            - acc (numpy.float64):
+            - `acc` (numpy.float64):
                 The accumulated accuracy.
-            - precision (numpy.float64):
+            - `precision` (numpy.float64):
                 The accumulated precision.
-            - recall (numpy.float64):
+            - `recall` (numpy.float64):
                 The accumulated recall.
-            - f1 (numpy.float64):
+            - `f1` (numpy.float64):
                 The accumulated f1.
-            - average_of_acc_and_f1 (numpy.float64):
+            - `average_of_acc_and_f1` (numpy.float64):
                 The average of accumulated accuracy and f1.
 
         """
@@ -265,13 +265,9 @@ class Mcc(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: The accumulated metric. A tuple of shape (mcc,)
+            tuple: Returns the accumulated metric, a tuple of shape (mcc,), `mcc` is the accumulated mcc and its data
+            type is float64.
 
-            With the fields:
-
-            - mcc (numpy.float64):
-                The accumulated mcc.
-                
         """
         if self.tp == 0 or self.fp == 0 or self.tn == 0 or self.fn == 0:
             mcc = 0.0
@@ -342,8 +338,8 @@ class PearsonAndSpearman(Metric):
 
         Args:
             preds_and_labels (tuple[Tensor] or list[Tensor]):
-                Tuple of predicted value and the ground truth label, with dtype
-                float32 or float64. Each shape is [batch_size, d0, ..., dN].
+                Tuple or list of predicted value and the ground truth label.
+                Its data type should be float32 or float64 and its shape is [batch_size, d0, ..., dN].
 
         """
         preds = preds_and_labels[0]
@@ -362,16 +358,18 @@ class PearsonAndSpearman(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: The accumulated metric. A tuple of (pearson, spearman,
-            the_average_of_pearson_and_spearman)
+            tuple: Returns the accumulated metric, a tuple of (pearson, spearman,
+            the_average_of_pearson_and_spearman).
 
             With the fields:
 
-            - pearson (numpy.float64):
+            - `pearson` (numpy.float64):
                 The accumulated pearson.
-            - spearman (numpy.float64):
+
+            - `spearman` (numpy.float64):
                 The accumulated spearman.
-            - the_average_of_pearson_and_spearman (numpy.float64):
+
+            - `the_average_of_pearson_and_spearman` (numpy.float64):
                 The average of accumulated pearson and spearman correlation
                 coefficient.
 

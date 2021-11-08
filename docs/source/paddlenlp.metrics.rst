@@ -17,5 +17,6 @@ paddlenlp.metrics
    paddlenlp.metrics.glue
    paddlenlp.metrics.perplexity
    paddlenlp.metrics.rouge
+   paddlenlp.metrics.sighan
    paddlenlp.metrics.squad
    paddlenlp.metrics.utils

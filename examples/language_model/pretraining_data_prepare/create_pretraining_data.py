@@ -1,6 +1,6 @@
-# Copyright (c) 2019 NVIDIA CORPORATION & 2021 PaddlePaddle Authors. 
-# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
-# All rights reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
+# Copyright (c) 2019 NVIDIA CORPORATION.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
