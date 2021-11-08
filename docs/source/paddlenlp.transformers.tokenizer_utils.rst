@@ -6,3 +6,4 @@ tokenizer\_utils
    :no-undoc-members:
    :show-inheritance:
    :special-members: __call__
+   :special-members: __call__
