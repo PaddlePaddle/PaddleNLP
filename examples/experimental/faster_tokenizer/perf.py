@@ -29,10 +29,10 @@ from transformers import AutoTokenizer
 parser = argparse.ArgumentParser()
 
 # yapf: disable
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--epochs", default=10, type=int, help="Total number of tokenize epochs to perform.")
-parser.add_argument("--num_samples", default=100, type=int, help="")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size for tokenization.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of tokenization epochs to perform.")
+parser.add_argument("--num_samples", default=100, type=int, help="The number of samples to be tokenized")
 # yapf: enable
 args = parser.parse_args()
 
@@ -151,5 +151,5 @@ for _ in range(epochs):
     for batch_data in batches:
         input_ids = tf_tokenizer.tokenize(batch_data)
 end = time.time()
-print("The throughput of tensorflow text BertTokenizer: {:,.2f} tokens/s".
+print("The throughput of TensorFlow Text BertTokenizer: {:,.2f} tokens/s".
       format((total_tokens / (end - start))))
