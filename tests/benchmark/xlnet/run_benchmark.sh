@@ -7,7 +7,7 @@ function _set_params(){
     run_mode=${1:-"sp"}          # 单卡sp|多卡mp
     batch_size=${2:-"64"}
     fp_item=${3:-"fp32"}        # fp32|fp16
-    max_iter=${4:-"1500"}       # 可选，如果需要修改代码提前中断
+    max_iter=${4:-"1000"}       # 可选，如果需要修改代码提前中断
     model_name=${5:-"xlnet-base-cased"}
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}  # TRAIN_LOG_DIR 后续QA设置该参数
 
@@ -26,6 +26,7 @@ function _train(){
     train_cmd="--model_name_or_path=${model_name}
                --task_name=SST-2
                --max_seq_length=128
+               --pad_to_max_seq_len=True
                --logging_steps=500
                --save_steps=2000
                --batch_size=${batch_size}
@@ -37,10 +38,10 @@ function _train(){
     case ${run_mode} in
     sp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
+        examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
     mp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}"
+        examples/language_model/xlnet/run_glue.py ${train_cmd}"
         log_parse_file="mylog/workerlog.0" ;;
     *) echo "choose run_mode(sp or mp)"; exit 1;
     esac

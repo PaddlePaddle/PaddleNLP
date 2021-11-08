@@ -74,8 +74,9 @@ int main(int argc, char* argv[]) {
                                                      {6, "O"}};
   for (size_t i = 0; i < data.size(); i++) {
     size_t seq_len = data[i].size();
-    size_t start = i * max_seq_len;
-    size_t end = start + max_seq_len;
+    // +1 for the concated CLS token
+    size_t start = i * max_seq_len + 1;
+    size_t end = start + seq_len;
     for (size_t j = start; j < end; j++) {
       std::cout << preds[j] << " ";
     }
