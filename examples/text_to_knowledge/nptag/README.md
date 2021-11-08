@@ -101,7 +101,7 @@ python deploy/python/predict.py --model_dir=./export
 
 ## Taskflow一键预测
 
-Taskflow向用户提供了一个百度基于大规模标注汉语短语数据集训练的名词短语标注工具`NPTag`。用户可以方便地使用该工具完成对中文名词短语的一键预测。
+除了以上的finetune示例，Taskflow内置了一个百度基于大规模标注汉语短语数据集训练的名词短语标注工具`NPTag`。用户可以方便地使用该工具完成对中文名词短语的一键预测。
 
 ```python
 from paddlenlp import Taskflow
