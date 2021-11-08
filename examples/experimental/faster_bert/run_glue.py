@@ -43,6 +43,7 @@ FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
+
 METRIC_CLASSES = {
     "cola": Mcc,
     "sst-2": Accuracy,
@@ -441,10 +442,12 @@ def do_train(args):
     fused_model, fused_state_to_load  = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 ####convert model to fused model
-    fused_state_to_load = convert_base_to_fused(base_state_to_load)
+    num_heads = fused_model.bert.encoder.layers[0].fused_attn.num_heads
+    fused_state_to_load = convert_base_to_fused(base_state_to_load, num_heads)
     fused_model.set_state_dict(fused_state_to_load)
 ####convert model to fused model
     model = fused_model
+    #print(model)
     #model = base_model
     #model.set_state_dict(base_state_to_load)
 
@@ -500,6 +503,7 @@ def do_train(args):
                 optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
+            #return
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"

@@ -2,7 +2,7 @@
  export PYTHONPATH=./models/
  export DATA_DIR=./models/bert-large/
 
- export CUDA_VISIBLE_DEVICES=4
+ export CUDA_VISIBLE_DEVICES=7
 
  batch_size=${1:-32}
  num_gpus=${2:-1}
@@ -33,5 +33,5 @@
     --logging_steps $logging_steps \
     --save_steps 50000 \
     --max_steps $max_steps \
-    --gradient_merge_steps 1\
+    --gradient_merge_steps 4096\
     --use_amp $use_amp

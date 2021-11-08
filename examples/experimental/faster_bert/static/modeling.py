@@ -14,6 +14,7 @@
 
 import paddle
 import paddle.nn as nn
+import paddle.incubate.nn as incubate_nn
 import paddle.nn.functional as F
 from paddle.incubate.nn import FusedTransformerEncoderLayer
 from paddle.nn import Layer
@@ -318,6 +319,8 @@ class BertPretrainedModel(PretrainedModel):
                         self.bert.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-12
+        elif isinstance(layer, incubate_nn.FusedMultiHeadAttention) or isinstance(layer, incubate_nn.FusedFeedForward):
             layer._epsilon = 1e-12
 
 

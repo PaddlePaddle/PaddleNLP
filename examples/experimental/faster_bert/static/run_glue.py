@@ -407,7 +407,8 @@ def do_train(args):
     # by the normal distribution.
 
 ####convert model to fused model
-    fused_pretrained_state_dict = convert_base_to_fused(pretrained_state_dict)
+    num_heads = fused_model.bert.encoder.layers[0].fused_attn.num_heads
+    fused_pretrained_state_dict = convert_base_to_fused(pretrained_state_dict, num_heads)
 ####convert model to fused model
 
     exe = paddle.static.Executor(place)
