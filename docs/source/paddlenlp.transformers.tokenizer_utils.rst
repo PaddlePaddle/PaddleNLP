@@ -7,3 +7,6 @@ tokenizer\_utils
    :show-inheritance:
    :special-members: __call__
    :special-members: __call__
+   :special-members: __call__
+   :special-members: __call__
+   :special-members: __call__

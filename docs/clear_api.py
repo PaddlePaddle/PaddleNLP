@@ -35,7 +35,6 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
     ]
     # 文档中空白的part，不显示
     del_rst = ['iterator', 'constant']
-    del_rst_flag = 0
     for rst_file in rst_files:
         f = open(os.path.join(abspath_rstfiles_dir, rst_file), 'r')
         file_lines = f.readlines()
@@ -56,6 +55,7 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
                     print(path)
                     continue
         #去除文档中空白页面，目前是data.iterator, embeddings.constant部分
+        del_rst_flag = 0
         for pattern in del_rst:
             if pattern in first_line:
                 path = os.path.join(abspath_rstfiles_dir, rst_file)
@@ -110,17 +110,6 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
                 last_name = file_line.split('.')[-1]
                 if last_name.strip() not in dataset_list:
                     continue
-            #去除data中多余内容
-            if 'paddlenlp.data' in file_line:
-                last_name = file_line.split('.')[-1]
-                if last_name.strip() in del_rst:
-                    continue
-            #去除embeddings中多余内容
-            if 'paddlenlp.embeddings' in file_line:
-                last_name = file_line.split('.')[-1]
-                if last_name.strip() in del_rst:
-                    continue
-
             if 'show-inheritance' in file_line:
                 if del_inheritance_flag == 0:
                     write_con.append(file_line)
