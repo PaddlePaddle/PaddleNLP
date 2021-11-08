@@ -329,27 +329,28 @@ class AxialPositionEmbeddings(nn.Layer):
     Constructs axial position embeddings. Useful for very long input sequences to save memory and time.
     """
 
-    def __init__(self,
-                 axial_pos_shape=[128, 512],
-                 axial_pos_embds_dim=[256, 768],
-                 hidden_dropout_prob=0.2,
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ],
-                 lsh_attn_chunk_length=256,
-                 local_attn_chunk_length=128,
-                 hidden_size=1024):
+    def __init__(
+            self,
+            axial_pos_shape=[128, 512],
+            axial_pos_embds_dim=[256, 768],
+            hidden_dropout_prob=0.2,
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ],
+            lsh_attn_chunk_length=256,
+            local_attn_chunk_length=128,
+            hidden_size=1024, ):
         super().__init__()
         self.axial_pos_shape = axial_pos_shape
         self.axial_pos_embds_dim = axial_pos_embds_dim
@@ -358,7 +359,7 @@ class AxialPositionEmbeddings(nn.Layer):
         self.least_common_mult_chunk_length = _get_least_common_mult_chunk_len(
             attn_layers=attn_layers,
             lsh_attn_chunk_length=lsh_attn_chunk_length,
-            local_attn_chunk_length=local_attn_chunk_length)
+            local_attn_chunk_length=local_attn_chunk_length, )
         self.weights = nn.ParameterList()
 
         if sum(self.axial_pos_embds_dim) != hidden_size:
@@ -475,30 +476,31 @@ class PositionEmbeddings(nn.Layer):
 class ReformerEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self,
-                 max_position_embeddings=65536,
-                 hidden_dropout_prob=0.2,
-                 axial_pos_embds=True,
-                 vocab_size=258,
-                 hidden_size=1024,
-                 axial_pos_shape=[128, 512],
-                 axial_pos_embds_dim=[256, 768],
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ],
-                 lsh_attn_chunk_length=256,
-                 local_attn_chunk_length=128):
+    def __init__(
+            self,
+            max_position_embeddings=65536,
+            hidden_dropout_prob=0.2,
+            axial_pos_embds=True,
+            vocab_size=258,
+            hidden_size=1024,
+            axial_pos_shape=[128, 512],
+            axial_pos_embds_dim=[256, 768],
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ],
+            lsh_attn_chunk_length=256,
+            local_attn_chunk_length=128, ):
         super().__init__()
         self.max_position_embeddings = max_position_embeddings
         self.dropout = hidden_dropout_prob
@@ -511,10 +513,11 @@ class ReformerEmbeddings(nn.Layer):
             attn_layers=attn_layers,
             lsh_attn_chunk_length=lsh_attn_chunk_length,
             local_attn_chunk_length=local_attn_chunk_length,
-            hidden_size=hidden_size) if axial_pos_embds else PositionEmbeddings(
-                hidden_dropout_prob=hidden_dropout_prob,
-                max_position_embeddings=max_position_embeddings,
-                hidden_size=hidden_size))
+            hidden_size=hidden_size,
+        ) if axial_pos_embds else PositionEmbeddings(
+            hidden_dropout_prob=hidden_dropout_prob,
+            max_position_embeddings=max_position_embeddings,
+            hidden_size=hidden_size, ))
 
     def forward(self, input_ids, position_ids=None, start_idx_pos_encodings=0):
         seq_length = input_ids.shape[1]
@@ -613,19 +616,20 @@ class EfficientAttentionMixin:
 
 
 class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
-    def __init__(self,
-                 lsh_attn_chunk_length=256,
-                 num_hashes=4,
-                 num_buckets=512,
-                 lsh_num_chunks_before=1,
-                 lsh_num_chunks_after=0,
-                 hash_seed=None,
-                 is_decoder=True,
-                 max_position_embeddings=65536,
-                 lsh_attention_probs_dropout_prob=0.1,
-                 num_attention_heads=8,
-                 attention_head_size=128,
-                 hidden_size=1024):
+    def __init__(
+            self,
+            lsh_attn_chunk_length=256,
+            num_hashes=4,
+            num_buckets=512,
+            lsh_num_chunks_before=1,
+            lsh_num_chunks_after=0,
+            hash_seed=None,
+            is_decoder=True,
+            max_position_embeddings=65536,
+            lsh_attention_probs_dropout_prob=0.1,
+            num_attention_heads=8,
+            attention_head_size=128,
+            hidden_size=1024, ):
         super().__init__()
 
         self.chunk_length = lsh_attn_chunk_length
@@ -656,15 +660,16 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
         self.register_buffer("mask_value_float16", paddle.to_tensor(-1e4))
         self.register_buffer("mask_value_float32", paddle.to_tensor(-1e9))
 
-    def forward(self,
-                hidden_states,
-                attention_mask=None,
-                num_hashes=None,
-                buckets=None,
-                past_buckets_states=None,
-                use_cache=False,
-                output_attentions=False,
-                **kwargs):
+    def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            num_hashes=None,
+            buckets=None,
+            past_buckets_states=None,
+            use_cache=False,
+            output_attentions=False,
+            **kwargs, ):
         batch_size, sequence_length = hidden_states.shape[:2]
 
         # num hashes can optionally be overwritten by user
@@ -952,8 +957,10 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
             paddle.seed(self.hash_seed)
 
         rotations_shape = [
-            self.num_attention_heads, vectors.shape[-1], num_hashes,
-            rotation_size // 2
+            self.num_attention_heads,
+            vectors.shape[-1],
+            num_hashes,
+            rotation_size // 2,
         ]
 
         # create a random self.attention_head_size x num_hashes x num_buckets/2
@@ -1059,9 +1066,15 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
         # set num buckets in config to be properly saved
         self.num_buckets = num_buckets
 
-    def _attend(self, query_vectors, key_vectors, value_vectors,
-                sorted_bucket_idx_per_hash, attention_mask,
-                do_standard_self_attention, do_cached_attention):
+    def _attend(
+            self,
+            query_vectors,
+            key_vectors,
+            value_vectors,
+            sorted_bucket_idx_per_hash,
+            attention_mask,
+            do_standard_self_attention,
+            do_cached_attention, ):
         # look at previous and following chunks if chunked attention
         if not do_standard_self_attention:
             key_vectors = self._look_adjacent(
@@ -1090,11 +1103,12 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
             key_value_bucket_idx = sorted_bucket_idx_per_hash
             query_bucket_idx = (paddle.ones(
                 shape=key_value_bucket_idx.shape[:-1] + [1],
-                dtype=key_value_bucket_idx.dtype) * key_value_bucket_idx.max())
+                dtype=key_value_bucket_idx.dtype,
+            ) * key_value_bucket_idx.max())
         elif do_cached_attention and query_key_dots.ndim <= 4:
-            query_bucket_idx = [
+            query_bucket_idx = (
                 query_key_dots.shape[-1] - 1
-            ] * paddle.ones_like(query_key_dots)[:, :, :, -1]
+            ) * paddle.ones_like(query_key_dots)[:, :, :, -1]
             key_value_bucket_idx = (paddle.arange(query_key_dots.shape[-1])
                                     .unsqueeze(axis=[0, 1])
                                     .expand(shape=query_bucket_idx.shape[:2] +
@@ -1267,8 +1281,8 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
         relevant_bucket_idx_chunk = self._expand_to_indices_in_relevant_chunk(
             relevant_bucket_idx, sequence_length)
 
-        relevant_bucket_idx_chunk = bucket_idx[tuple(
-            relevant_bucket_idx_chunk.transpose(perm=[1, 0]))]
+        relevant_bucket_idx_chunk = bucket_idx.gather_nd(
+            relevant_bucket_idx_chunk)
 
         # adapt bucket_idx for batch and hidden states for index select
         bucket_idx_batch_offset = sequence_length * (
@@ -1368,16 +1382,17 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
 
 
 class LocalSelfAttention(nn.Layer, EfficientAttentionMixin):
-    def __init__(self,
-                 num_attention_heads=8,
-                 local_attn_chunk_length=128,
-                 local_num_chunks_before=1,
-                 local_num_chunks_after=0,
-                 is_decoder=True,
-                 pad_token_id=0,
-                 attention_head_size=128,
-                 hidden_size=1024,
-                 local_attention_probs_dropout_prob=0.2):
+    def __init__(
+            self,
+            num_attention_heads=8,
+            local_attn_chunk_length=128,
+            local_num_chunks_before=1,
+            local_num_chunks_after=0,
+            is_decoder=True,
+            pad_token_id=0,
+            attention_head_size=128,
+            hidden_size=1024,
+            local_attention_probs_dropout_prob=0.2, ):
         super().__init__()
         self.num_attention_heads = num_attention_heads
         self.chunk_length = local_attn_chunk_length
@@ -1404,13 +1419,14 @@ class LocalSelfAttention(nn.Layer, EfficientAttentionMixin):
         self.register_buffer("mask_value_float16", paddle.to_tensor(-1e4))
         self.register_buffer("mask_value_float32", paddle.to_tensor(-1e9))
 
-    def forward(self,
-                hidden_states,
-                attention_mask=None,
-                past_buckets_states=None,
-                use_cache=False,
-                output_attentions=False,
-                **kwargs):
+    def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            past_buckets_states=None,
+            use_cache=False,
+            output_attentions=False,
+            **kwargs, ):
         sequence_length = hidden_states.shape[1]
         batch_size = hidden_states.shape[0]
 
@@ -1627,11 +1643,12 @@ class LocalSelfAttention(nn.Layer, EfficientAttentionMixin):
 
 
 class ReformerSelfOutput(nn.Layer):
-    def __init__(self,
-                 num_attention_heads=8,
-                 attention_head_size=128,
-                 hidden_dropout_prob=0.2,
-                 hidden_size=1024):
+    def __init__(
+            self,
+            num_attention_heads=8,
+            attention_head_size=128,
+            hidden_dropout_prob=0.2,
+            hidden_size=1024, ):
         super().__init__()
         all_head_size = num_attention_heads * attention_head_size
         self.dropout = hidden_dropout_prob
@@ -1646,41 +1663,42 @@ class ReformerSelfOutput(nn.Layer):
 
 
 class ReformerAttention(nn.Layer):
-    def __init__(self,
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ],
-                 hidden_size=1024,
-                 layer_norm_eps=1e-12,
-                 lsh_attn_chunk_length=256,
-                 num_hashes=4,
-                 num_buckets=512,
-                 lsh_num_chunks_before=1,
-                 lsh_num_chunks_after=0,
-                 hash_seed=None,
-                 is_decoder=True,
-                 max_position_embeddings=65536,
-                 lsh_attention_probs_dropout_prob=0.1,
-                 num_attention_heads=8,
-                 attention_head_size=128,
-                 local_attn_chunk_length=128,
-                 local_num_chunks_before=1,
-                 local_num_chunks_after=0,
-                 pad_token_id=0,
-                 local_attention_probs_dropout_prob=0.2,
-                 hidden_dropout_prob=0.2,
-                 layer_id=0):
+    def __init__(
+            self,
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ],
+            hidden_size=1024,
+            layer_norm_eps=1e-12,
+            lsh_attn_chunk_length=256,
+            num_hashes=4,
+            num_buckets=512,
+            lsh_num_chunks_before=1,
+            lsh_num_chunks_after=0,
+            hash_seed=None,
+            is_decoder=True,
+            max_position_embeddings=65536,
+            lsh_attention_probs_dropout_prob=0.1,
+            num_attention_heads=8,
+            attention_head_size=128,
+            local_attn_chunk_length=128,
+            local_num_chunks_before=1,
+            local_num_chunks_after=0,
+            pad_token_id=0,
+            local_attention_probs_dropout_prob=0.2,
+            hidden_dropout_prob=0.2,
+            layer_id=0, ):
         super().__init__()
         self.layer_id = layer_id
         self.attn_layers = attn_layers
@@ -1700,7 +1718,7 @@ class ReformerAttention(nn.Layer):
                 lsh_attention_probs_dropout_prob=lsh_attention_probs_dropout_prob,
                 num_attention_heads=num_attention_heads,
                 attention_head_size=attention_head_size,
-                hidden_size=hidden_size)
+                hidden_size=hidden_size, )
         elif len(set(self.attn_layers)) == 1 and self.attn_layers[0] == "local":
             self.self_attention = LocalSelfAttention(
                 num_attention_heads=num_attention_heads,
@@ -1711,7 +1729,7 @@ class ReformerAttention(nn.Layer):
                 pad_token_id=pad_token_id,
                 attention_head_size=attention_head_size,
                 hidden_size=hidden_size,
-                local_attention_probs_dropout_prob=local_attention_probs_dropout_prob
+                local_attention_probs_dropout_prob=local_attention_probs_dropout_prob,
             )
         elif len(set(self.attn_layers)) == 2 and set(self.attn_layers) == set(
             ["lsh", "local"]):
@@ -1729,7 +1747,7 @@ class ReformerAttention(nn.Layer):
                     lsh_attention_probs_dropout_prob=lsh_attention_probs_dropout_prob,
                     num_attention_heads=num_attention_heads,
                     attention_head_size=attention_head_size,
-                    hidden_size=hidden_size)
+                    hidden_size=hidden_size, )
             else:
                 self.self_attention = LocalSelfAttention(
                     num_attention_heads=num_attention_heads,
@@ -1740,7 +1758,7 @@ class ReformerAttention(nn.Layer):
                     pad_token_id=pad_token_id,
                     attention_head_size=attention_head_size,
                     hidden_size=hidden_size,
-                    local_attention_probs_dropout_prob=local_attention_probs_dropout_prob
+                    local_attention_probs_dropout_prob=local_attention_probs_dropout_prob,
                 )
         else:
             raise NotImplementedError(
@@ -1750,17 +1768,18 @@ class ReformerAttention(nn.Layer):
             num_attention_heads=num_attention_heads,
             attention_head_size=attention_head_size,
             hidden_dropout_prob=hidden_dropout_prob,
-            hidden_size=hidden_size)
+            hidden_size=hidden_size, )
 
-    def forward(self,
-                hidden_states,
-                attention_mask=None,
-                num_hashes=None,
-                past_buckets_states=None,
-                use_cache=False,
-                orig_sequence_length=None,
-                output_attentions=False,
-                buckets=None):
+    def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            num_hashes=None,
+            past_buckets_states=None,
+            use_cache=False,
+            orig_sequence_length=None,
+            output_attentions=False,
+            buckets=None, ):
         hidden_states = self.layer_norm(hidden_states)
 
         # make sure cached hidden states is set to None for backward pass
@@ -1816,11 +1835,12 @@ class ReformerAttention(nn.Layer):
 
 
 class ReformerFeedForwardDense(nn.Layer):
-    def __init__(self,
-                 hidden_dropout_prob=0.2,
-                 hidden_act="relu",
-                 hidden_size=1024,
-                 feed_forward_size=4096):
+    def __init__(
+            self,
+            hidden_dropout_prob=0.2,
+            hidden_act="relu",
+            hidden_size=1024,
+            feed_forward_size=4096, ):
         super().__init__()
         self.dropout = hidden_dropout_prob
 
@@ -1857,13 +1877,14 @@ class ReformerFeedForwardOutput(nn.Layer):
 
 
 class ChunkReformerFeedForward(nn.Layer):
-    def __init__(self,
-                 chunk_size_feed_forward=0,
-                 hidden_size=1024,
-                 layer_norm_eps=1e-12,
-                 hidden_dropout_prob=0.1,
-                 hidden_act="relu",
-                 feed_forward_size=4096):
+    def __init__(
+            self,
+            chunk_size_feed_forward=0,
+            hidden_size=1024,
+            layer_norm_eps=1e-12,
+            hidden_dropout_prob=0.1,
+            hidden_act="relu",
+            feed_forward_size=4096, ):
         super().__init__()
         self.chunk_size_feed_forward = chunk_size_feed_forward
         self.seq_len_dim = 1
@@ -1873,11 +1894,11 @@ class ChunkReformerFeedForward(nn.Layer):
             hidden_dropout_prob=hidden_dropout_prob,
             hidden_act=hidden_act,
             hidden_size=hidden_size,
-            feed_forward_size=feed_forward_size)
+            feed_forward_size=feed_forward_size, )
         self.output = ReformerFeedForwardOutput(
             hidden_dropout_prob=hidden_dropout_prob,
             feed_forward_size=feed_forward_size,
-            hidden_size=hidden_size)
+            hidden_size=hidden_size, )
 
     def forward(self, attention_output):
         return _apply_chunking_to_forward(
@@ -1893,44 +1914,45 @@ class ChunkReformerFeedForward(nn.Layer):
 
 
 class ReformerLayer(nn.Layer):
-    def __init__(self,
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ],
-                 hidden_size=1024,
-                 layer_norm_eps=1e-12,
-                 lsh_attn_chunk_length=256,
-                 num_hashes=4,
-                 num_buckets=512,
-                 lsh_num_chunks_before=1,
-                 lsh_num_chunks_after=0,
-                 hash_seed=None,
-                 is_decoder=True,
-                 max_position_embeddings=65536,
-                 lsh_attention_probs_dropout_prob=0.1,
-                 num_attention_heads=8,
-                 attention_head_size=128,
-                 local_attn_chunk_length=128,
-                 local_num_chunks_before=1,
-                 local_num_chunks_after=0,
-                 pad_token_id=0,
-                 local_attention_probs_dropout_prob=0.2,
-                 hidden_dropout_prob=0.2,
-                 chunk_size_feed_forward=0,
-                 hidden_act="relu",
-                 feed_forward_size=4096,
-                 layer_id=0):
+    def __init__(
+            self,
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ],
+            hidden_size=1024,
+            layer_norm_eps=1e-12,
+            lsh_attn_chunk_length=256,
+            num_hashes=4,
+            num_buckets=512,
+            lsh_num_chunks_before=1,
+            lsh_num_chunks_after=0,
+            hash_seed=None,
+            is_decoder=True,
+            max_position_embeddings=65536,
+            lsh_attention_probs_dropout_prob=0.1,
+            num_attention_heads=8,
+            attention_head_size=128,
+            local_attn_chunk_length=128,
+            local_num_chunks_before=1,
+            local_num_chunks_after=0,
+            pad_token_id=0,
+            local_attention_probs_dropout_prob=0.2,
+            hidden_dropout_prob=0.2,
+            chunk_size_feed_forward=0,
+            hidden_act="relu",
+            feed_forward_size=4096,
+            layer_id=0, ):
         super().__init__()
         self.attention = ReformerAttention(
             attn_layers=attn_layers,
@@ -1953,7 +1975,7 @@ class ReformerLayer(nn.Layer):
             pad_token_id=pad_token_id,
             local_attention_probs_dropout_prob=local_attention_probs_dropout_prob,
             hidden_dropout_prob=hidden_dropout_prob,
-            layer_id=layer_id)
+            layer_id=layer_id, )
         # dropout requires to have the same
         # seed for forward and backward pass
         self.attention_seed = None
@@ -1965,7 +1987,7 @@ class ReformerLayer(nn.Layer):
             layer_norm_eps=layer_norm_eps,
             hidden_dropout_prob=hidden_dropout_prob,
             hidden_act=hidden_act,
-            feed_forward_size=feed_forward_size)
+            feed_forward_size=feed_forward_size, )
 
     def _init_attention_seed(self):
         """
@@ -2117,44 +2139,45 @@ class ReformerLayer(nn.Layer):
 
 
 class ReformerEncoder(nn.Layer):
-    def __init__(self,
-                 num_hidden_layers=12,
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ],
-                 hidden_size=1024,
-                 layer_norm_eps=1e-12,
-                 lsh_attn_chunk_length=256,
-                 num_hashes=4,
-                 num_buckets=512,
-                 lsh_num_chunks_before=1,
-                 lsh_num_chunks_after=0,
-                 hash_seed=None,
-                 is_decoder=True,
-                 max_position_embeddings=65536,
-                 lsh_attention_probs_dropout_prob=0.1,
-                 num_attention_heads=8,
-                 attention_head_size=128,
-                 local_attn_chunk_length=128,
-                 local_num_chunks_before=1,
-                 local_num_chunks_after=0,
-                 pad_token_id=0,
-                 local_attention_probs_dropout_prob=0.2,
-                 hidden_dropout_prob=0.2,
-                 chunk_size_feed_forward=0,
-                 hidden_act="relu",
-                 feed_forward_size=4096):
+    def __init__(
+            self,
+            num_hidden_layers=12,
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ],
+            hidden_size=1024,
+            layer_norm_eps=1e-12,
+            lsh_attn_chunk_length=256,
+            num_hashes=4,
+            num_buckets=512,
+            lsh_num_chunks_before=1,
+            lsh_num_chunks_after=0,
+            hash_seed=None,
+            is_decoder=True,
+            max_position_embeddings=65536,
+            lsh_attention_probs_dropout_prob=0.1,
+            num_attention_heads=8,
+            attention_head_size=128,
+            local_attn_chunk_length=128,
+            local_num_chunks_before=1,
+            local_num_chunks_after=0,
+            pad_token_id=0,
+            local_attention_probs_dropout_prob=0.2,
+            hidden_dropout_prob=0.2,
+            chunk_size_feed_forward=0,
+            hidden_act="relu",
+            feed_forward_size=4096, ):
         super().__init__()
         self.dropout = hidden_dropout_prob
 
@@ -2183,21 +2206,22 @@ class ReformerEncoder(nn.Layer):
                 chunk_size_feed_forward=chunk_size_feed_forward,
                 hidden_act=hidden_act,
                 feed_forward_size=feed_forward_size,
-                layer_id=i) for i in range(num_hidden_layers)
+                layer_id=i, ) for i in range(num_hidden_layers)
         ])
         # Reformer is using Rev Nets, thus last layer outputs are concatenated and
         # Layer Norm is done over 2 * hidden_size
         self.layer_norm = nn.LayerNorm(2 * hidden_size, epsilon=layer_norm_eps)
 
-    def forward(self,
-                hidden_states,
-                attention_mask=None,
-                num_hashes=None,
-                past_buckets_states=None,
-                use_cache=False,
-                orig_sequence_length=None,
-                output_hidden_states=False,
-                output_attentions=False):
+    def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            num_hashes=None,
+            past_buckets_states=None,
+            use_cache=False,
+            orig_sequence_length=None,
+            output_hidden_states=False,
+            output_attentions=False, ):
         # hidden_states and attention lists to be filled if wished
         all_hidden_states = []
         all_attentions = []
@@ -2394,9 +2418,9 @@ class ReformerPreTrainedModel(PretrainedModel):
         """
         Tie the weights between the input embeddings and the output embeddings.
         """
-        tie_word_embeddings = self.tie_word_embeddings if hasattr(
-            self, "tie_word_embeddings") else self.reformer.config.get(
-                "tie_word_embeddings", False)
+        tie_word_embeddings = (
+            self.tie_word_embeddings if hasattr(self, "tie_word_embeddings")
+            else self.reformer.config.get("tie_word_embeddings", False))
         if (hasattr(self, "get_output_embeddings") and
                 hasattr(self, "get_input_embeddings") and tie_word_embeddings):
             output_embeddings = self.get_output_embeddings()
@@ -2500,7 +2524,7 @@ class ReformerModel(ReformerPreTrainedModel):
         attention_head_size (int, optional):
             Dimensionality of the projected key, query and value vectors. Defaults to `128`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer.Defaults to `1024`.            
+            Dimensionality of the embedding layer, encoder layer.Defaults to `1024`.
         num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
             Defaults to `8`.
@@ -2564,52 +2588,53 @@ class ReformerModel(ReformerPreTrainedModel):
 
     """
 
-    def __init__(self,
-                 tie_word_embeddings=False,
-                 is_decoder=True,
-                 chunk_size_feed_forward=0,
-                 pad_token_id=0,
-                 hash_seed=None,
-                 vocab_size=258,
-                 attention_head_size=128,
-                 hidden_size=1024,
-                 num_attention_heads=8,
-                 num_hashes=4,
-                 num_hidden_layers=12,
-                 num_buckets=512,
-                 lsh_attn_chunk_length=256,
-                 local_attn_chunk_length=128,
-                 lsh_num_chunks_after=0,
-                 lsh_num_chunks_before=1,
-                 local_num_chunks_after=0,
-                 local_num_chunks_before=1,
-                 hidden_act="relu",
-                 feed_forward_size=4096,
-                 hidden_dropout_prob=0.2,
-                 lsh_attention_probs_dropout_prob=0.1,
-                 local_attention_probs_dropout_prob=0.2,
-                 max_position_embeddings=65536,
-                 initializer_range=0.02,
-                 layer_norm_eps=1e-12,
-                 axial_pos_embds=True,
-                 axial_pos_shape=[128, 512],
-                 axial_pos_embds_dim=[256, 768],
-                 axial_norm_std=1.0,
-                 chunk_size_lm_head=0,
-                 attn_layers=[
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                     "local",
-                     "local",
-                     "lsh",
-                     "local",
-                 ]):
+    def __init__(
+            self,
+            tie_word_embeddings=False,
+            is_decoder=True,
+            chunk_size_feed_forward=0,
+            pad_token_id=0,
+            hash_seed=None,
+            vocab_size=258,
+            attention_head_size=128,
+            hidden_size=1024,
+            num_attention_heads=8,
+            num_hashes=4,
+            num_hidden_layers=12,
+            num_buckets=512,
+            lsh_attn_chunk_length=256,
+            local_attn_chunk_length=128,
+            lsh_num_chunks_after=0,
+            lsh_num_chunks_before=1,
+            local_num_chunks_after=0,
+            local_num_chunks_before=1,
+            hidden_act="relu",
+            feed_forward_size=4096,
+            hidden_dropout_prob=0.2,
+            lsh_attention_probs_dropout_prob=0.1,
+            local_attention_probs_dropout_prob=0.2,
+            max_position_embeddings=65536,
+            initializer_range=0.02,
+            layer_norm_eps=1e-12,
+            axial_pos_embds=True,
+            axial_pos_shape=[128, 512],
+            axial_pos_embds_dim=[256, 768],
+            axial_norm_std=1.0,
+            chunk_size_lm_head=0,
+            attn_layers=[
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+                "local",
+                "local",
+                "lsh",
+                "local",
+            ], ):
         super().__init__()
         assert (
             num_hidden_layers > 0
@@ -2633,7 +2658,7 @@ class ReformerModel(ReformerPreTrainedModel):
             axial_pos_embds_dim=axial_pos_embds_dim,
             attn_layers=attn_layers,
             lsh_attn_chunk_length=lsh_attn_chunk_length,
-            local_attn_chunk_length=local_attn_chunk_length)
+            local_attn_chunk_length=local_attn_chunk_length, )
         self.encoder = ReformerEncoder(
             hidden_dropout_prob=hidden_dropout_prob,
             num_hidden_layers=num_hidden_layers,
@@ -2658,7 +2683,7 @@ class ReformerModel(ReformerPreTrainedModel):
             local_attention_probs_dropout_prob=local_attention_probs_dropout_prob,
             hidden_act=hidden_act,
             feed_forward_size=feed_forward_size,
-            chunk_size_feed_forward=chunk_size_feed_forward)
+            chunk_size_feed_forward=chunk_size_feed_forward, )
 
         self.init_weights()
 
@@ -2668,18 +2693,19 @@ class ReformerModel(ReformerPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids=None,
-                attention_mask=None,
-                position_ids=None,
-                num_hashes=None,
-                past_buckets_states=None,
-                use_cache=False,
-                output_hidden_states=False,
-                output_attentions=False):
-        r'''
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            num_hashes=None,
+            past_buckets_states=None,
+            use_cache=False,
+            output_hidden_states=False,
+            output_attentions=False, ):
+        r"""
         The ReformerModel forward method, overrides the `__call__()` special method.
-        
+
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
@@ -2700,16 +2726,16 @@ class ReformerModel(ReformerPreTrainedModel):
                 The number of hashing rounds that should be performed during bucketing. Setting this argument overwrites the default defined in `config["num_hashes"]`. Defaults to `None`.
             past_buckets_states (List[tuple(Tensor, Tensor)], optional):
                 List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`, with the first element being the previous `buckets` of shape `[batch_size, num_heads, num_hashes, sequence_length]` and the second being the previous `hidden_states` of shape `[batch_size, sequence_length, hidden_size]`.
-                Contains precomputed hidden-states and buckets (only relevant for LSH Self-Attention). Can be used to speed up sequential decoding. Defaults to `None`. 
+                Contains precomputed hidden-states and buckets (only relevant for LSH Self-Attention). Can be used to speed up sequential decoding. Defaults to `None`.
             use_cache (bool, optional):
-                Whether or not to use cache. If set to `True`, `past_buckets_states` states are returned and can be used to speed up decoding. Defaults to `False`. 
+                Whether or not to use cache. If set to `True`, `past_buckets_states` states are returned and can be used to speed up decoding. Defaults to `False`.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers.
                 Defaults to `False`.
             output_hidden_states (bool, optional):
                 Whether or not to return the output of all hidden layers.
                 Defaults to `False`.
-                
+
         Returns:
             tuple: Returns tuple (`last_hidden_state`, `past_buckets_states`, `hidden_states`, `attentions`)
 
@@ -2727,7 +2753,7 @@ class ReformerModel(ReformerPreTrainedModel):
             - `attentions` (tuple(Tensor), optional):
                 returned when `output_attentions=True` is passed.
                 tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
-                
+
         Example:
             .. code-block::
 
@@ -2744,7 +2770,7 @@ class ReformerModel(ReformerPreTrainedModel):
                 outputs = model(**inputs)
                 last_hidden_state = outputs[0]
 
-        '''
+        """
 
         input_shape = input_ids.shape
 
@@ -2900,9 +2926,8 @@ class ReformerModelWithLMHead(ReformerPreTrainedModel):
         self.reformer = reformer
         local_num_chunks_after = self.reformer.config["local_num_chunks_after"]
         lsh_num_chunks_after = self.reformer.config["lsh_num_chunks_after"]
-        assert (
-            self.reformer.config["is_decoder"]
-        ), "If you want to use `ReformerModelWithLMHead` make sure that `is_decoder=True`."
+        assert self.reformer.config[
+            "is_decoder"], "If you want to use `ReformerModelWithLMHead` make sure that `is_decoder=True`."
         assert (
             "local" not in self.reformer.config["attn_layers"] or
             local_num_chunks_after == 0
@@ -2984,7 +3009,7 @@ class ReformerModelWithLMHead(ReformerPreTrainedModel):
 
         Example:
             .. code-block::
-        
+
                 import paddle
                 from paddlenlp.transformers import ReformerModelWithLMHead, ReformerTokenizer
 
@@ -3062,9 +3087,8 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
     def __init__(self, reformer):
         super().__init__()
         self.reformer = reformer
-        assert (
-            not self.reformer.config["is_decoder"]
-        ), "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
+        assert not self.reformer.config[
+            "is_decoder"], "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
         self.lm_head = ReformerOnlyLMHead(
             chunk_size_lm_head=self.reformer.config["chunk_size_lm_head"],
             hidden_size=self.reformer.config["hidden_size"],
@@ -3078,14 +3102,15 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head.decoder = new_embeddings
 
-    def forward(self,
-                input_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                num_hashes=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False):
+    def forward(
+            self,
+            input_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            num_hashes=None,
+            labels=None,
+            output_hidden_states=False,
+            output_attentions=False, ):
         r"""
 
         Args:
@@ -3127,7 +3152,7 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
 
         Example:
             .. code-block::
-        
+
                 import paddle
                 from paddlenlp.transformers import ReformerForMaskedLM, ReformerTokenizer
 
@@ -3161,11 +3186,11 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
             loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
             masked_lm_loss = loss_fct(
                 logits.reshape(shape=[-1, self.reformer.config["vocab_size"]]),
-                labels.flatten())
+                labels.flatten(), )
 
         output = (logits, ) + reformer_outputs[1:]
-        return (((masked_lm_loss, ) + output)
-                if masked_lm_loss is not None else output)
+        return ((masked_lm_loss, ) + output
+                ) if masked_lm_loss is not None else output
 
 
 class ReformerForSequenceClassification(ReformerPreTrainedModel):
@@ -3193,7 +3218,7 @@ class ReformerForSequenceClassification(ReformerPreTrainedModel):
         self.classifier = ReformerClassificationHead(
             hidden_size=self.reformer.config["hidden_size"],
             classifier_dropout=classifier_dropout,
-            num_classes=num_classes)
+            num_classes=num_classes, )
         if self.reformer.config["is_decoder"] is True:
             logger.warning(
                 "You might want to disable causal masking for sequence classification"
@@ -3201,14 +3226,15 @@ class ReformerForSequenceClassification(ReformerPreTrainedModel):
 
         self.init_weights()
 
-    def forward(self,
-                input_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                num_hashes=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False):
+    def forward(
+            self,
+            input_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            num_hashes=None,
+            labels=None,
+            output_hidden_states=False,
+            output_attentions=False, ):
         r"""
 
         Args:
@@ -3250,7 +3276,7 @@ class ReformerForSequenceClassification(ReformerPreTrainedModel):
 
         Example:
             .. code-block::
-        
+
                 import paddle
                 from paddlenlp.transformers import ReformerForSequenceClassification, ReformerTokenizer
 
@@ -3322,15 +3348,16 @@ class ReformerForQuestionAnswering(ReformerPreTrainedModel):
             )
         self.init_weights()
 
-    def forward(self,
-                input_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                num_hashes=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False):
+    def forward(
+            self,
+            input_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            num_hashes=None,
+            start_positions=None,
+            end_positions=None,
+            output_hidden_states=False,
+            output_attentions=False, ):
         r"""
 
         Args:
@@ -3381,7 +3408,7 @@ class ReformerForQuestionAnswering(ReformerPreTrainedModel):
 
         Example:
             .. code-block::
-        
+
                 import paddle
                 from paddlenlp.transformers import ReformerForQuestionAnswering, ReformerTokenizer
 
