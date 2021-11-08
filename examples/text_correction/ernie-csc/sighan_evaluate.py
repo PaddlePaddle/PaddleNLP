@@ -78,17 +78,27 @@ def main(args):
 
     # Detection level
     detect_pos = detect_tp + fp
-    detect_precision = detect_tp * 1.0 / detect_pos
-    detect_recall = detect_tp * 1.0 / neg
-    detect_f1 = 2. * detect_precision * detect_recall / (
-        detect_precision + detect_recall + eps)
+    if detect_pos > 0 and neg > 0:
+        detect_precision = detect_tp * 1.0 / detect_pos
+        detect_recall = detect_tp * 1.0 / neg
+        detect_f1 = 2. * detect_precision * detect_recall / (
+            detect_precision + detect_recall + eps)
+    else:
+        detect_precision = 0
+        detect_recall = 0
+        detect_f1 = 0
 
     # Correction level
     correct_pos = correct_tp + fp
-    correct_precision = correct_tp * 1.0 / correct_pos
-    correct_recall = correct_tp * 1.0 / neg
-    correct_f1 = 2. * correct_precision * correct_recall / (
-        correct_precision + correct_recall + eps)
+    if correct_pos > 0 and neg > 0:
+        correct_precision = correct_tp * 1.0 / correct_pos
+        correct_recall = correct_tp * 1.0 / neg
+        correct_f1 = 2. * correct_precision * correct_recall / (
+            correct_precision + correct_recall + eps)
+    else:
+        correct_precision = 0
+        correct_recall = 0
+        correct_f1 = 0
 
     print("==========================================================")
     print("Overall Performance")
