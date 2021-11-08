@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--save_path", type=str, default="checkpoint/model_900", help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", type=int, default=3, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", type=int, default=1, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -60,12 +60,5 @@ if __name__ == "__main__":
         max_seq_len=args.max_seq_length)
     results = predict(model, data, label_map, batch_size=args.batch_size)
 
-    file_path = "results.txt"
-    print(
-        "The results have been saved to the file: %s, some results are shown as below: "
-        % file_path)
-    with open(file_path, "w", encoding="utf8") as fout:
-        for idx, text in enumerate(data):
-            if idx < 10:
-                print(text, " : ", results[idx])
-            fout.write(text + " : " + results[idx] + "\n")
+    for idx, text in enumerate(data):
+        print(text, " : ", results[idx])

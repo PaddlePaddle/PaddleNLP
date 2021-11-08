@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", type=int, default=1, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, False], help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
@@ -129,14 +129,7 @@ if __name__ == "__main__":
         labels = predictor.predict(batch_data, label_map)
         results.extend(labels)
 
-    file_path = "results.txt"
-    print(
-        "The results have been saved to the file: %s, some results are shown as below: "
-        % file_path)
-    with open(file_path, "w", encoding="utf8") as fout:
-        for idx, text in enumerate(texts):
-            seq_len = len(text)
-            label = results[idx][:seq_len]
-            if idx < 10:
-                print(text, " : ", " ".join(label))
-            fout.write(text + " : " + " ".join(label) + "\n")
+    for idx, text in enumerate(texts):
+        seq_len = len(text)
+        label = results[idx][:seq_len]
+        print(text, " : ", " ".join(label))
