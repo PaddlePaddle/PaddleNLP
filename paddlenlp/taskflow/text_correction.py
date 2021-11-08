@@ -315,9 +315,14 @@ class CSCTask(Task):
 
         pred_result = ""
         for j, word in enumerate(words):
-            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[j])
-            if not is_chinese_char(ord(word)) or det_pred[
-                    j] == 0 or candidates == UNK or candidates == '[PAD]':
+            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[
+                j] if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
+            word_icc = is_chinese_char(ord(word))
+            cand_icc = is_chinese_char(ord(candidates)) if len(
+                candidates) == 1 else False
+            if not word_icc or det_pred[j] == 0\
+                or candidates in [UNK, '[PAD]']\
+                or (word_icc and not cand_icc):
                 pred_result += word
             else:
                 pred_result += candidates.lstrip("##")
