@@ -560,6 +560,26 @@ class NPTagTask(Task):
         self._construct_dict_map(name_dict_path)
         if self._static_mode:
             self._get_inference_model()
+            # Reload Predictor to disable IR optimization
+            if paddle.get_device().startswith("gpu"):
+                inference_model_path = os.path.join(self._task_path, "static",
+                                            "inference")
+                model_file = inference_model_path + ".pdmodel"
+                params_file = inference_model_path + ".pdiparams"
+                self._config = paddle.inference.Config(model_file, params_file)
+                self._config.enable_use_gpu(100, 0)
+                self._config.switch_use_feed_fetch_ops(False)
+                self._config.disable_glog_info()
+                self._config.switch_ir_optim(False)
+                self.predictor = paddle.inference.create_predictor(self._config)
+                self.input_handles = [
+                    self.predictor.get_input_handle(name)
+                    for name in self.predictor.get_input_names()
+                ]
+                self.output_handle = [
+                    self.predictor.get_output_handle(name)
+                    for name in self.predictor.get_output_names()
+                ]
         else:
             self._construct_model(model)
 

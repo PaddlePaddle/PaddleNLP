@@ -78,13 +78,25 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 - `seed`: 随机种子，默认为1000。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
-### 模型预测
+### 基于动态图的预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" predict.py \
     --device=gpu \
-    --params_path ./output/nptag_ft_model_100/model_state.pdparams
+    --params_path ./output/model_100/model_state.pdparams
+```
+
+### 基于静态图的预测部署
+
+使用动态图训练结束之后，可以将动态图参数导出成静态图参数，从而获得最优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
+```shell
+python export_model.py --params_path=./output/model_100/model_state --output_path=./export
+```
+
+导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
+```shell
+python deploy/python/predict.py --model_dir=./export
 ```
 
 ## Taskflow一键预测

@@ -180,8 +180,7 @@ def do_train(args):
             if (global_step % args.save_steps == 0 or global_step ==
                     num_training_steps) and rank == 0:
                 output_dir = os.path.join(args.output_dir,
-                                          "nptag_ft_model_%d" %
-                                          (global_step))
+                                          "model_%d" % (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
                 model._layers.save_pretrained(output_dir)
