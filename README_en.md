@@ -222,6 +222,10 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 
 For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
 
+## Acknowledge
+
+We have borrowed from Hugging Face's [Transformer](https://github.com/huggingface/transformers)🤗 excellent design on pretrained models usage, and we would like to express our gratitude to the authors of Hugging Face and its open source community.
+
 ## License
 
 PaddleNLP is provided under the [Apache-2.0 License](./LICENSE).
