@@ -3,31 +3,32 @@
 
 用Paddle来复现论文End-To-End Memory Networks 
 
-![模型简介](./image/model_introduction.png)
+![模型简介](http://paddle.yulan.net.cn/model_introduction.png)
 
-原论文地址：[Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, Rob Fergus: “End-To-End Memory Networks”, 2015.](https://arxiv.org/pdf/1503.08895v5.pdf)
+本模型是Facebook AI在Memory networks之后提出的一个更加完善的记忆网络模型，在问答系统以及语言模型中均有良好的应用。论文中使用了多个单层单元堆叠而成的多层架构。
 
-复现repo：[yulangz/End-to-End-Memory-Networks-in-Paddle](https://github.com/yulangz/End-to-End-Memory-Networks-in-Paddle)
+单层架构如上图a所示，主要的参数包括A,B,C,W四个矩阵，其中A,B,C三个矩阵就是embedding矩阵，主要是将输入文本和Question编码成词向量，W是最终的输出矩阵。从上图可以看出，对于输入的句子s分别会使用A和C进行编码得到Input和Output的记忆模块，Input用来跟Question编码得到的向量相乘得到每句话跟q的相关性，Output则与该相关性进行加权求和得到输出向量。然后再加上q并传入最终的输出层。
 
-参考repo：[https://github.com/facebookarchive/MemNN](https://github.com/facebookarchive/MemNN)
+多层网络如上图b所示，实际上是将多个单层堆叠到一起形成的网络，这里将每一层称为一个hop。
+为了减少参数，模型提出了两种让各个hop之间共享Embedding参数（A与C）的方法：
+* Adjacent：这种方法让相邻层之间的$A=C$。也就是说$A_{k+1}=C_{k}$，此外W等于顶层的C，B等于底层的A，这样就减少了一半的参数量。
+* Layer-wise（RNN-like)：与RNN相似，采用完全共享参数的方法，即各层之间参数均相等。$A_{1}=A_{2}=...=A_{k}$,$C_{1}=C_{2}=...=C_{k}$。但这样模型的参数太少，性能会受到影响，故提出一种改进方法，在每一层之间加一个线性映射矩阵H，即令$u^{k+1}=H u^{k}+o^{k}$。
 
-项目AiStudio地址：[https://aistudio.baidu.com/aistudio/projectdetail/2381004](https://aistudio.baidu.com/aistudio/projectdetail/2381004)
+具体到语言模型，模型做出了一下调整：
+1. 由于输入是单个句子，编码级别是单词级的，所以可以直接将每个单词的词向量存入memory即可，也就是说A与C现在都是单词的Embedding矩阵，mi与ci中都是单个单词的词向量。
+2. 输出W矩阵的output为下一个单词的概率，即输出维度为vocab size。
+3. 不同于QA任务，这里不存在Question，所以直接将q向量设置为全0.1的常量，也不需要再进行Embedding操作。
+4. 采用Layer-wise的参数缩减策略。
+5. 文中提出，对于每一层的u向量中一半的神经元进行ReLU操作，以帮助模型训练。
 
-## 二、复现精度
-
-相应模型已包含在本repo中，分别位于目录`models_ptb`与`models_text8`下
-
-| Dataset | Paper Perplexity | Our Perplexity |
-| :-----: | :--------------: | :------------: |
-|   ptb   |       111        |     110.75     |
-|  text8  |       147        |     145.62     |
-
-## 三、数据集
+## 二、数据集
 
 * Penn Treetank:
 
-    * [Penn Treebank](https://aistudio.baidu.com/aistudio/datasetdetail/108805) 
-
+    * [Penn Treebank](http://paddle.yulan.net.cn/ptb.zip) 
+        
+        NLP中常用的PTB语料库,语料来源为1989年华尔街日报，并做以下切分
+        
         train：887k words
 
         valid：70k words
@@ -36,18 +37,32 @@
 
         vocabulary  size：10k
 
-    * [text8](https://aistudio.baidu.com/aistudio/datasetdetail/108807)
+    * [text8](http://paddle.yulan.net.cn/text8.zip)
 
-        train：总共100M个字符，划分为93.3M/5.7M/1M字符(train/valid/test)，将出现次数少于10次的单词替换为<UNK>
+        来源于enwiki8，总共100M个字符，划分为93.3M/5.7M/1M字符(train/valid/test)，将出现次数少于10次的单词替换为<UNK>
 
-## 四、环境依赖
+## 三、环境依赖
 
 * 硬件：GPU
 * 框架：Paddle >= 2.0.0，progress库
 
-## 五、快速开始
+## 四、快速开始
 
-请先到[yulangz/End-to-End-Memory-Networks-in-Paddle](https://github.com/yulangz/End-to-End-Memory-Networks-in-Paddle)下载数据集和预训练模型。
+下载数据集和已训练好的模型
+```bash
+mkdir data
+mkdir models
+cd data
+wget http://paddle.yulan.net.cn/ptb.zip
+wget http://paddle.yulan.net.cn/text8.zip
+unzip -d ptb ptb.zip
+unzip -d text8 text8.zip
+cd ..
+cd models
+wget http://paddle.yulan.net.cn/model_ptb
+wget http://paddle.yulan.net.cn/model_text8
+cd ..
+```
 
 ### 训练
 
@@ -99,7 +114,7 @@ python eval.py
 
 将得到以下结果
 
-![](image/test_ptb.png)
+![](http://paddle.yulan.net.cn/test_ptb.png)
 
 #### text8数据集上
 
@@ -110,7 +125,16 @@ python eval.py
 
 结果如下
 
-![](image/test_text8.png)
+![](http://paddle.yulan.net.cn/test_text8.png)
+
+## 五、复现精度
+
+相应模型已包含在本repo中，分别位于目录`models_ptb`与`models_text8`下
+
+| Dataset | Paper Perplexity | Our Perplexity |
+| :-----: | :--------------: | :------------: |
+|   ptb   |       111        |     110.75     |
+|  text8  |       147        |     145.62     |
 
 ## 六、代码结构详细说明
 
@@ -123,26 +147,6 @@ python eval.py
 │   ├── config_ptb_test
 │   ├── config_text8
 │   └── config_text8_test
-├── data										# 数据集（请在复现repo下载）
-│   ├── ptb.test.txt
-│   ├── ptb.train.txt
-│   ├── ptb.valid.txt
-│   ├── ptb.vocab.txt
-│   ├── text8.test.txt
-│   ├── text8.train.txt
-│   ├── text8.valid.txt
-│   └── text8.vocab.txt
-├── models_ptb									# ptb数据集上的预训练模型（请在复现repo下载）
-│   └── model_17814_110.75
-├── models_text8								# text8数据集上的预训练模型（请在复现repo下载）
-│   └── model_500_7_100_145.62
-├── image
-│   ├── model_introduction.png
-│   ├── test_ptb.png
-│   └── test_text8.png
-├── log
-│   └── ptb_train_until.log
-├── README_cn.md
 ├── README.md
 ├── requirements.txt
 ├── config.py
@@ -178,3 +182,11 @@ config.show = True                      # print progress, need progress module
 config.srand = 17814                    # initial random seed
 ```
 
+### 七、reference
+原论文地址：[Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, Rob Fergus: “End-To-End Memory Networks”, 2015.](https://arxiv.org/pdf/1503.08895v5.pdf)
+
+复现repo：[yulangz/End-to-End-Memory-Networks-in-Paddle](https://github.com/yulangz/End-to-End-Memory-Networks-in-Paddle)
+
+参考repo：[https://github.com/facebookarchive/MemNN](https://github.com/facebookarchive/MemNN)
+
+项目AiStudio地址：[https://aistudio.baidu.com/aistudio/projectdetail/2381004](https://aistudio.baidu.com/aistudio/projectdetail/2381004)
