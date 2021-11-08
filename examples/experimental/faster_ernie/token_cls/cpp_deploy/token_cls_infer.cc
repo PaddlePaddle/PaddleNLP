@@ -45,6 +45,7 @@ int main(int argc, char* argv[]) {
   if (FLAGS_use_gpu) {
     config.EnableUseGpu(100, 0);
   }
+  config.SwitchIrOptim(false);
   auto predictor = paddle_infer::CreatePredictor(config);
 
   std::vector<std::string> data{
@@ -74,10 +75,9 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < data.size(); i++) {
     size_t seq_len = data[i].size();
     size_t start = i * max_seq_len;
-    size_t end = start + seq_len;
-    std::cout << data[i] << " : ";
+    size_t end = start + max_seq_len;
     for (size_t j = start; j < end; j++) {
-      std::cout << label_map[preds[j]];
+      std::cout << preds[j] << " ";
     }
     std::cout << std::endl;
   }

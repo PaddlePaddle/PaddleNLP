@@ -41,10 +41,9 @@ def predict(model, data, label_map, batch_size=1):
     model.eval()
     for texts in batches:
         texts = to_tensor(texts)
-        logits, predictions = model(texts)
-        probs = F.softmax(logits, axis=1)
-        idx = paddle.argmax(probs, axis=1).numpy()
-        labels = [label_map[i] for i in idx]
+        logits, preds = model(texts)
+        preds = preds.numpy()
+        labels = [label_map[i] for i in preds]
         results.extend(labels)
     return results
 

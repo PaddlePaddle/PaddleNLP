@@ -84,7 +84,6 @@ def create_dataloader(dataset, mode='train', batch_size=1):
 
 def do_train():
     paddle.set_device(args.device)
-
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
