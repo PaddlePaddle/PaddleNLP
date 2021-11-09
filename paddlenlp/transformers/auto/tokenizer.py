@@ -22,7 +22,6 @@ from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
-#from .. import MODEL_MAPPING_NAMES
 
 __all__ = ["AutoTokenizer", ]
 
@@ -188,30 +187,3 @@ class AutoTokenizer(_BaseAutoTokenizerClass):
     MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
-
-
-if __name__ == '__main__':
-    # From local dir path
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bert'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bart'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bigbird'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-
-    # From built-in pretrained models
-    tokenizer = AutoTokenizer.from_pretrained(('bert-base-cased'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(('plato-mini'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(('bigbird-base-uncased'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-
-    # From community-contributed pretrained models
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('yingyibiao/bert-base-uncased-sst-2-finetuned'))
-    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
