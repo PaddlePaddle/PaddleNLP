@@ -65,12 +65,18 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class")
-                class_name = cls._name_mapping[init_class]
-                import_class = importlib.import_module(
-                    f"paddlenlp.transformers.{class_name}.modeling")
-                model_name = getattr(import_class, init_class)
-                return model_name.from_pretrained(pretrained_model_name_or_path,
-                                                  *model_args, **kwargs)
+                try:
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.modeling")
+                    model_name = getattr(import_class, init_class)
+                    return model_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                except KeyError as err:
+                    logger.error(err)
+                    print(
+                        f"The model class is {init_class}, it is not match the Auto Class."
+                    )
         else:
             for names, model_class in cls._model_mapping.items():
                 # From built-in pretrained models
@@ -95,12 +101,19 @@ class _BaseAutoModelClass:
                         init_kwargs = json.load(f)
                     # class name corresponds to this configuration
                     init_class = init_kwargs.pop("init_class")
-                    class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.modeling")
-                    model_name = getattr(import_class, init_class)
-                    return model_name.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
+                    try:
+                        class_name = cls._name_mapping[init_class]
+                        import_class = importlib.import_module(
+                            f"paddlenlp.transformers.{class_name}.modeling")
+                        model_name = getattr(import_class, init_class)
+                        return model_name.from_pretrained(
+                            pretrained_model_name_or_path, *model_args,
+                            **kwargs)
+                    except KeyError as err:
+                        logger.error(err)
+                        print(
+                            f"The model class is {init_class}, it is not match the Auto Class."
+                        )
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

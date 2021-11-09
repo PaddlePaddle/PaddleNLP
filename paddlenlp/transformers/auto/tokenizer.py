@@ -113,6 +113,7 @@ class _BaseAutoTokenizerClass:
     _tokenizer_mapping = None
     _name_mapping = None
     tokenizer_config_file = "tokenizer_config.json"
+    model_config_file = "model_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -161,10 +162,13 @@ class _BaseAutoTokenizerClass:
             try:
                 resolved_vocab_file = get_path_from_url(community_config_path,
                                                         default_root)
+                print(resolved_vocab_file)
                 if os.path.exists(resolved_vocab_file):
                     with io.open(resolved_vocab_file, encoding="utf-8") as f:
                         init_kwargs = json.load(f)
+
                     # class name corresponds to this configuration
+                    print(init_kwargs)
                     init_class = init_kwargs.pop("init_class")
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(

@@ -25,7 +25,7 @@ def from_built_in_models():
 
 
 def from_community_models():
-    # From community-contributed pretrained models
+    #From community-contributed pretrained models
     tokenizer = AutoTokenizer.from_pretrained(
         ('yingyibiao/bert-base-uncased-sst-2-finetuned'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
@@ -35,6 +35,6 @@ def from_community_models():
 
 
 if __name__ == '__main__':
-    from_local_dir()
-    from_built_in_models()
+    #from_local_dir()
+    #from_built_in_models()
     from_community_models()

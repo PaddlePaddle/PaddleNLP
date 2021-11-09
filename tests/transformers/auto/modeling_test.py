@@ -1,8 +1,11 @@
+import paddle
 from paddlenlp.transformers.auto.modeling import *
+from paddlenlp.transformers import *
 
-if __name__ == '__main__':
-    # test
-    #1、 model test
+
+# test
+#1、 model test
+def from_built_in_model():
     model = AutoModel.from_pretrained('bert-base-uncased')
     #model = AutoModel.from_pretrained('unimo-text-1.0')
     #model = AutoModel.from_pretrained('plato-mini')
@@ -64,12 +67,31 @@ if __name__ == '__main__':
     model = AutoDiscriminator.from_pretrained("electra-small")
 
     print(model)
+
+
+def from_local_dir():
+    model = AutoModel.from_pretrained(
+        ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
+
+
+def from_community_model():
+    #model = AutoModelForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'junnyu/ckiplab-bert-base-chinese-ner')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+
 '''
     tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
     inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
     outputs = model(**inputs)
     print(outputs)
-
     logits = outputs[0]
 '''
+
+if __name__ == '__main__':
+    from_built_in_model()
+    from_local_dir()
+    from_community_model()
