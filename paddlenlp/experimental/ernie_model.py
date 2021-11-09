@@ -22,7 +22,10 @@ from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from paddlenlp.transformers.model_utils import register_base_model
 from paddlenlp.transformers.ernie.modeling import ErnieEmbeddings, ErniePooler
 
-__all__ = ["FasterErnieModel", "FasterErnieForSequenceClassification"]
+__all__ = [
+    "FasterErnieModel", "FasterErnieForSequenceClassification",
+    "FasterErnieForTokenClassification"
+]
 
 
 class FasterErniePretrainedModel(FasterPretrainedModel):
@@ -234,7 +237,7 @@ class FasterErnieModel(FasterErniePretrainedModel):
         self.tokenizer = FasterTokenizer(
             self.vocab,
             do_lower_case=self.do_lower_case,
-            is_split_into_words=False, )
+            is_split_into_words=is_split_into_words)
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
@@ -288,5 +291,26 @@ class FasterErnieForSequenceClassification(FasterErniePretrainedModel):
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
+        predictions = paddle.argmax(logits, axis=-1)
+        return logits, predictions
+
+
+class FasterErnieForTokenClassification(FasterErniePretrainedModel):
+    def __init__(self, ernie, num_classes=2, dropout=None):
+        super(FasterErnieForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+        self.ernie = ernie  # allow ernie to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.ernie.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                    num_classes)
+        self.apply(self.init_weights)
+
+    def forward(self, text, text_pair=None):
+
+        sequence_output, _ = self.ernie(text, text_pair)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
         predictions = paddle.argmax(logits, axis=-1)
         return logits, predictions

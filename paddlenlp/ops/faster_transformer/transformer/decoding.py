@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 import numpy as np
+from functools import partial
 
 import paddle
 import paddle.nn as nn
@@ -105,6 +106,95 @@ def infer_transformer_decoding(
 
     helper.append_op(
         type='fusion_decoding', inputs=inputs, outputs=outputs, attrs=attrs)
+
+    return output_ids, parent_ids, sequence_length
+
+
+def infer_force_decoding(
+        enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, linear_weight, linear_bias, pos_emb, trg_word,
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha):
+    helper = LayerHelper('fusion_force_decoding', **locals())
+
+    inputs = {
+        'Input': enc_output,
+        'MemSeqLen': memory_seq_lens,
+        'WordEmbedding': word_emb,
+        'SelfLayernormWeight@VECTOR': slf_ln_weight,
+        'SelfLayernormBias@VECTOR': slf_ln_bias,
+        'SelfQueryWeight@VECTOR': slf_q_weight,
+        'SelfQueryBias@VECTOR': slf_q_bias,
+        'SelfKeyWeight@VECTOR': slf_k_weight,
+        'SelfKeyBias@VECTOR': slf_k_bias,
+        'SelfValueWeight@VECTOR': slf_v_weight,
+        'SelfValueBias@VECTOR': slf_v_bias,
+        'SelfOutWeight@VECTOR': slf_out_weight,
+        'SelfOutBias@VECTOR': slf_out_bias,
+        'CrossLayernormWeight@VECTOR': cross_ln_weight,
+        'CrossLayernormBias@VECTOR': cross_ln_bias,
+        'CrossQueryWeight@VECTOR': cross_q_weight,
+        'CrossQueryBias@VECTOR': cross_q_bias,
+        'CrossKeyWeight@VECTOR': cross_k_weight,
+        'CrossKeyBias@VECTOR': cross_k_bias,
+        'CrossValueWeight@VECTOR': cross_v_weight,
+        'CrossValueBias@VECTOR': cross_v_bias,
+        'CrossOutWeight@VECTOR': cross_out_weight,
+        'CrossOutBias@VECTOR': cross_out_bias,
+        'FFNLayernormWeight@VECTOR': ffn_ln_weight,
+        'FFNLayernormBias@VECTOR': ffn_ln_bias,
+        'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterBias@VECTOR': ffn_inter_bias,
+        'FFNOutWeight@VECTOR': ffn_out_weight,
+        'FFNOutBias@VECTOR': ffn_out_bias,
+        'DecoderLayernormWeight': decoder_ln_weight,
+        'DecoderLayernormBias': decoder_ln_bias,
+        'EmbWeight': linear_weight,
+        'EmbBias': linear_bias,
+        'PositionEncEmb': pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported. 
+        'TrgWord': trg_word
+    }
+
+    attrs = {
+        'decoding_strategy': _decoding_strategy,
+        'beam_size': _beam_size,
+        'topk': _topk,
+        'topp': _topp,
+        'n_head': _n_head,
+        'size_per_head': _size_per_head,
+        'num_layer': _n_layer,
+        'bos_id': _bos_id,
+        'eos_id': _eos_id,
+        'max_len': _max_out_len,
+        'beam_search_diversity_rate': _diversity_rate,
+        "rel_len": _rel_len,
+        "alpha": _alpha
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
+
+    outputs = {
+        'OutputIds': output_ids,
+        'ParentIds': parent_ids,
+        'SequenceLength': sequence_length
+    }
+
+    helper.append_op(
+        type='fusion_force_decoding',
+        inputs=inputs,
+        outputs=outputs,
+        attrs=attrs)
 
     return output_ids, parent_ids, sequence_length
 
@@ -548,30 +638,71 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_weight = [linear.weight]
         self.linear_bias = [linear.bias]
 
-    def forward(self, enc_output, memory_seq_lens):
+    def forward(self, enc_output, memory_seq_lens, trg_word=None):
+        def parse_function(func_name):
+            return partial(
+                func_name,
+                word_emb=self.word_emb,
+                slf_ln_weight=self.slf_ln_weight,
+                slf_ln_bias=self.slf_ln_bias,
+                slf_q_weight=self.slf_q_weight,
+                slf_q_bias=self.slf_q_bias,
+                slf_k_weight=self.slf_k_weight,
+                slf_k_bias=self.slf_k_bias,
+                slf_v_weight=self.slf_v_weight,
+                slf_v_bias=self.slf_v_bias,
+                slf_out_weight=self.slf_out_weight,
+                slf_out_bias=self.slf_out_bias,
+                cross_ln_weight=self.cross_ln_weight,
+                cross_ln_bias=self.cross_ln_bias,
+                cross_q_weight=self.cross_q_weight,
+                cross_q_bias=self.cross_q_bias,
+                cross_k_weight=self.cross_k_weight,
+                cross_k_bias=self.cross_k_bias,
+                cross_v_weight=self.cross_v_weight,
+                cross_v_bias=self.cross_v_bias,
+                cross_out_weight=self.cross_out_weight,
+                cross_out_bias=self.cross_out_bias,
+                ffn_ln_weight=self.ffn_ln_weight,
+                ffn_ln_bias=self.ffn_ln_bias,
+                ffn_inter_weight=self.ffn_inter_weight,
+                ffn_inter_bias=self.ffn_inter_bias,
+                ffn_out_weight=self.ffn_out_weight,
+                ffn_out_bias=self.ffn_out_bias,
+                decoder_ln_weight=self.decoder_ln_weight,
+                decoder_ln_bias=self.decoder_ln_bias,
+                linear_weight=self.linear_weight,
+                linear_bias=self.linear_bias,
+                pos_emb=self.pos_emb,
+                _decoding_strategy=self._decoding_strategy,
+                _beam_size=self._beam_size,
+                _topk=self._topk,
+                _topp=self._topp,
+                _n_head=self._n_head,
+                _size_per_head=int(self._d_model / self._n_head),
+                _n_layer=self._num_decoder_layers,
+                _bos_id=self._bos_id,
+                _eos_id=self._eos_id,
+                _max_out_len=self._max_out_len,
+                _diversity_rate=self._diversity_rate,
+                _rel_len=self._rel_len,
+                _alpha=self._alpha)
+
         if self._decoding_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 enc_output, self._beam_size)
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 memory_seq_lens, self._beam_size)
 
-        output_ids, parent_ids, sequence_length = infer_transformer_decoding(
-            [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
-            self.slf_ln_bias, self.slf_q_weight, self.slf_q_bias,
-            self.slf_k_weight, self.slf_k_bias, self.slf_v_weight,
-            self.slf_v_bias, self.slf_out_weight, self.slf_out_bias,
-            self.cross_ln_weight, self.cross_ln_bias, self.cross_q_weight,
-            self.cross_q_bias, self.cross_k_weight, self.cross_k_bias,
-            self.cross_v_weight, self.cross_v_bias, self.cross_out_weight,
-            self.cross_out_bias, self.ffn_ln_weight, self.ffn_ln_bias,
-            self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
-            self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
-            self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, self._beam_size, self._topk, self._topp,
-            self._n_head,
-            int(self._d_model / self._n_head), self._num_decoder_layers,
-            self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
-            self._rel_len, self._alpha)
+        if trg_word is None:
+            output_ids, parent_ids, sequence_length = parse_function(
+                infer_transformer_decoding)(enc_output=[enc_output],
+                                            memory_seq_lens=[memory_seq_lens])
+        else:
+            output_ids, parent_ids, sequence_length = parse_function(
+                infer_force_decoding)(enc_output=[enc_output],
+                                      memory_seq_lens=[memory_seq_lens],
+                                      trg_word=[trg_word])
 
         ids = finalize(
             self._beam_size,

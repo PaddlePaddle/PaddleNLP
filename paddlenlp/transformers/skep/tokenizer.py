@@ -1,6 +1,6 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -170,6 +170,10 @@ class SkepTokenizer(PretrainedTokenizer):
     Constructs a Skep tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):

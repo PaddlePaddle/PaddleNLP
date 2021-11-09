@@ -34,6 +34,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
     Args:
         vocab_file (str): 
             The vocabulary file path (ends with '.txt') required to instantiate

@@ -17,6 +17,7 @@ import os
 
 import paddle
 import paddle.nn.functional as F
+from paddlenlp.datasets import load_dataset
 from paddlenlp.experimental import FasterErnieModel, FasterErnieForSequenceClassification, to_tensor
 
 # yapf: disable
@@ -51,15 +52,14 @@ def predict(model, data, label_map, batch_size=1):
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-
-    data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-        '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-        '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
-    ]
+    test_ds = load_dataset("chnsenticorp", splits=["test"])
+    data = [example["text"] for example in test_ds]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = FasterErnieForSequenceClassification.from_pretrained(args.save_path)
+    model = FasterErnieForSequenceClassification.from_pretrained(
+        args.save_path,
+        num_classes=len(test_ds.label_list),
+        max_seq_len=args.max_seq_length)
     results = predict(model, data, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Lable: {}'.format(text, results[idx]))

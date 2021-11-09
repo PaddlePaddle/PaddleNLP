@@ -98,7 +98,8 @@ class BertPretrainedModel(PretrainedModel):
     An abstract class for pretrained BERT models. It provides BERT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -323,7 +324,7 @@ class BertPretrainedModel(PretrainedModel):
 @register_base_model
 class BertModel(BertPretrainedModel):
     """
-    The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
+    The bare BERT Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -524,9 +525,8 @@ class BertModel(BertPretrainedModel):
 
 class BertForQuestionAnswering(BertPretrainedModel):
     """
-    Bert Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    Bert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         bert (:class:`BertModel`):
@@ -601,8 +601,8 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
 class BertForSequenceClassification(BertPretrainedModel):
     """
-    Bert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    Bert Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         bert (:class:`BertModel`):
@@ -679,8 +679,8 @@ class BertForSequenceClassification(BertPretrainedModel):
 
 class BertForTokenClassification(BertPretrainedModel):
     """
-    Bert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    Bert Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         bert (:class:`BertModel`):
@@ -982,8 +982,8 @@ class BertPretrainingCriterion(paddle.nn.Layer):
 
 class BertForMultipleChoice(BertPretrainedModel):
     """
-    Bert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
-    softmax) e.g. for RocStories/SWAG tasks.
+    Bert Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
     
     Args:
         bert (:class:`BertModel`):
@@ -1124,7 +1124,7 @@ class BertOnlyMLMHead(nn.Layer):
 
 class BertForMaskedLM(BertPretrainedModel):
     """
-    Bert Model with a MLM tasks on top.
+    Bert Model with a `masked language modeling` head on top.
 
     Args:
         bert (:class:`BertModel`):

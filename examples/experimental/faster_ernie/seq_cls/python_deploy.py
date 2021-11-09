@@ -91,10 +91,12 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = self.predictor.get_input_handle(
+        self.input_handle = self.predictor.get_input_handle(
             self.predictor.get_input_names()[0])
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.output_handles = [
+            self.predictor.get_output_handle(name)
+            for name in self.predictor.get_output_names()
+        ]
 
     def predict(self, data, label_map):
         """
@@ -109,9 +111,10 @@ class Predictor(object):
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
-        self.input_handles.copy_from_cpu(data)
+        self.input_handle.copy_from_cpu(data)
         self.predictor.run()
-        logits = self.output_handle.copy_to_cpu()
+        logits = self.output_handle[0].copy_to_cpu()
+        preds = self.output_handle[1].copy_to_cpu()
 
         # probs = softmax(logits, axis=1)
         # idx = np.argmax(probs, axis=1)
