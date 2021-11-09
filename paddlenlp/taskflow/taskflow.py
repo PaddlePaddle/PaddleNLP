@@ -42,7 +42,6 @@ TASKS = {
             "nptag": {
                 "task_class": NPTagTask,
                 "task_flag": 'knowledge_mining-nptag',
-                "linking": False,
             },
         },
         "default": {

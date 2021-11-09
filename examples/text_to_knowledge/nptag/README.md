@@ -44,9 +44,25 @@ wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/nptag_dataset.tar.gz && 
 解压之后
 ```text
 data/
-├── name_category_map.json # NPTag一二级标签（粗粒度与细粒度类别标签）
+├── name_category_map.json # NPTag标签文件
 ├── dev.txt # 验证集
 └── train.txt  # 训练集
+```
+
+数据集`train.txt`和`dev.txt`格式示例
+```
+石竹  植物
+杂链聚合物   化学物质
+罗伯特·布雷森   人
+```
+
+标签文件`name_category_map.json`格式示例。其中key为细粒度标签，即NPTag的预测结果；value为粗粒度标签标签，示例中对应WordTag的标签集合，用户可以根据场景需要自定义修改该标签映射。
+```
+{
+    "作品": "作品类_实体",
+    "菜品": "饮食类_菜品",
+    "人": "人物类_实体",
+}
 ```
 
 #### 模型训练
