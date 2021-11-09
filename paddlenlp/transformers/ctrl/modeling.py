@@ -396,12 +396,17 @@ class CTRLModel(CTRLPreTrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             cache (Tuple[Tuple[Tensor]], optional):
-                Contains pre-computed hidden-states (key and values in the attention blocks) as computed by the model. Can be used to speed up sequential decoding. The `input_ids` which have their past given to this model should not be passed as input ids as they have already been computed.
+                Contains pre-computed hidden-states (key and values in the attention blocks) 
+                as computed by the model. Can be used to speed up sequential decoding. 
+                The `input_ids` which have their past given to this model should not be 
+                passed as input ids as they have already been computed.
                 Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on to some unwanted positions, usually the paddings or the subsequent positions.
+                Mask used in multi-head attention to avoid performing attention on to some 
+                unwanted positions, usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is bool, the `masked` tokens have `False` values and the others 
+                have `True` values.
                 When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
                 When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
@@ -418,11 +423,12 @@ class CTRLModel(CTRLPreTrainedModel):
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             position_ids(Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
-                max_position_embeddings - 1]`.
+                Indices of positions of each input sequence tokens in the position embeddings. Selected 
+                in the range `[0, max_position_embeddings - 1]`.
                 Shape as [batch_size, num_tokens] and dtype as int64. Defaults to `None`.
             use_cache (bool, optional):
-                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and can be used to speed up decoding.
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states 
+                will be returned and can be used to speed up decoding.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers.
                 Defaults to `False`.
@@ -441,15 +447,19 @@ class CTRLModel(CTRLPreTrainedModel):
 
             - `caches` (tuple(tuple(Tensor), optional):
                 returned when `use_cache=True` is passed.
-                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
+                Tuple of `tuple(Tensor)` of length `num_hidden_layers`, with each tuple having 2 
+                tensors of shape [batch_size, num_heads, sequence_length, embed_size_per_head] and float32 dtype.
 
             - `hidden_states` (tuple(Tensor), optional):
                 returned when `output_hidden_states=True` is passed.
-                Tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+                Tuple of `Tensor` (one for the output of the embeddings + one for the output of 
+                each layer). Each Tensor has a data type of float32 and its shape is 
+                [batch_size, sequence_length, hidden_size].
 
             - `attentions` (tuple(Tensor), optional):
                 returned when `output_attentions=True` is passed.
-                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+                Tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of 
+                float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
 
         Example:
             .. code-block::
@@ -551,7 +561,8 @@ class CTRLModel(CTRLPreTrainedModel):
 
 class CTRLLMHeadModel(CTRLPreTrainedModel):
     """
-    The CTRL Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
+    The CTRL Model transformer with a language modeling head on top (linear 
+    layer with weights tied to the input embeddings).
 
     Args:
         ctrl (:class:`CTRLModel`):
@@ -615,7 +626,10 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
             position_ids (Tensor, optional):
                 See :class:`CTRLModel`.
             labels (Tensor, optional):
-                Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
+                Labels for language modeling. Note that the labels **are shifted** 
+                inside the model, i.e. you can set `labels = input_ids` Indices are 
+                selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are 
+                ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
                 Shape is [batch_size, sequence_length] and dtype is int64.
             use_cache (bool, optional):
                 See :class:`CTRLModel`.
@@ -634,8 +648,10 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
                 It's data type should be float32 and its shape is [1,].
 
             - `logits` (Tensor):
-                Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
-                It's data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+                Prediction scores of the language modeling head (scores for each vocabulary 
+                token before SoftMax).
+                It's data type should be float32 and 
+                its shape is [batch_size, sequence_length, vocab_size].
 
             - `caches` (tuple(tuple(Tensor), optional):
                 See :class:`CTRLModel`.
@@ -701,7 +717,11 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
 class CTRLForSequenceClassification(CTRLPreTrainedModel):
     """
     The CTRL Model transformer with a sequence classification head on top (linear layer).
-    `CTRLForSequenceClassification` uses the last token in order to do the classification, as other causal models (e.g. GPT-2) do. Since it does classification on the last token, it requires to know the position of the last token. If a `pad_token_id` is defined in the configuration, it finds the last token that is not a padding token in each row. If no `pad_token_id` is defined, it simply takes the last value in each row of the batch. 
+    `CTRLForSequenceClassification` uses the last token in order to do the classification, 
+    as other causal models (e.g. GPT-2) do. Since it does classification on the last token, 
+    it requires to know the position of the last token. If a `pad_token_id` is defined in the 
+    configuration, it finds the last token that is not a padding token in each row. If no 
+    `pad_token_id` is defined, it simply takes the last value in each row of the batch. 
 
     Args:
         ctrl (:class:`CTRLModel`):
@@ -750,7 +770,10 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
             position_ids (Tensor, optional):
                 See :class:`CTRLModel`.
             labels (Tensor, optional):
-                Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression loss is computed (Mean-Square loss), If `num_classes > 1` a classification loss is computed (Cross-Entropy).
+                Labels for computing the sequence classification/regression loss. 
+                Indices should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` 
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1` 
+                a classification loss is computed (Cross-Entropy).
                 Shape is [batch_size,] and dtype is int64.
             use_cache (bool, optional):
                 See :class:`CTRLModel`.
@@ -769,7 +792,8 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
                 It's data type should be float32 and its shape is [1,].
 
             - `logits` (Tensor):
-                Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+                Prediction scores of the language modeling head (scores for each vocabulary 
+                token before SoftMax).
                 It's data type should be float32 and its shape is [batch_size, num_classes].
 
             - `caches` (tuple(tuple(Tensor), optional):
