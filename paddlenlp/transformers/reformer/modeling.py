@@ -1991,8 +1991,9 @@ class ReformerLayer(nn.Layer):
 
     def _init_attention_seed(self):
         """
-        This function sets a new seed for the attention layer to make dropout deterministic for both forward calls: 1
-        normal forward call and 1 forward call in backward to recalculate activations.
+        This function sets a new seed for the attention layer to make dropout 
+        deterministic for both forward calls: 1 normal forward call and 1 forward 
+        call in backward to recalculate activations.
         """
 
         # randomize seeds
@@ -2712,23 +2713,34 @@ class ReformerModel(ReformerPreTrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on to some unwanted positions, usually the paddings or the subsequent positions.
+                Mask used in multi-head attention to avoid performing attention on 
+                to some unwanted positions, usually the paddings or the subsequent positions.
                 Its data type can be int, float.
-                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
+                When the data type is int, the `masked` tokens have `0` values and the others 
+                have `1` values.
+                When the data type is float, the `masked` tokens have `0.0` values and the 
+                others have `1.0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             position_ids(Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
-                max_position_embeddings - 1]`.
+                Indices of positions of each input sequence tokens in the position embeddings. 
+                Selected in the range `[0, max_position_embeddings - 1]`.
                 Shape as [batch_size, num_tokens] and dtype as int64. Defaults to `None`.
             num_hashes (int, optional):
-                The number of hashing rounds that should be performed during bucketing. Setting this argument overwrites the default defined in `config["num_hashes"]`. Defaults to `None`.
+                The number of hashing rounds that should be performed during bucketing. Setting 
+                this argument overwrites the default defined in `config["num_hashes"]`. 
+                Defaults to `None`.
             past_buckets_states (List[tuple(Tensor, Tensor)], optional):
-                List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`, with the first element being the previous `buckets` of shape `[batch_size, num_heads, num_hashes, sequence_length]` and the second being the previous `hidden_states` of shape `[batch_size, sequence_length, hidden_size]`.
-                Contains precomputed hidden-states and buckets (only relevant for LSH Self-Attention). Can be used to speed up sequential decoding. Defaults to `None`.
+                List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`, with 
+                the first element being the previous `buckets` of shape `[batch_size, num_heads, num_hashes, sequence_length]` and the second being the previous `hidden_states` of shape 
+                `[batch_size, sequence_length, hidden_size]`.
+                Contains precomputed hidden-states and buckets (only relevant for LSH Self-Attention). Can 
+                be used to speed up sequential decoding. 
+                Defaults to `None`.
             use_cache (bool, optional):
-                Whether or not to use cache. If set to `True`, `past_buckets_states` states are returned and can be used to speed up decoding. Defaults to `False`.
+                Whether or not to use cache. If set to `True`, `past_buckets_states` states are returned 
+                and can be used to speed up decoding. 
+                Defaults to `False`.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers.
                 Defaults to `False`.
@@ -2743,16 +2755,23 @@ class ReformerModel(ReformerPreTrainedModel):
 
             - `last_hidden_state` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+                It's data type should be float32 and 
+                its shape is [batch_size, sequence_length, hidden_size].
             - `past_buckets_states` (List[tuple(Tensor, Tensor)], optional):
                 returned when `use_cache=True` is passed.
-                List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`, with the first element being the previous `buckets` of shape `[batch_size, num_heads, num_hashes, sequence_length]` and the second being the previous `hidden_states` of shape `[batch_size, sequence_length, hidden_size]`.
+                List of `tuple(Tensor, Tensor)` of length `config["num_hidden_layers"]`, 
+                with the first element being the previous `buckets` of shape 
+                `[batch_size, num_heads, num_hashes, sequence_length]` and the second 
+                being the previous `hidden_states` of shape `[batch_size, sequence_length, hidden_size]`.
             - `hidden_states` (tuple(Tensor), optional):
                 returned when `output_hidden_states=True` is passed.
-                tuple of `Tensor` (one for the output of the embeddings + one for the output of each layer). Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+                tuple of `Tensor` (one for the output of the embeddings + one for the 
+                output of each layer). Each Tensor has a data type of float32 
+                and its shape is [batch_size, sequence_length, hidden_size].
             - `attentions` (tuple(Tensor), optional):
                 returned when `output_attentions=True` is passed.
-                tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
+                tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data 
+                type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
 
         Example:
             .. code-block::
@@ -2977,7 +2996,10 @@ class ReformerModelWithLMHead(ReformerPreTrainedModel):
             use_cache (bool, optional):
                 See :class:`ReformerModel`.
             labels (Tensor, optional):
-                Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
+                Labels for language modeling. Note that the labels **are shifted** 
+                inside the model, i.e. you can set `labels = input_ids` Indices are 
+                selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are 
+                ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
                 Shape is [batch_size, sequence_length] and dtype is int64.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
@@ -2995,8 +3017,10 @@ class ReformerModelWithLMHead(ReformerPreTrainedModel):
                 It's data type should be float32 and its shape is [1,].
 
             - `logits` (Tensor):
-                Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
-                It's data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+                Prediction scores of the language modeling head 
+                (scores for each vocabulary token before SoftMax).
+                It's data type should be float32 and its shape is 
+                [batch_size, sequence_length, vocab_size].
 
             - `past_buckets_states` (List[tuple(Tensor, Tensor)]):
                 See :class:`ReformerModel`.
@@ -3123,7 +3147,11 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
             labels (Tensor, optional):
-                Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` (see ``input_ids`` docstring) Tokens with indices set to ``-100`` are ignored(masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]``.
+                Labels for computing the masked language modeling loss. 
+                Indices should be in ``[-100, 0, ..., vocab_size]`` 
+                (see ``input_ids`` docstring) Tokens with indices set 
+                to ``-100`` are ignored(masked), the loss is only computed 
+                for the tokens with labels in ``[0, ..., vocab_size]``.
                 Shape is [batch_size, sequence_length] and dtype is int64.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
@@ -3141,8 +3169,10 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
                 It's data type should be float32 and its shape is [1,].
 
             - `logits` (Tensor):
-                Prediction scores of the masked language modeling head (scores for each vocabulary token before SoftMax).
-                It's data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+                Prediction scores of the masked language modeling head 
+                (scores for each vocabulary token before SoftMax).
+                It's data type should be float32 and its shape is 
+                [batch_size, sequence_length, vocab_size].
 
             - `hidden_states` (tuple(Tensor)):
                 See :class:`ReformerModel`.
@@ -3247,7 +3277,10 @@ class ReformerForSequenceClassification(ReformerPreTrainedModel):
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
             labels (Tensor, optional):
-                Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression loss is computed (Mean-Square loss), If `num_classes > 1` a classification loss is computed (Cross-Entropy).
+                Labels for computing the sequence classification/regression loss. Indices 
+                should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a regression 
+                loss is computed (Mean-Square loss), If `num_classes > 1` a classification 
+                loss is computed (Cross-Entropy).
                 Shape is [batch_size,] and dtype is int64.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
@@ -3370,12 +3403,18 @@ class ReformerForQuestionAnswering(ReformerPreTrainedModel):
             num_hashes (int, optional):
                 See :class:`ReformerModel`.
             start_positions (Tensor, optional):
-                Labels for position (index) of the start of the labelled span for computing the token classification loss.
-                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence are not taken into account for computing the loss.
+                Labels for position (index) of the start of the labelled 
+                span for computing the token classification loss.
+                Positions are clamped to the length of the sequence 
+                (`sequence_length`). Position outside of the sequence 
+                are not taken into account for computing the loss.
                 Shape is [batch_size,] and dtype is int64.
             end_positions (Tensor, optional):
-                Labels for position (index) of the end of the labelled span for computing the token classification loss.
-                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence are not taken into account for computing the loss.
+                Labels for position (index) of the end of the labelled 
+                span for computing the token classification loss.
+                Positions are clamped to the length of the sequence 
+                (`sequence_length`). Position outside of the sequence 
+                are not taken into account for computing the loss.
                 Shape is [batch_size,] and dtype is int64.
             output_attentions (bool, optional):
                 See :class:`ReformerModel`.
@@ -3393,11 +3432,13 @@ class ReformerForQuestionAnswering(ReformerPreTrainedModel):
                 It's data type should be float32 and its shape is [1,].
 
             - `start_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                A tensor of the input token classification logits, indicates 
+                the start position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
             - `end_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                A tensor of the input token classification logits, indicates 
+                the end position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
             - `hidden_states` (tuple(Tensor)):
