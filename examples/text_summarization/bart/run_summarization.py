@@ -32,7 +32,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Tuple, Stack
 from utils import convert_example, compute_metrics
 
-summarization_name_mapping = {"cnn_dailymail": ("article", "highlights"), }
+summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 
 
 def parse_args():
