@@ -25,7 +25,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding)
 
-from .encoder import enable_faster_encoder
+from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (
@@ -1050,7 +1050,6 @@ class FasterBART(BartPretrainedModel):
             decoding_strategy=decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
-        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
 
     def get_encoder(self):
         return self.encoder
@@ -1080,10 +1079,11 @@ class FasterBART(BartPretrainedModel):
             self._model, 'eos_token_id', None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(
             self._model, 'pad_token_id', None)
-
+        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.encoder(input_ids)
+        self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
