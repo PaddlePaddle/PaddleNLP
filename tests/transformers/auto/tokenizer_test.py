@@ -1,4 +1,5 @@
 from paddlenlp.transformers import AutoTokenizer
+from collections import OrderedDict
 
 
 def from_local_dir():
@@ -30,9 +31,35 @@ def from_community_models():
         ('yingyibiao/bert-base-uncased-sst-2-finetuned'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
-    #tokenizer = AutoTokenizer.from_pretrained(('junnyu/ckiplab-bert-base-chinese-ner'))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('junnyu/ckiplab-bert-base-chinese-ner'))
     #print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
+
+TOKENIZER_MAPPING_NAMES = OrderedDict([
+    # Base model mapping
+    ("AlbertTokenizer", "albert"),
+    ("BartTokenizer", "bart"),
+    ("BigBirdTokenizer", "bigbird"),
+    ("ConvBertTokenizer", "convbert"),
+    ("DistilBertTokenizer", "distilbert"),
+    ("ElectraTokenizer", "electra"),
+    ("SkepTokenizer", "skep"),
+    ("ErnieCtmTokenizer", "ernie-ctm"),
+    ("ErnieDocTokenizer", "ernie-doc"),
+    ("ErnieGramTokenizer", "ernie-gram"),
+    ("ErnieTokenizer", "ernie"),
+    ("GPTTokenizer", "gpt"),
+    ("MPNetTokenizer", "mpnet"),
+    ("NeZhaTokenizer", "nezha"),
+    ("RobertaTokenizer", "roberta"),
+    ("RoFormerTokenizer", "roformer"),
+    ("TinyBertTokenizer", "tinybert"),
+    ("BertTokenizer", "bert"),
+    ("UnifiedTransformerTokenizer", "unified_transformer"),
+    ("UNIMOTokenizer", "unimo"),
+    ("XLNetTokenizer", "xlnet"),
+])
 
 if __name__ == '__main__':
     #from_local_dir()

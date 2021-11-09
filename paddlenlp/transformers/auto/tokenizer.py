@@ -135,13 +135,27 @@ class _BaseAutoTokenizerClass:
                 with io.open(config_file, encoding="utf-8") as f:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class")
-                class_name = cls._name_mapping[init_class]
-                import_class = importlib.import_module(
-                    f"paddlenlp.transformers.{class_name}.tokenizer")
-                tokenizer_name = getattr(import_class, init_class)
-                return tokenizer_name.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
+                try:
+                    init_class = init_kwargs.pop("init_class")
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.tokenizer")
+                    tokenizer_name = getattr(import_class, init_class)
+                    return tokenizer_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                # If no `init_class`, we use pattern recoginition to recoginize the Tokenizerc class.
+                except KeyError as err:
+                    logger.error(err)
+                    for key, pattern in cls._name_mapping.items():
+                        if pattern in pretrained_model_name_or_path:
+                            init_class = key
+                            class_name = cls._name_mapping[init_class]
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.tokenizer")
+                            tokenizer_name = getattr(import_class, init_class)
+                            return tokenizer_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs)
 
         else:
             for tokenizer_names, tokenizer_class in cls._tokenizer_mapping.items(
@@ -166,16 +180,31 @@ class _BaseAutoTokenizerClass:
                 if os.path.exists(resolved_vocab_file):
                     with io.open(resolved_vocab_file, encoding="utf-8") as f:
                         init_kwargs = json.load(f)
-
                     # class name corresponds to this configuration
-                    print(init_kwargs)
-                    init_class = init_kwargs.pop("init_class")
-                    class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.tokenizer")
-                    tokenizer_name = getattr(import_class, init_class)
-                    return tokenizer_name.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
+                    try:
+                        init_class = init_kwargs.pop("init_class")
+                        class_name = cls._name_mapping[init_class]
+                        import_class = importlib.import_module(
+                            f"paddlenlp.transformers.{class_name}.tokenizer")
+                        tokenizer_name = getattr(import_class, init_class)
+                        return tokenizer_name.from_pretrained(
+                            pretrained_model_name_or_path, *model_args,
+                            **kwargs)
+                    # If no `init_class`, we use pattern recoginition to recoginize the Tokenizerc class.
+                    except KeyError as err:
+                        logger.error(err)
+                        for key, pattern in cls._name_mapping.items():
+                            if pattern in pretrained_model_name_or_path:
+                                init_class = key
+                                class_name = cls._name_mapping[init_class]
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.tokenizer"
+                                )
+                                tokenizer_name = getattr(import_class,
+                                                         init_class)
+                                return tokenizer_name.from_pretrained(
+                                    pretrained_model_name_or_path, *model_args,
+                                    **kwargs)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

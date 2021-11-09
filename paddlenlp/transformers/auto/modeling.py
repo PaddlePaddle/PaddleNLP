@@ -74,7 +74,7 @@ class _BaseAutoModelClass:
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 except KeyError as err:
                     logger.error(err)
-                    print(
+                    raise KeyError(
                         f"The model class is {init_class}, it is not match the Auto Class."
                     )
         else:
@@ -111,7 +111,7 @@ class _BaseAutoModelClass:
                             **kwargs)
                     except KeyError as err:
                         logger.error(err)
-                        print(
+                        raise KeyError(
                             f"The model class is {init_class}, it is not match the Auto Class."
                         )
             except RuntimeError as err:

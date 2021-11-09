@@ -3,22 +3,16 @@ from paddlenlp.transformers.auto.modeling import *
 from paddlenlp.transformers import *
 
 
-# test
-#1、 model test
 def from_built_in_model():
     model = AutoModel.from_pretrained('bert-base-uncased')
     #model = AutoModel.from_pretrained('unimo-text-1.0')
     #model = AutoModel.from_pretrained('plato-mini')
     #model = AutoModel.from_pretrained('unified_transformer-12L-cn')
 
-    #model = AutoModel.from_pretrained(('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
-
     #2、pretraining test
     model = AutoModelForPreTraining.from_pretrained('bart-base')
     #model = AutoModelForPreTraining.from_pretrained('roformer-chinese-small')
     #model = AutoModelForPreTraining.from_pretrained('tinybert-4l-312d')
-
-    #model = AutoModelForPreTraining.from_pretrained(('/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
 
     #3、lm_head test
     model = AutoModelWithLMHead.from_pretrained('gpt-cpm-large-cn')
@@ -37,8 +31,6 @@ def from_built_in_model():
     model = AutoModelForSequenceClassification.from_pretrained('rbt3')
     #model = AutoModelForSequenceClassification.from_pretrained('roberta-wwm-ext')
     #model = AutoModelForSequenceClassification.from_pretrained('roformer-chinese-small')
-
-    #model = AutoModelForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
     #6、multiple choice test
     model = AutoModelForMultipleChoice.from_pretrained('albert-base-v1')
@@ -62,24 +54,23 @@ def from_built_in_model():
 
     # discriminator generotor test
     model = AutoGenerator.from_pretrained("convbert-base")
-    #model = AutoGenerator.from_pretrained("electra-small")
+    model = AutoGenerator.from_pretrained("electra-small")
     model = AutoDiscriminator.from_pretrained("convbert-base")
     model = AutoDiscriminator.from_pretrained("electra-small")
-
-    print(model)
 
 
 def from_local_dir():
     model = AutoModel.from_pretrained(
         ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
+    model = AutoModelForPreTraining.from_pretrained((
+        '/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
 
 
 def from_community_model():
-    #model = AutoModelForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
-    model = AutoModelForSequenceClassification.from_pretrained(
-        'junnyu/ckiplab-bert-base-chinese-ner')
     model = AutoModelForSequenceClassification.from_pretrained(
         'yingyibiao/bert-base-uncased-sst-2-finetuned')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'junnyu/ckiplab-bert-base-chinese-ner')
 
 
 '''
@@ -92,6 +83,6 @@ def from_community_model():
 '''
 
 if __name__ == '__main__':
-    from_built_in_model()
     from_local_dir()
     from_community_model()
+    # from_built_in_model()
