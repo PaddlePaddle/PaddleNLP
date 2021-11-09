@@ -570,7 +570,7 @@ class NPTagTask(Task):
                 self._config.enable_use_gpu(100, 0)
                 self._config.switch_use_feed_fetch_ops(False)
                 self._config.disable_glog_info()
-                self._config.switch_ir_optim(False)
+                self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
                 self.predictor = paddle.inference.create_predictor(self._config)
                 self.input_handles = [
                     self.predictor.get_input_handle(name)

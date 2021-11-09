@@ -53,7 +53,7 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
-            config.switch_ir_optim(False)
+            config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -99,23 +99,10 @@ class Predictor(object):
 
         all_scores_can = []
         all_preds_can = []
-        pred_ids = []
-
-        # paddle.enable_static()
-        # executor = paddle.static.Executor(paddle.get_device())
-        # static_program, static_feed_names, static_fetch_targets = \
-        #     paddle.static.load_inference_model("./export/inference", executor)
-        
+        pred_ids = []  
 
         for batch in batches:
             input_ids, token_type_ids, label_indices = batchify_fn(batch)
-            # data_dict = dict()
-            # t = [input_ids, token_type_ids]
-            # for name, value in zip(static_feed_names, t):
-            #     data_dict[name] = value
-            # results = executor.run(static_program, feed=data_dict, fetch_list=static_fetch_targets)
-            # print(results)
-            # exit()
             self.input_handles[0].copy_from_cpu(input_ids)
             self.input_handles[1].copy_from_cpu(token_type_ids)
             self.predictor.run()
