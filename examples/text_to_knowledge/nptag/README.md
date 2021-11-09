@@ -49,7 +49,7 @@ data/
 └── train.txt  # 训练集
 ```
 
-数据集`train.txt`和`dev.txt`格式示例
+数据集`train.txt`和`dev.txt`格式示例(text VS label)
 ```
 石竹  植物
 杂链聚合物   化学物质
