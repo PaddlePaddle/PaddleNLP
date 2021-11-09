@@ -560,7 +560,7 @@ class NPTagTask(Task):
         self._construct_dict_map(name_dict_path)
         if self._static_mode:
             self._get_inference_model()
-            # Reload Predictor to disable IR optimization
+            # Reload Predictor
             if paddle.get_device().startswith("gpu"):
                 inference_model_path = os.path.join(self._task_path, "static",
                                             "inference")
