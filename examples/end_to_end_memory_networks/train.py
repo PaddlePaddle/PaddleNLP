@@ -1,26 +1,42 @@
-import paddle
-from paddle import nn
-from model import MenN2N
-from config import config
-from eval import eval
-from data import load_vocab, read_data
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from importlib import import_module
 import os, math
-import numpy as np
 import random
 
+import paddle
+from paddle import nn
+import numpy as np
 
-def train_single_step(model: MenN2N, lr, data, config):
+from model import MenN2N
+from config import Config
+from eval import eval
+from data import load_data
+
+
+def train_single_epoch(model: MenN2N, lr, data, config):
     """
-    训练一个epoch
-    :param model: 训练的模型
-    :param lr: 本epoch的learning rate
-    :param data: 训练数据
-    :param config: 配置信息
-    :return: 平均loss
+    train one epoch
+    :param model: model to be trained
+    :param lr: the learning rate of this epoch
+    :param data: training data
+    :param config: configs
+    :return: average loss
     """
     model.train()
-    N = int(math.ceil(len(data) / config.batch_size))  # 总共训练N个Batch
+    N = int(math.ceil(len(data) / config.batch_size))  # total train N batchs
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=config.max_grad_norm)
     optimizer = paddle.optimizer.SGD(learning_rate=lr,
@@ -39,16 +55,13 @@ def train_single_step(model: MenN2N, lr, data, config):
             bar.next()
 
         optimizer.clear_grad()
-        context = np.ndarray([config.batch_size, config.mem_size],
-                             dtype=np.int64)
+        context = np.ndarray(
+            [config.batch_size, config.mem_size], dtype=np.int64)
         target = np.ndarray([config.batch_size], dtype=np.int64)
         for i in range(config.batch_size):
-            # 在原论文对应的实现中，这里采用的就是这种随机取样的方法
-            # 这里的随机也许会导致模型不稳定
-            # 我尝试过采用非随机的顺序取样，但得到的模型效果比随机取样的要差
             m = random.randrange(config.mem_size, len(data))
             target[i] = data[m]
-            context[i, :] = data[m - config.mem_size: m]
+            context[i, :] = data[m - config.mem_size:m]
 
         batch_data = paddle.to_tensor(context)
         batch_label = paddle.to_tensor(target)
@@ -67,7 +80,7 @@ def train_single_step(model: MenN2N, lr, data, config):
 
 def train(model: MenN2N, train_data, valid_data, config):
     """
-    完成训练
+    do train
     """
     lr = config.init_lr
 
@@ -78,15 +91,12 @@ def train(model: MenN2N, train_data, valid_data, config):
     valid_perplexities = []
 
     for epoch in range(1, config.nepoch + 1):
-        train_loss = train_single_step(model, lr, train_data, config)
+        train_loss = train_single_epoch(model, lr, train_data, config)
         valid_loss = eval(model, valid_data, config, "Validation")
 
-        info = {
-            'epoch': epoch,
-            'learning_rate': lr
-        }
+        info = {'epoch': epoch, 'learning_rate': lr}
 
-        # 当valid上的loss不再下降时，就像learning rate除以1.5
+        # When the loss on the valid no longer drops, it's like learning rate divided by 1.5
         if len(valid_losses) > 0 and valid_loss > valid_losses[-1] * 0.9999:
             lr /= 1.5
 
@@ -101,15 +111,15 @@ def train(model: MenN2N, train_data, valid_data, config):
 
         print(info)
 
-        if epoch % 5 == 0:
+        if epoch % config.log_epoch == 0:
             save_dir = os.path.join(config.checkpoint_dir, "model_%d" % epoch)
             paddle.save(model.state_dict(), save_dir)
             lr_path = os.path.join(config.checkpoint_dir, "lr_%d" % epoch)
             with open(lr_path, "w") as f:
                 f.write(f"{lr}")
 
-        # 为了完成目标精度
-        if info["validate_perplexity"] < 147.0:
+        # to get the target ppl
+        if info["validate_perplexity"] < config.target_ppl:
             save_dir = os.path.join(config.checkpoint_dir, "model_good")
             paddle.save(model.state_dict(), save_dir)
             break
@@ -122,28 +132,14 @@ def train(model: MenN2N, train_data, valid_data, config):
 
 
 if __name__ == '__main__':
-    paddle.set_device("gpu")
-
-    vocab_path = os.path.join(config.data_dir,
-                              "%s.vocab.txt" % config.data_name)
-    word2idx = load_vocab(vocab_path)
+    config = Config('config.yaml')
 
     if not os.path.exists(config.checkpoint_dir):
         os.makedirs(config.checkpoint_dir)
 
-    train_data = read_data(
-        os.path.join(config.data_dir, "%s.train.txt" % config.data_name),
-        word2idx)
-    valid_data = read_data(
-        os.path.join(config.data_dir, "%s.valid.txt" % config.data_name),
-        word2idx)
-    test_data = read_data(
-        os.path.join(config.data_dir, "%s.test.txt" % config.data_name),
-        word2idx)
-
+    word2idx, train_data, valid_data, test_data = load_data(config)
     idx2word = dict(zip(word2idx.values(), word2idx.keys()))
     config.nwords = len(word2idx)
-
     print("vacab size is %d" % config.nwords)
 
     np.random.seed(config.srand)

@@ -1,3 +1,17 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 from paddle import nn
 import numpy as np
@@ -5,21 +19,24 @@ import numpy as np
 
 class MenN2N(nn.Layer):
     """
-    End to End Memory Networks 模型
+    End to End Memory Networks model
     """
 
     def __init__(self, config):
+        """
+        Model initialization
+        :param config: model configuration, see config.yaml for more detail
+        """
         super(MenN2N, self).__init__()
         self.nwords = config.nwords
         self.init_hid = config.init_hid
         self.init_std = config.init_std
-        self.batch_size = config.batch_size
-        self.nepoch = config.nepoch
         self.nhop = config.nhop
         self.edim = config.edim
         self.mem_size = config.mem_size
         self.lindim = config.lindim
         self.max_grad_norm = config.max_grad_norm
+        self.batch_size = config.batch_size
 
         # self.show = config.show
         self.checkpoint_dir = config.checkpoint_dir
@@ -28,36 +45,36 @@ class MenN2N(nn.Layer):
             initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.A = nn.Embedding(self.nwords, self.edim, weight_attr=normal_attr)
 
-        normal_attr = paddle.framework.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        # normal_attr = paddle.framework.ParamAttr(
+        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.C = nn.Embedding(self.nwords, self.edim, weight_attr=normal_attr)
 
         # Temporal Encoding
-        normal_attr = paddle.framework.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=self.init_std))
-        self.T_A = nn.Embedding(self.mem_size, self.edim,
-                                weight_attr=normal_attr)
+        # normal_attr = paddle.framework.ParamAttr(
+        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        self.T_A = nn.Embedding(
+            self.mem_size, self.edim, weight_attr=normal_attr)
 
-        normal_attr = paddle.framework.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=self.init_std))
-        self.T_C = nn.Embedding(self.mem_size, self.edim,
-                                weight_attr=normal_attr)
+        # normal_attr = paddle.framework.ParamAttr(
+        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        self.T_C = nn.Embedding(
+            self.mem_size, self.edim, weight_attr=normal_attr)
 
         # 用于将q进行线性映射的H矩阵
-        normal_attr = paddle.framework.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=self.init_std))
-        self.H = nn.Linear(self.edim, self.edim, weight_attr=normal_attr,
-                           bias_attr=False)
+        # normal_attr = paddle.framework.ParamAttr(
+        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        self.H = nn.Linear(
+            self.edim, self.edim, weight_attr=normal_attr, bias_attr=False)
 
         # 用于输出的W矩阵
-        normal_attr = paddle.framework.ParamAttr(
-            initializer=paddle.nn.initializer.Normal(std=self.init_std))
-        self.W = nn.Linear(self.edim, self.nwords, weight_attr=normal_attr,
-                           bias_attr=False)
+        # normal_attr = paddle.framework.ParamAttr(
+        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        self.W = nn.Linear(
+            self.edim, self.nwords, weight_attr=normal_attr, bias_attr=False)
 
     def forward(self, data):
         """
-        data的shape为[batch_size, mem_size], 内容为每个词的id
+        The shape of data is [batch_size, mem_size], and the content is the id of each word
         """
         q = np.ndarray([self.batch_size, self.edim], dtype=np.float32)
         q.fill(self.init_hid)
@@ -74,8 +91,8 @@ class MenN2N(nn.Layer):
             A_in = paddle.add(A_in_c, A_in_t)  # [batch_size, mem_size, edim]
 
             q_in = q.reshape([-1, 1, self.edim])  # [batch, 1, edim]
-            A_out3d = paddle.matmul(q_in, A_in,
-                                    transpose_y=True)  # [batch, 1, mem_size]
+            A_out3d = paddle.matmul(
+                q_in, A_in, transpose_y=True)  # [batch, 1, mem_size]
             A_out2d = A_out3d.reshape([-1, self.mem_size])
             p = nn.functional.softmax(A_out2d)  # [batch, mem_size]
 
@@ -88,7 +105,7 @@ class MenN2N(nn.Layer):
 
             C_out2d = C_out3d.reshape([-1, self.edim])  # [batch, edim]
 
-            # 线性映射并相加
+            # Linear mapping and addition
             q_mapped = self.H(q)
             q_out = paddle.add(C_out2d, q_mapped)
 

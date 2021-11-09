@@ -1,42 +1,42 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
-from model import MenN2N
-from train import train
-from eval import test
-from config import config
 import os, random, time
-from data import read_data, load_vocab
+
 import paddle
 import numpy as np
 
+from data import load_data
+from model import MenN2N
+from train import train
+from eval import test
+from config import Config
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--target", default=111.0, type=float,
-                    help="target perplexity")
+parser.add_argument(
+    "--target", default=111.0, type=float, help="target perplexity")
 target = parser.parse_args().target
 
-
 if __name__ == '__main__':
-    paddle.set_device("gpu")
-
-    vocab_path = os.path.join(config.data_dir, "%s.vocab.txt" % config.data_name)
-    word2idx = load_vocab(vocab_path)
-
+    config = Config('config.yaml')
     if not os.path.exists(config.checkpoint_dir):
         os.makedirs(config.checkpoint_dir)
 
-    train_data = read_data(
-        os.path.join(config.data_dir, "%s.train.txt" % config.data_name),
-        word2idx)
-    valid_data = read_data(
-        os.path.join(config.data_dir, "%s.valid.txt" % config.data_name),
-        word2idx)
-    test_data = read_data(
-        os.path.join(config.data_dir, "%s.test.txt" % config.data_name),
-        word2idx)
-
+    word2idx, train_data, valid_data, test_data = load_data(config)
     idx2word = dict(zip(word2idx.values(), word2idx.keys()))
     config.nwords = len(word2idx)
-
     print("vacab size is %d" % config.nwords)
 
     while True:
@@ -52,6 +52,8 @@ if __name__ == '__main__':
 
         test_ppl = test(model, test_data, config)
         if test_ppl < target:
-            model_path = os.path.join(config.checkpoint_dir, config.model_name + "_" + str(config.srand) + "_good")
+            model_path = os.path.join(
+                config.checkpoint_dir,
+                config.model_name + "_" + str(config.srand) + "_good")
             paddle.save(model.state_dict(), model_path)
             break

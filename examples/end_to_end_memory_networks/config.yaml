@@ -1,0 +1,40 @@
+# internal state dimension
+edim: 150
+# linear part of the state
+lindim: 75
+# number of hops
+nhop: 7
+# memory size
+mem_size: 200
+# initial internal state value
+init_hid: 0.1
+# initial learning rate
+init_lr: 0.01
+# weight initialization std
+init_std: 0.05
+# clip gradients to this norm
+max_grad_norm: 50
+
+# batch size to use during training
+batch_size: 128
+# number of epoch to use during training
+nepoch: 100
+
+# data directory
+data_dir: "data/ptb"
+# checkpoint directory
+checkpoint_dir: "checkpoints"
+# model name for test and recover train
+model_name: "model"
+# if True, load model [model_name] before train
+recover_train: False
+# data set name
+data_name: "ptb"
+# print progress, need progress module
+show: True
+# initial random seed
+srand: 17814
+# How many epochs output log once
+log_epoch: 5
+# Desired ppl
+target_ppl: 147

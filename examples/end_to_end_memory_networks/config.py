@@ -1,22 +1,32 @@
-class Empty():
-    pass
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-config = Empty()
+import yaml
 
-config.edim = 150                       # internal state dimension
-config.lindim = 75                      # linear part of the state
-config.nhop = 7                         # number of hops
-config.mem_size = 200                   # memory size
-config.batch_size = 128                 # batch size to use during training
-config.nepoch = 100                     # number of epoch to use during training
-config.init_lr = 0.01                   # initial learning rate
-config.init_hid = 0.1                   # initial internal state value
-config.init_std = 0.05                  # weight initialization std
-config.max_grad_norm = 50               # clip gradients to this norm
-config.data_dir = "data"                # data directory
-config.checkpoint_dir = "checkpoints"   # checkpoint directory
-config.model_name = "model"             # model name for test and recover train
-config.recover_train = False            # if True, load model [model_name] before train
-config.data_name = "ptb"                # data set name
-config.show = True                      # print progress, need progress module
-config.srand = 17814                    # initial random seed
+
+class Config(object):
+    """
+    A simple waper for configs
+    """
+
+    def __init__(self, config_path: str):
+        with open(config_path, 'r') as f:
+            self.d = yaml.load(f.read(), Loader=yaml.SafeLoader)
+
+    def __getattribute__(self, key):
+        d = super(Config, self).__getattribute__('d')
+        if key in d:
+            return d[key]
+        else:
+            return super(Config, self).__getattribute__(key)

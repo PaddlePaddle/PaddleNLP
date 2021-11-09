@@ -1,7 +1,7 @@
 # End-To-End-Memory-Networks-in-Paddle
 ## 一、简介
 
-用Paddle来复现论文End-To-End Memory Networks 
+用Paddle来复现论文End-To-End Memory Networks
 
 ![模型简介](http://paddle.yulan.net.cn/model_introduction.png)
 
@@ -25,10 +25,10 @@
 
 * Penn Treetank:
 
-    * [Penn Treebank](http://paddle.yulan.net.cn/ptb.zip) 
-        
+    * [Penn Treebank](http://paddle.yulan.net.cn/ptb.zip)
+
         NLP中常用的PTB语料库,语料来源为1989年华尔街日报，并做以下切分
-        
+
         train：887k words
 
         valid：70k words
@@ -66,14 +66,14 @@ cd ..
 
 ### 训练
 
-训练参数可在`config.py`文件中调整。
+训练参数可在`config.yaml`文件中调整。
 
 Note: 由于本模型受随机因素影响较大，故每次训练的结果差异较大，即使固定随机种子，由于GPU的原因训练结果仍然无法完全一致。
 
 #### 在ptb数据集上训练
 
 ```bash
-cp config/config_ptb config.py
+cp config/config_ptb.yaml config.yaml
 python train.py
 ```
 
@@ -82,22 +82,22 @@ python train.py
 由于模型受随机因素影响较大，故要进行多次训练来找到最优模型，原论文中在ptb数据集上进行了10次训练，并保留了在test集上表现最好的模型。本复现提供了一个脚本，来进行多次训练以获得能达到足够精度的模型。
 
 ```bash
-cp config/config_ptb config.py
+cp config/config_ptb.yaml config.yaml
 python train_until.py --target 111.0
 ```
 
-以下是在ptb数据集上进行多次训练以达到目标精度的[log](./log/ptb_train_until.log)
+以下是在ptb数据集上进行多次训练以达到目标精度的[log](http://paddle.yulan.net.cn/ptb_train_until.log),可以计算出20轮的平均ppl为113，方差为5.68
 
 #### 在text8数据集上训练
 
 ```bash
-cp config/config_text8 config.py
+cp config/config_text8.yaml config.yaml
 python train.py
 ```
 
 ### 测试
 
-保持`config.py`文件与训练时相同
+保持`config.yaml`文件与训练时相同
 
 ```
 python eval.py
@@ -108,7 +108,7 @@ python eval.py
 #### ptb数据集上
 
 ```bash
-cp config/config_ptb_test config.py
+cp config/config_ptb_test.yaml config.yaml
 python eval.py
 ```
 
@@ -119,7 +119,7 @@ python eval.py
 #### text8数据集上
 
 ```bash
-cp config/config_text8_test config.py
+cp config/config_text8_test.yaml config.yaml
 python eval.py
 ```
 
@@ -142,44 +142,64 @@ python eval.py
 
 ```
 ├── checkpoints
-├── config										# 配置文件模板
-│   ├── config_ptb
-│   ├── config_ptb_test
-│   ├── config_text8
-│   └── config_text8_test
+├── config                                        # 配置文件模板
+├── config.yaml
 ├── README.md
 ├── requirements.txt
 ├── config.py
 ├── model.py
 ├── data.py
-├── train.py									# 训练脚本
-├── eval.py										# 测试脚本
+├── train.py                                    # 训练脚本
+├── eval.py                                        # 测试脚本
 ├── train_until.py
 └── utils.py
 ```
 
 ### 6.2 参数说明
 
-可以在`config.py`中设置以下参数
+可以在`config.yaml`中设置以下参数
 
 ```
-config.edim = 150                       # internal state dimension
-config.lindim = 75                      # linear part of the state
-config.nhop = 7                         # number of hops
-config.mem_size = 200                   # memory size
-config.batch_size = 128                 # batch size to use during training
-config.nepoch = 100                     # number of epoch to use during training
-config.init_lr = 0.01                   # initial learning rate
-config.init_hid = 0.1                   # initial internal state value
-config.init_std = 0.05                  # weight initialization std
-config.max_grad_norm = 50               # clip gradients to this norm
-config.data_dir = "data"                # data directory
-config.checkpoint_dir = "checkpoints"   # checkpoint directory
-config.model_name = "model"             # model name for test and recover train
-config.recover_train = False            # if True, load model [model_name] before train
-config.data_name = "ptb"                # data set name
-config.show = True                      # print progress, need progress module
-config.srand = 17814                    # initial random seed
+# internal state dimension
+edim: 150
+# linear part of the state
+lindim: 75
+# number of hops
+nhop: 7
+# memory size
+mem_size: 200
+# initial internal state value
+init_hid: 0.1
+# initial learning rate
+init_lr: 0.01
+# weight initialization std
+init_std: 0.05
+# clip gradients to this norm
+max_grad_norm: 50
+
+# batch size to use during training
+batch_size: 128
+# number of epoch to use during training
+nepoch: 100
+
+# data directory
+data_dir: "data/ptb"
+# checkpoint directory
+checkpoint_dir: "checkpoints"
+# model name for test and recover train
+model_name: "model"
+# if True, load model [model_name] before train
+recover_train: False
+# data set name
+data_name: "ptb"
+# print progress, need progress module
+show: True
+# initial random seed
+srand: 17814
+# How many epochs output log once
+log_epoch: 5
+# Desired ppl
+target_ppl: 147
 ```
 
 ### 七、reference
