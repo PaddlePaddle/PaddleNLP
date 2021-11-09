@@ -68,3 +68,6 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
+from .mbart.modeling import *
+from .mbart.tokenizer import *
+from .mbart50.tokenizer import *
