@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The Open AI Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +15,15 @@
 
 import os
 from functools import lru_cache
-from collections import namedtuple
 
 import json
 import jieba
 import shutil
 from paddle.utils import try_import
-from paddlenlp.data import Vocab
+
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
-    _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
     'GPTTokenizer',
@@ -73,7 +71,7 @@ def get_pairs(word):
 
 class GPTChineseTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT Chinese tokenizerbased on `SentencePiece <https://github.com/google/sentencepiece>`__.
+    Constructs a GPT Chinese tokenizer based on `SentencePiece <https://github.com/google/sentencepiece>`__.
 
     This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
     which contains most of the main methods. For more information regarding those methods,

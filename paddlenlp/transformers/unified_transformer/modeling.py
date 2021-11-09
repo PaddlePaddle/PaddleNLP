@@ -29,13 +29,11 @@ __all__ = [
 
 class UnifiedTransformerPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained UnifiedTransformer models. It provides 
-    UnifiedTransformer related `model_config_file`, `resource_files_names`, 
-    `pretrained_resource_files_map`, `pretrained_init_configuration`, 
-    `base_model_prefix` for downloading and loading pretrained models. 
-    
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for 
-    more details.
+    An abstract class for pretrained UnifiedTransformer models. It provides  UnifiedTransformer
+    related `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -155,12 +153,10 @@ class UnifiedTransformerEmbeddings(nn.Layer):
 @register_base_model
 class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
     """
-    The bare UnifiedTransformer Model outputting raw hidden-states without any 
-    specific head on top.
+    The bare UnifiedTransformer Model outputting raw hidden-states.
 
-    This model inherits from 
-    :class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to the 
-    superclass documentation for the generic methods.
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
 
     This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn
     /documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ 
@@ -195,7 +191,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             Defaults to 0.1.
         normalize_before (bool, optional): 
             Indicate whether to put layer normalization into preprocessing of 
-            MHA and FFN sub-layers. If True, pre-process is layer ormalization 
+            MHA and FFN sub-layers. If True, pre-process is layer normalization 
             and post-precess includes dropout, residual connection. Otherwise, 
             no pre-process and post-precess includes dropout, residual 
             connection, layer normalization. Defaults to True.
@@ -395,8 +391,8 @@ class UnifiedTransformerLMHead(nn.Layer):
 
 class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
     """
-    The UnifiedTransformer Model with a language modeling head on top (linear 
-    layer with weights tied to the input embeddings) for generation tasks.
+    The UnifiedTransformer Model with a language modeling head on top
+    for generation tasks.
 
     Args:
         unified_transformer (:class:`UnifiedTransformerModel`):

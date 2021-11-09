@@ -19,7 +19,7 @@ from abc import abstractmethod
 import paddle
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from .utils import static_mode_guard, dygraph_mode_guard
+from .utils import download_check, static_mode_guard, dygraph_mode_guard
 
 
 class Task(metaclass=abc.ABCMeta):
@@ -44,6 +44,9 @@ class Task(metaclass=abc.ABCMeta):
         self._config = None
         self._task_path = os.path.join(PPNLP_HOME, "taskflow", self.task,
                                        self.model)
+        self._task_flag = self.kwargs[
+            'task_flag'] if 'task_flag' in self.kwargs else self.model
+        download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
