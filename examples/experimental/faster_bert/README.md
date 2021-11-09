@@ -130,6 +130,36 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --use_amp False
 ```
 
+* 使用faster_bert进行fine-tune
+1. 先进行模型转换
+```
+python model_convert_util.py \
+    --model_type bert \
+    --model_name_or_path bert-large-uncased \
+    --task_name SST-2 \
+    --max_seq_length 128 \
+    --batch_size 16 \
+    --output_dir ./tmp/ \
+    --device gpu \
+    --use_amp False
+```
+2. fine-tune
+```
+python run_glue.py \
+    --model_type bert \
+    --model_name_or_path ./tmp/faster_bert_sst-2 \
+    --task_name SST-2 \
+    --max_seq_length 128 \
+    --batch_size 16 \
+    --learning_rate 2e-5 \
+    --num_train_epochs 3 \
+    --logging_steps 100 \
+    --save_steps 500 \
+    --output_dir ./tmp/ \
+    --device gpu \
+    --use_amp False
+```
+
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`bert-base-uncased`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下converter中的内容。

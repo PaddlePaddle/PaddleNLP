@@ -28,8 +28,8 @@ from paddlenlp.datasets import load_dataset
 from paddle.metric import Accuracy
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertTokenizer
-from modeling import BertForSequenceClassification
+from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from modeling import FasterBertForSequenceClassification
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import Mcc, PearsonAndSpearman
@@ -48,6 +48,7 @@ METRIC_CLASSES = {
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
+    "faster_bert": (FasterBertForSequenceClassification, BertTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
 }
 
@@ -284,6 +285,7 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     metric_class = METRIC_CLASSES[args.task_name]
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    fused_model_class, tokenizer_class = MODEL_CLASSES['faster_' + args.model_type]
 
     # Create the tokenizer and dataset
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
@@ -364,7 +366,7 @@ def do_train(args):
         base_model, pretrained_state_dict = model_class.from_pretrained(
             args.model_name_or_path, num_classes=num_class)
 
-        fused_model, fused_pretrained_state_dict = model_class.from_pretrained(
+        fused_model, fused_pretrained_state_dict = fused_model_class.from_pretrained(
             args.model_name_or_path, num_classes=num_class)
 
         model = fused_model

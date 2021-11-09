@@ -27,7 +27,7 @@ __all__ = [
     'BertForPretraining',
     'BertPretrainingCriterion',
     'BertPretrainingHeads',
-    'BertForSequenceClassification',
+    'FasterBertForSequenceClassification',
     'BertForTokenClassification',
     'BertForQuestionAnswering',
     'BertForMultipleChoice',
@@ -603,7 +603,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
         return start_logits, end_logits
 
 
-class BertForSequenceClassification(BertPretrainedModel):
+class FasterBertForSequenceClassification(BertPretrainedModel):
     """
     Bert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
     for GLUE tasks.
@@ -620,7 +620,7 @@ class BertForSequenceClassification(BertPretrainedModel):
     """
 
     def __init__(self, bert, num_classes=2, dropout=None):
-        super(BertForSequenceClassification, self).__init__()
+        super(FasterBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.bert = bert  # allow bert to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else
