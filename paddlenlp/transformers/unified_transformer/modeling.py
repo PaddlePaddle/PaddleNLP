@@ -354,6 +354,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             return sequence_output, cache
         else:
             sequence_output = self.encoder(embedding_output, attention_mask)
+
             return sequence_output
 
 
@@ -473,6 +474,21 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             return logits, cache
         else:
             return logits
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterUnifiedTransformer
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        self._faster_entry = FasterUnifiedTransformer(
+            self,
+            decode_strategy=decode_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution

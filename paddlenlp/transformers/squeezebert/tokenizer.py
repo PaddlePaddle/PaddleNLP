@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,12 +47,9 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "squeezebert-uncased":
-                "squeezebert-uncased-vocab.txt",
-            "squeezebert-mnli":
-                "squeezebert-mnli-vocab.txt",
-            "queezebert-mnli-headless":
-                "queezebert-mnli-headless-vocab.txt",
+            "squeezebert-uncased": "squeezebert-uncased-vocab.txt",
+            "squeezebert-mnli": "squeezebert-mnli-vocab.txt",
+            "queezebert-mnli-headless": "queezebert-mnli-headless-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -81,7 +78,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = SqueezeBertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                    .format(vocab_file))
+                .format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
@@ -149,7 +146,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
         token_ids_1 = []
         return len(
             self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-            if pair else None))
+                                                  if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -249,5 +246,5 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + (
-                    [0] * len(token_ids_1)) + [1]
+                [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
