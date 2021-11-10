@@ -20,7 +20,7 @@ from paddlenlp.experimental import FasterErnieForTokenClassification, to_tensor
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_path", type=str, default="ckpt/model_4221", help="The path to model parameters to be loaded.")
+parser.add_argument("--save_dir", type=str, default="ckpt/model_4221", help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=1, help="Batch size per GPU/CPU for training.")
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     texts = ["".join(example["tokens"]) for example in test_ds]
     label_map = dict(enumerate(test_ds.label_list))
     model = FasterErnieForTokenClassification.from_pretrained(
-        args.save_path,
+        args.save_dir,
         num_classes=len(test_ds.label_list),
         max_seq_len=args.max_seq_length,
         is_split_into_words=True)

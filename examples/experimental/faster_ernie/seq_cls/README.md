@@ -21,7 +21,7 @@ python predict.py --device gpu --save_dir ckpt/model_900
 ## 导出模型
 
 ```shell
-python export_model.py --save_path ckpt/model_900 --output_path export/ --max_seq_length 128
+python export_model.py --save_dir ckpt/model_900 --output_path export/ --max_seq_length 128
 ```
 
 ## 部署推理
