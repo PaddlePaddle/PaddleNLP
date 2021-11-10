@@ -20,7 +20,6 @@ class NPTagAccuracy(paddle.metric.Metric):
     """
     Accuracy for NPTag Prompt Model.
     """
-
     def __init__(self):
         super(NPTagAccuracy, self).__init__()
         self.reset()
@@ -39,7 +38,8 @@ class NPTagAccuracy(paddle.metric.Metric):
                 real_pred.append(pred[i])
                 real_label.append(label[i])
 
-            if all(real_pred[i] == real_label[i] for i in range(len(real_label))):
+            if all(real_pred[i] == real_label[i]
+                   for i in range(len(real_label))):
                 correct.append(1)
             else:
                 correct.append(0)
@@ -48,7 +48,7 @@ class NPTagAccuracy(paddle.metric.Metric):
     def update(self, correct):
         self.corrects += sum(correct)
         self.total += len(correct)
-    
+
     def accumulate(self):
         return float(self.corrects) / self.total
 

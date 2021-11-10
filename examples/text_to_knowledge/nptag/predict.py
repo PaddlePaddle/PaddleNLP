@@ -14,11 +14,9 @@
 
 import os
 import argparse
-from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer
 
@@ -37,15 +35,17 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=2):
+def do_predict(data,
+               model,
+               tokenizer,
+               batch_size=1,
+               max_cls_len=5,
+               summary_num=2):
     examples = []
     for text in data:
         example = {"text": text}
         input_ids, token_type_ids, label_indices = convert_example(
-            example,
-            tokenizer,
-            max_seq_len=args.max_seq_len,
-            is_test=True)
+            example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
         examples.append((input_ids, token_type_ids, label_indices))
 
     batches = [
@@ -59,8 +59,8 @@ def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=
         Stack(dtype='int64'),  # label_indices
     ): fn(samples)
 
-    name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(tokenizer,
-        os.path.join(args.data_dir, "name_category_map.json"))
+    name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(
+        tokenizer, os.path.join(args.data_dir, "name_category_map.json"))
 
     all_scores_can = []
     all_preds_can = []
@@ -74,7 +74,7 @@ def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=
         token_type_ids = paddle.to_tensor(token_type_ids)
         logits = model(input_ids, token_type_ids).numpy()
         for i, l in zip(label_indices, logits):
-            score = l[i[0]: i[-1] + 1, vocab_ids]
+            score = l[i[0]:i[-1] + 1, vocab_ids]
             # Find topk candidates of scores and predicted indices.
             score_can, pred_id_can = find_topk(score, k=4, axis=-1)
 
@@ -104,11 +104,11 @@ def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=
                 else:
                     labels_can = bk_tree.search_similar_word(label)
                     result['label'] = labels_can[0][0]
-        
+
         result['category'] = name_dict[result['label']]
         results.append(result)
     return results
-   
+
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
@@ -126,6 +126,6 @@ if __name__ == "__main__":
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-    
+
     results = do_predict(data, model, tokenizer, batch_size=args.batch_size)
     print(results)

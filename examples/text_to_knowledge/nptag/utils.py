@@ -18,6 +18,7 @@ from typing import List
 
 import numpy as np
 
+
 def construct_dict_map(tokenizer, name_dict_path):
     """Construct dict map"""
     with open(name_dict_path, encoding="utf-8") as fp:
@@ -50,10 +51,9 @@ def search(scores_can, pred_ids_can, depth, path, score):
         return [(path, score)]
     res = []
     for i in range(len(pred_ids_can[0])):
-        tmp_res = search(
-            scores_can, pred_ids_can, depth + 1, path + [pred_ids_can[depth][i]],
-            score + scores_can[depth][i]
-        )
+        tmp_res = search(scores_can, pred_ids_can, depth + 1,
+                         path + [pred_ids_can[depth][i]],
+                         score + scores_can[depth][i])
         res.extend(tmp_res)
     return res
 
@@ -67,20 +67,22 @@ def find_topk(a, k, axis=-1, largest=True, sorted=True):
 
     a = np.asanyarray(a)
     if largest:
-        index_array = np.argpartition(a, axis_size-k, axis=axis)
-        topk_indices = np.take(index_array, -np.arange(k)-1, axis=axis)
+        index_array = np.argpartition(a, axis_size - k, axis=axis)
+        topk_indices = np.take(index_array, -np.arange(k) - 1, axis=axis)
     else:
-        index_array = np.argpartition(a, k-1, axis=axis)
+        index_array = np.argpartition(a, k - 1, axis=axis)
         topk_indices = np.take(index_array, np.arange(k), axis=axis)
     topk_values = np.take_along_axis(a, topk_indices, axis=axis)
     if sorted:
         sorted_indices_in_topk = np.argsort(topk_values, axis=axis)
         if largest:
             sorted_indices_in_topk = np.flip(sorted_indices_in_topk, axis=axis)
-        sorted_topk_values = np.take_along_axis(
-            topk_values, sorted_indices_in_topk, axis=axis)
-        sorted_topk_indices = np.take_along_axis(
-            topk_indices, sorted_indices_in_topk, axis=axis)
+        sorted_topk_values = np.take_along_axis(topk_values,
+                                                sorted_indices_in_topk,
+                                                axis=axis)
+        sorted_topk_indices = np.take_along_axis(topk_indices,
+                                                 sorted_indices_in_topk,
+                                                 axis=axis)
         return sorted_topk_values, sorted_topk_indices
     return topk_values, topk_indices
 
@@ -96,7 +98,7 @@ def levenstein_distance(s1: str, s2: str) -> int:
         int: the minimal distance.
     """
     m, n = len(s1) + 1, len(s2) + 1
-    
+
     # Initialize
     dp = [[0] * n for i in range(m)]
     dp[0][0] = 0
@@ -120,7 +122,6 @@ class BurkhardKellerNode(object):
     Args:
         word (str): word of current node.
     """
-
     def __init__(self, word: str):
         self.word = word
         self.next = {}
@@ -129,7 +130,6 @@ class BurkhardKellerNode(object):
 class BurkhardKellerTree(object):
     """Implementataion of BK-Tree
     """
-
     def __init__(self):
         self.root = None
         self.nodes = {}
@@ -159,7 +159,10 @@ class BurkhardKellerTree(object):
         """
         return self.__add(self.root, word)
 
-    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
+    def __search_similar_word(self,
+                              cur_node: BurkhardKellerNode,
+                              s: str,
+                              threshold: int = 2) -> List[str]:
         res = []
         if cur_node is None:
             return res
@@ -168,7 +171,8 @@ class BurkhardKellerTree(object):
             res.append((cur_node.word, dist))
         start = max(dist - threshold, 1)
         while start < dist + threshold:
-            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None),
+                                                 s)[:]
             res.extend(tmp_res)
             start += 1
         return res

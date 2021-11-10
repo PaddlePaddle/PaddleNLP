@@ -18,7 +18,6 @@ import argparse
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.transformers import ErnieCtmTokenizer
 
@@ -77,10 +76,7 @@ class Predictor(object):
         for text in data:
             example = {"text": text}
             input_ids, token_type_ids, label_indices = convert_example(
-                example,
-                tokenizer,
-                max_seq_len=args.max_seq_len,
-                is_test=True)
+                example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
             examples.append((input_ids, token_type_ids, label_indices))
 
         batches = [
@@ -94,12 +90,12 @@ class Predictor(object):
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 
-        name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(tokenizer,
-            os.path.join(args.data_dir, "name_category_map.json"))
+        name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(
+            tokenizer, os.path.join(args.data_dir, "name_category_map.json"))
 
         all_scores_can = []
         all_preds_can = []
-        pred_ids = []  
+        pred_ids = []
 
         for batch in batches:
             input_ids, token_type_ids, label_indices = batchify_fn(batch)
@@ -107,15 +103,15 @@ class Predictor(object):
             self.input_handles[1].copy_from_cpu(token_type_ids)
             self.predictor.run()
             logits = self.output_handle.copy_to_cpu()
-            
+
             for i, l in zip(label_indices, logits):
-                score = l[i[0]: i[-1] + 1, vocab_ids]
+                score = l[i[0]:i[-1] + 1, vocab_ids]
                 # Find topk candidates of scores and predicted indices.
                 score_can, pred_id_can = find_topk(score, k=4, axis=-1)
 
                 all_scores_can.extend([score_can.tolist()])
                 all_preds_can.extend([pred_id_can.tolist()])
-                pred_ids.extend([pred_id_can[:, 0].tolist()])  
+                pred_ids.extend([pred_id_can[:, 0].tolist()])
 
         results = []
         for i, d in enumerate(data):
@@ -137,7 +133,7 @@ class Predictor(object):
                     else:
                         labels_can = bk_tree.search_similar_word(label)
                         result['label'] = labels_can[0][0]
-            
+
             result['category'] = name_dict[result['label']]
             results.append(result)
         return results
