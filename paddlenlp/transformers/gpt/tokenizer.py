@@ -15,18 +15,15 @@
 
 import os
 from functools import lru_cache
-from collections import namedtuple
 
 import json
 import jieba
 import shutil
 from paddle.utils import try_import
-from paddlenlp.data import Vocab
+
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
-    _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
     'GPTTokenizer',

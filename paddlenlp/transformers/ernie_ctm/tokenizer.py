@@ -82,7 +82,9 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             "ernie-ctm":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
             "wordtag":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "nptag":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -93,7 +95,11 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         "wordtag": {
             "do_lower_case": True,
             "cls_num": 2
-        }
+        },
+        "nptag": {
+            "do_lower_case": True,
+            "cls_num": 2
+        },
     }
 
     def __init__(self,
