@@ -22,6 +22,7 @@ void topK_softMax_update(
     const T* log_probs,
     const T* bias,  // NOTE: bias is float in V3.1
     bool* finished,
+    bool* alive_finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
@@ -40,6 +41,7 @@ void topK_update_kernelLauncher(
     size_t& workspace_size,
     const T* log_probs,
     bool* finished,
+    bool* alive_finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams

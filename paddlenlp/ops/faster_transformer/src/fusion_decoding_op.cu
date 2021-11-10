@@ -128,7 +128,8 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
 
-    if (decoding_strategy == "beam_search") {
+    if (decoding_strategy == "beam_search" ||
+        decoding_strategy == "beam_search_v2") {
       params[i].request_batch_size = batch_size_ * beam_width_;
       params[i].request_max_mem_seq_len = memory_max_seq_len;
     }

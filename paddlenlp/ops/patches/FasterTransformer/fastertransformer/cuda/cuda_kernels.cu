@@ -27,16 +27,18 @@ __global__ void update_logits_kernel(T* logits,
   bool finish = ALIVE ? false : finished[bid];
   int offset = bid * n;
 
-  float max_val = -1 * FLT_MAX;
+  const T MAX_T_VAL = (sizeof(T) == 2) ? HALF_FLT_MAX : FLT_MAX;
+
+  float max_val = -FLT_MAX;
   __shared__ float s_max_val;
   __shared__ float s_sum_val;
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     if (finish)
-      logits[offset + tid] = (tid == end_id) ? FLT_MAX : -1 * FLT_MAX;
+      logits[offset + tid] = (tid == end_id) ? MAX_T_VAL : -MAX_T_VAL;
     else
       logits[offset + tid] += bias[tid];
-    max_val = max(max_val, logits[offset + tid]);
+    max_val = max(max_val, (float)logits[offset + tid]);
   }
 
   max_val = blockReduceMax<float>((float)max_val);
@@ -45,8 +47,9 @@ __global__ void update_logits_kernel(T* logits,
 
   float sum_val = 0.0f;
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
-    logits[offset + tid] = __expf((float)logits[offset + tid] - s_max_val);
-    sum_val += (float)logits[offset + tid];
+    float tmp = __expf((float)logits[offset + tid] - s_max_val);
+    logits[offset + tid] = (T)tmp;
+    sum_val += tmp;
   }
 
   sum_val = blockReduceSum<float>(sum_val);
@@ -54,12 +57,13 @@ __global__ void update_logits_kernel(T* logits,
   __syncthreads();
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
-    logits[offset + tid] = logf((float)logits[offset + tid] / s_sum_val);
+    logits[offset + tid] = (T)logf((float)logits[offset + tid] / s_sum_val);
   }
 }
 
-void update_logits_v2(float* logits,
-                      const float* bias,
+template <typename T>
+void update_logits_v2(T* logits,
+                      const T* bias,
                       const int end_id,
                       const bool* finished,
                       const int m,
@@ -69,9 +73,28 @@ void update_logits_v2(float* logits,
   dim3 block(min(n, 1024));
   /*n is the vocab_size, e.g., 30000, 7000.... vocab_size is usually very big.
    */
-  update_logits_kernel<float, true><<<grid, block, 0, stream>>>(
+  update_logits_kernel<T, true><<<grid, block, 0, stream>>>(
       logits, bias, end_id, finished, n);
 }
+
+template void update_logits_v2(float* logits,
+                               const float* bias,
+                               const int end_id,
+                               const bool* finished,
+                               const int m,
+                               const int n,
+                               cudaStream_t stream);
+
+template void update_logits_v2(half* logits,
+                               const half* bias,
+                               const int end_id,
+                               const bool* finished,
+                               const int m,
+                               const int n,
+                               cudaStream_t stream);
+
+// Encoder kernels
+#ifdef BUILD_ENCODER
 
 template <typename T>
 __global__ void add_bias_input_pre_layernorm_generalize(T* out,
@@ -135,8 +158,6 @@ __global__ void add_bias_input_generalize(T* out,
   }
 }
 
-// Encoder kernels
-#ifdef WITH_ENCODER
 template <typename T>
 __global__ void encoder_layernorm_generalize(
     T* out, const T* input, const T* gamma, const T* beta, int n) {
@@ -244,8 +265,6 @@ template void layernorm_kernelLauncher(float* out,
                                        int m,
                                        int n,
                                        cudaStream_t stream);
-// End of encoder kernels
-#endif
 
 template <typename T>
 __global__ void add_bias_relu_encoder(T* out, const T* bias, int m, int n) {
@@ -275,8 +294,6 @@ __global__ void add_bias_relu_encoder(half* out,
   }
 }
 
-#ifdef BUILD_ENCODER
-
 template void add_bias_act_kernelLauncher<float>(float* out,
                                                  const float* bias,
                                                  int m,
@@ -303,6 +320,7 @@ void add_bias_act_kernelLauncher(
     add_bias_relu_encoder<T><<<grid, block, 0, stream>>>(out, bias, m, n);
 }
 
+// End of encoder kernels
 #endif
 
 }  // namespace fastertransformer

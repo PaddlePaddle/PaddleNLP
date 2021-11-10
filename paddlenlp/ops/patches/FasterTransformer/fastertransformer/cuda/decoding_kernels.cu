@@ -19,6 +19,7 @@ namespace fastertransformer {
 
 template <typename T, bool ALIVE = false>
 __global__ void init_kernel_v2(bool* finished,
+                               bool* alive_finished,
                                int* sequence_length,
                                int* word_ids,
                                T* cum_log_probs,
@@ -31,6 +32,9 @@ __global__ void init_kernel_v2(bool* finished,
        index < batch_size * beam_width;
        index += blockDim.x * gridDim.x) {
     finished[index] = false;
+    if (index < batch_size * beam_width / 2) {
+      alive_finished[index] = false;
+    }
     sequence_length[index] = 0;
     if (ALIVE) {
       if (index < batch_size * beam_width / 2) word_ids[index] = sentence_id;
@@ -45,6 +49,7 @@ __global__ void init_kernel_v2(bool* finished,
 
 template <typename T>
 void init_kernelLauncher_v2(bool* finished,
+                            bool* alive_finished,
                             int* sequence_length,
                             int* word_ids,
                             T* cum_log_probs,
@@ -56,6 +61,7 @@ void init_kernelLauncher_v2(bool* finished,
   dim3 block(256);
 
   init_kernel_v2<T, true><<<grid, block, 0, stream>>>(finished,
+                                                      alive_finished,
                                                       sequence_length,
                                                       word_ids,
                                                       cum_log_probs,
@@ -205,6 +211,7 @@ void update_with_force_decodingLauncher(const int* trg_word,
 }
 
 template void init_kernelLauncher_v2(bool* finished,
+                                     bool* alive_finished,
                                      int* sequence_length,
                                      int* word_ids,
                                      float* cum_log_probs,
@@ -214,6 +221,7 @@ template void init_kernelLauncher_v2(bool* finished,
                                      cudaStream_t stream);
 
 template void init_kernelLauncher_v2(bool* finished,
+                                     bool* alive_finished,
                                      int* sequence_length,
                                      int* word_ids,
                                      half* cum_log_probs,

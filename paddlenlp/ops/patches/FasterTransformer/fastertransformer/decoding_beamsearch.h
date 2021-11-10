@@ -58,6 +58,8 @@ private:
   int *word_ids_buf_;
   int *parent_ids_buf_;
   bool *finished_buf_;
+  bool *alive_finished_buf_;
+
   void *buf_;
   int *finished_count_buf_;
   bool *h_finished_buf_;
@@ -114,7 +116,6 @@ public:
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     if (args_.beam_width_ > 16) is_fuse_topk_softMax_ = false;
-    args_.vocab_size_ = vocab_size;
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;
     else if (std::is_same<DataType_, half>::value)
@@ -161,7 +162,8 @@ public:
     size_t parent_ids_buf_size =
         keep_alive_beam_ ? word_ids_buf_size : 0;  // type int
     size_t finished_buf_size =
-        args_.batch_size_ * args_.beam_width_;                  // type bool
+        args_.batch_size_ * args_.beam_width_;  // type bool
+    size_t alive_finished_buf_size = keep_alive_beam_ ? finished_buf_size : 0;
     size_t finished_count_size = (size_t)(ceil(1 / 32.)) * 32;  // type int
 
     size_t storage_size_per_beam =
@@ -212,6 +214,8 @@ public:
     word_ids_buf_size = (size_t)(ceil(word_ids_buf_size / 4.)) * 4;
     parent_ids_buf_size = (size_t)(ceil(parent_ids_buf_size / 4.)) * 4;
     finished_buf_size = (size_t)(ceil(finished_buf_size / 32.)) * 32;
+    alive_finished_buf_size =
+        (size_t)(ceil(alive_finished_buf_size / 32.)) * 32;
     const size_t tmp_logits_buf_size = logits_buf_size;
 
     // get workspace size of topk kernel
@@ -220,6 +224,7 @@ public:
                                  topk_workspace_size_,
                                  logits_buf_,
                                  finished_buf_,
+                                 alive_finished_buf_,
                                  nullptr,
                                  word_ids_buf_,
                                  parent_ids_buf_,
@@ -251,7 +256,8 @@ public:
         sizeof(DataType_) * padded_embedding_kernel_size +
         sizeof(float) * padded_embedding_bias_size +
         sizeof(int) * (word_ids_buf_size + parent_ids_buf_size) +
-        sizeof(bool) * finished_buf_size + topk_workspace_size_ +
+        sizeof(bool) * (finished_buf_size + alive_finished_buf_size) +
+        topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
         sizeof(int) * finished_count_size));
 
@@ -302,7 +308,8 @@ public:
     word_ids_buf_ = (int *)(cum_log_buf_ + cum_log_buf_size);
     parent_ids_buf_ = (int *)(word_ids_buf_ + word_ids_buf_size);
     finished_buf_ = (bool *)(parent_ids_buf_ + parent_ids_buf_size);
-    temp_storage_ = (float *)(finished_buf_ + finished_buf_size);
+    alive_finished_buf_ = (bool *)(finished_buf_ + finished_buf_size);
+    temp_storage_ = (float *)(alive_finished_buf_ + alive_finished_buf_size);
     finished_count_buf_ = (int *)(temp_storage_ + args_.temp_storage_size_);
     topK_kernel_workspace = (void *)(finished_count_buf_ + finished_count_size);
     padded_embedding_kernel =
@@ -384,14 +391,15 @@ public:
       cum_log_probs: If keep_alive_beam_ is true, the first alive element is 0.
     */
     if (keep_alive_beam_ == true) {
-      init_kernelLauncher_v2(finished_buf_,
-                             decoding_params.sequence_length,
-                             word_ids_buf_,
-                             cum_log_buf_,
-                             args_.start_id_,
-                             args_.batch_size_,
-                             args_.beam_width_ * 2,
-                             decoding_params.stream);
+      init_kernelLauncher_v2<float>(finished_buf_,
+                                    alive_finished_buf_,
+                                    decoding_params.sequence_length,
+                                    word_ids_buf_,
+                                    cum_log_buf_,
+                                    args_.start_id_,
+                                    args_.batch_size_,
+                                    args_.beam_width_ * 2,
+                                    decoding_params.stream);
     } else {
       init_kernelLauncher(finished_buf_,
                           decoding_params.sequence_length,
@@ -523,18 +531,19 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-        decoder_->forward(from_tensor_[from_id],
-                          decoding_params.memory_tensor,
-                          K_cache_[kv_cache_id] + layer * cache_size,
-                          V_cache_[kv_cache_id] + layer * cache_size,
-                          K_mem_cache_[layer],
-                          V_mem_cache_[layer],
-                          decoding_params.memory_sequence_length,
-                          from_tensor_[out_id],
-                          step,
-                          args_.seq_len_,
-                          true, /* is_cross_attention */
-                          finished_buf_);
+        decoder_->forward(
+            from_tensor_[from_id],
+            decoding_params.memory_tensor,
+            K_cache_[kv_cache_id] + layer * cache_size,
+            V_cache_[kv_cache_id] + layer * cache_size,
+            K_mem_cache_[layer],
+            V_mem_cache_[layer],
+            decoding_params.memory_sequence_length,
+            from_tensor_[out_id],
+            step,
+            args_.seq_len_,
+            true, /* is_cross_attention */
+            keep_alive_beam_ ? alive_finished_buf_ : finished_buf_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -621,12 +630,11 @@ public:
         if (is_fuse_topk_softMax_) {
           if (keep_alive_beam_) {
             // Use separated alive and finish beam queues to avoid the decrease
-            // of
-            // alive beams.
-            /*
+            // of alive beams.
             topK_softMax_update(tmp_logits_buf_,
                                 embedding_bias_ptr,
                                 finished_buf_,
+                                alive_finished_buf_,
                                 decoding_params.sequence_length,
                                 word_ids_buf_,
                                 parent_ids_buf_,
@@ -637,7 +645,6 @@ public:
                                 step,
                                 args_,
                                 decoding_params.stream);
-            */
           } else {
             topK_softMax(tmp_logits_buf_,
                          embedding_bias_ptr,
@@ -669,8 +676,7 @@ public:
 
         } else {
           if (keep_alive_beam_ == true) {
-            /*
-            update_logits_v2(logits_buf_,
+            update_logits_v2(tmp_logits_buf_,
                              decoding_params.embedding_bias,
                              args_.end_id_,
                              finished_buf_,
@@ -679,13 +685,13 @@ public:
                              decoding_params.stream);
 
             // Use separated alive and finish beam queues to avoid the decrease
-            of
-            // alive beams.
+            // of alive beams.
             topK_update_kernelLauncher(
                 topK_kernel_workspace,
                 topk_workspace_size_,
-                logits_buf_,
+                tmp_logits_buf_,
                 finished_buf_,
+                alive_finished_buf_,
                 decoding_params.sequence_length,
                 word_ids_buf_,
                 parent_ids_buf_,
@@ -695,7 +701,6 @@ public:
                 step,
                 args_,
                 decoding_params.stream);
-            */
           } else {
             update_logits(logits_buf_,
                           tmp_logits_buf_,
@@ -814,7 +819,7 @@ public:
             V_cache_,
             keep_alive_beam_ ? parent_ids_buf_
                              : decoding_params.parent_ids + (step - 1) * m,
-            finished_buf_,
+            keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
             args_.batch_size_,
             args_.beam_width_,
             args_.head_num_,

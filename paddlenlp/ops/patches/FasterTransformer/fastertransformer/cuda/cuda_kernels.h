@@ -16,9 +16,9 @@
  */
 namespace fastertransformer {
 
-
 template <typename T>
 void init_kernelLauncher_v2(bool* finished,
+                            bool* alive_finished,
                             int* sequence_length,
                             int* word_ids,
                             T* cum_log_probs,
@@ -27,8 +27,9 @@ void init_kernelLauncher_v2(bool* finished,
                             const int beam_width,
                             cudaStream_t stream);
 
-void update_logits_v2(float* logits,
-                      const float* bias,
+template <typename T>
+void update_logits_v2(T* logits,
+                      const T* bias,
                       const int end_id,
                       const bool* finished,
                       const int m,
