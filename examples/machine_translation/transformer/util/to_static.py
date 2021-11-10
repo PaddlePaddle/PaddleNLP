@@ -33,6 +33,5 @@ def apply_to_static(config, model):
     support_to_static = config.get('to_static', False)
     if support_to_static:
         specs = create_input_specs()
-        build_strategy = None
-        model = to_static(model, input_spec=specs, build_strategy=build_strategy)
+        model = to_static(model, input_spec=specs)
     return model
