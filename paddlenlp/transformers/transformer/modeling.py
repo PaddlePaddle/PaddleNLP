@@ -589,7 +589,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
-                0, batch_size * beam_size, step=beam_size, dtype=scores_dtype),
+                0, batch_size * beam_size, step=beam_size, dtype="int64"),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
@@ -1192,7 +1192,7 @@ class InferTransformerModel(TransformerModel):
 
             # Length penalty is given by = (5+len(decode)/6) ^ -\alpha. Pls refer to
             # https://arxiv.org/abs/1609.08144.
-            length_penalty = paddle.pow(5.0 + (i + 1.0) / 6.0, alpha)
+            length_penalty = paddle.pow((5.0 + i + 1.0) / 6.0, alpha)
             curr_scores = log_probs / length_penalty
             flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
 

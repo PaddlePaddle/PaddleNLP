@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -256,7 +257,8 @@ class RoFormerPretrainedModel(PretrainedModel):
     An abstract class for pretrained RoFormer models. It provides RoFormer related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -678,9 +680,8 @@ class RoFormerModel(RoFormerPretrainedModel):
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
     """
-    RoFormer Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    RoFormer with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         roformer (:class:`RoFormerModel`):

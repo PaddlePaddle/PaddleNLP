@@ -30,10 +30,10 @@ __all__ = [
 class UNIMOPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained UNIMO models. It provides UNIMO related
-    `model_config_file`, `pretrained_init_configuration`,
-    `resource_files_names`, `pretrained_resource_files_map`,
-    `base_model_prefix` for downloading and loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -373,8 +373,7 @@ class UNIMOLMHead(nn.Layer):
 
 class UNIMOLMHeadModel(UNIMOPretrainedModel):
     """
-    The UNIMO Model with a language modeling head on top (linear
-    layer with weights tied to the input embeddings), designed for generation tasks.
+    The UNIMO Model with a `language modeling` head on top designed for generation tasks.
 
     Args:
         unimo (:class:`UNIMOModel`):
