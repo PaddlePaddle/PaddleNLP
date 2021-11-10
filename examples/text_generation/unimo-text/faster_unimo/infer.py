@@ -77,12 +77,6 @@ def run(args):
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
-    model = FasterUNIMOText(
-        model,
-        decoding_strategy=args.decode_strategy,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
-
     print('\nEval begin...')
     model.eval()
     pred_ref = []
@@ -90,7 +84,7 @@ def evaluation(model, data_loader, args, tokenizer):
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
         input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
-        ids = model.generate(
+        ids, _ = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -104,8 +98,8 @@ def evaluation(model, data_loader, args, tokenizer):
             num_beams=args.num_beams,
             num_return_sequences=args.num_return_sequences,
             bos_token_id=tokenizer.cls_token_id,
-            eos_token_id=tokenizer.mask_token_id)
-
+            eos_token_id=tokenizer.mask_token_id,
+            use_fast=True)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %
@@ -117,7 +111,6 @@ def evaluation(model, data_loader, args, tokenizer):
             None,
             tokenizer,
             num_return_sequences=args.num_return_sequences)
-
         pred_ref.extend(results)
         start_time = time.time()
 

@@ -14,6 +14,7 @@
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
 from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
@@ -21,7 +22,7 @@ from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfL
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieCtmPretrainedModel', 'ErnieCtmModel', 'ErnieCtmWordtagModel',
+    'ErnieCtmPretrainedModel', 'ErnieCtmModel', 'ErnieCtmWordtagModel', 'ErnieCtmNptagModel',
     'ErnieCtmForTokenClassification'
 ]
 
@@ -139,6 +140,23 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "content_summary_index": 1,
             "cls_num": 2,
         },
+        "nptag": {
+            "vocab_size": 23000,
+            "embedding_size": 128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "use_content_summary": True,
+            "content_summary_index": 1,
+            "cls_num": 2,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -146,7 +164,9 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "ernie-ctm":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
             "wordtag":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag_pos.pdparams"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag_pos.pdparams",
+            "nptag":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/nptag.pdparams",
         }
     }
     base_model_prefix = "ernie_ctm"
@@ -259,7 +279,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             padding_idx=pad_token_id,
             cls_num=cls_num)
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
-                                                     hidden_size)
+                                                     hidden_size)                                                               
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -376,7 +396,6 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-
         embedding_output = self.embedding_hidden_mapping_in(embedding_output)
 
         encoder_outputs = self.encoder(embedding_output, attention_mask)
@@ -392,11 +411,11 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                     (sequence_output,
                      sequence_output[:, self.content_summary_index].clone(
                      ).unsqueeze([1]).expand_as(sequence_output)), 2)
-            else:
-                sequence_output = paddle.concat(
-                    (sequence_output,
-                     sequence_output[:, self.content_summary_index].unsqueeze(
-                         [1]).expand_as(sequence_output)), 2)
+            else: 
+                content_output = paddle.expand(content_output.unsqueeze([1]), 
+                    shape=(sequence_output.shape[0], sequence_output.shape[1], sequence_output.shape[2]))
+
+                sequence_output = paddle.concat((sequence_output, content_output), 2)
 
             sequence_output = self.feature_fuse(sequence_output)
 
@@ -527,7 +546,102 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             return total_loss, seq_logits, cls_logits
         else:
             return seq_logits, cls_logits
+     
 
+class ErnieCtmMLMHead(Layer):
+    def __init__(self,
+                 embedding_size,
+                 vocab_size,
+                 hidden_size):
+        super(ErnieCtmMLMHead, self).__init__()
+        self.layer_norm = nn.LayerNorm(embedding_size)
+
+        self.bias = self.create_parameter(
+            [vocab_size],
+            is_bias=True,
+            default_initializer=nn.initializer.Constant(value=0.0))
+        self.dense = nn.Linear(hidden_size, embedding_size)
+        self.decoder = nn.Linear(embedding_size, vocab_size)
+        self.activation = nn.GELU(approximate=True)
+        # Link bias
+        self.decoder.bias = self.bias
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = self.decoder(hidden_states)
+        prediction_scores = hidden_states
+        return prediction_scores
+
+
+class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
+    r"""
+    ErnieCtmNptag Model with a `masked language modeling` head on top.
+
+    Args:
+        ernie_ctm (:clss:`ErnieCtmModel`):
+            An instance of :class:`ErnieCtmModel`.
+    """
+
+    def __init__(self,
+                 ernie_ctm):
+        super(ErnieCtmNptagModel, self).__init__()
+
+        self.ernie_ctm = ernie_ctm
+        self.predictions = ErnieCtmMLMHead(
+            self.ernie_ctm.config["embedding_size"],
+            self.ernie_ctm.config["vocab_size"],
+            self.ernie_ctm.config["hidden_size"])
+        
+        self.apply(self.init_weights)
+        
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                attention_mask=None,
+                position_ids=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+
+        Returns:
+            tuple: Returns tensor `logits`, the scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmNptagModel.from_pretrained('ernie-ctm')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 45, 23000]
+
+        """
+        outputs = self.ernie_ctm(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids)
+        sequence_output = outputs[0]
+        logits = self.predictions(sequence_output)
+        return logits
+        
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
     r"""
