@@ -20,4 +20,3 @@ paddlenlp.ops
 
    paddlenlp.ops.einsum
    paddlenlp.ops.ext_utils
-   paddlenlp.ops.strings
