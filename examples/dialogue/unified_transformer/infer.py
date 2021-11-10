@@ -82,13 +82,6 @@ def infer(args):
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
-    if args.faster:
-        model = FasterUnifiedTransformer(
-            model,
-            decoding_strategy=args.decode_strategy,
-            decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
-
     model.eval()
     total_time = 0.0
     start_time = time.time()
@@ -110,7 +103,8 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences)
+            num_return_sequences=args.num_return_sequences,
+            use_fast=args.faster)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
@@ -118,17 +112,9 @@ def infer(args):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        if args.faster:
-            ids = output
-            results = select_response(
-                ids,
-                None,
-                tokenizer,
-                num_return_sequences=args.num_return_sequences)
-        else:
-            ids, scores = output
-            results = select_response(ids, scores, tokenizer, args.max_dec_len,
-                                      args.num_return_sequences)
+        ids, scores = output
+        results = select_response(ids, scores, tokenizer, args.max_dec_len,
+                                  args.num_return_sequences)
         pred_responses.extend(results)
 
         start_time = time.time()
