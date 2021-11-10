@@ -68,8 +68,7 @@ class ErnieCrfForTokenClassification(nn.Layer):
         self.crf = LinearChainCrf(
             self.num_classes, crf_lr=crf_lr, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
-        self.viterbi_decoder = ViterbiDecoder(
-            self.crf.transitions, with_start_stop_tag=False)
+        self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
     def forward(self,
                 input_ids,
