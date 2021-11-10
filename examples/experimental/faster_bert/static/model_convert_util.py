@@ -36,7 +36,7 @@ def fused_qkv(qkv_weight, num_head):
     else:
         return np.concatenate((fq, fk, fv), axis=0)
 
-def convert_base_to_fused(state_to_load):
+def convert_base_to_fused(state_to_load, num_head):
     base_to_fused = dict()
     base_to_fused["weight"] = "scale"
     base_to_fused["bias"] = "bias"
@@ -45,7 +45,6 @@ def convert_base_to_fused(state_to_load):
     qkv_weight = dict()
     qkv_bias = dict()
     qkv_count = 0
-    num_head = 16
     layer_index = 0
     for key, tensor_value in state_to_load.items():
         array = key.split('.')
@@ -118,9 +117,11 @@ def convert_base_to_fused(state_to_load):
                 fused_array[5] = "qkv_bias"
                 fused_key = '.'.join(fused_array)
                 if paddle.in_dynamic_mode():
+                    #print("qkv_bias.shape", qkv_bias['q'].shape)
                     a = paddle.concat(x=[qkv_bias['q'], qkv_bias['k'], qkv_bias['v']], axis=0)
                     tmp_bias = paddle.reshape(a, shape=[3, num_head, int(a.shape[0]/3/num_head)])
                     fused_state_to_load[fused_key] = tmp_bias
+                    #print("tmp_bias.shape", tmp_bias.shape)
                 else:
                     a = np.concatenate((qkv_bias['q'], qkv_bias['k'], qkv_bias['v']), axis=0)
                     fused_state_to_load[fused_key] = a.reshape((3, num_head, int(a.shape[0]/3/num_head)))

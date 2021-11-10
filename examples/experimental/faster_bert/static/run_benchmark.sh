@@ -2,7 +2,7 @@
  export PYTHONPATH=./models/
  export DATA_DIR=./models/bert-large/
 
- export CUDA_VISIBLE_DEVICES=4
+ export CUDA_VISIBLE_DEVICES=7
 
  batch_size=${1:-32}
  num_gpus=${2:-1}
