@@ -287,9 +287,6 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/decoding_sampling.h decoding_sampling_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/decoding_sampling.h decoding_sampling_h_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/gpt.h gpt_h_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/gpt.h gpt_h_dst)
-
 # TODO(ENCODER)
 # set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
 
@@ -302,6 +299,7 @@ set(FT_PATCH_COMMAND
   && cp ${cmakelists_src} ${cmakelists_dst}
   && cp ${topk_kernels_src} ${topk_kernels_dst}
   && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
+  && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst}
   && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
   && cp ${beamsearch_h_src} ${trans_dst}
   && cp ${sampling_h_src} ${trans_dst}
@@ -321,7 +319,6 @@ set(FT_PATCH_COMMAND
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
 
   && cp ${gpt_h_src} ${gpt_h_dst}
-  && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst}
   && cat blank_lines ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${trans_decoder_h_src} >> ${open_decoder_h_dst}
   && cat blank_lines ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
