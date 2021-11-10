@@ -148,9 +148,7 @@ def select_sum(ids, scores, tokenizer, max_dec_len=None,
             preds = sorted(preds, key=lambda x: -x[1])
             results.append(preds[0][0])
     else:
-        if len(ids.shape) > 2:
-            ids = ids[:, :, 0]
-        ids = ids.numpy().transpose()
+        ids = ids.numpy()
 
         for pred in ids:
             pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
