@@ -121,12 +121,16 @@ def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
     if len(words) > max_seq_length - 2:
         rest_words = words[max_seq_length - 2:]
         words = words[:max_seq_length - 2]
-
     pred_result = ""
     for j, word in enumerate(words):
-        candidates = tokenizer.convert_ids_to_tokens(corr_pred[j])
-        if not is_chinese_char(ord(word)) or det_pred[
-                j] == 0 or candidates == UNK or candidates == '[PAD]':
+        candidates = tokenizer.convert_ids_to_tokens(corr_pred[j] if corr_pred[
+            j] < tokenizer.vocab_size else UNK_id)
+        word_icc = is_chinese_char(ord(word))
+        cand_icc = is_chinese_char(ord(candidates)) if len(
+            candidates) == 1 else False
+        if not word_icc or det_pred[j] == 0\
+            or candidates in [UNK, '[PAD]']\
+            or (word_icc and not cand_icc):
             pred_result += word
         else:
             pred_result += candidates.lstrip("##")

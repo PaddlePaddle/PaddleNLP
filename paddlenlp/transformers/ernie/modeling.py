@@ -92,8 +92,8 @@ class ErniePooler(nn.Layer):
 class ErniePretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained ERNIE models. It provides ERNIE related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. 
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
@@ -657,8 +657,8 @@ class ErniePretrainingHeads(nn.Layer):
 
 class ErnieForPretraining(ErniePretrainedModel):
     r"""
-    Ernie Model with two heads on top as done during the pretraining:
-    a `masked language modeling` head and a `next sentence prediction (classification)` head.
+    Ernie Model with a `masked language modeling` head and a `sentence order prediction` head
+    on top.
 
     """
 

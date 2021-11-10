@@ -28,7 +28,11 @@ __all__ = ['ErnieCtmTokenizer']
 
 class ErnieCtmTokenizer(PretrainedTokenizer):
     r"""
-    Construct a ERNIE-CTM tokenizer.
+    Construct an ERNIE-CTM tokenizer.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
     
     Args:
         vocab_file (str):

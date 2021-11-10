@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,9 +20,9 @@ __all__ = ['TinyBertTokenizer']
 
 class TinyBertTokenizer(BertTokenizer):
     """
-    Constructs a TinyBert tokenizer.
-    The usage of TinyBertTokenizer is the same as
+    Constructs a TinyBert tokenizer. The usage of TinyBertTokenizer is the same as
     `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
+    For more information regarding those methods, please refer to this superclass.
     """
 
     pretrained_resource_files_map = {
