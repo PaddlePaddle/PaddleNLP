@@ -168,6 +168,18 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, _M parameters.                |
 |                    |                                                                                  |              | Trained on lower-cased English text.    |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|Blenderbot_         |``blenderbot-3B``                                                                 | English      | 26-layer,                               |
+|                    |                                                                                  |              | 32-heads, 106M parameters.              |
+|                    |                                                                                  |              | The Blenderbot base model.              |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``blenderbot-400M-distill``                                                       | English      | 14-layer, 384-hidden,                   |
+|                    |                                                                                  |              | 32-heads, 17M parameters.               |
+|                    |                                                                                  |              | The ConvBERT medium small model.        |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``blenderbot-1B-distill``                                                         | English      | 14-layer, 128-hidden,                   |
+|                    |                                                                                  |              | 32-heads, 13M parameters.               |
+|                    |                                                                                  |              | The ConvBERT small model.               |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |ConvBert_           |``convbert-base``                                                                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 106M parameters.              |
 |                    |                                                                                  |              | The ConvBERT base model.                |
