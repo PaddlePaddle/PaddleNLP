@@ -12,9 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 import paddle.nn as nn
 from paddlenlp.transformers import ErniePretrainedModel
-from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
+from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
+from paddlenlp.utils.tools import compare_version
+
+if compare_version(paddle.version.full_version, "2.2.0") >= 0:
+    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+    from paddle.text import ViterbiDecoder
+else:
+    from paddlenlp.layers.crf import ViterbiDecoder
 
 
 class BiGRUWithCRF(nn.Layer):
