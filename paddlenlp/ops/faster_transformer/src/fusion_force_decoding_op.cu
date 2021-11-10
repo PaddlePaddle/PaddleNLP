@@ -159,8 +159,14 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
 
-    if (decoding_strategy == "beam_search") {
+    if (decoding_strategy == "beam_search" ||
+        decoding_strategy == "beam_search_v2") {
       params[i].request_batch_size = batch_size_ * beam_width_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    } else if (decoding_strategy == "sampling" ||
+               decoding_strategy == "topk_sampling" ||
+               decoding_strategy == "topp_sampling") {
+      params[i].request_batch_size = batch_size_;
       params[i].request_max_mem_seq_len = memory_max_seq_len;
     }
 
@@ -312,26 +318,28 @@ std::vector<paddle::Tensor> decoding_kernel(
     decoding_beam_search_->forward(params, decoding_params);
 
     delete decoding_beam_search_;
-  } else if ("sampling" == decoding_strategy) {
-    // DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
-    // decoding_sampling_ =
-    //     new DecodingSampling<DecodingTraits_::OpType>(allocator_,
-    //                                                   batch_size_,
-    //                                                   max_seq_len_,
-    //                                                   head_num_,
-    //                                                   size_per_head_,
-    //                                                   vocab_size,
-    //                                                   num_layer_,
-    //                                                   memory_hidden_dim,
-    //                                                   memory_max_seq_len,
-    //                                                   start_id_,
-    //                                                   end_id_,
-    //                                                   candidate_num_,
-    //                                                   probability_threshold_);
+  } else if ("topk_sampling" == decoding_strategy ||
+             "topp_sampling" == decoding_strategy ||
+             "sampling" == decoding_strategy) {
+    DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
+    decoding_sampling_ =
+        new DecodingSampling<DecodingTraits_::OpType>(allocator_,
+                                                      batch_size_,
+                                                      max_seq_len_,
+                                                      head_num_,
+                                                      size_per_head_,
+                                                      vocab_size,
+                                                      num_layer_,
+                                                      memory_hidden_dim,
+                                                      memory_max_seq_len,
+                                                      start_id_,
+                                                      end_id_,
+                                                      candidate_num_,
+                                                      probability_threshold_);
 
-    // decoding_sampling_->forward(params, decoding_params);
+    decoding_sampling_->forward(params, decoding_params);
 
-    // delete decoding_sampling_;
+    delete decoding_sampling_;
   } else {
     PD_THROW(
         "Only beam_search, beam_search_v2 and sampling are supported for "
