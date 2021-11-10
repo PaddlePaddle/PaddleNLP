@@ -56,7 +56,7 @@ data/
 罗伯特·布雷森   人
 ```
 
-标签文件`name_category_map.json`格式示例。其中key为细粒度标签，即NPTag的预测结果；value为粗粒度标签，示例中对应WordTag的标签集合，用户可以根据场景需要自定义修改该标签映射。
+标签文件`name_category_map.json`格式示例。其中key为细粒度标签，即NPTag的预测结果；value为粗粒度标签，示例中对应WordTag的标签集合，用户可以根据场景需要自定义修改该标签映射
 ```
 {
     "植物": "生物类_植物",
