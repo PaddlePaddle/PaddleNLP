@@ -510,6 +510,9 @@ class GenerationMixin(object):
                  bos_token_id=None,
                  eos_token_id=None,
                  pad_token_id=None,
+                 decoder_start_token_id=None,
+                 forced_bos_token_id=None,
+                 forced_eos_token_id=None,
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
@@ -566,6 +569,14 @@ class GenerationMixin(object):
                 None.
             pad_token_id (int, optional): The id of the `pad_token`. Default to 
                 None.
+            decoder_start_token_id (:obj:`int`, `optional`):
+                If an encoder-decoder model starts decoding with a different token than `bos`, the id of that token.
+            forced_bos_token_id (:obj:`int`, `optional`):
+                The id of the token to force as the first generated token after the :obj:`decoder_start_token_id`.
+                Useful for multilingual models like :doc:`mBART <../model_doc/mbart>` where the first generated token
+                needs to be the target language token.
+            forced_eos_token_id (:obj:`int`, `optional`):
+                The id of the token to force as the last generated token when :obj:`max_length` is reached.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
             diversity_rate (float, optional): If num_beam_groups is 1, this is the 
