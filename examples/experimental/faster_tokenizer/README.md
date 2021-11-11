@@ -68,6 +68,6 @@ python perf.py
 
 
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/9d46bfe903614444b4cf9e63206b28ee06f06c5d5cb04da58bb206431904af00"  ></center>
-<br><center> Tokenizer性能对比 </center></br>
+<br> <center> Tokenizer性能对比 </center></br>
 
 从以上结果可以看出，FasterTokenizer性能远远超过了其他Tokenizer， 高达HFFastTokenizer性能20倍。

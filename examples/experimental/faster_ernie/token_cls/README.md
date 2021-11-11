@@ -22,6 +22,7 @@ FasterTokenizer底层为C++实现，同时提供了python接口调用。其可�
 
 以下是本项目主要代码结构及说明：
 
+```text
 token_cls/
 ├── cpp_deploy # cpp静态图推理
 │   ├── CMakeLists.txt
@@ -36,6 +37,7 @@ token_cls/
 ├── python_deploy.py # python静态图推理
 ├── README.md # 文档说明
 └── train.py # 动态图训练
+```
 
 ## 训练
 
