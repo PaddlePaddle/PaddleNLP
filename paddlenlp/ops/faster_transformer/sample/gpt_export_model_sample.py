@@ -17,7 +17,6 @@ import numpy as np
 from attrdict import AttrDict
 import argparse
 import time
-from functools import partial
 
 import paddle
 
