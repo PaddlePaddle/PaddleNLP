@@ -456,7 +456,7 @@ class MultiLabelsMetric(Metric):
         .. code-block::
 
             import paddle
-            from paddlenlp.metrics import AccuracyAndF1
+            from paddlenlp.metrics import MultiLabelsMetric
 
             x = paddle.to_tensor([[0.1, 0.2, 0.9], [0.5, 0.8, 0.5], [0.6, 1.5, 0.4], [2.8, 0.7, 0.3]])
             y = paddle.to_tensor([[2], [1], [2], [1]])
