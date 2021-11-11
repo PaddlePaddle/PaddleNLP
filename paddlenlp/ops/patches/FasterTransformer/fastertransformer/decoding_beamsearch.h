@@ -477,7 +477,6 @@ public:
             decoding_params.stream);
       } else {
         // TODO(gongenlei): Only support Bart temporarily.
-        /*
         embedding_position_lookups_bart_kernel_launcher(
             embedding_buf_,
             decoding_params.embedding_table,
@@ -492,14 +491,14 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-        decoder_->initialize_stream(decoding_params.stream);
-        decoder_->decoder_norm1(embedding_buf_,
-                                decoding_params.layernorm.gamma,
-                                decoding_params.layernorm.beta,
-                                from_tensor_[0],
-                                m,
-                                k);
-        */
+
+        layer_norm(embedding_buf_,
+                   decoding_params.layernorm.gamma,
+                   decoding_params.layernorm.beta,
+                   from_tensor_[0],
+                   m,
+                   k,
+                   decoding_params.stream);
       }
 
 #ifndef NDEBUG
@@ -592,33 +591,28 @@ public:
                                               cublas_workspace_);
 
         } else {
-          /*
           // Post-norm
-          check_cuda_error(
-              cublasGemmEx(decoding_params.cublas_handle,
-                           CUBLAS_OP_N,
-                           CUBLAS_OP_N,
-                           n,
-                           m,
-                           k,
-                           &alpha,
-                           decoding_params.embedding_kernel,
-                           AType_,
-                           n,
-                           from_tensor_[out_id],
-                           BType_,
-                           k,
-                           &beta,
-                           logits_buf_,
-                           CUDA_R_32F,
-                           n,
-  #ifdef CUDA11_MODE
-                             CUBLAS_COMPUTE_32F_PEDANTIC,
-  #else
-                             CUDA_R_32F,
-  #endif
-                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-          */
+          cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                              decoding_params.cublas_handle,
+                                              CUBLAS_OP_N,
+                                              CUBLAS_OP_N,
+                                              n,
+                                              m,
+                                              k,
+                                              &alpha,
+                                              embedding_kernel_ptr,
+                                              AType_,
+                                              n,
+                                              from_tensor_[out_id],
+                                              BType_,
+                                              k,
+                                              &beta,
+                                              tmp_logits_buf_,
+                                              CType_,
+                                              n,
+                                              decoding_params.stream,
+                                              cublasAlgoMap_,
+                                              cublas_workspace_);
         }
 
 #ifndef NDEBUG

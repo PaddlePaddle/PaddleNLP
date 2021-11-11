@@ -1395,9 +1395,8 @@ class InferBartDecoding(nn.Layer):
 
             model.lm_head_weight = transfer_param(
                 model.lm_head_weight, restore_data=True)
-            if not decoding_strategy.startswith("beam_search"):
-                model.final_logits_bias = transfer_param(
-                    model.final_logits_bias, is_bias=True, restore_data=True)
+            model.final_logits_bias = transfer_param(
+                model.final_logits_bias, is_bias=True, restore_data=True)
 
             model.decoder.decoder_embed_positions.weight = transfer_param(
                 model.decoder.decoder_embed_positions.weight, restore_data=True)

@@ -31,7 +31,7 @@ option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT a
 option(WITH_DECODER     "Compile with Transformer Decoder"                          OFF)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          OFF)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
-option(WITH_BART        "Compile with BART"                                         OFF)
+option(WITH_BART        "Compile with BART"                                         ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")

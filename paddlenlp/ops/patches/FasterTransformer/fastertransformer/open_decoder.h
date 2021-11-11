@@ -203,8 +203,6 @@ public:
     l_parallel_param_ = param;
   }
 
-  void initialize_stream(cudaStream_t stream) { param_.stream = stream; }
-
   void initialize(DecoderInitParam<DataType_> param,
                   DataType_ *buf,
                   void *cublas_workapsce,
