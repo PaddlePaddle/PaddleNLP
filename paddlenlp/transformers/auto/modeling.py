@@ -77,25 +77,26 @@ class _BaseAutoModelClass:
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 except KeyError as err:
                     # logger.error(err)
-                    print(
-                        f"Warning: the model class is {init_class}, it is not match the Auto Class: {auto_class}.\n"
-                        f"Import {init_class}.")
                     for diff_model in cls._all_name_mapping:
                         if init_class in diff_model:
                             class_name = diff_model[init_class]
                             import_class = importlib.import_module(
                                 f"paddlenlp.transformers.{class_name}.modeling")
-                            model_name = getattr(import_class, init_class)
-                            return model_name.from_pretrained(
-                                pretrained_model_name_or_path, *model_args,
-                                **kwargs)
+                            for i, j in cls._name_mapping.items():
+                                if j == class_name:
+                                    init_class = i
+                                    model_name = getattr(import_class,
+                                                         init_class)
+                                    return model_name.from_pretrained(
+                                        pretrained_model_name_or_path,
+                                        *model_args, **kwargs)
 
         else:
             for names, model_class in cls._model_mapping.items():
                 # From built-in pretrained models
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
-                        #print(pattern, model_class)
+                        # print(pattern, model_class)
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, **kwargs)
 
@@ -123,10 +124,21 @@ class _BaseAutoModelClass:
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
                     except KeyError as err:
-                        print(
-                            f"Warning: the model class is {init_class}, it is not match the Auto Class: {auto_class}.\n"
-                            f"Import {init_class}.")
-
+                        for diff_model in cls._all_name_mapping:
+                            if init_class in diff_model:
+                                class_name = diff_model[init_class]
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.modeling"
+                                )
+                                for i, j in cls._name_mapping.items():
+                                    if j == class_name:
+                                        init_class = i
+                                        model_name = getattr(import_class,
+                                                             init_class)
+                                        return model_name.from_pretrained(
+                                            pretrained_model_name_or_path,
+                                            *model_args, **kwargs)
+                        '''
                         for diff_model in cls._all_name_mapping:
                             if init_class in diff_model:
                                 class_name = diff_model[init_class]
@@ -137,6 +149,7 @@ class _BaseAutoModelClass:
                                 return model_name.from_pretrained(
                                     pretrained_model_name_or_path, *model_args,
                                     **kwargs)
+                        '''
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -468,6 +481,9 @@ class AutoModel(_BaseAutoModelClass):
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
     _all_name_mapping = All_MAPPING_NAMES
+
+    def __init__(self, task='model'):
+        self.task = task
 
 
 class AutoModelForPreTraining(_BaseAutoModelClass):
