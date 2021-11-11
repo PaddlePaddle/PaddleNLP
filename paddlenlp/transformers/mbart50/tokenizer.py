@@ -34,10 +34,18 @@ class MBart50Tokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-50-one-to-many-mmt":
-            "https://huggingface.co/facebook/mbart-large-50-one-to-many-mmt/resolve/main/sentencepiece.bpe.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
+            "mbart-large-50-many-to-one-mmt":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
+            "mbart-large-50-many-to-many-mmt":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model"
         }
     }
-    pretrained_init_configuration = {"mbart-large-50-one-to-many-mmt": {}}
+    pretrained_init_configuration = {
+        "mbart-large-50-one-to-many-mmt": {},
+        "mbart-large-50-many-to-one-mmt": {},
+        "mbart-large-50-many-to-many-mmt": {}
+    }
 
     def __init__(self,
                  vocab_file,

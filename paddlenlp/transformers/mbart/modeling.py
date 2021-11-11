@@ -114,14 +114,62 @@ class MBartPretrainedModel(PretrainedModel):
             "activation_dropout": 0.0,
             "max_position_embeddings": 1024,
             "init_std": 0.02,
+        },
+        "mbart-large-50-many-to-one-mmt": {
+            "vocab_size": 250054,
+            "bos_token_id": 0,
+            "pad_token_id": 1,
+            "eos_token_id": 2,
+            "decoder_start_token_id": 2,
+            "forced_bos_token_id": 250004,
+            "d_model": 1024,
+            "num_encoder_layers": 12,
+            "num_decoder_layers": 12,
+            "encoder_attention_heads": 16,
+            "decoder_attention_heads": 16,
+            "encoder_ffn_dim": 4096,
+            "decoder_ffn_dim": 4096,
+            "dropout": 0.1,
+            "activation_function": "relu",
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
+            "max_position_embeddings": 1024,
+            "init_std": 0.02,
+        },
+        "mbart-large-50-many-to-many-mmt": {
+            "vocab_size": 250054,
+            "bos_token_id": 0,
+            "pad_token_id": 1,
+            "eos_token_id": 2,
+            "decoder_start_token_id": 2,
+            "d_model": 1024,
+            "num_encoder_layers": 12,
+            "num_decoder_layers": 12,
+            "encoder_attention_heads": 16,
+            "decoder_attention_heads": 16,
+            "encoder_ffn_dim": 4096,
+            "decoder_ffn_dim": 4096,
+            "dropout": 0.1,
+            "activation_function": "relu",
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
+            "max_position_embeddings": 1024,
+            "init_std": 0.02,
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "mbart-large-cc25": "",
-            "mbart-large-en-ro": "",
-            "mmbart-large-50-one-to-many-mmt": ""
+            "mbart-large-cc25":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.pdparams",
+            "mbart-large-en-ro":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.pdparams",
+            "mbart-large-50-one-to-many-mmt":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
+            "mbart-large-50-many-to-one-mmt":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
+            "mbart-large-50-many-to-many-mmt":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
         }
     }
     base_model_prefix = "mbart"
@@ -418,6 +466,7 @@ class MBartModel(MBartPretrainedModel):
                  pad_token_id=1,
                  eos_token_id=2,
                  decoder_start_token_id=2,
+                 forced_bos_token_id=250004,
                  d_model=768,
                  num_encoder_layers=6,
                  num_decoder_layers=6,

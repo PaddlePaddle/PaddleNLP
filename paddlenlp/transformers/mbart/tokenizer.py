@@ -52,9 +52,9 @@ class MBartTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-en-ro":
-            "https://huggingface.co/facebook/mbart-large-en-ro/resolve/main/sentencepiece.bpe.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
             "mbart-large-cc25":
-            "https://huggingface.co/facebook/mbart-large-cc25/resolve/main/sentencepiece.bpe.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {
