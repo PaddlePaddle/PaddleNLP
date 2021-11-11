@@ -16,14 +16,11 @@ import argparse
 import os
 import random
 import time
-import math
 from functools import partial
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-
-import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
@@ -43,6 +40,13 @@ parser.add_argument("--seed", type=int, default=1000, help="random seed for init
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 args = parser.parse_args()
 # yapf: enable
+
+
+def set_seed(seed):
+    """sets random seed"""
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
 
 
 @paddle.no_grad()
@@ -87,6 +91,7 @@ def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
 
 def do_train():
     paddle.set_device(args.device)
+    set_seed(args.seed)
 
     train_ds, test_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
@@ -122,7 +127,6 @@ def do_train():
     num_training_steps = len(train_data_loader) * args.epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
-
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [

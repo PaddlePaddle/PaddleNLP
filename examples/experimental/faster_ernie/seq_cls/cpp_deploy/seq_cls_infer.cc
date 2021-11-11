@@ -43,6 +43,10 @@ int main(int argc, char* argv[]) {
   if (FLAGS_use_gpu) {
     config.EnableUseGpu(100, 0);
   }
+  auto pass_builder = config.pass_builder();
+  // TODO(Steffy-zxf): delete embedding_eltwise_layernorm_fuse_pass to avoid IR
+  // optimization.
+  pass_builder->DeletePass("embedding_eltwise_layernorm_fuse_pass");
   auto predictor = paddle_infer::CreatePredictor(config);
 
   std::vector<std::string> data{
