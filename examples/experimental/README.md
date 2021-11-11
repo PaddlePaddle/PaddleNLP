@@ -35,10 +35,10 @@ BERT-Base, Cased                   | `FasterTokenizer.from_pretrained("bert-base
 BERT-Large, Cased                  | `FasterTokenizer.from_pretrained("bert-large-cased")`
 BERT-Base, Multilingual Cased      | `FasterTokenizer.from_pretrained("bert-base-multilingual-cased")`
 BERT-Base, Chinese                 | `FasterTokenizer.from_pretrained("bert-base-chinese")`
-BERT-WWM, Chinese                 | `FasterTokenizer.from_pretrained("bert-wwm-chinese")`
-BERT-WWM-Ext, Chinese                 | `FasterTokenizer.from_pretrained("bert-wwm-ext-chinese")`
-RoBERTa-WWM-Ext, Chinese                 | `FasterTokenizer.from_pretrained("roberta-wwm-ext")`
-RoBERTa-WWM-Ext-Large, Chinese                 | `FasterTokenizer.from_pretrained("roberta-wwm-ext-large")`
+BERT-WWM, Chinese                  | `FasterTokenizer.from_pretrained("bert-wwm-chinese")`
+BERT-WWM-Ext, Chinese              | `FasterTokenizer.from_pretrained("bert-wwm-ext-chinese")`
+RoBERTa-WWM-Ext, Chinese           | `FasterTokenizer.from_pretrained("roberta-wwm-ext")`
+RoBERTa-WWM-Ext-Large, Chinese     | `FasterTokenizer.from_pretrained("roberta-wwm-ext-large")`
 
 
 
