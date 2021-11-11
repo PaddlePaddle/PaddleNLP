@@ -531,6 +531,9 @@ public:
             max_trg_len,
             step,
             decoding_params.stream);
+      } else {
+        word_ids_buf_ =
+            decoding_params.output_ids + (step - 1) * args_.batch_size_;
       }
 
 #ifndef NDEBUG
