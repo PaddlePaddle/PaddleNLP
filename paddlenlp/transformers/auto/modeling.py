@@ -78,8 +78,8 @@ class _BaseAutoModelClass:
                 except KeyError as err:
                     # logger.error(err)
                     print(
-                        f"Warning: the model class is {init_class}, it is not match the Auto Class:{auto_class}.\n"
-                        f"Import {init_class}")
+                        f"Warning: the model class is {init_class}, it is not match the Auto Class: {auto_class}.\n"
+                        f"Import {init_class}.")
                     for diff_model in cls._all_name_mapping:
                         if init_class in diff_model:
                             class_name = diff_model[init_class]
@@ -95,7 +95,7 @@ class _BaseAutoModelClass:
                 # From built-in pretrained models
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
-                        print(pattern, model_class)
+                        #print(pattern, model_class)
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, **kwargs)
 
@@ -124,8 +124,9 @@ class _BaseAutoModelClass:
                             **kwargs)
                     except KeyError as err:
                         print(
-                            f"Warning: the model class is {init_class}, it is not match the Auto Class:{auto_class}.\n"
-                            f"Import {init_class}")
+                            f"Warning: the model class is {init_class}, it is not match the Auto Class: {auto_class}.\n"
+                            f"Import {init_class}.")
+
                         for diff_model in cls._all_name_mapping:
                             if init_class in diff_model:
                                 class_name = diff_model[init_class]
