@@ -19,15 +19,43 @@ import warnings
 
 
 class T5Tokenizer(AlbertEnglishTokenizer):
-    resource_files_names = {"sentencepiece_model_file": "spiece.model", }
+    """
+    Constructs a T5 tokenizer based on SentencePiece .
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
+    Args:
+        sentencepiece_model_file (str):
+            The vocabulary file (ends with '.spm') required to instantiate
+            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+        do_lower_case (bool):
+            Whether or not to lowercase the input when tokenizing. Defaults to `False`.
+        remove_space (bool):
+            Whether or note to remove space when tokenizing. Defaults to `True`.
+        keep_accents (bool):
+            Whether or note to keep accents when tokenizing. Defaults to `False`.
+        eos_token (str):
+            A special token representing the *eos (end-of-sentence)* token.
+            Defaults to "</s>".
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            Defaults to "<unk>".
+        pad_token (str):
+            A special token used to make arrays of tokens the same size for batching purposes.
+            Defaults to "<pad>".
+
+    """
+    resource_files_names = {"sentencepiece_model_file": "spiece.model"}
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "t5-small":
-            "https://huggingface.co/t5-small/resolve/main/spiece.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-small/spiece.model",
             "t5-base":
-            "https://huggingface.co/t5-base/resolve/main/spiece.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-base/spiece.model",
             "t5-large":
-            "https://huggingface.co/t5-large/resolve/main/spiece.model"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-large/spiece.model",
         },
     }
 
@@ -73,6 +101,24 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             return token_ids + [self.eos_token_id]
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1):
+        """
+        Build model inputs from a sequence or a pair of sequence.
+
+        An Reformer sequence has the following format:
+
+        - single sequence:      ``X </s>``
+        - pair of sequences:        ``A </s> B </s>``
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+
+        Returns:
+            List[int]: List of input_id with the appropriate special tokens.
+
+        """
         token_ids_0 = self._add_eos_if_not_present(token_ids_0)
         if token_ids_1 is None:
             return token_ids_0
@@ -83,16 +129,44 @@ class T5Tokenizer(AlbertEnglishTokenizer):
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
+        """
+        Create a mask from the two sequences.
+
+        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs.
+
+        Returns:
+            List[int]: List of token_type_id according to the given sequence(s).
+            
+        """
         eos = [self.eos_token_id]
         if token_ids_1 is None:
             return len(token_ids_0 + eos) * [0]
         return len(token_ids_0 + eos + token_ids_1 + eos) * [0]
 
-    def get_special_tokens_mask(
-            self,
-            token_ids_0,
-            token_ids_1=None,
-            already_has_special_tokens=False, ):
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]): List of ids of the first sequence.
+            token_ids_1 (List[int], optional): List of ids of the second sequence.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers in the range [0, 1]:
+                1 for a special token, 0 for a sequence token.
+        """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
                 token_ids_0=token_ids_0,
@@ -120,23 +194,53 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         return out_string.strip()
 
     def decode(self,
-               seq,
+               token_ids,
                skip_special_tokens=False,
                clean_up_tokenization_spaces=True):
-        if hasattr(seq, "tolist"):
-            seq = seq.tolist()
+        """
+        Converts a sequence of ids in a string, using the tokenizer and vocabulary with options to remove special
+        tokens and clean up tokenization spaces.
+
+        Similar to doing ``self.convert_tokens_to_string(self.convert_ids_to_tokens(token_ids))``.
+
+        Args:
+            token_ids (Union[List[int], Tensor]):
+                List of tokenized input ids. 
+            skip_special_tokens (bool, optional):
+                Whether or not to remove special tokens in the decoding. Defaults to `False`.
+            clean_up_tokenization_spaces (bool, optional):
+                Whether or not to clean up the tokenization spaces. Defaults to `True`.
+
+        Returns:
+            str: The decoded sentence.
+        """
+        if hasattr(token_ids, "tolist"):
+            token_ids = token_ids.tolist()
         text = self.convert_tokens_to_string(
             self.convert_ids_to_tokens(
-                seq, skip_special_tokens=skip_special_tokens))
+                token_ids, skip_special_tokens=skip_special_tokens))
         if clean_up_tokenization_spaces:
             text = self.clean_up_tokenization(text)
         return text
 
-    def batch_decode(
-            self,
-            sequences,
-            skip_special_tokens=False,
-            clean_up_tokenization_spaces=True, ):
+    def batch_decode(self,
+                     sequences,
+                     skip_special_tokens=False,
+                     clean_up_tokenization_spaces=True):
+        """
+        Convert a list of lists of token ids into a list of strings by calling decode.
+
+        Args:
+            sequences (Union[List[int], List[List[int]], Tensor]):
+                List of tokenized input ids.
+            skip_special_tokens (bool, optional):
+                Whether or not to remove special tokens in the decoding. Defaults to `False`.
+            clean_up_tokenization_spaces (bool, optional):
+                Whether or not to clean up the tokenization spaces. Defaults to `True`.
+
+        Returns:
+            List[str]: The list of decoded sentences.
+        """
         return [
             self.decode(
                 seq,
@@ -145,7 +249,17 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             for seq in sequences
         ]
 
-    def clean_up_tokenization(self, out_string):
+    @staticmethod
+    def clean_up_tokenization(out_string):
+        """
+        Clean up a list of simple English tokenization artifacts like spaces before punctuations and abbreviated forms.
+
+        Args:
+            out_string (str): The text to clean up.
+
+        Returns:
+            str: The cleaned-up string.
+        """
         out_string = (out_string.replace(" .", ".").replace(" ?", "?")
                       .replace(" !", "!").replace(" ,", ",").replace(" ' ", "'")
                       .replace(" n't", "n't").replace(" 'm", "'m")
