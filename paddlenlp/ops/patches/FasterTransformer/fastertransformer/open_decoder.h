@@ -60,6 +60,9 @@ public:
 
   int request_batch_size = -1;
   int request_max_mem_seq_len = -1;
+
+  const float *k_cache = nullptr;
+  const float *v_cache = nullptr;
 };
 
 template <OperationType OpType_>
@@ -273,7 +276,8 @@ public:
                const int step,
                const int decoder_max_seq_len,
                const bool is_cross_attention,
-               const bool *finished = nullptr) {
+               const bool *finished = nullptr,
+               const int memory_max_seq_len = -1) {
 #ifndef NDEBUG
 // PRINT_FUNC_NAME_();
 #endif

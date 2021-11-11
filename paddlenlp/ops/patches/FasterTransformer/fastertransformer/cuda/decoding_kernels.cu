@@ -210,6 +210,67 @@ void update_with_force_decodingLauncher(const int* trg_word,
       step);
 }
 
+template <typename T>
+void update_KV_cache_kernelLauncher_v2(T** key_cache,
+                                       T** value_cache,
+                                       const int* beam_ids,
+                                       const bool* finished,
+                                       const int batch_size,
+                                       const int beam_width,
+                                       const int head_num,
+                                       const int size_per_head,
+                                       const int step,
+                                       const int decoder_max_seq_len,
+                                       const int cache_size,
+                                       const int decoder_layers,
+                                       cudaStream_t stream,
+                                       const int memory_max_seq_len = -1) {
+  int src_id = step & 0x1;
+  int tgt_id = 1 - src_id;
+  int tmp_len = (memory_max_seq_len != -1) ? step + memory_max_seq_len : step;
+
+  if (decoder_max_seq_len < 0) {
+    int hidden_dim = head_num * size_per_head;
+    dim3 grid(decoder_layers * batch_size * beam_width * tmp_len);
+    dim3 block(min(1024, hidden_dim));
+    block.x = block.x / (4 / sizeof(T));
+
+    update_KV_cache_kernel<<<grid, block, 0, stream>>>(key_cache[src_id],
+                                                       key_cache[tgt_id],
+                                                       value_cache[src_id],
+                                                       value_cache[tgt_id],
+                                                       beam_ids,
+                                                       finished,
+                                                       batch_size,
+                                                       beam_width,
+                                                       hidden_dim,
+                                                       cache_size,
+                                                       tmp_len,
+                                                       decoder_layers);
+  } else {
+    dim3 grid(batch_size * beam_width, head_num, decoder_layers);
+    constexpr int block_sz = 128;
+    int tmp_decoder_max_seq_len =
+        (memory_max_seq_len != -1) ? (decoder_max_seq_len + memory_max_seq_len)
+                                   : decoder_max_seq_len;
+
+    update_KV_batch_major_cache_kernel<<<grid, block_sz, 0, stream>>>(
+        key_cache[src_id],
+        key_cache[tgt_id],
+        value_cache[src_id],
+        value_cache[tgt_id],
+        beam_ids,
+        finished,
+        batch_size,
+        beam_width,
+        size_per_head,
+        cache_size,
+        tmp_len,
+        tmp_decoder_max_seq_len,
+        decoder_layers);
+  }
+}
+
 template void init_kernelLauncher_v2(bool* finished,
                                      bool* alive_finished,
                                      int* sequence_length,
@@ -279,5 +340,35 @@ template void update_with_force_decodingLauncher(const int* trg_word,
                                                  const int max_trg_len,
                                                  const int step,
                                                  cudaStream_t stream);
+
+template void update_KV_cache_kernelLauncher_v2(float** key_cache,
+                                                float** value_cache,
+                                                const int* beam_ids,
+                                                const bool* finished,
+                                                const int batch_size,
+                                                const int beam_width,
+                                                const int head_num,
+                                                const int size_per_head,
+                                                const int step,
+                                                const int decoder_max_seq_len,
+                                                const int cache_size,
+                                                const int decoder_layers,
+                                                cudaStream_t stream,
+                                                const int memory_max_seq_len);
+
+template void update_KV_cache_kernelLauncher_v2(half** key_cache,
+                                                half** value_cache,
+                                                const int* beam_ids,
+                                                const bool* finished,
+                                                const int batch_size,
+                                                const int beam_width,
+                                                const int head_num,
+                                                const int size_per_head,
+                                                const int step,
+                                                const int decoder_max_seq_len,
+                                                const int cache_size,
+                                                const int decoder_layers,
+                                                cudaStream_t stream,
+                                                const int memory_max_seq_len);
 
 }  // end of name space fastertransformer

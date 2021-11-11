@@ -310,6 +310,7 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat blank_lines ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
+  && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && ${MUTE_COMMAND}
 )
 
@@ -322,7 +323,6 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${trans_decoder_h_src} >> ${open_decoder_h_dst}
   && cat blank_lines ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
-  && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
 ]]
 
 # TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake

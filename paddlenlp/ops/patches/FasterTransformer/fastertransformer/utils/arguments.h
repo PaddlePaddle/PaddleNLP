@@ -109,8 +109,12 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   float beam_search_diversity_rate_;
   float alpha_;  // power number for length penalty in beam search v2
   bool normalization_before_{true};
-  int pos_offset_{0};  // for position embedding
+  int pos_offset_{0};     // For BART position embedding
+  bool pos_bias_{false};  // For Unified position embedding
   ActivationType act_{ActivationType::RELU};
+
+  int memory_max_seq_len_{0};
+  bool prefix_lm_{false};
 };
 
 struct GptArguments : public DecodingSamplingArguments {
