@@ -129,12 +129,7 @@ def do_predict(args):
         input_spec=[
             # src_word
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
-            # trg_word
-            # Support exporting model which support force decoding
-            # NOTE: Data type MUST be int32 !
-            # paddle.static.InputSpec(
-            #     shape=[None, None], dtype="int32")
+                shape=[None, None], dtype="int64")
         ])
 
     # Save converted static graph model
