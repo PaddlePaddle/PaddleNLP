@@ -17,6 +17,7 @@ import io
 import importlib
 import paddle
 import json
+import warnings
 from collections import OrderedDict
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
@@ -43,6 +44,7 @@ class _BaseAutoModelClass:
     # Base class for auto models.
     _model_mapping = None
     _name_mapping = None
+    _all_name_mapping = None
     model_config_file = "model_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -56,6 +58,7 @@ class _BaseAutoModelClass:
                         **kwargs):
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        auto_class = cls.__name__
         # From local dir path
         if os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
@@ -73,10 +76,20 @@ class _BaseAutoModelClass:
                     return model_name.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 except KeyError as err:
-                    logger.error(err)
-                    raise KeyError(
-                        f"The model class is {init_class}, it is not match the Auto Class."
-                    )
+                    # logger.error(err)
+                    print(
+                        f"Warning: the model class is {init_class}, it is not match the Auto Class:{auto_class}.\n"
+                        f"Import {init_class}")
+                    for diff_model in cls._all_name_mapping:
+                        if init_class in diff_model:
+                            class_name = diff_model[init_class]
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.modeling")
+                            model_name = getattr(import_class, init_class)
+                            return model_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs)
+
         else:
             for names, model_class in cls._model_mapping.items():
                 # From built-in pretrained models
@@ -110,10 +123,19 @@ class _BaseAutoModelClass:
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
                     except KeyError as err:
-                        logger.error(err)
-                        raise KeyError(
-                            f"The model class is {init_class}, it is not match the Auto Class."
-                        )
+                        print(
+                            f"Warning: the model class is {init_class}, it is not match the Auto Class:{auto_class}.\n"
+                            f"Import {init_class}")
+                        for diff_model in cls._all_name_mapping:
+                            if init_class in diff_model:
+                                class_name = diff_model[init_class]
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.modeling"
+                                )
+                                model_name = getattr(import_class, init_class)
+                                return model_name.from_pretrained(
+                                    pretrained_model_name_or_path, *model_args,
+                                    **kwargs)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -266,6 +288,16 @@ DISCRIMINATOR_MAPPING_NAMES = OrderedDict([
     ("ConvBertDiscriminator", "convbert"),
     ("ElectraDiscriminator", "electra"),
 ])
+
+All_MAPPING_NAMES = [
+    MODEL_MAPPING_NAMES, MODEL_FOR_PRETRAINING_MAPPING_NAMES,
+    MODEL_WITH_LM_HEAD_MAPPING_NAMES, MODEL_FOR_MASKED_LM_MAPPING_NAMES,
+    MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
+    MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES,
+    MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES,
+    MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES, ENCODER_MAPPING_NAMES,
+    DECODER_MAPPING_NAMES, GENERATOR_MAPPING_NAMES, DISCRIMINATOR_MAPPING_NAMES
+]
 
 
 def get_configurations(key):
@@ -434,69 +466,81 @@ class AutoModel(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("model")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForPreTraining(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("pretraining")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_PRETRAINING_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelWithLMHead(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("lm_head")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_WITH_LM_HEAD_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("masked_lm")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_MASKED_LM_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("sequence_classification")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("question_answering")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("token_classification")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("multiple_choice")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_MULTIPLE_CHOICE_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoEncoder(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("encoder")
     _model_mapping = MAPPING_NAMES
     _name_mapping = ENCODER_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoDecoder(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("decoder")
     _model_mapping = MAPPING_NAMES
     _name_mapping = DECODER_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoGenerator(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("generator")
     _model_mapping = MAPPING_NAMES
     _name_mapping = GENERATOR_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoDiscriminator(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("discriminator")
     _model_mapping = MAPPING_NAMES
     _name_mapping = DISCRIMINATOR_MAPPING_NAMES
+    _all_name_mapping = All_MAPPING_NAMES
