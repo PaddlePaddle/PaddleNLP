@@ -122,7 +122,7 @@ def do_predict(args):
             args.max_out_len,
             bos_id,
             eos_id,
-            None,
+            tokenizer.pad_token_id,
             args.temperature,
         ])
 
