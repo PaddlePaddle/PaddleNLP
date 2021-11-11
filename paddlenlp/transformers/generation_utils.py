@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from typing import List
+import inspect
 from abc import ABC
 
 import paddle
@@ -21,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.data_feeder import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
 
@@ -170,7 +172,7 @@ class BeamSearchScorer(object):
                 # add to generated hypotheses if end of sentence
                 if (eos_token_id is not None) and (
                         next_token.numpy().item() == eos_token_id):
-                    # If beam_token does not belong to top num_beams tokens, 
+                    # If beam_token does not belong to top num_beams tokens,
                     # it should not be added
                     is_beam_token_worse_than_top_num_beams = (
                         beam_token_rank >= self.group_size)
@@ -277,11 +279,14 @@ class GenerationMixin(object):
     """
 
     @staticmethod
-    def prepare_input_ids_for_generation(bos_token_id):
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no "
                              "`input_ids` are provided.")
-        return paddle.ones([1, 1]) * bos_token_id
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+        return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id,
@@ -299,11 +304,39 @@ class GenerationMixin(object):
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
     @staticmethod
-    def get_logits_processor(min_length=None, eos_token_id=None):
+    def prepare_seq_len_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+            input_ids == pad_token_id).numpy().item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id))
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            seq_len = paddle.sum(input_ids != pad_token_id,
+                                 axis=1).unsqueeze(-1)
+        else:
+            seq_len = paddle.full(
+                (input_ids.shape[0], 1), input_ids.shape[1], dtype="int64")
+        return seq_len
+
+    @staticmethod
+    def get_logits_processor(min_length=None,
+                             eos_token_id=None,
+                             num_beams=1,
+                             num_beam_groups=1,
+                             diversity_rate=0.0,
+                             repetition_penalty=None):
         processors = LogitsProcessorList()
         if min_length is not None and eos_token_id is not None and min_length > -1:
             processors.append(
                 MinLengthLogitsProcessor(min_length, eos_token_id))
+        if num_beam_groups > 1 and diversity_rate > 0.0:
+            processors.append(
+                HammingDiversityLogitsProcessor(
+                    diversity_rate=diversity_rate,
+                    num_beams=num_beams,
+                    num_beam_groups=num_beam_groups))
+        if repetition_penalty is not None and repetition_penalty != 1.0:
+            processors.append(
+                RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty))
         # TODO
         # Add more pre_processing for distribution
 
@@ -334,14 +367,25 @@ class GenerationMixin(object):
             model_kwargs["position_ids"] = paddle.index_select(position_ids,
                                                                index)
 
+        if "seq_len" in model_kwargs:
+            seq_len = model_kwargs["seq_len"]
+            model_kwargs["seq_len"] = paddle.index_select(seq_len, index)
+
+        if "encoder_output" in model_kwargs:
+            encoder_output = model_kwargs["encoder_output"]
+            model_kwargs["encoder_output"] = paddle.index_select(encoder_output,
+                                                                 index)
+
         return input_ids, model_kwargs
 
     @staticmethod
-    def update_model_kwargs_for_generation(outputs, model_kwargs):
-        # Update the model inputs during generation. 
-        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
-        # and they contain pad value, the result vectors updated by this method 
-        # may be different from expected. In this case, you need to rewrite the 
+    def update_model_kwargs_for_generation(outputs,
+                                           model_kwargs,
+                                           is_encoder_decoder=False):
+        # Update the model inputs during generation.
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
+        # and they contain pad value, the result vectors updated by this method
+        # may be different from expected. In this case, you need to rewrite the
         # method.
 
         # update cache
@@ -362,7 +406,7 @@ class GenerationMixin(object):
                 axis=-1)
 
         # update attention_mask
-        if "attention_mask" in model_kwargs:
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             # nn.Pad2D don't support the data type `bool`
             if convert_dtype(attention_mask.dtype) == 'bool':
@@ -391,6 +435,22 @@ class GenerationMixin(object):
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
+    def prepare_encoder_decoder_kwargs_for_generation(self, input_ids,
+                                                      model_kwargs):
+        if "encoder_output" not in model_kwargs:
+            # retrieve encoder hidden states
+            encoder = self.get_encoder()
+            encoder_kwargs = {
+                argument: value
+                for argument, value in model_kwargs.items()
+                if not (argument.startswith("decoder_") or argument.startswith(
+                    "cross_attn"))
+            }
+
+            model_kwargs["encoder_output"] = encoder(input_ids,
+                                                     **encoder_kwargs)
+        return model_kwargs
+
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
         # generate method.
@@ -398,10 +458,40 @@ class GenerationMixin(object):
         return {"input_ids": input_ids}
 
     def adjust_logits_during_generation(self, logits):
-        # Implement in subclasses for custom behavior to adjust the logits in 
+        # Implement in subclasses for custom behavior to adjust the logits in
         # the generate method.
 
         return logits
+
+    def prepare_faster_entry(self, kwargs):
+        return False
+
+    def _convert_to_faster(self, kwargs):
+        # try general convert
+        pass
+
+    def _build_faster(self, kwargs):
+        self._faster_entry = False
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
+        if kwargs['repetition_penalty'] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
+        if kwargs['num_beam_groups'] != 1:
+            # not support for group_beam_search yet in the faster version
+            raise AttributeError(
+                "'num_beam_groups != 1' is not supported yet in the faster version"
+            )
+        if kwargs['early_stopping'] != False:
+            # not support for early_stopping yet in the faster version
+            raise AttributeError(
+                "'early_stopping != False' is not supported yet in the faster version"
+            )
+        self.prepare_faster_entry(kwargs)
 
     @paddle.no_grad()
     def generate(self,
@@ -412,14 +502,18 @@ class GenerationMixin(object):
                  temperature=1.0,
                  top_k=0,
                  top_p=1.0,
+                 repetition_penalty=1.0,
                  num_beams=1,
+                 num_beam_groups=1,
                  length_penalty=0.0,
                  early_stopping=False,
                  bos_token_id=None,
                  eos_token_id=None,
                  pad_token_id=None,
                  num_return_sequences=1,
+                 diversity_rate=0.0,
                  use_cache=True,
+                 use_fast=True,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -450,8 +544,15 @@ class GenerationMixin(object):
                 top-p-filtering in the "sampling" strategy. The value should 
                 satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
                 effect.
+            repetition_penalty (float, optional):
+                The parameter for repetition penalty. 1.0 means no penalty. See `this paper
+                <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details. Defaults to 1.0.
             num_beams (int, optional): The number of beams in the "beam_search"
                 strategy. Default to 1.
+            num_beam_groups (int, optional):
+                Number of groups to divide `num_beams` into in order to use DIVERSE
+                BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ 
+                for more details. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
                 sequence length in the "beam_search" strategy. The larger this
                 param is, the more that the model would generate shorter 
@@ -467,6 +568,10 @@ class GenerationMixin(object):
                 None.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
+            diversity_rate (float, optional): If num_beam_groups is 1, this is the 
+                diversity_rate for Diverse Siblings Search. See 
+                `this paper https://arxiv.org/abs/1611.08562`__ for more details. 
+                If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether or not use the model cache to 
                 speed up decoding. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
@@ -567,6 +672,35 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+        if getattr(self, '_faster_entry', None) is not False and use_fast:
+            args = locals()
+            args.pop('self')
+            args.pop("__class__", None)
+            try:
+                if not hasattr(self, '_faster_entry'):
+                    self._build_faster(args)
+                if self._faster_entry:
+                    model_kwargs = args.pop('model_kwargs')
+                    output_ids = self._faster_entry(**args, **model_kwargs)
+                    if decode_strategy == "beam_search":
+                        output_ids = output_ids.transpose([1, 2, 0])
+                        output_ids = output_ids[:, :
+                                                num_return_sequences, :].reshape(
+                                                    [-1, output_ids.shape[-1]])
+                    else:
+                        output_ids = output_ids.transpose([1, 0])
+                    # make result and faster result oneconsistent
+                    dummy_srore = None
+                    return output_ids, dummy_srore
+            except Exception as e:
+                args['model_kwargs'] = model_kwargs
+                #TODO
+                # Prevent self._convert_to_faster to throw Exception
+                self._convert_to_faster(args)
+                logger.warning(e)
+                logger.warning(
+                    "FasterGenerate is not available, "
+                    "and the original version would be used instead.")
 
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -586,18 +720,32 @@ class GenerationMixin(object):
             model_kwargs[
                 "attention_mask"] = self.prepare_attention_mask_for_generation(
                     input_ids, pad_token_id, eos_token_id)
+        self.is_encoder_decoder = hasattr(self, 'encoder') and hasattr(
+            self, 'decoder')
+        if self.is_encoder_decoder:
+            model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)
+            # set input_ids as decoder_input_ids
+            if "decoder_input_ids" in model_kwargs:
+                input_ids = model_kwargs.pop("decoder_input_ids")
+            else:
+                input_ids = self.prepare_input_ids_for_generation(
+                    bos_token_id, model_kwargs["encoder_output"])
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
                   "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
-        # TODO Add relevant processing for encoder_decoder model.
-
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
         min_length += input_ids.shape[-1]
-        logits_processors = self.get_logits_processor(min_length, eos_token_id)
+        logits_processors = self.get_logits_processor(
+            min_length=min_length,
+            eos_token_id=eos_token_id,
+            num_beams=num_beams,
+            num_beam_groups=num_beam_groups,
+            diversity_rate=diversity_rate)
 
         if decode_strategy == 'greedy_search':
             if num_return_sequences > 1:
@@ -630,21 +778,39 @@ class GenerationMixin(object):
                     "`num_beams` has to be bigger than 1. But received "
                     "`num_beams` is {}. If `num_beams` is 1, `decode_strategy` "
                     "should be 'greedy_search'".format(num_beams))
+            if num_beam_groups > 1:
+                diverse_beam_scorer = BeamSearchScorer(
+                    batch_size=batch_size,
+                    max_length=max_length,
+                    num_beams=num_beams,
+                    length_penalty=length_penalty,
+                    do_early_stopping=early_stopping,
+                    num_beam_hyps_to_keep=num_return_sequences,
+                    num_beam_groups=num_beam_groups)
 
-            beam_scorer = BeamSearchScorer(
-                batch_size=batch_size,
-                max_length=max_length,
-                num_beams=num_beams,
-                length_penalty=length_penalty,
-                do_early_stopping=early_stopping,
-                num_beam_hyps_to_keep=num_return_sequences)
+                # interleave with `num_beams`
+                input_ids, model_kwargs = self.expand_inputs_for_generation(
+                    input_ids, expand_size=num_beams, **model_kwargs)
 
-            input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_beams, **model_kwargs)
+                return self.group_beam_search(input_ids, diverse_beam_scorer,
+                                              logits_processors, max_length,
+                                              diversity_rate, pad_token_id,
+                                              eos_token_id, **model_kwargs)
+            else:
+                beam_scorer = BeamSearchScorer(
+                    batch_size=batch_size,
+                    max_length=max_length,
+                    num_beams=num_beams,
+                    length_penalty=length_penalty,
+                    do_early_stopping=early_stopping,
+                    num_beam_hyps_to_keep=num_return_sequences)
 
-            return self.beam_search(input_ids, beam_scorer, logits_processors,
-                                    max_length, pad_token_id, eos_token_id,
-                                    **model_kwargs)
+                input_ids, model_kwargs = self.expand_inputs_for_generation(
+                    input_ids, expand_size=num_beams, **model_kwargs)
+
+                return self.beam_search(
+                    input_ids, beam_scorer, logits_processors, max_length,
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs)
 
         else:
             raise ValueError(
@@ -667,7 +833,6 @@ class GenerationMixin(object):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
@@ -696,8 +861,10 @@ class GenerationMixin(object):
             if not paddle.any(unfinished_flag):
                 break
 
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def sample(self,
@@ -724,7 +891,7 @@ class GenerationMixin(object):
             sorted_indices = paddle.argsort(probs, descending=True)
             cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
 
-            # Remove tokens with cumulative probs above the top_p, But keep at 
+            # Remove tokens with cumulative probs above the top_p, But keep at
             # least min_tokens_to_keep tokens
             sorted_indices_to_remove = cumulative_probs > top_p
             if min_tokens_to_keep > 1:
@@ -797,12 +964,14 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
 
@@ -830,24 +999,57 @@ class GenerationMixin(object):
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
-            logits = logits_processors(input_ids, logits)
 
             # beam search
             # [batch_size * num_beams, vocab_size]
             next_scores = F.softmax(logits)
             next_scores = paddle.log(next_scores)
-
+            next_scores = logits_processors(input_ids, next_scores)
             next_scores = next_scores + beam_scores.unsqueeze(-1)
-            # reshape for beam search
+
             vocab_size = next_scores.shape[-1]
-            next_scores = next_scores.reshape(
-                [batch_size, num_beams * vocab_size])
+            if diversity_rate == 0.0:
+                # reshape for beam search
+                next_scores = next_scores.reshape(
+                    [batch_size, num_beams * vocab_size])
 
-            next_scores, next_tokens = paddle.topk(
-                next_scores, 2 * num_beams, axis=1)
+                next_scores, next_tokens = paddle.topk(
+                    next_scores, 2 * num_beams, axis=1)
 
-            next_indices = next_tokens // vocab_size
-            next_tokens = next_tokens % vocab_size
+                next_indices = next_tokens // vocab_size
+                next_tokens = next_tokens % vocab_size
+
+            else:
+                next_scores, next_tokens = paddle.topk(
+                    next_scores, 2 * num_beams, axis=1)
+
+                sibling_score = paddle.arange(
+                    1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
+
+                diversed_score = next_scores - sibling_score
+
+                next_scores = next_scores.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+                next_tokens = next_tokens.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+
+                diversed_score = diversed_score.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+                diversed_score, diversed_tokens = paddle.topk(
+                    diversed_score, 2 * num_beams, axis=1)
+
+                # TODO
+                # Use gather_nd() to select origan token and score
+                next_scores = paddle.stack([
+                    paddle.index_select(next_scores[i], diversed_tokens[i])
+                    for i in range(next_scores.shape[0])
+                ])
+                next_tokens = paddle.stack([
+                    paddle.index_select(next_tokens[i], diversed_tokens[i])
+                    for i in range(next_tokens.shape[0])
+                ])
+
+                next_indices = diversed_tokens // (2 * num_beams)
 
             # stateless
             beam_outputs = beam_scorer.process(
@@ -872,8 +1074,10 @@ class GenerationMixin(object):
 
             if beam_scorer.is_done:
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
             if model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
@@ -889,11 +1093,154 @@ class GenerationMixin(object):
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
 
+    def group_beam_search(self, input_ids, beam_scorer, logits_processors,
+                          max_length, diversity_rate, pad_token_id,
+                          eos_token_id, **model_kwargs):
+
+        batch_size = len(beam_scorer._beam_hyps)
+        num_beams = beam_scorer.num_beams
+        num_beam_groups = beam_scorer.num_beam_groups
+        num_sub_beams = num_beams // num_beam_groups
+
+        batch_beam_size, cur_len = input_ids.shape
+        origin_len = cur_len
+
+        assert (
+            num_beams * batch_size == batch_beam_size
+        ), "Batch dimension of `input_ids` should be {}, but received {}.".format(
+            num_beams * batch_size, batch_beam_size)
+
+        beam_scores = paddle.full(
+            (batch_size, num_beams), -1e9, dtype="float32")
+        # initialise score of first beam of each group with 0 and the rest with 1e-9. This ensures that the beams in
+        # the same group don't produce same tokens everytime.
+        beam_scores[:, ::num_sub_beams] = 0
+        beam_scores = paddle.reshape(beam_scores, [-1])
+
+        while cur_len < max_length:
+            # predicted tokens in cur_len step
+            current_tokens = paddle.zeros(
+                shape=[batch_size * num_beams], dtype=input_ids.dtype)
+
+            # indices which will form the beams in the next time step
+            reordering_indices = paddle.zeros(
+                shape=[batch_size * num_beams], dtype="int64")
+            # prepare model inputs & get model output
+            model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                              **model_kwargs)
+            outputs = self(**model_inputs)
+
+            for beam_group_idx in range(num_beam_groups):
+                group_start_idx = beam_group_idx * num_sub_beams
+                group_end_idx = min(group_start_idx + num_sub_beams, num_beams)
+                group_size = group_end_idx - group_start_idx
+
+                # indices of beams of current group among all sentences in batch
+                batch_group_indices = []
+
+                for batch_idx in range(batch_size):
+                    batch_group_indices.extend([
+                        batch_idx * num_beams + idx
+                        for idx in range(group_start_idx, group_end_idx)
+                    ])
+
+                group_input_ids = input_ids[batch_group_indices]
+                logits = outputs[0] if isinstance(outputs, tuple) else outputs
+                # select outputs of beams of current group only
+
+                logits = logits[:, -1, :]
+                logits = paddle.index_select(
+                    logits, paddle.to_tensor(batch_group_indices))
+                logits = self.adjust_logits_during_generation(logits)
+
+                next_scores = F.softmax(logits)
+                next_scores = paddle.log(next_scores)
+                vocab_size = next_scores.shape[-1]
+
+                next_scores = logits_processors(
+                    group_input_ids,
+                    next_scores,
+                    current_tokens=current_tokens,
+                    beam_group_idx=beam_group_idx)
+
+                next_scores = next_scores + beam_scores[
+                    batch_group_indices].unsqueeze(-1)
+
+                # reshape for beam search
+                next_scores = next_scores.reshape(
+                    [batch_size, group_size * vocab_size])
+
+                next_scores, next_tokens = paddle.topk(
+                    next_scores, 2 * group_size, axis=1)
+
+                next_indices = next_tokens // vocab_size
+                next_tokens = next_tokens % vocab_size
+
+                beam_outputs = beam_scorer.process(
+                    group_input_ids,
+                    next_scores,
+                    next_tokens,
+                    next_indices,
+                    origin_len=origin_len,
+                    pad_token_id=pad_token_id,
+                    eos_token_id=eos_token_id, )
+
+                beam_scores[batch_group_indices] = beam_outputs[
+                    "next_beam_scores"]
+                beam_next_tokens = beam_outputs["next_beam_tokens"]
+                beam_idx = beam_outputs["next_beam_indices"]
+
+                input_ids[batch_group_indices] = group_input_ids[beam_idx]
+                group_input_ids = paddle.concat(
+                    [
+                        paddle.index_select(
+                            group_input_ids, index=beam_idx),
+                        beam_next_tokens.unsqueeze(-1)
+                    ],
+                    axis=-1)
+                current_tokens[batch_group_indices] = beam_next_tokens
+
+                reordering_indices[batch_group_indices] = (
+                    num_beams * (beam_idx // group_size) + group_start_idx +
+                    (beam_idx % group_size))
+
+            input_ids = paddle.concat(
+                [input_ids, current_tokens.unsqueeze(-1)], axis=-1)
+
+            cur_len += 1
+            if beam_scorer.is_done:
+                break
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
+            if model_kwargs["cache"] is not None:
+                # reorder the cache
+                model_kwargs["cache"] = map_structure(
+                    lambda x: paddle.index_select(x, reordering_indices),
+                    model_kwargs["cache"])
+
+        pred_ids, scores = beam_scorer.finalize(
+            input_ids,
+            beam_scores,
+            next_tokens,
+            next_indices,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id)
+        return pred_ids[:, origin_len:], scores
+
 
 class LogitsProcessorList(List):
-    def __call__(self, input_ids, logits):
+    def __call__(self, input_ids, logits, **kwargs):
         for processor in self:
-            logits = processor(input_ids, logits)
+            processor_args = inspect.signature(processor.__call__).parameters
+            if len(processor_args) > 2:
+                assert all(
+                    arg in kwargs for arg in list(processor_args.keys())[2:]
+                ), f"The parameters don't match for {processor.__class__}"
+                logits = processor(input_ids, logits, **kwargs)
+            else:
+                logits = processor(input_ids, logits)
         return logits
 
 
@@ -937,3 +1284,87 @@ class MinLengthLogitsProcessor(LogitsProcessor):
         if cur_len < self.min_length:
             logits[:, self.eos_token_id] = -1e9
         return logits
+
+
+class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
+    r"""
+    Enforcing an exponential penalty on repeated sequences.
+
+    Args:
+        repetition_penalty (float):
+            The parameter for repetition penalty. 1.0 means no penalty. See `this paper
+            <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
+    """
+
+    def __init__(self, penalty: float):
+        if not isinstance(penalty, float) or not (penalty > 0):
+            raise ValueError(
+                f"`penalty` has to be a strictly positive float, but is {penalty}"
+            )
+
+        self.penalty = penalty
+
+    def __call__(self, input_ids, logits):
+        score = paddle.index_sample(logits, input_ids)
+        score = paddle.where(score < 0, score * self.penalty,
+                             score / self.penalty)
+        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(
+            -1) * logits.shape[-1]
+        outputs = paddle.scatter(logits.flatten(),
+                                 input_ids.flatten(),
+                                 score.flatten()).reshape(logits.shape)
+        return outputs
+
+
+class HammingDiversityLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces diverse beam search. Note that this logits
+    processor is only effective for `group_beam_search`. See 
+    `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ for more details.
+
+    Args:
+        diversity_rate (float):
+            This value is subtracted from a beam's score if it generates a 
+            token same as any beam from other group at a particular time. 
+        num_beams (int):
+            Number of beams used for group beam search. 
+        num_beam_groups (int):
+            Number of groups to divide `num_beams` into in order to ensure 
+            diversity among different groups of beams. 
+    """
+
+    def __init__(self, diversity_rate, num_beams, num_beam_groups):
+        if not isinstance(diversity_rate, float) or (not diversity_rate > 0.0):
+            raise ValueError(
+                "`diversity_rate` should be a float strictly larger than 0.")
+        self._diversity_rate = diversity_rate
+        if not isinstance(num_beams, int) or num_beams < 2:
+            raise ValueError(
+                "`num_beams` should be an integer strictly larger than 1.")
+        self._num_beams = num_beams
+        if not isinstance(num_beam_groups, int) or num_beam_groups < 2:
+            raise ValueError(
+                "`num_beam_groups` should be an integer strictly larger than 1.")
+        self._num_sub_beams = num_beams // num_beam_groups
+
+    def __call__(self, input_ids, scores, current_tokens, beam_group_idx):
+        batch_size = current_tokens.shape[0] // self._num_beams
+        group_start_idx = beam_group_idx * self._num_sub_beams
+        group_end_idx = min(group_start_idx + self._num_sub_beams,
+                            self._num_beams)
+        group_size = group_end_idx - group_start_idx
+        vocab_size = scores.shape[-1]
+
+        if group_start_idx == 0:
+            return scores
+
+        for batch_idx in range(batch_size):
+            previous_group_tokens = current_tokens[batch_idx * self._num_beams:
+                                                   batch_idx * self._num_beams +
+                                                   group_start_idx]
+            token_frequency = paddle.bincount(
+                previous_group_tokens, minlength=vocab_size)
+            scores[batch_idx * group_size:(batch_idx + 1) *
+                   group_size] -= self._diversity_rate * token_frequency
+
+        return scores

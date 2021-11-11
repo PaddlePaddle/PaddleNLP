@@ -54,7 +54,7 @@ python run_ernie.py
 ##### 模型导出
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在output_path指定路径中。 运行方式：
 
-`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+`python export_model.py --params_path ernie_ckpt/model_80/model_state.pdparams --output_path=./output`
 
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 

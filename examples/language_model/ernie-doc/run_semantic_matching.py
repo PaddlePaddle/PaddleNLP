@@ -56,6 +56,7 @@ parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear
 parser.add_argument("--dataset", default="cail2019_scm", choices=["cail2019_scm"], type=str, help="The training dataset")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
+parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
 
 # yapf: enable
 args = parser.parse_args()
@@ -322,6 +323,8 @@ def do_train(args):
                         paddle.save(model_to_save.state_dict(), save_param_path)
                         tokenizer.save_pretrained(best_model_dir)
 
+            if args.max_steps > 0 and global_steps >= args.max_steps:
+                return
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader,
                         create_memory(), create_memory())

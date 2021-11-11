@@ -37,7 +37,10 @@ except ImportError:
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
 
-__all__ = ['PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars']
+__all__ = [
+    'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
+    'is_chinese_char'
+]
 
 
 def convert_to_unicode(text):
@@ -113,36 +116,36 @@ def _is_punctuation(char):
     return False
 
 
+def is_chinese_char(cp):
+    """Checks whether CP is the codepoint of a CJK character."""
+    # This defines a "chinese character" as anything in the CJK Unicode block:
+    #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+    #
+    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
+    # despite its name. The modern Korean Hangul alphabet is a different block,
+    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
+    # space-separated words, so they are not treated specially and handled
+    # like the all of the other languages.
+    if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
+        (cp >= 0x3400 and cp <= 0x4DBF) or  #
+        (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+        (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+        (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+        (cp >= 0x2B820 and cp <= 0x2CEAF) or
+        (cp >= 0xF900 and cp <= 0xFAFF) or  #
+        (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+        return True
+
+    return False
+
+
 def tokenize_chinese_chars(text):
     """Adds whitespace around any CJK character."""
-
-    def _is_chinese_char(cp):
-        """Checks whether CP is the codepoint of a CJK character."""
-        # This defines a "chinese character" as anything in the CJK Unicode block:
-        #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-        #
-        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-        # despite its name. The modern Korean Hangul alphabet is a different block,
-        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-        # space-separated words, so they are not treated specially and handled
-        # like the all of the other languages.
-        if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
-            (cp >= 0x3400 and cp <= 0x4DBF) or  #
-            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
-            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
-            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
-            (cp >= 0x2B820 and cp <= 0x2CEAF) or
-            (cp >= 0xF900 and cp <= 0xFAFF) or  #
-            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
-            return True
-
-        return False
-
     output = []
     buff = ""
     for char in text:
         cp = ord(char)
-        if _is_chinese_char(cp):
+        if is_chinese_char(cp):
             if buff != "":
                 output.append(buff)
                 buff = ""
@@ -1219,57 +1222,11 @@ class PretrainedTokenizer(object):
 
             if stride > 0 and second_ids is not None:
 
-                max_len_for_pair = max_seq_len - len(first_ids) - 3
+                max_len_for_pair = max_seq_len - len(
+                    first_ids) - self.num_special_tokens_to_add(pair=True)
 
-                tokens = text.split()
-                token_pair = text_pair.split()
-
-                token_offset_mapping = []
-                token_pair_offset_mapping = []
-
-                token_start_offset = 0
-                for token in tokens:
-                    sub_tokens = []
-                    for basic_token in self.basic_tokenizer.tokenize(token):
-                        for sub_token in self.wordpiece_tokenizer.tokenize(
-                                basic_token):
-                            sub_tokens.append(sub_token if sub_token !=
-                                              self.unk_token else basic_token)
-                    for i in range(len(sub_tokens)):
-                        if i == len(sub_tokens) - 1:
-                            token_offset_mapping.append(
-                                (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].replace("##", ""))))
-                            token_start_offset += (
-                                len(sub_tokens[i].replace("##", "")) + 1)
-                        else:
-                            token_offset_mapping.append(
-                                (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].replace("##", ""))))
-                            token_start_offset += (
-                                len(sub_tokens[i].replace("##", "")))
-
-                token_start_offset = 0
-                for token in token_pair:
-                    sub_tokens = []
-                    for basic_token in self.basic_tokenizer.tokenize(token):
-                        for sub_token in self.wordpiece_tokenizer.tokenize(
-                                basic_token):
-                            sub_tokens.append(sub_token if sub_token !=
-                                              self.unk_token else basic_token)
-                    for i in range(len(sub_tokens)):
-                        if i == len(sub_tokens) - 1:
-                            token_pair_offset_mapping.append(
-                                (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].replace("##", ""))))
-                            token_start_offset += (
-                                len(sub_tokens[i].replace("##", "")) + 1)
-                        else:
-                            token_pair_offset_mapping.append(
-                                (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].replace("##", ""))))
-                            token_start_offset += (
-                                len(sub_tokens[i].replace("##", "")))
+                token_offset_mapping = self.get_offset_mapping(text)
+                token_pair_offset_mapping = self.get_offset_mapping(text_pair)
 
                 offset = 0
                 while offset < len(second_ids):
@@ -1389,6 +1346,55 @@ class PretrainedTokenizer(object):
                         return_special_tokens_mask=return_special_tokens_mask))
 
         return batch_encode_inputs
+
+    def get_offset_mapping(self, text):
+        """
+        Returns the map of tokens and the start and end index of their start and end character.
+        Modified from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
+
+        Args:
+            text (str):
+                Input text.
+        Returns:
+            list: The offset map of input text.
+            
+        """
+        split_tokens = []
+        for token in self.basic_tokenizer.tokenize(text):
+            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                split_tokens.append(sub_token
+                                    if sub_token != self.unk_token else token)
+
+        normalized_text, char_mapping = '', []
+
+        for i, ch in enumerate(text):
+            if self.basic_tokenizer.do_lower_case:
+                ch = ch.lower()
+                ch = unicodedata.normalize('NFD', ch)
+                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
+
+            ch = ''.join([
+                c for c in ch
+                if not (ord(c) == 0 or ord(c) == 0xfffd or _is_control(c))
+            ])
+            normalized_text += ch
+
+            char_mapping.extend([i] * len(ch))
+
+        text, token_mapping, offset = normalized_text, [], 0
+
+        for token in split_tokens:
+            if token[:2] == '##':
+                token = token[2:]
+
+            start = text[offset:].index(token) + offset
+            end = start + len(token)
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
+            offset = end
+
+        return token_mapping
 
 
 class BPETokenizer(PretrainedTokenizer):

@@ -1,4 +1,5 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2020 TsinghuaAI Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +41,9 @@ class Demo:
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
         logger.info('Loading the model parameters, please wait...')
         self.model = model_class.from_pretrained(
-            model_name_or_path, max_predict_len=max_predict_len)
+            model_name_or_path,
+            max_predict_len=max_predict_len,
+            eol_token_id=self.tokenizer.eol_token_id)
         self.model.eval()
         logger.info('Model loaded.')
 
@@ -49,7 +52,7 @@ class Demo:
         ids = self.tokenizer(text)["input_ids"]
         input_ids = paddle.to_tensor(
             np.array(ids).reshape(1, -1).astype('int64'))
-        out = self.model(input_ids, self.tokenizer.eol_token_id)
+        out = self.model(input_ids)
         out = [int(x) for x in out.numpy().reshape([-1])]
         logger.info(self.tokenizer.convert_ids_to_string(out))
 

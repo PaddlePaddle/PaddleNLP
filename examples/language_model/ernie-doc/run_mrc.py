@@ -58,6 +58,8 @@ parser.add_argument("--do_lower_case", action='store_false', help="Whether to lo
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
 parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
+parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
+
 # yapf: enable
 args = parser.parse_args()
 
@@ -323,6 +325,8 @@ def do_train(args):
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
 
+            if args.max_steps > 0 and global_steps >= args.max_steps:
+                return
     logger.info("Test:")
     evaluate(args, model, criterion,
              EM_AND_F1(), test_dataloader, create_memory(), tokenizer)

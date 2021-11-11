@@ -41,12 +41,17 @@ public:
   const T *embedding_bias_T = nullptr;
   const float *embedding_bias = nullptr;
 
-  // Used for unilm
+  // Used for unilm.
   const T *trans_kernel = nullptr;
   const T *trans_bias = nullptr;
 
   const T *memory_tensor = nullptr;
+  const int *type_id = nullptr;
   const int *memory_sequence_length = nullptr;
+
+  // Used for force decoding.
+  const int *trg_word = nullptr;
+  const int *trg_length = nullptr;
 
   const T *position_encoding_table = nullptr;
 
@@ -86,12 +91,19 @@ struct DecodingSamplingArguments : public DecodingArguments {
   int candidate_num_;
   float probability_threshold_;
   size_t cub_temp_storage_size_{0};
+  bool normalization_before_{true};
+  int pos_offset_{0};  // for position embedding
+  ActivationType act_{ActivationType::RELU};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
   int beam_width_;
   int temp_storage_size_;
   float beam_search_diversity_rate_;
+  float alpha_;  // power number for length penalty in beam search v2
+  bool normalization_before_{true};
+  int pos_offset_{0};  // for position embedding
+  ActivationType act_{ActivationType::RELU};
 };
 
 struct Gpt2Arguments : public DecodingSamplingArguments {
@@ -110,10 +122,11 @@ struct TransformerSamplingArguments : public DecodingSamplingArguments {
   float len_penalty{1.0};
   float repeat_penalty{1.0};
   int *vocab_mask{nullptr};
-  int type_id_{0};
   bool normalization_before_{true};
+  bool pos_bias_{true};
   int unk_id_{-1};
   int mask_id_{-1};
+  ActivationType act_{ActivationType::GELU};
 };
 
 struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
@@ -121,10 +134,11 @@ struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
   float temperature_{2.0};
   float len_penalty{1.0};
   float repeat_penalty{2.0};
-  int type_id_{0};
   bool normalization_before_{true};
+  bool pos_bias_{true};
   int unk_id_{-1};
   int mask_id_{-1};
+  ActivationType act_{ActivationType::GELU};
 };
 
 }  // namespace fastertransformer

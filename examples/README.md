@@ -1,30 +1,42 @@
-# PaddleNLP 范例
+# PaddleNLP Examples
 
-在本目录（https://github.com/PaddlePaddle/PaddleNLP ）下，包含了一些范例。涵盖了大多数常见NLP任务，是入门NLP和PaddleNLP的学习资料，也可以作为工作中上手NLP的基线参考实现。
+PaddleNLP旨在提供覆盖从研究到产业应用的丰富示例，助力开发者加速文本任务开发效率。
 
+PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
 
-## PaddleNLP的例子清单
+## NLP 基础技术 (NLP Basic Technique)
 
-| **目录**  | **主题**                                           | 简要说明                                                      |
-| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| benchmark/glue   | GLUE Benchmark                                    | GLUE是当今使用最为普遍的自然语言理解评测基准数据集，评测数据涵盖新闻、电影、百科等许多领域，其中有简单的句子，也有困难的句子。本项目是 GLUE评测任务 在 Paddle 2.0上的开源实现                       |
-| dialogue | 该目录下涵盖了多个对话系统相关的例子| 如dgu 对话通用理解模型, LIC 2021对话比赛基线, PLATO-2 开放域机器人 UnifiedTransformer 适合对话生成任务的Transfer网络。|
-| few_shot       | 小样本学习                                           | 提供简单易用、全面、前沿的 FSL 策略库，如P-tuning，EFL等。           |
-| information_extraction    | 信息抽取 | 提供了多个数据集上的信息抽取基线实现。包含快递单信息抽取， MSRA-NER 数据集命名实体识别，LIC2021 DuIE 关系抽取基线，LIC2021 DuEE 事件抽取基线 |
-| language_model       | 语言模型    | 提供了多个语言模型的PaddleNLP实现。如bert, bigbird, electra，elmo, gpt等等。也提供了支持语言模型在垂直了类领域数据上继续训练的工具包。   |
-| lexical_analysis       | 词法分析    | 词法分析任务的输入是一个句子，而输出是句子中的词边界和词性、实体类别。这个例子基于双向GRU和CRF实现 |
-| machine_reading_comprehension       | 机器阅读理解    | 提供了多个机器阅读理解数据集， 如SQuAD，DuReader以及它们对应的实现。 |
-| machine_translation       | 机器翻译    | 提供了一个带Attention机制的，基于LSTM的多层RNN Seq2Seq翻译模型，以及一个基于Transformer的翻译模型 |
-| model_compression       | 模型压缩    | 提供了一些大模型压缩，知识蒸馏的工具包。比如将Bert蒸馏到双向LSTM，对Bert网络进行压缩和蒸馏等。 |
-| semantic_indexing       | 语义索引    | 语义索引技术是搜索引擎、推荐系统、广告系统在召回阶段的核心技术之一，语义索引库提供了前沿语义索引策略的训练、语义索引模型的效果评估方案、支持用户基于我们开源的语义索引模型进行文本 Pair 的相似度计算或者 Embedding 语义表示抽取。 |
-| sentiment_analysis/skep/       | 情感分析    | 情感预训练模型SKEP。 |
-| simultaneous_translation/stacl/ | 同声传译    | 基于机器翻译领域主流模型 Transformer网络结构的同传模型STACL的PaddlePaddle 实现，包含模型训练，预测以及使用自定义数据等内容 |
-| text_classification       | 文本分类    | 该项目示例使用PaddleNLP如何完成文本分类任务。该项目展示了使用传统的Recurrent Neural Networks 和 预训练模型Pretrained Models两种方法完成文本分类任务。 |
-| text_generation       | 文本生成    | 包含ERNIE-Gen面向生成任务的预训练+微调模型框架，以及一个使用传统Seq2Seq模型的对对联应用，以及文本的基于变分自动编码器的生成模型 |
-| text_graph/erniesage       | 文本图模型    | 基于PaddleNLP的ErnieSage模型，可以同时建模文本语义与图结构信息。 |
-| text_matching      | 文本匹配    | 提供了多个不同算法的文本匹配算法实现。可以应用于搜索，推荐系统排序，召回等场景。 |
-| text_summarization/pointer_summarizer       | 文本摘要    | 提供了一个基于指针生成网络的文本摘要算法实现。 |
-| text_to_knowledge       | 语言模型    | 是百度解语的开源。解语（Text to Knowledge）是首个覆盖中文全词类的知识库（百科知识树）及知识标注框架，拥有可描述所有中文词汇的词类体系、中文知识标注工具集，以及更适用于中文挖掘任务的预训练语言模型 |
-| text_to_sql       | 表格问答 / Text2SQL     | 提供了两个Text2SQL的例子实现。其中一个是IGSQL模型， 一个是RAT-SQL模型|
-| time_series/tcn       | 时间序列预测    | 一个使用时间卷积网络TCN进行预测的例子 |
-| word_embedding       | 词向量模型    | 提供了一个利用领域数据集提升词向量效果的例子。这个例子利用ChnSentiCorp数据集提升了预置词向量在分类任务上的准确性。 |
+| 目录 Folder  | 任务 Task    |
+| :--------------- | ------- |
+| word_embedding | [词向量 (Word Embedding)](./word_embedding/) |
+| lexical_analysis | [词法分析 (Lexical Analysis)](./lexical_analysis/) |
+| dependency_parsing | [句法依存分析 (Dependency Parsing)](./dependency_parsing/) |
+| language_model | [预训练语言模型 (Pretrained Language Model)](./language_model/) |
+| text_to_sql | [语义解析 (Semantic Parsing/Text to SQL)](./text_to_sql):star: |
+| text_classification | [文本分类 (Text Classification)](./text_classification/) |
+| text_matching | [文本匹配 (Text Matching)](./text_matching/) |
+| text_generation | [文本生成 (Text Generation)](./text_generation/) |
+| text_summarization | [文本摘要 (Text Summarization)](./text_summarization/) |
+| text_correction  |[文本纠错 (Text Correction)](./text_correction/):star: |
+| semantic_indexing | [语义索引 (Semantic Indexing)](./semantic_indexing/)|
+| information_extraction | [信息抽取 (Information Extraction)](./information_extraction/) |
+
+## NLP 系统应用 (NLP System Applications)
+
+| 目录 Folder  | 任务 Task    |
+| :--------------- | ------- |
+| sentiment_analysis|[情感分析 (Sentiment Analysis)](./sentiment_analysis/):star2: |
+| dialogue |[通用对话 (General Dialogue System)](./dialogue/) |
+| machine_translation |[文本翻译 (Machine Translation)](./machine_translation/) |
+| simultaneous_translation|[同声翻译 (Simultaneous Translation)](./simultaneous_translation/) |
+| machine_reading_comprehension | [阅读理解 (Machine Reading Comprehension)](./machine_reading_comprehension/) |
+
+## NLP 拓展应用 (NLP Extented Applications)
+
+| 目录 Folder  | 任务 Task    |
+| :--------------- | ------- |
+| few_shot |[小样本学习 (Few-shot Learning)](./few_shot/):star2: |
+| text_to_knowledge |[解语知识关联框架 (Text Knowledge Mining)](./text_to_knowledge/):star2: |
+| model_compression |[模型压缩 (Model Compression）](./model_compression/) |
+| text_graph |[文本图学习 (Text Graph Learning)](./text_graph/erniesage/) |
+| time_series |[时间序列预测 (Time Series Prediction)](./time_series/) |

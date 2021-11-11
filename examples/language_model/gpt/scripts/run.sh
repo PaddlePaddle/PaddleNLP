@@ -18,4 +18,6 @@ python -u run_pretrain.py \
     --grad_clip 1.0\
     --logging_freq 1\
     --eval_freq 1000\
-    --device "gpu"
+    --device "gpu" \
+
+#    --use_amp true
