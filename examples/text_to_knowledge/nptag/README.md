@@ -56,7 +56,7 @@ data/
 罗伯特·布雷森   人
 ```
 
-标签文件`name_category_map.json`格式示例。其中key为细粒度标签，即NPTag的预测结果；value为粗粒度标签，示例中对应WordTag的标签集合，用户可以根据场景需要自定义修改该标签映射
+标签文件`name_category_map.json`格式示例，其中key为细粒度标签，即NPTag的预测结果；value为粗粒度标签，示例中对应WordTag的标签集合，用户可以根据场景需要自定义修改该标签映射
 ```
 {
     "植物": "生物类_植物",
@@ -90,7 +90,6 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 - `weight_decay`: 控制正则项力度的参数，用于防止过拟合，默认为0.0。
 - `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 - `adam_epsilon`: Adam优化器的参数，避免分母为零，默认为1e-8。
-- `max_steps`: 表示最大训练步数，默认为-1.如果`max_steps`大于零，将会覆盖`num_train_epochs`。
 - `seed`: 随机种子，默认为1000。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
@@ -107,7 +106,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 
 使用动态图训练结束之后，可以将动态图参数导出成静态图参数，从而获得最优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
 ```shell
-python export_model.py --params_path=./output/model_100/model_state --output_path=./export
+python export_model.py --params_path=./output/model_100/model_state.pdparams --output_path=./export
 ```
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
