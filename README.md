@@ -264,6 +264,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 * [TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree):star2:
 * [WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag):star2:
+* [NPTag: 中文名词短语标注工具](./examples/text_to_knowledge/nptag):star2:
 
 #### 文本图学习 (Text Graph Learning)
 
