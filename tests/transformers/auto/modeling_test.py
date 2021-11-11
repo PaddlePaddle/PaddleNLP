@@ -1,6 +1,7 @@
 import paddle
 from paddlenlp.transformers.auto.modeling import *
 from paddlenlp.transformers import *
+import warnings
 
 
 def from_built_in_model():
@@ -8,7 +9,7 @@ def from_built_in_model():
     #model = AutoModel.from_pretrained('unimo-text-1.0')
     #model = AutoModel.from_pretrained('plato-mini')
     #model = AutoModel.from_pretrained('unified_transformer-12L-cn')
-
+    '''
     #2、pretraining test
     model = AutoModelForPreTraining.from_pretrained('bart-base')
     #model = AutoModelForPreTraining.from_pretrained('roformer-chinese-small')
@@ -57,6 +58,7 @@ def from_built_in_model():
     model = AutoGenerator.from_pretrained("electra-small")
     model = AutoDiscriminator.from_pretrained("convbert-base")
     model = AutoDiscriminator.from_pretrained("electra-small")
+    '''
 
 
 def from_local_dir():
@@ -67,10 +69,12 @@ def from_local_dir():
 
 
 def from_community_model():
-    model = AutoModelForSequenceClassification.from_pretrained(
-        'yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+    #model = AutoModelForSequenceClassification.from_pretrained(
+    #   'yingyibiao/bert-base-uncased-sst-2-finetuned')
     model = AutoModelForSequenceClassification.from_pretrained(
         'junnyu/ckiplab-bert-base-chinese-ner')
+    print(model)
 
 
 '''
@@ -83,6 +87,6 @@ def from_community_model():
 '''
 
 if __name__ == '__main__':
-    from_local_dir()
+    from_built_in_model()
+    #from_local_dir()
     from_community_model()
-    # from_built_in_model()
