@@ -21,6 +21,8 @@ import paddle
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import BertTokenizer
+from paddlenlp.datasets import load_dataset
+import time
 
 
 def parse_args():
@@ -43,6 +45,7 @@ def parse_args():
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
     args = parser.parse_args()
     return args
 
@@ -136,20 +139,33 @@ def main():
     args = parse_args()
     predictor = Predictor.create_predictor(args)
 
-    data = [
-        'against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting',
-        'the situation in a well-balanced fashion',
-        'at achieving the modest , crowd-pleasing goals it sets for itself',
-        'so pat it makes your teeth hurt',
-        'this new jangle of noise , mayhem and stupidity must be a serious contender for the title .'
-    ]
+    #data = [
+    #    'against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting',
+    #    'the situation in a well-balanced fashion',
+    #    'at achieving the modest , crowd-pleasing goals it sets for itself',
+    #    'so pat it makes your teeth hurt',
+    #    'this new jangle of noise , mayhem and stupidity must be a serious contender for the title .'
+    #]
     label_map = {0: 'negative', 1: 'positive'}
 
-    outputs, results = predictor.predict(data, label_map)
+    test_ds = load_dataset("chnsenticorp", splits=["test"])
+    data = [d["text"] for d in test_ds]
+    batches = [
+        data[idx:idx + args.batch_size]
+        for idx in range(0, len(data), args.batch_size)
+    ]
+
+    iters = 1
+    start = time.time()
+    results = []
+    for i in range(iters):
+        for batch_data in batches:
+            results.extend(predictor.predict(batch_data, label_map))
+    end = time.time()
+
     for idx, text in enumerate(data):
-        print(
-            'Data: {} \n Label: {} \n Negative prob: {} \n Positive prob: {} \n '.
-            format(text, results[idx], outputs[idx][0], outputs[idx][1]))
+        print('Data: {} \t Label: {}'.format(text, results[idx]))
+    print("time:", (end-start)*1000.0/iters, "ms")
 
 
 if __name__ == "__main__":

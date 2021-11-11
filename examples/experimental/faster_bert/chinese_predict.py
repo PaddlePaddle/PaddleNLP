@@ -21,6 +21,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Tuple, Pad
 
 from utils import convert_example
+from static.modeling import FasterBertForSequenceClassification
 import time 
 
 # yapf: disable
@@ -97,11 +98,11 @@ if __name__ == "__main__":
 
     #model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
     #    'ernie-tiny', num_classes=len(label_map))
-    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_classes=2)
+    model = FasterBertForSequenceClassification.from_pretrained('./tmp/faster_bert_chnsenticorp', num_classes=2)
 
     #tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
     #    'ernie-tiny')
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('./tmp/faster_bert_chnsenticorp/')
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

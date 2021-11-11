@@ -314,7 +314,7 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model,_ = model_class.from_pretrained(
+    model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
