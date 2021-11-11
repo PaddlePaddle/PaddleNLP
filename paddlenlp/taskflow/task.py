@@ -42,7 +42,10 @@ class Task(metaclass=abc.ABCMeta):
         # The static model instantce
         self._input_spec = None
         self._config = None
-        self._task_path = os.path.join(PPNLP_HOME, "taskflow", self.task,
+        # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
+        self._home_path = self.kwargs[
+            'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
+        self._task_path = os.path.join(self._home_path, "taskflow", self.task,
                                        self.model)
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model

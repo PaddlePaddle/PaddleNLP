@@ -21,9 +21,7 @@ from functools import partial
 
 import numpy as np
 import paddle
-from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
-from paddlenlp.layers.crf import LinearChainCrfLoss, ViterbiDecoder
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.utils.log import logger
 import distutils.util
