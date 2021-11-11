@@ -57,6 +57,25 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-lcsts-new": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
         "unimo-text-1.0-large": {
             "vocab_size": 12800,
             "hidden_size": 1024,
@@ -82,6 +101,8 @@ class UNIMOPretrainedModel(PretrainedModel):
         "model_state": {
             "unimo-text-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0.pdparams",
+            "unimo-text-1.0-lcsts-new":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
             "unimo-text-1.0-large":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large.pdparams",
         }

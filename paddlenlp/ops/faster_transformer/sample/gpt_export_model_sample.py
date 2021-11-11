@@ -17,6 +17,7 @@ import numpy as np
 from attrdict import AttrDict
 import argparse
 import time
+from functools import partial
 
 import paddle
 
@@ -103,12 +104,6 @@ def do_predict(args):
 
     gpt = FasterGPT(
         model=model,
-        topk=args.topk,
-        topp=args.topp,
-        max_out_len=args.max_out_len,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        temperature=args.temperature,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
@@ -121,7 +116,14 @@ def do_predict(args):
         input_spec=[
             # input_ids
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int32")
+                shape=[None, None], dtype="int32"),
+            args.topk,
+            args.topp,
+            args.max_out_len,
+            bos_id,
+            eos_id,
+            None,
+            args.temperature,
         ])
 
     # Save converted static graph model
