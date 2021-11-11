@@ -226,7 +226,7 @@ poetry(["林密不见人", "举头邀明月"])
 
 ### Q1 Taskflow如何修改任务保存路径？
 
-**A:** Taskflow默认会将任务相关模型等文件保存到`$HOME/.paddlenlp/taskflow`下，可以在任务初始化的时候通过`home_path`自定义修改保存路径。
+**A:** Taskflow默认会将任务相关模型等文件保存到`$HOME/.paddlenlp`下，可以在任务初始化的时候通过`home_path`自定义修改保存路径。
 
 示例：
 ```python
@@ -234,4 +234,4 @@ from paddlenlp import Taskflow
 
 ner = Taskflow("ner", home_path="/workspace")
 ```
-通过以上方式即可将ner任务相关文件保存至`/workspace/taskflow`路径下。
+通过以上方式即可将ner任务相关文件保存至`/workspace`路径下。
