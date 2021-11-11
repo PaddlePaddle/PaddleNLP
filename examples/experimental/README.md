@@ -1,5 +1,5 @@
 
-# ERNIE文本预处理——FasterTokenizer
+# 高性能文本处理——FasterTokenizer
 
 ## 概览
 
@@ -21,12 +21,26 @@ FasterTokenizer底层为C++实现，同时提供了python接口调用。其可�
 
 ## FasterTokenizer 切词
 
-目前，PaddleNLP 2.2版本提供了FasterTokenizer python API接口。FasterTokenizer目前支持
-ernie-1.0，ernie-2.0-en，ernie-2.0-large-en，
-bert-base-uncased，bert-large-uncased，bert-base-cased，bert-large-cased，
-bert-base-multilingual-uncased，bert-base-multilingual-cased，
-bert-base-chinese，bert-wwm-chinese，bert-wwm-ext-chinese，
-roberta-wwm-ext，roberta-wwm-ext-large， rbt3，rbtl3等模型使用。
+目前，PaddleNLP 2.2版本提供了FasterTokenizer python API接口。
+
+
+   模型名                           |  FasterTokenizer
+---------------------------------- | :------:
+ERNIE, Chinese                     | `FasterTokenizer.from_pretrained("ernie-1.0")`
+ERNIE 2.0 Base, English            | `FasterTokenizer.from_pretrained("ernie-2.0-en")`
+ERNIE 2.0 Large, English           | `FasterTokenizer.from_pretrained("ernie-2.9-large-en")`
+BERT-Base, Uncased                 | `FasterTokenizer.from_pretrained("bert-base-uncased")`
+BERT-Large, Uncased                | `FasterTokenizer.from_pretrained("bert-large-uncased")`
+BERT-Base, Cased                   | `FasterTokenizer.from_pretrained("bert-base-cased")`
+BERT-Large, Cased                  | `FasterTokenizer.from_pretrained("bert-large-cased")`
+BERT-Base, Multilingual Cased      | `FasterTokenizer.from_pretrained("bert-base-multilingual-cased")`
+BERT-Base, Chinese                 | `FasterTokenizer.from_pretrained("bert-base-chinese")`
+BERT-WWM, Chinese                 | `FasterTokenizer.from_pretrained("bert-wwm-chinese")`
+BERT-WWM-Ext, Chinese                 | `FasterTokenizer.from_pretrained("bert-wwm-ext-chinese")`
+RoBERTa-WWM-Ext, Chinese                 | `FasterTokenizer.from_pretrained("roberta-wwm-ext")`
+RoBERTa-WWM-Ext-Large, Chinese                 | `FasterTokenizer.from_pretrained("roberta-wwm-ext-large")`
+
+
 
 使用方式如下：
 
@@ -36,12 +50,12 @@ text = '小说是文学的一种样式，一般描写人物故事，塑造多种
 input_ids, token_type_ids = tokenizer([text], max_seq_len=50)
 ```
 
-同时我们对比FasterTokenizer、HuggingFace Tokenizer(use_fast=True)以及 tensorflow_text BertTokenizer的性能。
-发现FasterTokenizer性能最高， 高达HuggingFace Tokenizer(use_fast=True)性能30倍。详细参考[性能测试脚本](./faster_tokenizer/perf.py)。
+同时通过对比FasterTokenizer、[HuggingFace Tokenizer(use_fast=True)](https://github.com/huggingface/tokenizers)以及 [Tensorflow Text BertTokenizer](https://www.tensorflow.org/text/api_docs/python/text/BertTokenizer)的性能。
+实验结果发现FasterTokenizer性能远远超过其他Tokenizer， 并且高达HuggingFace Tokenizer(use_fast=True)性能20倍。详细参考[性能测试脚本](./faster_tokenizer/perf.py)。
 
-## FasterErnieModel
+## FasterERNIE
 
 如上所述，FasterTokenizer可以直接作为模型的一部分，即可以直接输入文本到模型就可以完成模型训练。基于FasterTokenizer，
 paddlenlp 2.2版本实现了`FasterErnieModel`。
 
-示例中提供了FasterErnie用于[文本分类](./faster_ernie/seq_cls)和[序列标注](./faster_ernie/token_cls)任务。
+示例中提供了FasterERNIE用于[文本分类](./faster_ernie/seq_cls)和[序列标注](./faster_ernie/token_cls)任务。

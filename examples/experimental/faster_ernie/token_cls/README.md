@@ -1,4 +1,4 @@
-# FasterErnie实现文本分类
+# FasterERNIE实现文本分类
 
 近几年NLP Transformer类的模型发展迅速，各个NLP的基础技术和核心应用的核心技术基本上都被Transformer类的核心技术所替换。
 学术上，目前各个NLP任务领域的SOTA效果基本都是由Transformer类刷新，但在落地应用上还面临上线困难的问题。
@@ -14,15 +14,15 @@ Transformer类文本预处理部分，主要存在以下两个因素影响Transf
 FasterTokenizer底层为C++实现，同时提供了python接口调用。其可以将文本转化为模型数值化输入。
 同时，用户可以将其导出为模型的一部分，直接用于部署推理。从而实现Transformer训推一体。
 
-为了更好地实现训推一体化，PaddleNLP 2.2版本将文本预处理FasterTokenizer内置到Ernie模型内形成FasterErnie模型。
+为了更好地实现训推一体化，PaddleNLP 2.2版本将文本预处理FasterTokenizer内置到ERNIE模型内形成FasterERNIE模型。
 
-以下示例展示FasterErnie用于序列标注任务。
+以下示例展示FasterERNIE用于序列标注任务。
 
 ## 代码结构说明
 
 以下是本项目主要代码结构及说明：
 
-seq_cls/
+token_cls/
 ├── cpp_deploy # cpp静态图推理
 │   ├── CMakeLists.txt
 │   ├── compile.sh # 编译脚本
@@ -92,18 +92,18 @@ python predict.py --device gpu --save_dir ckpt/model_4221
 
 ## 部署推理
 
-### python
+### Python
 
-导出模型之后，可以用于部署，python_predict.py文件提供了python部署预测示例。运行方式：
+导出模型之后，可以用于部署，python_predict.py文件提供了Python部署预测示例。运行方式：
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python python_deploy.py --model_dir export/ --batch_size 1
 ```
 
-### cpp
+### C++
 
-同时，我们还提供了CPP端部署推理示例脚本。
+同时，我们还提供了C++部署推理示例脚本。
 
 首先需要从[官网](https://paddleinference.paddlepaddle.org.cn/master/user_guides/download_lib.html)下载2.2 版本以上paddle inference lib。
 解压至cpp_deploy/lib文件目录下, 如
@@ -141,8 +141,37 @@ cpp_deploy/lib
 ```
 
 
-运行以下命令，即可完成C++推理。
+- 首先，编译C++源码，生成可执行文件。
+注意替换CUDNN_LIB、CUDA_LIB指定路径。
 
 ```shell
-sh run.sh
+mkdir -p build
+cd build
+
+# same with the token_cls_infer.cc
+PROJECT_NAME=token_cls_infer
+
+WITH_MKL=ON
+WITH_GPU=ON
+
+LIB_DIR=$PWD/lib/paddle_inference
+CUDNN_LIB=/path/to/cudnn/lib/
+CUDA_LIB=/path/to/cuda/lib/
+
+cmake .. -DPADDLE_LIB=${LIB_DIR} \
+  -DWITH_MKL=${WITH_MKL} \
+  -DPROJECT_NAME=${PROJECT_NAME} \
+  -DWITH_GPU=${WITH_GPU} \
+  -DWITH_STATIC_LIB=OFF \
+  -DCUDNN_LIB=${CUDNN_LIB} \
+  -DCUDA_LIB=${CUDA_LIB}
+
+make -j
+```
+
+- 之后，运行可执行文件token_cls_infer，即可完成推理。
+
+
+```shell
+token_cls_infer --model_file ../../export/inference.pdmodel --params_file ../../export/inference.pdiparams
 ```
