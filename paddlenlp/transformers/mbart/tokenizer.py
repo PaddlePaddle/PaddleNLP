@@ -14,7 +14,7 @@
 
 import itertools
 from contextlib import contextmanager
-import sentencepiece as spm
+from paddle.utils import try_import
 from .. import PretrainedTokenizer
 
 __all__ = ['MBartTokenizer']
@@ -74,6 +74,7 @@ class MBartTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
+        spm = try_import('sentencepiece')
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
         self.fairseq_offset = 1
@@ -275,7 +276,7 @@ class MBartTokenizer(PretrainedTokenizer):
         self.prefix_tokens = []
         self.suffix_tokens = [self.eos_token_id, self.cur_lang_code_id]
 
-    def set_tgt_lang_special_tokens(self, tgt_lang: str):
+    def set_tgt_lang_special_tokens(self, tgt_lang):
         """Reset the special tokens to the target language setting. No prefix and suffix=[eos, tgt_lang_code]."""
         self.cur_lang_code_id = self.lang_code_to_id[tgt_lang]
         self.prefix_tokens = []
