@@ -222,12 +222,11 @@ def do_convert(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
-    metric_class = METRIC_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     faster_model_class, faster_tokenizer_class = MODEL_CLASSES["faster_" + args.model_type]
 
-    train_ds = load_dataset('glue', args.task_name, splits="train")
+    train_ds = load_dataset('chnsenticorp', splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
@@ -243,45 +242,6 @@ def do_convert(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
-    if args.task_name == "mnli":
-        dev_ds_matched, dev_ds_mismatched = load_dataset(
-            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
-
-        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
-        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
-        dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader_matched = DataLoader(
-            dataset=dev_ds_matched,
-            batch_sampler=dev_batch_sampler_matched,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-        dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader_mismatched = DataLoader(
-            dataset=dev_ds_mismatched,
-            batch_sampler=dev_batch_sampler_mismatched,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-    else:
-        dev_ds = load_dataset('glue', args.task_name, splits='dev')
-        dhidden_dropout_probev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     base_model = model_class.from_pretrained(
