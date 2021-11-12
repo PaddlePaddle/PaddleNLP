@@ -428,6 +428,18 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | Trained using the RoBERTa model         |
 |                    |                                                                                  |              | ``roberta_large_en``                    |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|SqueezeBert_        |``squeezebert-uncased``                                                           | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Uncased model.              |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``squeezebert-mnli``                                                              | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Mnli model.                 |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``squeezebert-mnli-headless``                                                     | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Mnli Headless model.        |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |TinyBert_           |``tinybert-4l-312d``                                                              | English      | 4-layer, 312-hidden,                    |
 |                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
 |                    |                                                                                  |              | The TinyBert model distilled from       |
@@ -547,6 +559,8 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |SKEP_               | ✅                      | ✅                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|SqueezeBert_        | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |TinyBert_           | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |UnifiedTransformer_ | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
@@ -574,6 +588,7 @@ Transformer预训练模型适用任务汇总
 .. _RoBERTa: https://arxiv.org/abs/1907.11692
 .. _RoFormer: https://arxiv.org/abs/2104.09864
 .. _SKEP: https://arxiv.org/abs/2005.05635
+.. _SqueezeBert:: https://arxiv.org/abs/2006.11316
 .. _TinyBert: https://arxiv.org/abs/1909.10351
 .. _UnifiedTransformer: https://arxiv.org/abs/2006.16779
 .. _UNIMO: https://arxiv.org/abs/2012.15409
@@ -652,6 +667,7 @@ Reference
 - Stephon, Emily, et al. "Blenderbot: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
 - Stephon, Emily, et al. "Blenderbot-Small: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
 - Jiang, Zihang, et al. "ConvBERT: Improving BERT with Span-based Dynamic Convolution." arXiv preprint arXiv:2008.02496 (2020).
+- Nitish, Bryan, et al. "CTRL: A Conditional Transformer Language Model for Controllable Generation." arXiv preprint arXiv:1909.05858 (2019).
 - Sanh, Victor, et al. "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter." arXiv preprint arXiv:1910.01108 (2019).
 - Clark, Kevin, et al. "Electra: Pre-training text encoders as discriminators rather than generators." arXiv preprint arXiv:2003.10555 (2020).
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
@@ -663,6 +679,7 @@ Reference
 - Liu, Yinhan, et al. "Roberta: A robustly optimized bert pretraining approach." arXiv preprint arXiv:1907.11692 (2019).
 - Su Jianlin, et al. "RoFormer: Enhanced Transformer with Rotary Position Embedding." arXiv preprint arXiv:2104.09864 (2021).
 - Tian, Hao, et al. "SKEP: Sentiment knowledge enhanced pre-training for sentiment analysis." arXiv preprint arXiv:2005.05635 (2020).
+- Forrest, ALbert, et al. "SqueezeBERT: What can computer vision teach NLP about efficient neural networks?" arXiv preprint arXiv:2006.11316 (2020).
 - Vaswani, Ashish, et al. "Attention is all you need." arXiv preprint arXiv:1706.03762 (2017).
 - Jiao, Xiaoqi, et al. "Tinybert: Distilling bert for natural language understanding." arXiv preprint arXiv:1909.10351 (2019).
 - Bao, Siqi, et al. "Plato-2: Towards building an open-domain chatbot via curriculum learning." arXiv preprint arXiv:2006.16779 (2020).
