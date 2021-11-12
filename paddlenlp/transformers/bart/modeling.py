@@ -389,6 +389,7 @@ class BartModel(BartPretrainedModel):
                  bos_token_id=0,
                  pad_token_id=1,
                  eos_token_id=2,
+                 forced_eos_token_id=2,
                  decoder_start_token_id=2,
                  d_model=768,
                  num_encoder_layers=6,
