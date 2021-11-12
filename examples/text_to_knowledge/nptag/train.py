@@ -46,7 +46,6 @@ def parse_args():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay if we apply some.")
     parser.add_argument("--warmup_proportion", type=float, default=0.0, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", type=float, default=1e-8, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_steps", type=int, default=-1, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
     parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
@@ -129,8 +128,7 @@ def do_train(args):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
     model = paddle.DataParallel(model)
-    num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_train_epochs)
+    num_training_steps = len(train_data_loader) * args.num_train_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
