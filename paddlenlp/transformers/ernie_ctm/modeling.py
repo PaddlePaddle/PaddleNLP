@@ -17,7 +17,14 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
-from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
+from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
+from paddlenlp.utils.tools import compare_version
+
+if compare_version(paddle.version.full_version, "2.2.0") >= 0:
+    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+    from paddle.text import ViterbiDecoder
+else:
+    from paddlenlp.layers.crf import ViterbiDecoder
 
 from .. import PretrainedModel, register_base_model
 
@@ -459,8 +466,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         self.crf = LinearChainCrf(
             self.num_tag, crf_lr, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
-        self.viterbi_decoder = ViterbiDecoder(
-            self.crf.transitions, with_start_stop_tag=False)
+        self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
         self.ignore_index = ignore_index
 
         self.apply(self.init_weights)

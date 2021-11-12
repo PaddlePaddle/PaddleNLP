@@ -14,4 +14,5 @@ paddlenlp.utils
    paddlenlp.utils.downloader
    paddlenlp.utils.env
    paddlenlp.utils.log
+   paddlenlp.utils.profiler
    paddlenlp.utils.tools
