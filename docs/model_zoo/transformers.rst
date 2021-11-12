@@ -9,8 +9,8 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **21** 种网络结构， **104** 种预训练的参数权重供用户使用，
-其中包含了 **52** 种中文语言模型的预训练权重。
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **23** 种网络结构， **108** 种预训练的参数权重供用户使用，
+其中包含了 **57** 种中文语言模型的预训练权重。
 
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 | Model              | Pretrained Weight                                                                | Language     | Details of the model                    |
@@ -165,20 +165,24 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | sentences crawed from Baidu Know.       |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |BigBird_            |``bigbird-base-uncased``                                                          | English      | 12-layer, 768-hidden,                   |
-|                    |                                                                                  |              | 12-heads, _M parameters.                |
+|                    |                                                                                  |              | 12-heads, 127M parameters.               |
 |                    |                                                                                  |              | Trained on lower-cased English text.    |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |Blenderbot_         |``blenderbot-3B``                                                                 | English      | 26-layer,                               |
-|                    |                                                                                  |              | 32-heads, 106M parameters.              |
+|                    |                                                                                  |              | 32-heads, 3B parameters.                |
 |                    |                                                                                  |              | The Blenderbot base model.              |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``blenderbot-400M-distill``                                                       | English      | 14-layer, 384-hidden,                   |
-|                    |                                                                                  |              | 32-heads, 17M parameters.               |
-|                    |                                                                                  |              | The ConvBERT medium small model.        |
+|                    |                                                                                  |              | 32-heads, 400M parameters.              |
+|                    |                                                                                  |              | The Blenderbot distil model.            |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``blenderbot-1B-distill``                                                         | English      | 14-layer, 128-hidden,                   |
-|                    |                                                                                  |              | 32-heads, 13M parameters.               |
-|                    |                                                                                  |              | The ConvBERT small model.               |
+|                    |``blenderbot-1B-distill``                                                         | English      | 14-layer,                               |
+|                    |                                                                                  |              | 32-heads, 1478M parameters.             |
+|                    |                                                                                  |              | The Blenderbot Distil 1B model.         |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|Blenderbot-Small_   |``blenderbot_small-90M``                                                          | English      | 16-layer,                               |
+|                    |                                                                                  |              | 16-heads, 90M parameters.               |
+|                    |                                                                                  |              | The Blenderbot small model.             |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |ConvBert_           |``convbert-base``                                                                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 106M parameters.              |
@@ -492,6 +496,8 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |Blenderbot_         | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|Blenderbot-Small_   | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              | ✅              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
@@ -529,7 +535,8 @@ Transformer预训练模型适用任务汇总
 .. _BART: https://arxiv.org/abs/1910.13461
 .. _BERT: https://arxiv.org/abs/1810.04805
 .. _BigBird: https://arxiv.org/abs/2007.14062
-.. _Blenderbot:: https://arxiv.org/pdf/2004.13637.pdf
+.. _Blenderbot: https://arxiv.org/pdf/2004.13637.pdf
+.. _Blenderbot-Small: https://arxiv.org/pdf/2004.13637.pdf
 .. _ConvBert: https://arxiv.org/abs/2008.02496
 .. _DistilBert: https://arxiv.org/abs/1910.01108
 .. _ELECTRA: https://arxiv.org/abs/2003.10555
@@ -618,6 +625,8 @@ Reference
 - Lewis, Mike, et al. "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension." arXiv preprint arXiv:1910.13461 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Zaheer, Manzil, et al. "Big bird: Transformers for longer sequences." arXiv preprint arXiv:2007.14062 (2020).
+- Stephon, Emily, et al. "Blenderbot: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
+- Stephon, Emily, et al. "Blenderbot-Small: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
 - Jiang, Zihang, et al. "ConvBERT: Improving BERT with Span-based Dynamic Convolution." arXiv preprint arXiv:2008.02496 (2020).
 - Sanh, Victor, et al. "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter." arXiv preprint arXiv:1910.01108 (2019).
 - Clark, Kevin, et al. "Electra: Pre-training text encoders as discriminators rather than generators." arXiv preprint arXiv:2003.10555 (2020).
