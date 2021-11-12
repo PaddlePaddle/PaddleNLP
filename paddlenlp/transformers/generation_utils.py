@@ -597,24 +597,23 @@ class GenerationMixin(object):
                 None.
             pad_token_id (int, optional): The id of the `pad_token`. Default to 
                 None.
-            decoder_start_token_id (int, optional):
-                The start token id for encoder-decoder models. Default to None.
-            forced_bos_token_id (:obj:`int`, `optional`):
-                The id of the token to force as the first generated token after the :obj:`decoder_start_token_id`.
-                Useful for multilingual models like :doc:`mBART <../model_doc/mbart>` where the first generated token
-                needs to be the target language token.
-            forced_eos_token_id (:obj:`int`, `optional`):
-                The id of the token to force as the last generated token when :obj:`max_length` is reached.
+            decoder_start_token_id (int, optional): The start token id for 
+                encoder-decoder models. Default to None.
+            forced_bos_token_id (int, optional): The id of the token to force as 
+                the first generated token. Usually use for multilingual models.
+                Default to None.
+            forced_eos_token_id (int, optional): The id of the token to force as 
+                the last generated token. Default to None.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
             diversity_rate (float, optional): If num_beam_groups is 1, this is the 
                 diversity_rate for Diverse Siblings Search. See 
                 `this paper https://arxiv.org/abs/1611.08562`__ for more details. 
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
-            use_cache: (bool, optional): Whether or not use the model cache to 
+            use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
-            use_fast: (bool, optional): Whether or not use the model cache to 
-                speed up decoding. Default to True.
+            use_fast: (bool, optional): Whether to use faster entry of model 
+                for generation. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
 
@@ -722,7 +721,13 @@ class GenerationMixin(object):
                     self._build_faster(args)
                 if self._faster_entry:
                     model_kwargs = args.pop('model_kwargs')
-                    output_ids = self._faster_entry(**args, **model_kwargs)
+                    faster_args = {}
+                    for arg_name in self._faster_entry.__code__.co_varnames:
+                        if arg_name in args.keys():
+                            faster_args[arg_name] = args[arg_name]
+                        if arg_name in model_kwargs.keys():
+                            faster_args[arg_name] = model_kwargs[arg_name]
+                    output_ids = self._faster_entry(**faster_args)
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
                         output_ids = output_ids[:, :
