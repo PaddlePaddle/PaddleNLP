@@ -1083,11 +1083,11 @@ class FasterBART(BartPretrainedModel):
             self._model, 'eos_token_id', None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(
             self._model, 'pad_token_id', None)
-        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.encoder(input_ids)
-        self.encoder = disable_faster_encoder(self.encoder)
+            self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(

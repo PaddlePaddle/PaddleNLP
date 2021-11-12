@@ -501,7 +501,10 @@ class InferTransformerDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer",
+                verbose=True,
+                opnames=["fusion_decoding", "fusion_force_decoding"])
 
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
@@ -725,7 +728,7 @@ class InferGptDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load("FasterTransformer", verbose=True, opnames=["fusion_gpt"])
 
         super(InferGptDecoding, self).__init__()
 
@@ -903,7 +906,10 @@ class InferUnifiedDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer",
+                verbose=True,
+                opnames=["fusion_unified_decoding"])
 
         super(InferUnifiedDecoding, self).__init__()
         for arg, value in locals().items():
@@ -1280,7 +1286,10 @@ class InferBartDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer",
+                verbose=True,
+                opnames=["fusion_bart_decoding"])
 
         super(InferBartDecoding, self).__init__()
         for arg, value in locals().items():

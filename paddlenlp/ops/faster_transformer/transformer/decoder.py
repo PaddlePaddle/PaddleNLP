@@ -121,7 +121,7 @@ class InferTransformerDecoder(nn.Layer):
                 logger.warning(
                     "The specified decoder_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load("FasterTransformer", verbose=True, opnames=["fusion_decoder"])
 
         super(InferTransformerDecoder, self).__init__()
         self.n_head = n_head

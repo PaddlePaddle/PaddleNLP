@@ -17,6 +17,7 @@ import paddle
 from paddle.fluid.layer_helper import LayerHelper
 import paddle.nn as nn
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
+from paddle.utils.cpp_extension import parse_op_info
 
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load
@@ -272,11 +273,22 @@ def enable_faster_encoder(self, need_build=True):
     if not self.training:
         if need_build:
             try:
-                load("FasterTransformer", verbose=True)
+                load(
+                    "FasterTransformer",
+                    verbose=True,
+                    opnames=["fusion_encoder"])
             except Exception:
                 logger.warning(
-                    "Exception occurs when using FasterTransformer. " \
-                    "The original forward will be involved. ")
+                    "Exception occurs when using FasterEncoder. " \
+                    "The original TransformerEncoder forward will be involved. ")
+                return self
+        else:
+            try:
+                parse_op_info("fusion_encoder")
+            except Exception:
+                logger.warning(
+                    "Exception occurs when using FasterEncoder. " \
+                    "The original TransformerEncoder forward will be involved. ")
                 return self
         for layer in self.children():
             layer.apply(init_func)

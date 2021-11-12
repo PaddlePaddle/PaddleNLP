@@ -22,7 +22,7 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.dep_util import newer_group
 
-from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
+from paddle.utils.cpp_extension import load_op_meta_info_and_register_op, parse_op_info
 from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
 from paddle.utils.cpp_extension.cpp_extension import (
     CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
@@ -212,7 +212,12 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         f.write(content)
 
 
-def load(name, build_dir=None, force=False, verbose=False, **kwargs):
+def load(name,
+         build_dir=None,
+         force=False,
+         verbose=False,
+         opnames=None,
+         **kwargs):
     # TODO(guosheng): Need better way to resolve unsupported such as CPU. Currently,
     # raise NotImplementedError and skip `_jit_compile`. Otherwise, `_jit_compile`
     # will output the error to stdout (when verbose is True) and raise `RuntimeError`,
@@ -247,7 +252,15 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                     ext_sources, ext_filepath, 'newer'):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
-                return load_op_meta_info_and_register_op(ext_filepath)
+                ops = load_op_meta_info_and_register_op(ext_filepath)
+
+                if opnames is not None and len(ops) != 0:
+                    if isinstance(opnames, str):
+                        opnames = [opnames]
+                    if not set(opnames).issubset(set(ops)):
+                        raise ImportError(
+                            "Operator ({}) is not registered. ".format(opnames))
+                return ops
 
     # write setup file and jit compile
     file_path = os.path.join(build_dir, "{}_setup.py".format(name))
@@ -256,7 +269,15 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     if isinstance(extension, CMakeExtension):
         # Load a shared library (if exists) only to register op.
         if os.path.exists(ext_filepath):
-            load_op_meta_info_and_register_op(ext_filepath)
+            ops = load_op_meta_info_and_register_op(ext_filepath)
+
+            if opnames is not None and len(ops) != 0:
+                if isinstance(opnames, str):
+                    opnames = [opnames]
+                if not set(opnames).issubset(set(ops)):
+                    raise ImportError(
+                        "Operator ({}) is not registered. ".format(opnames))
+            return ops
     else:
         # Import as callable python api
         return _import_module_from_library(name, build_base_dir, verbose)
