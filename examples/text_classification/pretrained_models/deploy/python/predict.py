@@ -184,8 +184,10 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
+    #     'ernie-tiny')
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
+        'bert-base-chinese')
     test_ds = load_dataset("chnsenticorp", splits=["test"])
     data = [d["text"] for d in test_ds]
     batches = [
@@ -193,11 +195,18 @@ if __name__ == "__main__":
         for idx in range(0, len(data), args.batch_size)
     ]
     label_map = {0: 'negative', 1: 'positive'}
-
-    results = []
     for batch_data in batches:
-        results.extend(predictor.predict(batch_data, tokenizer, label_map))
+        predictor.predict(batch_data, tokenizer, label_map)
+    results = []
+    epochs = 10
+    import time
+    start = time.time()
+    for _ in range(epochs):
+        for batch_data in batches:
+            results.extend(predictor.predict(batch_data, tokenizer, label_map))
+    end = time.time()
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
+    print("Total cost: {:.4f} ms".format((end - start) * 1000.0 / epochs))
     if args.benchmark:
         predictor.autolog.report()

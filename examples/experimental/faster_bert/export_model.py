@@ -30,22 +30,19 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
-    )
+        ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
         "--model_path",
         default=None,
         type=str,
         required=True,
-        help="Path of the trained model to be exported.",
-    )
+        help="Path of the trained model to be exported.", )
     parser.add_argument(
         "--output_path",
         default=None,
         type=str,
         required=True,
-        help=
-        "The output file prefix used to save the exported inference model.",
+        help="The output file prefix used to save the exported inference model.",
     )
     args = parser.parse_args()
     return args
@@ -58,22 +55,28 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     # build model and load trained parameters
-    model = model_class.from_pretrained(args.model_path)
+    model = model_class.from_pretrained(
+        './tmp/faster_bert_chnsenticorp', num_classes=2)
+    if args.model_path and os.path.isfile(args.model_path):
+        state_dict = paddle.load(args.model_path)
+        model.set_dict(state_dict)
+        print("Loaded parameters from %s" % args.model_path)
     # switch to eval model
     model.eval()
     # convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
         ])
     # save converted static graph model
-    paddle.jit.save(model, args.output_path)
+    paddle.jit.save(model, os.path.join(args.output_path, "inference"))
     # also save tokenizer for inference usage
-    tokenizer = tokenizer_class.from_pretrained(args.model_path)
+    tokenizer = tokenizer_class.from_pretrained(
+        './tmp/faster_bert_chnsenticorp')
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 

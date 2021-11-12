@@ -28,9 +28,10 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        "ernie-tiny", num_classes=len(label_map))
-
+    # model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+    #     "ernie-1.0", num_classes=len(label_map))
+    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
+        'bert-base-chinese', num_classes=2)
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)

@@ -45,7 +45,11 @@ def parse_args():
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=2,
+        help="Batch size per GPU/CPU for training.")
     args = parser.parse_args()
     return args
 
@@ -92,7 +96,7 @@ class Predictor(object):
         output_handle = predictor.get_output_handle(predictor.get_output_names()
                                                     [0])
         tokenizer = BertTokenizer.from_pretrained(
-            os.path.dirname(args.model_path))
+            "./tmp/faster_bert_chnsenticorp")
 
         return cls(predictor, input_handles, output_handle, tokenizer,
                    max_seq_length)
@@ -112,27 +116,38 @@ class Predictor(object):
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
 
-        # Seperates data into some batches.
-        batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
+        input_ids, segment_ids = batchify_fn(examples)
+        self.input_handles[0].copy_from_cpu(input_ids)
+        self.input_handles[1].copy_from_cpu(segment_ids)
+        self.predictor.run()
+        logits = self.output_handle.copy_to_cpu()
 
-        outputs = []
-        results = []
-        for batch in batches:
-            input_ids, segment_ids = batchify_fn(batch)
-            self.input_handles[0].copy_from_cpu(input_ids)
-            self.input_handles[1].copy_from_cpu(segment_ids)
-            self.predictor.run()
-            logits = self.output_handle.copy_to_cpu()
-            probs = softmax(logits, axis=1)
-            idx = np.argmax(probs, axis=1)
-            idx = idx.tolist()
-            labels = [label_map[i] for i in idx]
-            outputs.extend(probs)
-            results.extend(labels)
-        return outputs, results
+        probs = softmax(logits, axis=1)
+        idx = np.argmax(probs, axis=1)
+        idx = idx.tolist()
+        labels = [label_map[i] for i in idx]
+        return labels
+        # Seperates data into some batches.
+        # batches = [
+        #     examples[idx:idx + batch_size]
+        #     for idx in range(0, len(examples), batch_size)
+        # ]
+
+        # outputs = []
+        # results = []
+        # for batch in batches:
+        #     input_ids, segment_ids = batchify_fn(batch)
+        #     self.input_handles[0].copy_from_cpu(input_ids)
+        #     self.input_handles[1].copy_from_cpu(segment_ids)
+        #     self.predictor.run()
+        #     logits = self.output_handle.copy_to_cpu()
+        #     probs = softmax(logits, axis=1)
+        #     idx = np.argmax(probs, axis=1)
+        #     idx = idx.tolist()
+        #     labels = [label_map[i] for i in idx]
+        #     outputs.extend(probs)
+        #     results.extend(labels)
+        # return outputs, results
 
 
 def main():
@@ -153,8 +168,10 @@ def main():
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
     ]
+    for batch_data in batches:
+        predictor.predict(batch_data, label_map)
 
-    iters = 1
+    iters = 10
     results = []
     start = time.time()
     for i in range(iters):
@@ -164,7 +181,7 @@ def main():
 
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
-    print("time:", (end-start)*1000.0/iters, "ms")
+    print("time:", (end - start) * 1000.0 / iters, "ms")
 
 
 if __name__ == "__main__":
