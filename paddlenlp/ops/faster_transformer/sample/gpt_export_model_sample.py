@@ -66,16 +66,6 @@ def parse_args():
     parser.add_argument(
         "--max_out_len", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
-        "--start_token",
-        default="<|endoftext|>",
-        type=str,
-        help="The start token. Defaults to <|endoftext|>. ")
-    parser.add_argument(
-        "--end_token",
-        default="<|endoftext|>",
-        type=str,
-        help="The end token. Defaults to <|endoftext|>. ")
-    parser.add_argument(
         "--temperature",
         default=1.0,
         type=float,
@@ -98,9 +88,6 @@ def do_predict(args):
     model = model_class.from_pretrained(
         args.model_name_or_path, max_predict_len=args.max_out_len)
 
-    bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
-    eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
-
     gpt = FasterGPT(
         model=model,
         decoding_lib=args.decoding_lib,
@@ -119,8 +106,8 @@ def do_predict(args):
             args.topk,
             args.topp,
             args.max_out_len,
-            bos_id,
-            eos_id,
+            tokenizer.eos_token_id,
+            tokenizer.eos_token_id,
             tokenizer.pad_token_id,
             args.temperature,
         ])

@@ -1500,5 +1500,5 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decoding_strategy=decoding_strategy)
         return ids
