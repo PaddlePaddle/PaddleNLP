@@ -219,6 +219,10 @@ python3 embedding_insert.py
 |1000万条|12min24s|
 
 
+另外，milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
+
+![](./img/mem.png)
+
 
 运行召回脚本：
 
@@ -237,7 +241,7 @@ python3 embedding_recall.py
 输入一条文本进行召回,输入的样本为：
 
 ```
-id2corpus={0:'外语阅读焦虑与英语成绩及性别的关系'}
+{0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
 ```
 运行命令
 ```
