@@ -1,1 +1,0 @@
-save inference model directory
