@@ -3,7 +3,7 @@ import paddle
 import torch
 import numpy as np
 
-sys.path.insert(0, "../../")
+sys.path.insert(0, "../../../")
 
 
 def get_input_demo(platform="paddle", device="cpu"):
