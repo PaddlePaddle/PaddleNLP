@@ -17,6 +17,7 @@ import os
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
+from paddle.incubate.nn import FusedTransformerEncoderLayer
 
 from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from paddlenlp.transformers.model_utils import register_base_model
@@ -105,7 +106,7 @@ class FasterErniePretrainedModel(FasterPretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/faster_ernie/faster_ernie_v1_chn_base.pdparams",
             "ernie-tiny":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-en":
@@ -245,14 +246,14 @@ class FasterErnieModel(FasterErniePretrainedModel):
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
-        encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = FusedTransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
             intermediate_size,
-            dropout=hidden_dropout_prob,
+            dropout_rate=hidden_dropout_prob,
             activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,
+            attn_dropout_rate=attention_probs_dropout_prob,
+            act_dropout_rate=0,
             weight_attr=weight_attr, )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = ErniePooler(hidden_size, weight_attr)
