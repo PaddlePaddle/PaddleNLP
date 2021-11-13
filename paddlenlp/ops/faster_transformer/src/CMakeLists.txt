@@ -1,3 +1,8 @@
+if (${CUDA_VERSION} GREATER_EQUAL 11.0)
+  message(STATUS "Add DCUDA11_MODE")
+  add_definitions("-DCUDA11_MODE")
+endif()
+
 add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
 # Default is 1 in standard c++ when using gcc8.2
