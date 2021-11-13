@@ -107,20 +107,16 @@ class FasterErniePretrainedModel(FasterPretrainedModel):
         "model_state": {
             "ernie-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/faster_ernie/faster_ernie_v1_chn_base.pdparams",
-            "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/faster_ernie_v2_base/faster_ernie_v2_eng_base.pdparams",
             "ernie-2.0-en-finetuned-squad":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/faster_ernie_v2_base/faster_ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/faster_ernie_v2_large/faster_ernie_v2_eng_large.pdparams",
         },
         "vocab_file": {
             "ernie-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/vocab.txt",
-            "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/vocab.txt",
             "ernie-2.0-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-en-finetuned-squad":
