@@ -20,8 +20,8 @@ def get_input_demo(platform="paddle", device="cpu"):
 def test_layoutlm_paddle():
     from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
 
-    tokenizer = LayoutXLMTokenizer.from_pretrained("./layoutxlm-base-paddle/")
-    model = LayoutXLMModel.from_pretrained("./layoutxlm-base-paddle/")
+    tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
+    model = LayoutXLMModel.from_pretrained("layoutxlm-base-uncased")
     model.eval()
 
     paddle.save(model.state_dict(), "v2.pdparams")
@@ -41,10 +41,7 @@ def test_layoutlm_paddle():
 def test_layoutlm_torch():
     # import pytorch models
     from layoutlmft.models.layoutxlm import LayoutXLMModel, LayoutXLMTokenizer
-
-    model_dir = "./layoutxlm-base-torch/"
-
-    model = LayoutXLMModel.from_pretrained(model_dir)
+    model = LayoutXLMModel.from_pretrained("layoutxlm-base-uncased")
     model.eval()
     model = model.cuda()
 
