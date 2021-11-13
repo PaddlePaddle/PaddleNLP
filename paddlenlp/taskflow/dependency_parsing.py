@@ -149,8 +149,8 @@ class DDParserTask(Task):
 
     def _construct_input_spec(self):
         """
-       Construct the input spec for the convert dygraph model to static model.
-       """
+        Construct the input spec for the convert dygraph model to static model.
+        """
         self._input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),

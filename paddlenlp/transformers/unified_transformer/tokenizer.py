@@ -36,13 +36,11 @@ __all__ = ['UnifiedTransformerTokenizer']
 
 class UnifiedTransformerTokenizer(PretrainedTokenizer):
     """
-    Constructs an UnifiedTransformer tokenizer based on 
-    `SentencePiece <https://github.com/google/sentencepiece>`__.
+    Constructs an UnifiedTransformer tokenizer based on `SentencePiece <https://github.com/google/sentencepiece>`__.
 
-    This tokenizer inherits from 
-    :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` which 
-    contains most of the main methods. For more information regarding those 
-    methods, please refer to this superclass.
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):

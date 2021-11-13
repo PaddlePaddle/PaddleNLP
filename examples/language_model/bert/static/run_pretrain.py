@@ -435,4 +435,5 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
+    print (args)
     do_train(args)
