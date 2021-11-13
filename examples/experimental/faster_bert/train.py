@@ -25,6 +25,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+import distutils.util
 
 from utils import convert_example
 from static.modeling import FasterBertForSequenceClassification
@@ -42,6 +43,8 @@ parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
+parser.add_argument("--scale_loss", type=float, default=32768, help="The value of scale_loss for fp16. This is only used for AMP training.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -115,7 +118,8 @@ def do_train():
 
     # If you wanna use bert/roberta/electra pretrained model,
     #model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_classes=2)
-    model = FasterBertForSequenceClassification.from_pretrained('./tmp/faster_bert_chnsenticorp', num_classes=2)
+    model = FasterBertForSequenceClassification.from_pretrained(
+        './tmp/faster_bert_chnsenticorp', num_classes=2)
     # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_classes=2)
     # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
     #model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
@@ -123,7 +127,8 @@ def do_train():
 
     # If you wanna use bert/roberta/electra pretrained model,
     #tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('./tmp/faster_bert_chnsenticorp/')
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
+        './tmp/faster_bert_chnsenticorp/')
     # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
     # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained('chinese-electra-small', num_classes=2)
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
@@ -176,14 +181,22 @@ def do_train():
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
-
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
-            loss = criterion(logits, labels)
+            with paddle.amp.auto_cast(
+                    args.use_amp,
+                    custom_white_list=["fused_feedforward", "fused_attention"],
+                    custom_black_list=[
+                        "reduce_sum", "c_softmax_with_cross_entropy",
+                        "c_embedding"
+                    ]):
+                logits = model(input_ids, token_type_ids)
+                loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
             metric.update(correct)
@@ -196,8 +209,12 @@ def do_train():
                     % (global_step, epoch, step, loss, acc,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
-            loss.backward()
-            optimizer.step()
+            if args.use_amp:
+                scaler.scale(loss).backward()
+                scaler.minimize(optimizer, loss)
+            else:
+                loss.backward()
+                optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % 100 == 0 and rank == 0:
