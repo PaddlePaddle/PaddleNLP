@@ -91,10 +91,3 @@ if __name__ == "__main__":
     print("======pool_out diff  info====")
     print("\t mean_abs_diff: {}".format(mean_abs_diff))
     print("\t max_abs_diff: {}".format(max_abs_diff))
-
-# Max absolute difference: 0.002334
-# Max relative difference: 7.8151183
-# np.testing.assert_allclose(torch_hidden_out, paddle_hidden_out)
-# Max absolute difference: 1.66893e-06
-# Max relative difference: 0.02247073
-# np.testing.assert_allclose(torch_pool_out, paddle_pool_out)
