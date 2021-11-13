@@ -27,7 +27,7 @@ def test_layoutlm_paddle():
     paddle.save(model.state_dict(), "v2.pdparams")
 
     batch_input = get_input_demo(platform="paddle", device="gpu")
-    with paddle.no_grad:
+    with paddle.no_grad():
         outputs = model(
             input_ids=batch_input["input_ids"],
             bbox=batch_input["bbox"],
