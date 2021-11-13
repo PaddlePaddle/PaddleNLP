@@ -60,7 +60,7 @@ class AddedToken:
         return self.__dict__
 
 
-class XLMRobertaTokenizer(PretrainedTokenizer):
+class LayoutXLMTokenizer(PretrainedTokenizer):
     """
     Adapted from :class:`~transformers.RobertaTokenizer` and class:`~transformers.XLNetTokenizer`. Based on
     `SentencePiece <https://github.com/google/sentencepiece>`__.
