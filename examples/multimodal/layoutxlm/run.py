@@ -41,7 +41,7 @@ def test_layoutlm_paddle():
 def test_layoutlm_torch():
     # import pytorch models
     from layoutlmft.models.layoutxlm import LayoutXLMModel, LayoutXLMTokenizer
-    model = LayoutXLMModel.from_pretrained("layoutxlm-base")
+    model = LayoutXLMModel.from_pretrained("microsoft/layoutxlm-base")
     model.eval()
     model = model.cuda()
 
