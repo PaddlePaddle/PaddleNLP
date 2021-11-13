@@ -17,6 +17,7 @@ import os
 import random
 import time
 from functools import partial
+import distutils.util
 
 import numpy as np
 import paddle
@@ -38,6 +39,8 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
+parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -142,6 +145,8 @@ def do_train():
     criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
 
     metric = ChunkEvaluator(label_list=train_ds.label_list)
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
     global_step = 0
     tic_train = time.time()
@@ -150,8 +155,11 @@ def do_train():
                 train_data_loader, start=1):
             texts = to_tensor(texts)
             global_step += 1
-            logits, preds = model(texts)
-            loss = criterion(logits, labels)
+            with paddle.amp.auto_cast(
+                    args.use_amp,
+                    custom_white_list=["fused_feedforward", "fused_attention"]):
+                logits, preds = model(texts)
+                loss = criterion(logits, labels)
             avg_loss = paddle.mean(loss)
             if global_step % 10 == 0:
                 print(
@@ -159,8 +167,12 @@ def do_train():
                     % (global_step, epoch, step, avg_loss,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
-            avg_loss.backward()
-            optimizer.step()
+            if args.use_amp:
+                scaler.scale(avg_loss).backward()
+                scaler.minimize(optimizer, avg_loss)
+            else:
+                avg_loss.backward()
+                optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % 500 == 0 or global_step == num_training_steps:
