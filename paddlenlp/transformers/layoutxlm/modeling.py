@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import math
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
-from paddle.nn import Layer
 import paddle.nn.functional as F
-import math
+from paddle.nn import Layer
+from paddle.nn import CrossEntropyLoss
 
 from .. import PretrainedModel, register_base_model
 from .visual_backbone import build_resnet_fpn_backbone
 from .visual_backbone import read_config
-# from .re import REDecoder
 
 __all__ = [
-    'LayoutLMv2Model', "LayoutLMv2PretrainedModel",
-    "LayoutLMv2ForTokenClassification", "LayoutLMv2ForPretraining"
+    'LayoutXLMModel', "LayoutXLMPretrainedModel",
+    "LayoutXLMForTokenClassification", "LayoutXLMForPretraining",
+    "LayoutXLMForRelationExtraction"
 ]
 
 
@@ -61,9 +63,9 @@ def relative_position_bucket(relative_position,
     return ret
 
 
-class LayoutLMv2Pooler(Layer):
+class LayoutXLMPooler(Layer):
     def __init__(self, hidden_size, with_pool):
-        super(LayoutLMv2Pooler, self).__init__()
+        super(LayoutXLMPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
         self.with_pool = with_pool
@@ -78,19 +80,18 @@ class LayoutLMv2Pooler(Layer):
         return pooled_output
 
 
-class LayoutLMv2Embeddings(Layer):
+class LayoutXLMEmbeddings(Layer):
     """
     Include embeddings from word, position and token_type embeddings
     """
 
     def __init__(self, config):
-        super().__init__()
-
+        super(LayoutXLMEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             config["vocab_size"], config["hidden_size"], padding_idx=0)
         self.position_embeddings = nn.Embedding(
             config["max_position_embeddings"], config["hidden_size"])
-        # gry add for layoutlm
+        # gry add for layoutxlm
         self.x_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.y_position_embeddings = nn.Embedding(
@@ -99,7 +100,7 @@ class LayoutLMv2Embeddings(Layer):
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.w_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
-        # end of gry add for layoutlm
+        # end of gry add for layoutxlm
         self.token_type_embeddings = nn.Embedding(config["type_vocab_size"],
                                                   config["hidden_size"])
         self.LayerNorm = nn.LayerNorm(
@@ -188,10 +189,10 @@ class LayoutLMv2Embeddings(Layer):
         return embeddings
 
 
-class LayoutLMv2PretrainedModel(PretrainedModel):
+class LayoutXLMPretrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "layoutlm-base-uncased": {
+        "layoutxlm-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
             "coordinate_size": 128,
             "fast_qkv": True,
@@ -207,7 +208,7 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
             "max_position_embeddings": 512,
             "max_rel_2d_pos": 256,
             "max_rel_pos": 128,
-            "model_type": "layoutlmv2",
+            "model_type": "layoutxlm",
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "output_past": True,
@@ -225,11 +226,11 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "layoutlmv2-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlmv2-base-uncased.pdparams",
+            "layoutxlmv2-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutxlm_base/model_state.pdparams",
         }
     }
-    base_model_prefix = "layoutlmv2"
+    base_model_prefix = "layoutxlm"
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -246,9 +247,9 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
                         shape=layer.weight.shape))
 
 
-class LayoutLMv2SelfOutput(nn.Layer):
+class LayoutXLMSelfOutput(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMSelfOutput, self).__init__()
         self.dense = nn.Linear(config["hidden_size"], config["hidden_size"])
         self.LayerNorm = nn.LayerNorm(
             config["hidden_size"], epsilon=config["layer_norm_eps"])
@@ -261,9 +262,9 @@ class LayoutLMv2SelfOutput(nn.Layer):
         return hidden_states
 
 
-class LayoutLMv2SelfAttention(nn.Layer):
+class LayoutXLMSelfAttention(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMSelfAttention, self).__init__()
         if config["hidden_size"] % config[
                 "num_attention_heads"] != 0 and not hasattr(config,
                                                             "embedding_size"):
@@ -367,11 +368,11 @@ class LayoutLMv2SelfAttention(nn.Layer):
         return outputs
 
 
-class LayoutLMv2Attention(nn.Layer):
+class LayoutXLMAttention(nn.Layer):
     def __init__(self, config):
-        super().__init__()
-        self.self = LayoutLMv2SelfAttention(config)
-        self.output = LayoutLMv2SelfOutput(config)
+        super(LayoutXLMAttention, self).__init__()
+        self.self = LayoutXLMSelfAttention(config)
+        self.output = LayoutXLMSelfOutput(config)
 
     def forward(
             self,
@@ -384,6 +385,7 @@ class LayoutLMv2Attention(nn.Layer):
             output_attentions=False,
             rel_pos=None,
             rel_2d_pos=None, ):
+
         self_outputs = self.self(
             hidden_states,
             attention_mask,
@@ -400,12 +402,12 @@ class LayoutLMv2Attention(nn.Layer):
         return outputs
 
 
-class LayoutLMv2Encoder(nn.Layer):
+class LayoutXLMEncoder(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMEncoder, self).__init__()
         self.config = config
         self.layer = nn.LayerList([
-            LayoutLMv2Layer(config) for _ in range(config["num_hidden_layers"])
+            LayoutXLMLayer(config) for _ in range(config["num_hidden_layers"])
         ])
 
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
@@ -523,9 +525,9 @@ class LayoutLMv2Encoder(nn.Layer):
         return (hidden_states, )
 
 
-class LayoutLMv2Intermediate(nn.Layer):
+class LayoutXLMIntermediate(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMIntermediate, self).__init__()
         self.dense = nn.Linear(config["hidden_size"],
                                config["intermediate_size"])
         if config["hidden_act"] == "gelu":
@@ -540,9 +542,9 @@ class LayoutLMv2Intermediate(nn.Layer):
         return hidden_states
 
 
-class LayoutLMv2Output(nn.Layer):
+class LayoutXLMOutput(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMOutput, self).__init__()
         self.dense = nn.Linear(config["intermediate_size"],
                                config["hidden_size"])
         self.LayerNorm = nn.LayerNorm(
@@ -556,16 +558,16 @@ class LayoutLMv2Output(nn.Layer):
         return hidden_states
 
 
-class LayoutLMv2Layer(nn.Layer):
+class LayoutXLMLayer(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(LayoutXLMLayer, self).__init__()
         # since chunk_size_feed_forward is 0 as default, no chunk is needed here.
         self.seq_len_dim = 1
-        self.attention = LayoutLMv2Attention(config)
+        self.attention = LayoutXLMAttention(config)
         # https://github.com/huggingface/transformers/blob/b6f332ecaf18054109294dd2efa1a5e6aa274a03/src/transformers/configuration_utils.py#L86
         self.add_cross_attention = False  # default as false
-        self.intermediate = LayoutLMv2Intermediate(config)
-        self.output = LayoutLMv2Output(config)
+        self.intermediate = LayoutXLMIntermediate(config)
+        self.output = LayoutXLMOutput(config)
 
     def feed_forward_chunk(self, attention_output):
         intermediate_output = self.intermediate(attention_output)
@@ -608,7 +610,7 @@ class LayoutLMv2Layer(nn.Layer):
 
 class VisualBackbone(nn.Layer):
     def __init__(self, config):
-        super().__init__()
+        super(VisualBackbone, self).__init__()
         self.cfg = read_config()
         self.backbone = build_resnet_fpn_backbone(self.cfg)
         # syncbn is removed cause that will cause import of torch
@@ -643,7 +645,7 @@ class VisualBackbone(nn.Layer):
 
 
 @register_base_model
-class LayoutLMv2Model(LayoutLMv2PretrainedModel):
+class LayoutXLMModel(LayoutXLMPretrainedModel):
     """
     The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -684,12 +686,12 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
             self,
             with_pool='tanh',
             **kwargs, ):
-        super().__init__()
+        super(LayoutXLMModel, self).__init__()
         config = kwargs
         self.config = kwargs
         self.has_visual_segment_embedding = config[
             "has_visual_segment_embedding"]
-        self.embeddings = LayoutLMv2Embeddings(config)
+        self.embeddings = LayoutXLMEmbeddings(config)
 
         self.visual = VisualBackbone(config)
         self.visual.stop_gradient = True
@@ -702,8 +704,8 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
             config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.visual_dropout = nn.Dropout(config["hidden_dropout_prob"])
 
-        self.encoder = LayoutLMv2Encoder(config)
-        self.pooler = LayoutLMv2Pooler(config["hidden_size"], with_pool)
+        self.encoder = LayoutXLMEncoder(config)
+        self.pooler = LayoutXLMPooler(config["hidden_size"], with_pool)
 
     #         self.apply(self.init_weights)
 
@@ -843,25 +845,25 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         return sequence_output, pooled_output
 
 
-class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
-    def __init__(self, layoutlm, num_classes=2, dropout=None):
-        super().__init__()
+class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
+    def __init__(self, layoutxlm, num_classes=2, dropout=None):
+        super(LayoutXLMForTokenClassification, self).__init__()
         self.num_classes = num_classes
-        if isinstance(layoutlm, dict):
-            self.layoutlmv2 = LayoutLMv2Model(**layoutlm)
+        if isinstance(layoutxlm, dict):
+            self.layoutxlm = LayoutXLMModel(**layoutxlm)
         else:
-            self.layoutlmv2 = layoutlm
-        # print(self.layoutlmv2)
+            self.layoutxlm = layoutxlm
+        # print(self.layoutxlm)
         # exit()
 
         self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.layoutlmv2.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutlmv2.config["hidden_size"],
+                                  self.layoutxlm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"],
                                     num_classes)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
-        return self.layoutlmv2.embeddings.word_embeddings
+        return self.layoutxlm.embeddings.word_embeddings
 
     def forward(
             self,
@@ -873,7 +875,7 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
             position_ids=None,
             head_mask=None,
             labels=None, ):
-        outputs = self.layoutlmv2(
+        outputs = self.layoutxlm(
             input_ids=input_ids,
             bbox=bbox,
             image=image,
@@ -909,7 +911,7 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
         return outputs
 
 
-class LayoutLMv2PredictionHead(Layer):
+class LayoutXLMPredictionHead(Layer):
     """
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
@@ -919,7 +921,7 @@ class LayoutLMv2PredictionHead(Layer):
                  vocab_size,
                  activation,
                  embedding_weights=None):
-        super(LayoutLMv2PredictionHead, self).__init__()
+        super(LayoutXLMPredictionHead, self).__init__()
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
@@ -946,14 +948,14 @@ class LayoutLMv2PredictionHead(Layer):
         return hidden_states
 
 
-class LayoutLMv2PretrainingHeads(Layer):
+class LayoutXLMPretrainingHeads(Layer):
     def __init__(self,
                  hidden_size,
                  vocab_size,
                  activation,
                  embedding_weights=None):
-        super(LayoutLMv2PretrainingHeads, self).__init__()
-        self.predictions = LayoutLMv2PredictionHead(
+        super(LayoutXLMPretrainingHeads, self).__init__()
+        self.predictions = LayoutXLMPredictionHead(
             hidden_size, vocab_size, activation, embedding_weights)
 
     def forward(self, sequence_output, masked_positions=None):
@@ -961,15 +963,15 @@ class LayoutLMv2PretrainingHeads(Layer):
         return prediction_scores
 
 
-class LayoutLMv2ForPretraining(LayoutLMv2PretrainedModel):
-    def __init__(self, layoutlm):
-        super(LayoutLMv2ForPretraining, self).__init__()
-        self.layoutlmv2 = layoutlm
-        self.cls = LayoutLMv2PretrainingHeads(
-            self.layoutlmv2.config["hidden_size"],
-            self.layoutlmv2.config["vocab_size"],
-            self.layoutlmv2.config["hidden_act"],
-            embedding_weights=self.layoutlmv2.embeddings.word_embeddings.weight)
+class LayoutXLMForPretraining(LayoutXLMPretrainedModel):
+    def __init__(self, layoutxlm):
+        super(LayoutXLMForPretraining, self).__init__()
+        self.layoutxlm = layoutxlm
+        self.cls = LayoutXLMPretrainingHeads(
+            self.layoutxlm.config["hidden_size"],
+            self.layoutxlm.config["vocab_size"],
+            self.layoutxlm.config["hidden_act"],
+            embedding_weights=self.layoutxlm.embeddings.word_embeddings.weight)
 
     #         self.apply(self.init_weights)
 
@@ -982,7 +984,7 @@ class LayoutLMv2ForPretraining(LayoutLMv2PretrainedModel):
                 position_ids=None,
                 head_mask=None,
                 masked_positions=None):
-        outputs = self.layoutlmv2(
+        outputs = self.layoutxlm(
             input_ids=input_ids,
             bbox=bbox,
             image=image,
@@ -995,80 +997,209 @@ class LayoutLMv2ForPretraining(LayoutLMv2PretrainedModel):
         return prediction_scores
 
 
-# class LayoutLMv2ForRelationExtraction(LayoutLMv2PretrainedModel):
-#     def __init__(self,
-#                  layoutlm,
-#                  hidden_size=768,
-#                  hidden_dropout_prob=0.1,
-#                  dropout=None):
-#         super().__init__()
-#         if isinstance(layoutlm, dict):
-#             self.layoutlmv2 = LayoutLMv2Model(**layoutlm)
-#         else:
-#             self.layoutlmv2 = layoutlm
-#
-#         self.extractor = REDecoder(hidden_size, hidden_dropout_prob)
-#
-#         self.dropout = nn.Dropout(dropout if dropout is not None else
-#                                   self.layoutlmv2.config["hidden_dropout_prob"])
-#         # self.extractor.apply(self.init_weights)
-#
-#     def init_weights(self, layer):
-#         """Initialize the weights"""
-#         if isinstance(layer, nn.Linear):
-#             # Slightly different from the TF version which uses truncated_normal for initialization
-#             # cf https://github.com/pytorch/pytorch/pull/5617
-#             layer.weight.set_value(
-#                 paddle.tensor.normal(
-#                     mean=0.0, std=0.02, shape=layer.weight.shape))
-#             if layer.bias is not None:
-#                 layer.bias.set_value(
-#                     paddle.tensor.zeros(shape=layer.bias.shape))
-#         elif isinstance(layer, nn.Embedding):
-#             layer.weight.set_value(
-#                 paddle.tensor.normal(
-#                     mean=0.0, std=0.02, shape=layer.weight.shape))
-#             if layer._padding_idx is not None:
-#                 layer.weight[layer._padding_idx].set_value(
-#                     paddle.tensor.normal(
-#                         mean=0.0,
-#                         std=0.02,
-#                         shape=layer.weight[layer._padding_idx].shape))
-#         elif isinstance(layer, nn.LayerNorm):
-#             layer.weight.set_value(paddle.tensor.ones(shape=layer.bias.shape))
-#             layer.bias.set_value(paddle.tensor.zeros(shape=layer.bias.shape))
-#
-#     def forward(
-#             self,
-#             input_ids,
-#             bbox,
-#             labels=None,
-#             image=None,
-#             attention_mask=None,
-#             token_type_ids=None,
-#             position_ids=None,
-#             head_mask=None,
-#             entities=None,
-#             relations=None, ):
-#         outputs = self.layoutlmv2(
-#             input_ids=input_ids,
-#             bbox=bbox,
-#             image=image,
-#             attention_mask=attention_mask,
-#             token_type_ids=token_type_ids,
-#             position_ids=position_ids,
-#             head_mask=head_mask, )
-#
-#         seq_length = input_ids.shape[1]
-#         sequence_output, image_output = outputs[0][:, :seq_length], outputs[
-#             0][:, seq_length:]
-#         sequence_output = self.dropout(sequence_output)
-#         loss, pred_relations = self.extractor(sequence_output, entities,
-#                                               relations)
-#
-#         return dict(
-#             loss=loss,
-#             entities=entities,
-#             relations=relations,
-#             pred_relations=pred_relations,
-#             hidden_states=outputs[0], )
+class BiaffineAttention(nn.Layer):
+    """
+    Implements a biaffine attention operator for binary relation classification.
+    """
+
+    def __init__(self, in_features, out_features):
+        super(BiaffineAttention, self).__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.bilinear = nn.Bilinear(
+            in_features, in_features, out_features, bias_attr=False)
+        self.linear = nn.Linear(2 * in_features, out_features)
+
+    def forward(self, x_1, x_2):
+        return self.bilinear(
+            x_1, x_2) + self.linear(paddle.concat(
+                (x_1, x_2), axis=-1))
+
+
+class REDecoder(nn.Layer):
+    def __init__(self, hidden_size=768, hidden_dropout_prob=0.1):
+        super(REDecoder, self).__init__()
+        # TODO scale_grad_by_freq=true
+        self.entity_emb = nn.Embedding(3, hidden_size)
+        projection = nn.Sequential(
+            nn.Linear(hidden_size * 2, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(hidden_dropout_prob),
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Dropout(hidden_dropout_prob), )
+        self.ffnn_head = copy.deepcopy(projection)
+        self.ffnn_tail = copy.deepcopy(projection)
+        self.rel_classifier = BiaffineAttention(hidden_size // 2, 2)
+        self.loss_fct = CrossEntropyLoss()
+
+    def build_relation(self, relations, entities):
+        batch_size = len(relations)
+        new_relations = []
+        for b in range(batch_size):
+            if len(entities[b]["start"]) <= 2:
+                entities[b] = {"end": [1, 1], "label": [0, 0], "start": [0, 0]}
+            all_possible_relations = set([
+                (i, j)
+                for i in range(len(entities[b]["label"]))
+                for j in range(len(entities[b]["label"]))
+                if entities[b]["label"][i] == 1 and entities[b]["label"][j] == 2
+            ])
+            if len(all_possible_relations) == 0:
+                all_possible_relations = {(0, 1)}
+            positive_relations = set(
+                list(zip(relations[b]["head"], relations[b]["tail"])))
+            negative_relations = all_possible_relations - positive_relations
+            positive_relations = set(
+                [i for i in positive_relations if i in all_possible_relations])
+            reordered_relations = list(positive_relations) + list(
+                negative_relations)
+            relation_per_doc = {
+                "head": [i[0] for i in reordered_relations],
+                "tail": [i[1] for i in reordered_relations],
+                "label": [1] * len(positive_relations) + [0] *
+                (len(reordered_relations) - len(positive_relations))
+            }
+            assert len(relation_per_doc["head"]) != 0
+            new_relations.append(relation_per_doc)
+        return new_relations, entities
+
+    def get_predicted_relations(self, logits, relations, entities):
+        pred_relations = []
+        for i, pred_label in enumerate(logits.argmax(-1)):
+            if pred_label != 1:
+                continue
+            rel = {}
+            rel["head_id"] = relations["head"][i]
+            rel["head"] = (entities["start"][rel["head_id"]],
+                           entities["end"][rel["head_id"]])
+            rel["head_type"] = entities["label"][rel["head_id"]]
+
+            rel["tail_id"] = relations["tail"][i]
+            rel["tail"] = (entities["start"][rel["tail_id"]],
+                           entities["end"][rel["tail_id"]])
+            rel["tail_type"] = entities["label"][rel["tail_id"]]
+            rel["type"] = 1
+            pred_relations.append(rel)
+        return pred_relations
+
+    def forward(self, hidden_states, entities, relations):
+        batch_size, max_n_words, context_dim = hidden_states.shape
+        relations, entities = self.build_relation(relations, entities)
+        loss = 0
+        all_pred_relations = []
+        for b in range(batch_size):
+            head_entities = paddle.to_tensor(relations[b]["head"])
+            tail_entities = paddle.to_tensor(relations[b]["tail"])
+            relation_labels = paddle.to_tensor(relations[b]["label"])
+            entities_start_index = paddle.to_tensor(entities[b]["start"])
+            entities_labels = paddle.to_tensor(entities[b]["label"])
+            head_index = entities_start_index[head_entities]
+            head_label = entities_labels[head_entities]
+            head_label_repr = self.entity_emb(head_label)
+
+            tail_index = entities_start_index[tail_entities]
+            tail_label = entities_labels[tail_entities]
+            tail_label_repr = self.entity_emb(tail_label)
+
+            tmp_hidden_states = hidden_states[b][head_index]
+            if len(tmp_hidden_states.shape) == 1:
+                tmp_hidden_states = paddle.unsqueeze(tmp_hidden_states, axis=0)
+            head_repr = paddle.concat(
+                (tmp_hidden_states, head_label_repr), axis=-1)
+
+            tmp_hidden_states = hidden_states[b][tail_index]
+            if len(tmp_hidden_states.shape) == 1:
+                tmp_hidden_states = paddle.unsqueeze(tmp_hidden_states, axis=0)
+            tail_repr = paddle.concat(
+                (tmp_hidden_states, tail_label_repr), axis=-1)
+
+            heads = self.ffnn_head(head_repr)
+            tails = self.ffnn_tail(tail_repr)
+            logits = self.rel_classifier(heads, tails)
+            loss += self.loss_fct(logits, relation_labels)
+            pred_relations = self.get_predicted_relations(logits, relations[b],
+                                                          entities[b])
+            all_pred_relations.append(pred_relations)
+        return loss, all_pred_relations
+
+
+class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
+    def __init__(self,
+                 layoutxlm,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 dropout=None):
+        super(LayoutXLMForRelationExtraction, self).__init__()
+        if isinstance(layoutxlm, dict):
+            self.layoutxlm = LayoutXLMModel(**layoutxlm)
+        else:
+            self.layoutxlm = layoutxlm
+
+        self.extractor = REDecoder(hidden_size, hidden_dropout_prob)
+
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.layoutxlm.config["hidden_dropout_prob"])
+        # self.extractor.apply(self.init_weights)
+
+    def init_weights(self, layer):
+        """Initialize the weights"""
+        if isinstance(layer, nn.Linear):
+            # Slightly different from the TF version which uses truncated_normal for initialization
+            # cf https://github.com/pytorch/pytorch/pull/5617
+            layer.weight.set_value(
+                paddle.tensor.normal(
+                    mean=0.0, std=0.02, shape=layer.weight.shape))
+            if layer.bias is not None:
+                layer.bias.set_value(
+                    paddle.tensor.zeros(shape=layer.bias.shape))
+        elif isinstance(layer, nn.Embedding):
+            layer.weight.set_value(
+                paddle.tensor.normal(
+                    mean=0.0, std=0.02, shape=layer.weight.shape))
+            if layer._padding_idx is not None:
+                layer.weight[layer._padding_idx].set_value(
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=0.02,
+                        shape=layer.weight[layer._padding_idx].shape))
+        elif isinstance(layer, nn.LayerNorm):
+            layer.weight.set_value(paddle.tensor.ones(shape=layer.bias.shape))
+            layer.bias.set_value(paddle.tensor.zeros(shape=layer.bias.shape))
+
+    def forward(
+            self,
+            input_ids,
+            bbox,
+            labels=None,
+            image=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            entities=None,
+            relations=None, ):
+        outputs = self.layoutxlm(
+            input_ids=input_ids,
+            bbox=bbox,
+            image=image,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask, )
+
+        seq_length = input_ids.shape[1]
+        sequence_output, image_output = outputs[0][:, :seq_length], outputs[
+            0][:, seq_length:]
+        sequence_output = self.dropout(sequence_output)
+        loss, pred_relations = self.extractor(sequence_output, entities,
+                                              relations)
+
+        return dict(
+            loss=loss,
+            entities=entities,
+            relations=relations,
+            pred_relations=pred_relations,
+            hidden_states=outputs[0], )

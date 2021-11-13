@@ -41,13 +41,13 @@ class Conv2d(nn.Conv2D):
     def __init__(self, *args, **kwargs):
         norm = kwargs.pop("norm", None)
         activation = kwargs.pop("activation", None)
-        super().__init__(*args, **kwargs)
+        super(Conv2d, self).__init__(*args, **kwargs)
 
         self.norm = norm
         self.activation = activation
 
     def forward(self, x):
-        x = super().forward(x)
+        x = super(Conv2d, self).forward(x)
         if self.norm is not None:
             x = self.norm(x)
         if self.activation is not None:
@@ -64,7 +64,7 @@ class CNNBlockBase(Layer):
             out_channels (int):
             stride (int):
         """
-        super().__init__()
+        super(CNNBlockBase, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.stride = stride
@@ -80,7 +80,8 @@ ResNetBlockBase = CNNBlockBase
 class ShapeSpec(
         namedtuple("_ShapeSpec", ["channels", "height", "width", "stride"])):
     def __new__(cls, channels=None, height=None, width=None, stride=None):
-        return super().__new__(cls, (channels, height, width, stride))
+        return super(ShapeSpec, cls).__new__(cls,
+                                             (channels, height, width, stride))
 
 
 def get_norm(norm, out_channels):
@@ -110,7 +111,7 @@ class FrozenBatchNorm(nn.BatchNorm):
     def __init__(self, num_channels):
         param_attr = ParamAttr(learning_rate=0.0, trainable=False)
         bias_attr = ParamAttr(learning_rate=0.0, trainable=False)
-        super().__init__(
+        super(FrozenBatchNorm, self).__init__(
             num_channels,
             param_attr=param_attr,
             bias_attr=bias_attr,
@@ -119,7 +120,7 @@ class FrozenBatchNorm(nn.BatchNorm):
 
 class Backbone(nn.Layer):
     def __init__(self):
-        super().__init__()
+        super(Backbone, self).__init__()
 
     @abstractmethod
     def forward(self, *args):
@@ -167,7 +168,7 @@ class BottleneckBlock(CNNBlockBase):
             norm="BN",
             stride_in_1x1=False,
             dilation=1, ):
-        super().__init__(in_channels, out_channels, stride)
+        super(BottleneckBlock, self).__init__(in_channels, out_channels, stride)
 
         if in_channels != out_channels:
             self.shortcut = Conv2d(
@@ -262,7 +263,7 @@ class BasicStem(CNNBlockBase):
             norm (str or callable): norm after the first conv layer.
                 See :func:`layers.get_norm` for supported format.
         """
-        super().__init__(in_channels, out_channels, 4)
+        super(BasicStem, self).__init__(in_channels, out_channels, 4)
         self.in_channels = in_channels
         self.conv1 = Conv2d(
             in_channels,
@@ -287,7 +288,7 @@ class ResNet(Backbone):
                  num_classes=None,
                  out_features=None,
                  freeze_at=0):
-        super().__init__()
+        super(ResNet, self).__init__()
         self.stem = stem
         self.num_classes = num_classes
 
@@ -497,7 +498,7 @@ class LastLevelMaxPool(nn.Layer):
     """
 
     def __init__(self):
-        super().__init__()
+        super(LastLevelMaxPool, self).__init__()
         self.num_levels = 1
         self.in_feature = "p5"
 
@@ -523,7 +524,7 @@ class FPN(Backbone):
                  norm="",
                  top_block=None,
                  fuse_type="sum"):
-        super().__init__()
+        super(FPN, self).__init__()
         assert isinstance(bottom_up, Backbone)
         assert in_features, in_features
 
@@ -596,7 +597,7 @@ class FPN(Backbone):
     def forward(self, x):
         """
         Args:
-            input (dict[str->Tensor]): mapping feature map name (e.g., "res5") to
+            x (dict[str->Tensor]): mapping feature map name (e.g., "res5") to
                 feature map tensor for each feature level in high to low resolution order.
 
         Returns:
@@ -758,7 +759,7 @@ def build_resnet_fpn_backbone(cfg, input_shape=None):
 
 class VisualBackbone(Layer):
     def __init__(self, config):
-        super().__init__()
+        super(VisualBackbone, self).__init__()
         self.cfg = read_config()
         self.backbone = build_resnet_fpn_backbone(self.cfg)
         # syncbn is removed cause that will cause import of torch
