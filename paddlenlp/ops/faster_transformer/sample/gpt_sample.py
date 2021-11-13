@@ -49,7 +49,7 @@ def parse_args():
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--batch_size", default=1, type=int, help="Batch size. ")
+        "--batch_size", default=4, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -57,11 +57,11 @@ def parse_args():
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
         "--topp",
-        default=0.0,
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
-        "--max_out_len", default=32, type=int, help="Maximum output length. ")
+        "--max_length", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--start_token",
         default="<|endoftext|>",
@@ -92,24 +92,14 @@ def do_predict(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
-    model = model_class.from_pretrained(
-        args.model_name_or_path, max_predict_len=args.max_out_len)
+    model = model_class.from_pretrained(args.model_name_or_path)
     model.eval()
 
     bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
     eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
 
     # Define model
-    gpt = FasterGPT(
-        model=model,
-        topk=args.topk,
-        topp=args.topp,
-        max_out_len=args.max_out_len,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        temperature=args.temperature,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+    gpt = model
 
     # Set evaluate mode
     gpt.eval()
@@ -124,11 +114,23 @@ def do_predict(args):
             if 50 == i:
                 paddle.fluid.core._cuda_synchronize(place)
                 start = time.time()
-            out_seq = gpt(input_ids)
+            out_seq, _ = gpt.generate(
+                input_ids,
+                top_k=args.topk,
+                top_p=args.topp,
+                max_length=args.max_length,
+                temperature=args.temperature,
+                bos_id=bos_id,
+                eos_id=eos_id,
+                num_beam=4,
+                decode_strategy="beam_search",
+                use_fast=True)
+            output_sequence = out_seq.numpy()
+
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
-        output_sequence = out_seq.numpy().transpose()
+        output_sequence = out_seq.numpy()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
         print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))

@@ -127,13 +127,11 @@ class Predictor(object):
     def predict(self, data, tokenizer, label_map):
         """
         Predicts the data labels.
-
         Args:
             data (obj:`List(str)`): The batch data whose each element is a raw text.
             tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
-
         Returns:
             results(obj:`dict`): All the predictions labels.
         """

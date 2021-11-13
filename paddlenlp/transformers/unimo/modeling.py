@@ -30,10 +30,10 @@ __all__ = [
 class UNIMOPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained UNIMO models. It provides UNIMO related
-    `model_config_file`, `pretrained_init_configuration`,
-    `resource_files_names`, `pretrained_resource_files_map`,
-    `base_model_prefix` for downloading and loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -373,8 +373,7 @@ class UNIMOLMHead(nn.Layer):
 
 class UNIMOLMHeadModel(UNIMOPretrainedModel):
     """
-    The UNIMO Model with a language modeling head on top (linear
-    layer with weights tied to the input embeddings), designed for generation tasks.
+    The UNIMO Model with a `language modeling` head on top designed for generation tasks.
 
     Args:
         unimo (:class:`UNIMOModel`):
@@ -442,13 +441,30 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
         outputs = self.unimo(input_ids, token_type_ids, position_ids,
                              attention_mask, use_cache, cache)
+
         sequence_output = outputs[0] if use_cache else outputs
+
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
             cache = outputs[1]
             return logits, cache
         else:
             return logits
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterUNIMOText
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        self._faster_entry = FasterUNIMOText(
+            self,
+            decode_strategy=decode_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
