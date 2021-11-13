@@ -67,6 +67,7 @@ class FasterTokenizer(nn.Layer):
         "bert-wwm-ext-chinese": BertTokenizer,
         "ernie-1.0": ErnieTokenizer,
         "ernie-2.0-en": ErnieTokenizer,
+        "ernie-2.0-large-en": ErnieTokenizer,
         "roberta-wwm-ext": RobertaTokenizer,
         "roberta-wwm-ext-large": RobertaTokenizer,
         "rbt3": RobertaTokenizer,
