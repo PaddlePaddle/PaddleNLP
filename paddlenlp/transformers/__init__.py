@@ -68,5 +68,7 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
+from .ctrl.modeling import *
+from .ctrl.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *

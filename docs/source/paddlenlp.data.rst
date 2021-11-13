@@ -11,6 +11,7 @@ paddlenlp.data
    :maxdepth: 4
 
    paddlenlp.data.collate
+   paddlenlp.data.iterator
    paddlenlp.data.sampler
    paddlenlp.data.tokenizer
    paddlenlp.data.vocab

@@ -15,18 +15,15 @@
 
 import os
 from functools import lru_cache
-from collections import namedtuple
 
 import json
 import jieba
 import shutil
 from paddle.utils import try_import
-from paddlenlp.data import Vocab
+
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
-    _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
     'GPTTokenizer',
@@ -341,6 +338,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "gpt3-13B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
+            "gpt2-xl-en": gpt_vocab_link,
+            "gpt2-large-en": gpt_vocab_link,
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
             "gpt2-small-en": gpt_vocab_link,
@@ -348,6 +347,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
+            "gpt2-xl-en": gpt_merges_link,
+            "gpt2-large-en": gpt_merges_link,
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
             "gpt2-small-en": gpt_merges_link,
@@ -356,6 +357,8 @@ class GPTTokenizer(PretrainedTokenizer):
     pretrained_init_configuration = {
         "gpt3-13B-en": {},
         "gpt3-1.3B-en": {},
+        "gpt2-xl-en": {},
+        "gpt2-large-en": {},
         "gpt2-medium-en": {},
         "gpt2-en": {},
         "gpt2-small-en": {},
