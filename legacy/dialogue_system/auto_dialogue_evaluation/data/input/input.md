@@ -1,1 +1,0 @@
-training data directory
