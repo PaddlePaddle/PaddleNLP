@@ -61,98 +61,19 @@ class AddedToken:
 
 
 class LayoutXLMTokenizer(PretrainedTokenizer):
-    """
-    Adapted from :class:`~transformers.RobertaTokenizer` and class:`~transformers.XLNetTokenizer`. Based on
-    `SentencePiece <https://github.com/google/sentencepiece>`__.
-
-    This tokenizer inherits from :class:`~transformers.PreTrainedTokenizer` which contains most of the main methods.
-    Users should refer to this superclass for more information regarding those methods.
-
-    Args:
-        vocab_file (:obj:`str`):
-            Path to the vocabulary file.
-        bos_token (:obj:`str`, `optional`, defaults to :obj:`"<s>"`):
-            The beginning of sequence token that was used during pretraining. Can be used a sequence classifier token.
-
-            .. note::
-
-                When building a sequence using special tokens, this is not the token that is used for the beginning of
-                sequence. The token used is the :obj:`cls_token`.
-        eos_token (:obj:`str`, `optional`, defaults to :obj:`"</s>"`):
-            The end of sequence token.
-
-            .. note::
-
-                When building a sequence using special tokens, this is not the token that is used for the end of
-                sequence. The token used is the :obj:`sep_token`.
-        sep_token (:obj:`str`, `optional`, defaults to :obj:`"</s>"`):
-            The separator token, which is used when building a sequence from multiple sequences, e.g. two sequences for
-            sequence classification or for a text and a question for question answering. It is also used as the last
-            token of a sequence built with special tokens.
-        cls_token (:obj:`str`, `optional`, defaults to :obj:`"<s>"`):
-            The classifier token which is used when doing sequence classification (classification of the whole sequence
-            instead of per-token classification). It is the first token of the sequence when built with special tokens.
-        unk_token (:obj:`str`, `optional`, defaults to :obj:`"<unk>"`):
-            The unknown token. A token that is not in the vocabulary cannot be converted to an ID and is set to be this
-            token instead.
-        pad_token (:obj:`str`, `optional`, defaults to :obj:`"<pad>"`):
-            The token used for padding, for example when batching sequences of different lengths.
-        mask_token (:obj:`str`, `optional`, defaults to :obj:`"<mask>"`):
-            The token used for masking values. This is the token used when training this model with masked language
-            modeling. This is the token which the model will try to predict.
-        additional_special_tokens (:obj:`List[str]`, `optional`, defaults to :obj:`["<s>NOTUSED", "</s>NOTUSED"]`):
-            Additional special tokens used by the tokenizer.
-
-    Attributes:
-        sp_model (:obj:`SentencePieceProcessor`):
-            The `SentencePiece` processor that is used for every conversion (string, tokens and IDs).
-    """
-
     resource_files_names = {"vocab_file": "sentencepiece.bpe.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "xlm-roberta-base":
-            "https://huggingface.co/xlm-roberta-base/resolve/main/sentencepiece.bpe.model",
-            "xlm-roberta-large":
-            "https://huggingface.co/xlm-roberta-large/resolve/main/sentencepiece.bpe.model",
-            "xlm-roberta-large-finetuned-conll02-dutch":
-            "https://huggingface.co/xlm-roberta-large-finetuned-conll02-dutch/resolve/main/sentencepiece.bpe.model",
-            "xlm-roberta-large-finetuned-conll02-spanish":
-            "https://huggingface.co/xlm-roberta-large-finetuned-conll02-spanish/resolve/main/sentencepiece.bpe.model",
-            "xlm-roberta-large-finetuned-conll03-english":
-            "https://huggingface.co/xlm-roberta-large-finetuned-conll03-english/resolve/main/sentencepiece.bpe.model",
-            "xlm-roberta-large-finetuned-conll03-german":
-            "https://huggingface.co/xlm-roberta-large-finetuned-conll03-german/resolve/main/sentencepiece.bpe.model",
+            "layoutxlm-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutxlm_base/sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {
-        "xlm-roberta-base": {
-            "do_lower_case": False
-        },
-        "xlm-roberta-large": {
-            "do_lower_case": False
-        },
-        "xlm-roberta-large-finetuned-conll02-dutch": {
-            "do_lower_case": False
-        },
-        "xlm-roberta-large-finetuned-conll02-spanish": {
-            "do_lower_case": False
-        },
-        "xlm-roberta-large-finetuned-conll03-english": {
-            "do_lower_case": False
-        },
-        "xlm-roberta-large-finetuned-conll03-german": {
+        "layoutxlm-base-uncased": {
             "do_lower_case": False
         },
     }
-    pretrained_positional_embedding_sizes = {
-        "xlm-roberta-base": 512,
-        "xlm-roberta-large": 512,
-        "xlm-roberta-large-finetuned-conll02-dutch": 512,
-        "xlm-roberta-large-finetuned-conll02-spanish": 512,
-        "xlm-roberta-large-finetuned-conll03-english": 512,
-        "xlm-roberta-large-finetuned-conll03-german": 512,
-    }
+    pretrained_positional_embedding_sizes = {"layoutxlm-base-uncased": 512, }
     max_model_input_sizes = pretrained_positional_embedding_sizes
     model_input_names = ["input_ids", "attention_mask"]
 
@@ -219,23 +140,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
     def build_inputs_with_special_tokens(
             self, token_ids_0: List[int],
             token_ids_1: Optional[List[int]]=None) -> List[int]:
-        """
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. An XLM-RoBERTa sequence has the following format:
-
-        - single sequence: ``<s> X </s>``
-        - pair of sequences: ``<s> A </s></s> B </s>``
-
-        Args:
-            token_ids_0 (:obj:`List[int]`):
-                List of IDs to which the special tokens will be added.
-            token_ids_1 (:obj:`List[int]`, `optional`):
-                Optional second list of IDs for sequence pairs.
-
-        Returns:
-            :obj:`List[int]`: List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
-        """
-
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         cls = [self.cls_token_id]
@@ -247,22 +151,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
             token_ids_0: List[int],
             token_ids_1: Optional[List[int]]=None,
             already_has_special_tokens: bool=False) -> List[int]:
-        """
-        Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
-        special tokens using the tokenizer ``prepare_for_model`` method.
-
-        Args:
-            token_ids_0 (:obj:`List[int]`):
-                List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
-                Optional second list of IDs for sequence pairs.
-            already_has_special_tokens (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not the token list is already formatted with special tokens for the model.
-
-        Returns:
-            :obj:`List[int]`: A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
-        """
-
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
@@ -281,21 +169,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
     def create_token_type_ids_from_sequences(
             self, token_ids_0: List[int],
             token_ids_1: Optional[List[int]]=None) -> List[int]:
-        """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. XLM-RoBERTa does
-        not make use of token type ids, therefore a list of zeros is returned.
-
-        Args:
-            token_ids_0 (:obj:`List[int]`):
-                List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
-                Optional second list of IDs for sequence pairs.
-
-        Returns:
-            :obj:`List[int]`: List of zeros.
-
-        """
-
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -317,14 +190,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return vocab
 
     def special_tokens_map_extended(self):
-        """
-        :obj:`Dict[str, Union[str, tokenizers.AddedToken, List[Union[str, tokenizers.AddedToken]]]]`: A dictionary
-        mapping special token class attributes (:obj:`cls_token`, :obj:`unk_token`, etc.) to their values
-        (:obj:`'<unk>'`, :obj:`'<cls>'`, etc.).
-
-        Don't convert tokens of :obj:`tokenizers.AddedToken` type to string so they can be used to control more finely
-        how special tokens are tokenized.
-        """
         set_attr = {}
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
             if hasattr(self, "_" + attr):
@@ -334,13 +199,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return set_attr
 
     def all_special_tokens_extended(self):
-        """
-        :obj:`List[Union[str, tokenizers.AddedToken]]`: All the special tokens (:obj:`'<unk>'`, :obj:`'<cls>'`, etc.)
-        mapped to class attributes.
-
-        Don't convert tokens of :obj:`tokenizers.AddedToken` type to string so they can be used to control more finely
-        how special tokens are tokenized.
-        """
         all_toks = []
         set_attr = self.special_tokens_map_extended()
         for attr_value in set_attr.values():
@@ -350,22 +208,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return all_toks
 
     def tokenize(self, text, **kwargs) -> List[str]:
-        """
-        Converts a string in a sequence of tokens, using the tokenizer.
-
-        Split in words for word-based vocabulary or sub-words for sub-word-based vocabularies
-        (BPE/SentencePieces/WordPieces). Takes care of added tokens.
-
-        Args:
-            text (:obj:`str`):
-                The sequence to be encoded.
-            **kwargs (additional keyword arguments):
-                Passed along to the model-specific ``prepare_for_tokenization`` preprocessing method.
-
-        Returns:
-            :obj:`List[str]`: The list of tokens.
-        """
-        # Simple mapping string => AddedToken for special tokens with specific tokenization behaviors
         all_special_tokens_extended = dict(
             (t.content, t) for t in self.all_special_tokens_extended()
             if isinstance(t, AddedToken))
@@ -475,37 +317,12 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return out_string
 
     def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a token (or a sequence of tokens) to a single integer id (or a sequence of ids),
-        using the vocabulary.
-
-        Args:
-            tokens (str or List[str]):
-                One or several token(s) to convert to token id(s).
-
-        Returns:
-            int or List[int] or tuple(int): The token id or list of token ids or tuple of token ids.
-        """
         if not isinstance(tokens, (list, tuple)):
             return self._convert_token_to_id(tokens)
         else:
             return [self._convert_token_to_id(token) for token in tokens]
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts a single index or a sequence of indices to a token or
-        a sequence of tokens, using the vocabulary and added tokens.
-
-        Args:
-            ids (int or List[int]):
-                The token id (or token ids) to be converted to token(s).
-            skip_special_tokens (bool, optional):
-                Whether or not to remove special tokens in the decoding.
-                Defaults to `False` and we do not remove special tokens.
-
-        Returns:
-            str or List[str]: The decoded token(s).
-        """
         if not isinstance(ids, (list, tuple)):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
@@ -517,21 +334,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return tokens
 
     def num_special_tokens_to_add(self, pair=False):
-        """
-        Returns the number of added tokens when encoding a sequence with special tokens.
-
-        Note:
-            This encodes inputs and checks the number of added tokens, and is therefore not efficient.
-            Do not put this inside your training loop.
-
-        Args:
-            pair (bool, optional):
-                Whether the input is a sequence pair or a single sequence.
-                Defaults to `False` and the input is a single sequence.
-
-        Returns:
-            int: Number of tokens added to sequences.
-        """
         token_ids_0 = []
         token_ids_1 = []
         return len(

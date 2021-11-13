@@ -226,7 +226,7 @@ class LayoutXLMPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "layoutxlmv2-base-uncased":
+            "layoutxlm-base-uncased":
             "https://paddlenlp.bj.bcebos.com/models/transformers/layoutxlm_base/model_state.pdparams",
         }
     }
