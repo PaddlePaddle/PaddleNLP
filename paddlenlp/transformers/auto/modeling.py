@@ -56,7 +56,6 @@ class _BaseAutoModelClass:
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         auto_class = cls.__name__
         # From local dir path
@@ -484,6 +483,8 @@ class AutoModel(_BaseAutoModelClass):
 
     def __init__(self, task='model'):
         self.task = task
+        if self.task == 'model':
+            dd
 
 
 class AutoModelForPreTraining(_BaseAutoModelClass):
