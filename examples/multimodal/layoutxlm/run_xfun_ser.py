@@ -51,10 +51,11 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def get_label_maps(label_map_path=None):
-    with open(label_map_path, "r") as fin:
-        lines = fin.readlines()
-    labels = [line.strip() for line in lines]
+def get_label_maps():
+    labels = [
+        "O", "B-QUESTION", "B-ANSWER", "B-HEADER", "I-ANSWER", "I-QUESTION",
+        "I-HEADER"
+    ]
     label2id_map = {label: idx for idx, label in enumerate(labels)}
     id2label_map = {idx: label for idx, label in enumerate(labels)}
     return label2id_map, id2label_map
@@ -74,7 +75,7 @@ def train(args):
     ch.setLevel(logging.DEBUG)
     logger.addHandler(ch)
 
-    label2id_map, id2label_map = get_label_maps(args.label_map_path)
+    label2id_map, id2label_map = get_label_maps()
     pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
 
     # dist mode
