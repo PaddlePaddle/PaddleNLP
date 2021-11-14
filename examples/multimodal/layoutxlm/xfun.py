@@ -43,7 +43,6 @@ class XFUN(Dataset):
                  pad_token_label_id=None,
                  add_special_ids=False,
                  return_attention_mask=True,
-                 model_type='layoutxlm',
                  load_mode='all',
                  max_seq_len=512):
         super(XFUN, self).__init__()
@@ -56,7 +55,6 @@ class XFUN(Dataset):
         self.pad_token_label_id = pad_token_label_id
         self.add_special_ids = add_special_ids
         self.return_attention_mask = return_attention_mask
-        self.model_type = model_type
         self.load_mode = load_mode
         self.max_seq_len = max_seq_len
 

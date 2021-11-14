@@ -24,7 +24,6 @@ def parse_args():
     parser.add_argument("--train_label_path", default=None, type=str, required=False,)
     parser.add_argument("--eval_data_dir", default=None, type=str, required=False,)
     parser.add_argument("--eval_label_path", default=None, type=str, required=False,)
-    parser.add_argument("--label_map_path", default="./labels/labels_ser.txt", type=str, required=False,)
     parser.add_argument("--use_vdl", default=False, type=bool, required=False,)
     parser.add_argument("--output_dir", default=None, type=str, required=True,)
     parser.add_argument("--max_seq_length", default=512, type=int,)
@@ -101,7 +100,6 @@ def train(args):
         contains_re=False,
         add_special_ids=False,
         return_attention_mask=True,
-        model_type=args.model_type,
         load_mode='all')
 
     train_sampler = paddle.io.DistributedBatchSampler(
