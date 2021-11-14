@@ -305,12 +305,12 @@ def evaluate(args,
         "f1": f1_score(out_label_list, preds_list),
     }
 
-    with open("test_gt.txt", "w") as fout:
+    with open(os.path.join(args.output_dir, "test_gt.txt"), "w") as fout:
         for lbl in out_label_list:
             for l in lbl:
                 fout.write(l + "\t")
             fout.write("\n")
-    with open("test_pred.txt", "w") as fout:
+    with open(os.path.join(args.output_dir, "test_pred.txt"), "w") as fout:
         for lbl in preds_list:
             for l in lbl:
                 fout.write(l + "\t")

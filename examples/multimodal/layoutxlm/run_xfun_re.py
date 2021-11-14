@@ -267,7 +267,7 @@ def evaluate(model, eval_dataloader, logger, prefix=""):
 
 def train(args):
     os.makedirs(args.output_dir, exist_ok=True)
-    set_seed(args.seed)
+    set_seed(args)
 
     label2id_map, id2label_map = get_label_maps()
     pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
