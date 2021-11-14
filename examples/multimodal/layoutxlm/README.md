@@ -1,0 +1,33 @@
+# LayoutXLM
+
+## 模型简介
+
+本项目是 [LayoutXLM: Multimodal Pre-training for Multilingual Visually-rich Document Understanding](https://arxiv.org/pdf/2104.08836.pdf) 在 Paddle 2.2上的开源实现，包含了在 [XFUND](https://github.com/doc-analysis/XFUND) 上的微调代码。
+
+## 快速开始
+
+### 环境依赖
+
+- cv2
+
+安装命令：`pip install opencv-python`
+
+### 数据准备
+处理好的XFUND中文数据集下载地址：https://bj.bcebos.com/v1/paddlenlp/datasets/XFUND.zip
+
+### 执行Fine-tuning
+
+1. ``Semantic Entity Recognition`` 任务启动Fine-tuning的方式如下：
+    ```shell
+    bash run_xfun_ser.sh
+    ```
+
+2. ``Relation Extraction`` 任务启动Fine-tuning的方式如下：
+    ```shell
+    bash run_xfun_re.sh
+    ```
+
+## Reference
+
+- [LayoutXLM: Multimodal Pre-training for Multilingual Visually-rich Document Understanding](https://arxiv.org/pdf/2104.08836.pdf)
+- [microsoft/unilm/layoutxlm](https://github.com/microsoft/unilm/tree/master/layoutxlm)
