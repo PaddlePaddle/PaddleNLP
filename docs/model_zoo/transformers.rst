@@ -165,7 +165,7 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | Trained on 22 million pairs of similar  |
 |                    |                                                                                  |              | sentences crawed from Baidu Know.       |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|Bert-Japanese_      |``iverxin/bert-base-japanese``                                                    | Japanese     | 12-layer, 768-hidden,                   |
+|BERT-Japanese_      |``iverxin/bert-base-japanese``                                                    | Japanese     | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 110M parameters.              |
 |                    |                                                                                  |              | Trained on Japanese text.               |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
@@ -589,6 +589,7 @@ Transformer预训练模型适用任务汇总
 .. _ALBERT: https://arxiv.org/abs/1909.11942
 .. _BART: https://arxiv.org/abs/1910.13461
 .. _BERT: https://arxiv.org/abs/1810.04805
+.. _BERT-Japanese: https://arxiv.org/abs/1810.04805
 .. _BigBird: https://arxiv.org/abs/2007.14062
 .. _Blenderbot: https://arxiv.org/pdf/2004.13637.pdf
 .. _Blenderbot-Small: https://arxiv.org/pdf/2004.13637.pdf
