@@ -65,13 +65,13 @@ def get_statistic_info(x, y):
 
 if __name__ == "__main__":
 
-    print("\n====test_layoutlmv2_torch=====")
+    print("\n====test_layoutxlm_torch=====")
     torch_hidden_out, torch_pool_out = test_layoutlm_torch()
     torch_hidden_out = torch_hidden_out.cpu().detach().numpy()
     torch_pool_out = torch_pool_out.cpu().detach().numpy()
     print(torch_hidden_out.shape, torch_pool_out.shape)
 
-    print("\n====test_layoutlmv2_paddle=====")
+    print("\n====test_layoutxlm_paddle=====")
     paddle_hidden_out, paddle_pool_out = test_layoutlm_paddle()
     paddle_hidden_out = paddle_hidden_out.numpy()
     paddle_pool_out = paddle_pool_out.numpy()

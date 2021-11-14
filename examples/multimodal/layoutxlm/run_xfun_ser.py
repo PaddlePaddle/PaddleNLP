@@ -1,12 +1,13 @@
 from __future__ import absolute_import, division, print_function
 import sys
-import numpy as np
+import os
 import random
 import copy
 import logging
+
 import argparse
-import os
 import paddle
+import numpy as np
 from seqeval.metrics import classification_report, f1_score, precision_score, recall_score
 from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer, LayoutXLMForTokenClassification
 from xfun import XFUN

@@ -1,4 +1,4 @@
-python -m paddle.distributed.launch --gpus="0" ./run_xfun_ser.py \
+python -m paddle.distributed.launch --gpus="0" ./run_xfun_re.py \
     --model_name_or_path "layoutxlm-base-uncased" \
     --max_seq_length 512 \
     --train_data_dir "zh.train/" \
@@ -6,9 +6,9 @@ python -m paddle.distributed.launch --gpus="0" ./run_xfun_ser.py \
     --eval_data_dir "zh.val/" \
     --eval_label_path "zh.val/xfun_normalize_val.json" \
     --num_train_epochs 200 \
-    --eval_steps 10 \
+    --eval_steps 50 \
     --save_steps 500 \
-    --output_dir "./output/ser/" \
+    --output_dir "./output/re/" \
     --learning_rate 5e-5 \
     --warmup_steps 50 \
     --per_gpu_train_batch_size 8 \
