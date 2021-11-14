@@ -241,7 +241,6 @@ def evaluate(args,
         contains_re=False,
         add_special_ids=False,
         return_attention_mask=True,
-        model_type=args.model_type,
         load_mode='all')
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
