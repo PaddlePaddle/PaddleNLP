@@ -671,8 +671,7 @@ class FasterGPT(GPTPretrainedModel):
                 pad_token_id=None,
                 temperature=0,
                 decode_strategy="sample",
-                num_return_sequences=1,
-                **model_kwargs):
+                num_return_sequences=1):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
