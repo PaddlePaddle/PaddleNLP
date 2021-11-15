@@ -206,8 +206,6 @@ public:
     l_parallel_param_ = param;
   }
 
-  void initialize_stream(cudaStream_t stream) { param_.stream = stream; }
-
   void initialize(DecoderInitParam<DataType_> param,
                   DataType_ *buf,
                   void *cublas_workapsce,
@@ -428,29 +426,28 @@ public:
 #endif
       } else {
         // post-normalization
-        masked_multi_head_attention(
-            from_tensor, 
-            key_cache_, 
-            value_cache_, 
-            masked_output_buf_, 
-            finished,
-            step,
-            decoder_max_seq_len);
+        masked_multi_head_attention(from_tensor,
+                                    key_cache_,
+                                    value_cache_,
+                                    masked_output_buf_,
+                                    finished,
+                                    step,
+                                    decoder_max_seq_len);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
         add_bias_input_layernorm_2_kernelLauncher(
-          from_tensor,
-          param_.self_layernorm.gamma,
-          param_.self_layernorm.beta,
-          param_.self_attention.attention_output_weight.bias,
-          masked_output_buf_,
-          norm_masked_output_buf_,
-          m,
-          hidden_units_,
-          param_.stream);
+            from_tensor,
+            param_.self_layernorm.gamma,
+            param_.self_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf_,
+            norm_masked_output_buf_,
+            m,
+            hidden_units_,
+            param_.stream);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -477,15 +474,16 @@ public:
           //  cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
           //  norm(cross_otuput_buf) -> normed_last_context (input for ffn)
           //
-          add_bias_input_layernorm_2_kernelLauncher(norm_masked_output_buf_,
-                        param_.cross_layernorm.gamma,
-                        param_.cross_layernorm.beta,
-                        param_.cross_attention.attention_output_weight.bias,
-                        cross_output_buf_,
-                        norm_cross_output_buf_,
-                        m,
-                        hidden_units_,
-                        param_.stream);
+          add_bias_input_layernorm_2_kernelLauncher(
+              norm_masked_output_buf_,
+              param_.cross_layernorm.gamma,
+              param_.cross_layernorm.beta,
+              param_.cross_attention.attention_output_weight.bias,
+              cross_output_buf_,
+              norm_cross_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -503,13 +501,12 @@ public:
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
 #endif
-          add_bias_input_kernelLauncher(
-            ffn_out_buf_,
-            param_.ffn.output_weight.bias, 
-            norm_cross_output_buf_, 
-            m, 
-            hidden_units_,
-            param_.stream);
+          add_bias_input_kernelLauncher(ffn_out_buf_,
+                                        param_.ffn.output_weight.bias,
+                                        norm_cross_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -517,12 +514,12 @@ public:
 #endif
 
           layer_norm(ffn_out_buf_,
-                        param_.ffn_layernorm.gamma,
-                        param_.ffn_layernorm.beta,
-                        decoder_output,
-                        m,
-                        hidden_units_,
-                        param_.stream);
+                     param_.ffn_layernorm.gamma,
+                     param_.ffn_layernorm.beta,
+                     decoder_output,
+                     m,
+                     hidden_units_,
+                     param_.stream);
 
         } else {
           ffn(norm_masked_output_buf_,
@@ -537,13 +534,12 @@ public:
           check_cuda_error(cudaGetLastError());
 #endif
 
-          add_bias_input_kernelLauncher(
-            ffn_out_buf_, 
-            param_.ffn.output_weight.bias, 
-            norm_masked_output_buf_, 
-            m, 
-            hidden_units_,
-            param_.stream);
+          add_bias_input_kernelLauncher(ffn_out_buf_,
+                                        param_.ffn.output_weight.bias,
+                                        norm_masked_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -551,12 +547,12 @@ public:
 #endif
 
           layer_norm(ffn_out_buf_,
-                        param_.ffn_layernorm.gamma,
-                        param_.ffn_layernorm.beta,
-                        decoder_output,
-                        m,
-                        hidden_units_,
-                        param_.stream);
+                     param_.ffn_layernorm.gamma,
+                     param_.ffn_layernorm.beta,
+                     decoder_output,
+                     m,
+                     hidden_units_,
+                     param_.stream);
         }
       }
     } catch (std::runtime_error &error) {
