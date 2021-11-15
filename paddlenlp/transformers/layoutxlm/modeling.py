@@ -347,7 +347,6 @@ class LayoutXLMSelfAttention(nn.Layer):
             attention_scores += rel_pos
         if self.has_spatial_attention_bias:
             attention_scores += rel_2d_pos
-        # attention_scores = attention_scores.float().masked_fill_(attention_mask.to(torch.bool), float("-inf"))
         attention_scores = paddle.where(
             attention_mask.astype(paddle.bool).expand_as(attention_scores),
             paddle.ones_like(attention_scores) * float("-inf"),

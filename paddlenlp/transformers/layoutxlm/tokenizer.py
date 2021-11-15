@@ -112,22 +112,13 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self.sp_model.Load(vocab_file)
         self.vocab_file = vocab_file
 
-        self.fairseq_tokens_to_ids = {
-            "<s>": 0,
-            "<pad>": 1,
-            "</s>": 2,
-            "<unk>": 3
-        }
+        self.tokens_to_ids = {"<s>": 0, "<pad>": 1, "</s>": 2, "<unk>": 3}
 
         # The first "real" token "," has position 4 in the original fairseq vocab and position 3 in the spm vocab
-        self.fairseq_offset = 1
+        self.offset = 1
 
-        self.fairseq_tokens_to_ids["<mask>"] = len(
-            self.sp_model) + self.fairseq_offset
-        self.fairseq_ids_to_tokens = {
-            v: k
-            for k, v in self.fairseq_tokens_to_ids.items()
-        }
+        self.tokens_to_ids["<mask>"] = len(self.sp_model) + self.offset
+        self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
 
     def build_inputs_with_special_tokens(
             self, token_ids_0: List[int],
@@ -170,8 +161,7 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
 
     @property
     def vocab_size(self):
-        return len(
-            self.sp_model) + self.fairseq_offset + 1  # Add the <mask> token
+        return len(self.sp_model) + self.offset + 1  # Add the <mask> token
 
     def get_vocab(self):
         vocab = {
@@ -286,18 +276,18 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
 
     def _convert_token_to_id(self, token):
         """ Converts a token (str) in an id using the vocab. """
-        if token in self.fairseq_tokens_to_ids:
-            return self.fairseq_tokens_to_ids[token]
+        if token in self.tokens_to_ids:
+            return self.tokens_to_ids[token]
         spm_id = self.sp_model.PieceToId(token)
 
         # Need to return unknown token if the SP model returned 0
-        return spm_id + self.fairseq_offset if spm_id else self.unk_token_id
+        return spm_id + self.offset if spm_id else self.unk_token_id
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
-        if index in self.fairseq_ids_to_tokens:
-            return self.fairseq_ids_to_tokens[index]
-        return self.sp_model.IdToPiece(index - self.fairseq_offset)
+        if index in self.ids_to_tokens:
+            return self.ids_to_tokens[index]
+        return self.sp_model.IdToPiece(index - self.offset)
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
