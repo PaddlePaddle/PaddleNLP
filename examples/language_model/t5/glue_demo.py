@@ -1,3 +1,17 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 
@@ -45,7 +59,6 @@ if __name__ == "__main__":
         "sst2 sentence: that loves its characters and communicates something rather beautiful about human nature ",
         "cola sentence: Mickey looked it up.",
         "sst2 sentence: remains utterly satisfied to remain the same throughout ",
-        "cola sentence: Mickey looked it up. ",
         "sst2 sentence: a well-made and often lovely depiction of the mysteries of friendship "
     ]
     for text in input_text_list:
@@ -63,9 +76,6 @@ if __name__ == "__main__":
     # ==================================================
     # input text: sst2 sentence: remains utterly satisfied to remain the same throughout 
     # label: positive
-    # ==================================================
-    # input text: cola sentence: Mickey looked it up. 
-    # label: acceptable
     # ==================================================
     # input text: sst2 sentence: a well-made and often lovely depiction of the mysteries of friendship 
     # label: positive

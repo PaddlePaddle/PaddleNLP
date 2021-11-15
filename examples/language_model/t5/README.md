@@ -72,9 +72,6 @@ label: acceptable
 input text: sst2 sentence: remains utterly satisfied to remain the same throughout
 label: positive
 ==================================================
-input text: cola sentence: Mickey looked it up.
-label: acceptable
-==================================================
 input text: sst2 sentence: a well-made and often lovely depiction of the mysteries of friendship
 label: positive
 ==================================================
