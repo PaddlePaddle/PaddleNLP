@@ -362,7 +362,6 @@ def train(args):
     logger.info(f"  Total optimization steps = {t_total}")
 
     global_step = 0
-    model.clear_grad()
     train_dataloader_len = len(train_dataloader)
     best_metirc = {'f1': 0}
     model.train()

@@ -150,9 +150,7 @@ def train(args):
 
     global_step = 0
     tr_loss = 0.0
-    model.clear_grad()
     set_seed(args)
-
     best_metrics = None
 
     for epoch_id in range(args.num_train_epochs):
@@ -172,7 +170,7 @@ def train(args):
             tr_loss += loss.item()
             optimizer.step()
             lr_scheduler.step()  # Update learning rate schedule
-            model.clear_grad()
+            optimizer.clear_grad()
             global_step += 1
 
             if (paddle.distributed.get_rank() == 0 and args.eval_steps > 0 and
