@@ -84,7 +84,6 @@ def create_dataloader(dataset, mode='train', batch_size=1):
 
 def do_train():
     paddle.set_device(args.device)
-
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
@@ -147,7 +146,7 @@ def do_train():
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % 100 == 0 and rank == 0:
+            if global_step % 100 == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)

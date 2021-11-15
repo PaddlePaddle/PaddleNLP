@@ -16,12 +16,11 @@ import argparse
 import os
 
 import paddle
-import paddlenlp
 from paddlenlp.experimental import FasterErnieForTokenClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_path", type=str, default="ckpt/model_4000", help="The path to model parameters to be loaded.")
+parser.add_argument("--save_dir", type=str, default="ckpt/model_4221", help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -40,7 +39,7 @@ if __name__ == "__main__":
         6: 'O'
     }
     model = FasterErnieForTokenClassification.from_pretrained(
-        args.save_path,
+        args.save_dir,
         num_classes=len(label_map),
         max_seq_len=args.max_seq_length,
         is_split_into_words=True)
