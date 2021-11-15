@@ -88,12 +88,12 @@ class FasterTokenizer(nn.Layer):
                 text_pair=None,
                 max_seq_len=0,
                 pad_to_max_seq_len=True):
-        if isinstance(text, list) or isinstance(text, tuple):
-            text = to_tensor(list(text))
-        if text_pair is not None:
-            if isinstance(text_pair, list) or isinstance(text_pair, tuple):
-                text_pair = to_tensor(list(text_pair))
         if in_dygraph_mode():
+            if isinstance(text, list) or isinstance(text, tuple):
+                text = to_tensor(list(text))
+            if text_pair is not None:
+                if isinstance(text_pair, list) or isinstance(text_pair, tuple):
+                    text_pair = to_tensor(list(text_pair))
             input_ids, seg_ids = _C_ops.faster_tokenizer(
                 self.vocab, text, text_pair, "do_lower_case",
                 self.do_lower_case, "max_seq_len", max_seq_len,
