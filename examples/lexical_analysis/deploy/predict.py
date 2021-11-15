@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import time
 
 import argparse
 import numpy as np
@@ -21,17 +22,16 @@ import paddle
 import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
-
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
 parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
-
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--epochs", default=1, type=int, help="The number of epochs when running benchmark.")
 
 args = parser.parse_args()
 # yapf: enable
@@ -220,24 +220,27 @@ if __name__ == "__main__":
     word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
     label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
     normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
-
+    infer_ds = []
+    with open(
+            os.path.join(args.data_dir, 'infer.tsv'), "r",
+            encoding="utf-8") as fp:
+        for line in fp.readlines():
+            infer_ds += [line.strip()]
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_len)
-
-    samples = [
-        '大学学籍证明怎么开',
-        '法网中国最后一朵金花也谢了,李娜称输球很正常,网球频道,nike新浪竞技风暴,新浪网',
-    ]
-
-    results = predictor.predict(
-        samples,
-        word_vocab,
-        label_vocab,
-        normlize_vocab,
-        batch_size=args.batch_size)
+    start = time.time()
+    for _ in range(args.epochs):
+        results = predictor.predict(
+            infer_ds,
+            word_vocab,
+            label_vocab,
+            normlize_vocab,
+            batch_size=args.batch_size)
+    end = time.time()
     for idx, result in enumerate(results):
-        print('Text: {}'.format(samples[idx]))
+        print('Text: {}'.format(infer_ds[idx]))
         sent_tags = []
         sent, tags = result
         sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
         print('Result: {}\n'.format(sent_tag))
+    print("Total predict time: {:.4f} s".format(end - start))
