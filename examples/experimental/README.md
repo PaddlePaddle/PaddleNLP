@@ -45,9 +45,11 @@ RoBERTa-Large (Whole Word Masking, EXT Data), Chinese    | `FasterTokenizer.from
 使用方式如下：
 
 ```python
+from paddlenlp.experimental import FasterTokenizer
+from paddlenlp.experimental import to_tensor
 tokenizer = FasterTokenizer.from_pretrained("ernie-1.0")
 text = '小说是文学的一种样式，一般描写人物故事，塑造多种多样的人物形象，但亦有例外。'
-input_ids, token_type_ids = tokenizer([text], max_seq_len=50)
+input_ids, token_type_ids = tokenizer(to_tensor([text]), max_seq_len=50)
 ```
 
 ### Performance
