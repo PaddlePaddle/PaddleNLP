@@ -17,7 +17,6 @@ import os
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
-from paddle.incubate.nn import FusedTransformerEncoderLayer
 
 from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from paddlenlp.transformers.model_utils import register_base_model
@@ -242,6 +241,11 @@ class FasterErnieModel(FasterErniePretrainedModel):
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
+        # Avoid import error in global scope when using paddle <= 2.2.0, therefore
+        # import FusedTransformerEncoderLayer in local scope.
+        # FusedTransformerEncoderLayer is supported by paddlepaddle since 2.2.0, please
+        # ensure the version >= 2.2.0
+        from paddle.incubate.nn import FusedTransformerEncoderLayer
         encoder_layer = FusedTransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
