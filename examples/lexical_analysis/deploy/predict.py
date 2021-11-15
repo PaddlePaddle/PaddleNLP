@@ -243,4 +243,4 @@ if __name__ == "__main__":
         sent, tags = result
         sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
         print('Result: {}\n'.format(sent_tag))
-    print("Total spend {:.4f} s".format(end - start))
+    print("Total predict time: {:.4f} s".format(end - start))
