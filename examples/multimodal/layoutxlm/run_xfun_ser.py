@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function
 import sys
 import os
 import random
@@ -12,6 +11,7 @@ from seqeval.metrics import classification_report, f1_score, precision_score, re
 from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer, LayoutXLMForTokenClassification
 from xfun import XFUN
 
+# Todo: delete the following line after the release of v2.2
 sys.path.insert(0, "../../../")
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def train(args):
 
     global_step = 0
     tr_loss = 0.0
-    model.clear_gradients()
+    model.clear_grad()
     set_seed(args)
 
     best_metrics = None
@@ -172,7 +172,7 @@ def train(args):
             tr_loss += loss.item()
             optimizer.step()
             lr_scheduler.step()  # Update learning rate schedule
-            model.clear_gradients()
+            model.clear_grad()
             global_step += 1
 
             if (paddle.distributed.get_rank() == 0 and args.eval_steps > 0 and

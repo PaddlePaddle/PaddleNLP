@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Tokenization classes for XLM-RoBERTa model."""
+""" Tokenization classes for LayoutXLM model."""
 
-import unicodedata
 import itertools
 from dataclasses import dataclass, field
 from collections import OrderedDict
@@ -113,13 +112,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self.sp_model.Load(vocab_file)
         self.vocab_file = vocab_file
 
-        # Original fairseq vocab and spm vocab must be "aligned":
-        # Vocab    |    0    |    1    |   2    |    3    |  4  |  5  |  6  |   7   |   8   |  9
-        # -------- | ------- | ------- | ------ | ------- | --- | --- | --- | ----- | ----- | ----
-        # fairseq  | '<s>'   | '<pad>' | '</s>' | '<unk>' | ',' | '.' | '▁' | 's'   | '▁de' | '-'
-        # spm      | '<unk>' | '<s>'   | '</s>' | ','     | '.' | '▁' | 's' | '▁de' | '-'   | '▁a'
-
-        # Mimic fairseq token-to-id alignment for the first 4 token
         self.fairseq_tokens_to_ids = {
             "<s>": 0,
             "<pad>": 1,
@@ -222,10 +214,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
                 split_text = text.split(tok)
             full_word = ""
             for i, sub_text in enumerate(split_text):
-                # AddedToken can control whitespace stripping around them.
-                # We use them for GPT2 and Roberta to have different behavior depending on the special token
-                # Cf. https://github.com/huggingface/transformers/pull/2778
-                # and https://github.com/huggingface/transformers/issues/3788
                 if isinstance(tok_extended, AddedToken):
                     if tok_extended.single_word:
                         # Try to avoid splitting on token

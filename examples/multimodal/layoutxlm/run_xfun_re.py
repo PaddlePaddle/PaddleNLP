@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function
 import sys
 import os
 import random
@@ -11,6 +10,7 @@ import numpy as np
 from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer, LayoutXLMForRelationExtraction
 from xfun import XFUN
 
+# Todo: delete the following line after the release of v2.2
 sys.path.insert(0, "../../../")
 logger = logging.getLogger(__name__)
 
@@ -36,26 +36,26 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
     # yapf: disable
-    parser.add_argument("--model_name_or_path", default=None, type=str, required=True, )
-    parser.add_argument("--train_data_dir", default=None, type=str, required=False, )
-    parser.add_argument("--train_label_path", default=None, type=str, required=False, )
-    parser.add_argument("--eval_data_dir", default=None, type=str, required=False, )
-    parser.add_argument("--eval_label_path", default=None, type=str, required=False, )
-    parser.add_argument("--use_vdl", default=False, type=bool, required=False, )
-    parser.add_argument("--output_dir", default=None, type=str, required=True, )
-    parser.add_argument("--max_seq_length", default=512, type=int, )
-    parser.add_argument("--evaluate_during_training", action="store_true", )
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True,)
+    parser.add_argument("--train_data_dir", default=None, type=str, required=False,)
+    parser.add_argument("--train_label_path", default=None, type=str, required=False,)
+    parser.add_argument("--eval_data_dir", default=None, type=str, required=False,)
+    parser.add_argument("--eval_label_path", default=None, type=str, required=False,)
+    parser.add_argument("--use_vdl", default=False, type=bool, required=False,)
+    parser.add_argument("--output_dir", default=None, type=str, required=True,)
+    parser.add_argument("--max_seq_length", default=512, type=int,)
+    parser.add_argument("--evaluate_during_training", action="store_true",)
     parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.",)
-    parser.add_argument("--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for eval.", )
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.", )
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.", )
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.", )
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.", )
+    parser.add_argument("--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for eval.",)
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.",)
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.",)
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.",)
+    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.",)
     parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.",)
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.", )
-    parser.add_argument("--eval_steps", type=int, default=10, help="eval every X updates steps.", )
-    parser.add_argument("--save_steps", type=int, default=50, help="Save checkpoint every X updates steps.", )
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization", )
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.",)
+    parser.add_argument("--eval_steps", type=int, default=10, help="eval every X updates steps.",)
+    parser.add_argument("--save_steps", type=int, default=50, help="Save checkpoint every X updates steps.",)
+    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization",)
     # yapf: enable
     args = parser.parse_args()
     return args
@@ -362,7 +362,7 @@ def train(args):
     logger.info(f"  Total optimization steps = {t_total}")
 
     global_step = 0
-    model.clear_gradients()
+    model.clear_grad()
     train_dataloader_len = len(train_dataloader)
     best_metirc = {'f1': 0}
     model.train()

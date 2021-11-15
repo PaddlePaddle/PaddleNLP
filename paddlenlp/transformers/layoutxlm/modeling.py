@@ -1,5 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 Microsoft Research The HuggingFace Inc. team. All rights reserved.
+# Copyright 2021 Microsoft Research and The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""" Modeling classes for LayoutXLM model."""
 
 import copy
 import math
@@ -45,7 +46,6 @@ def relative_position_bucket(relative_position,
     else:
         n = paddle.max(-relative_position, paddle.zeros_like(relative_position))
     # now n is in the range [0, inf)
-
     # half of the buckets are for exact increments in positions
     max_exact = num_buckets // 2
     is_small = n < max_exact
@@ -237,8 +237,6 @@ class LayoutXLMPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, (nn.Linear, nn.Embedding)):
-            # In the dygraph mode, use the `set_value` to reset the parameter directly,
-            # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
                     paddle.tensor.normal(
@@ -524,7 +522,7 @@ class LayoutXLMEncoder(nn.Layer):
 
             hidden_save["{}_data".format(i)] = hidden_states
 
-        return (hidden_states, )
+        return hidden_states,
 
 
 class LayoutXLMIntermediate(nn.Layer):
@@ -566,7 +564,6 @@ class LayoutXLMLayer(nn.Layer):
         # since chunk_size_feed_forward is 0 as default, no chunk is needed here.
         self.seq_len_dim = 1
         self.attention = LayoutXLMAttention(config)
-        # https://github.com/huggingface/transformers/blob/b6f332ecaf18054109294dd2efa1a5e6aa274a03/src/transformers/configuration_utils.py#L86
         self.add_cross_attention = False  # default as false
         self.intermediate = LayoutXLMIntermediate(config)
         self.output = LayoutXLMOutput(config)
@@ -615,7 +612,6 @@ class VisualBackbone(nn.Layer):
         super(VisualBackbone, self).__init__()
         self.cfg = read_config()
         self.backbone = build_resnet_fpn_backbone(self.cfg)
-        # syncbn is removed cause that will cause import of torch
 
         assert len(self.cfg.MODEL.PIXEL_MEAN) == len(self.cfg.MODEL.PIXEL_STD)
         num_channels = len(self.cfg.MODEL.PIXEL_MEAN)
@@ -649,12 +645,15 @@ class VisualBackbone(nn.Layer):
 @register_base_model
 class LayoutXLMModel(LayoutXLMPretrainedModel):
     """
-    The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
+    The bare LayoutXLM Model outputting raw hidden-states.
+
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
-    Check the superclass documentation for the generic methods and the library implements for all its model.
+    Refer to the superclass documentation for the generic methods.
+
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+
     Args:
         vocab_size (`int`):
             Vocabulary size of the XLNet model. Defines the number of different tokens that can
@@ -708,8 +707,6 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
 
         self.encoder = LayoutXLMEncoder(config)
         self.pooler = LayoutXLMPooler(config["hidden_size"], with_pool)
-
-    #         self.apply(self.init_weights)
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids,
                               token_type_ids):
@@ -855,9 +852,6 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
             self.layoutxlm = LayoutXLMModel(**layoutxlm)
         else:
             self.layoutxlm = layoutxlm
-        # print(self.layoutxlm)
-        # exit()
-
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.layoutxlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"],
@@ -892,7 +886,7 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = (logits, )  # + outputs[2:]
+        outputs = logits,
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -975,8 +969,6 @@ class LayoutXLMForPretraining(LayoutXLMPretrainedModel):
             self.layoutxlm.config["hidden_act"],
             embedding_weights=self.layoutxlm.embeddings.word_embeddings.weight)
 
-    #         self.apply(self.init_weights)
-
     def forward(self,
                 input_ids=None,
                 bbox=None,
@@ -1000,9 +992,7 @@ class LayoutXLMForPretraining(LayoutXLMPretrainedModel):
 
 
 class BiaffineAttention(nn.Layer):
-    """
-    Implements a biaffine attention operator for binary relation classification.
-    """
+    """Implements a biaffine attention operator for binary relation classification."""
 
     def __init__(self, in_features, out_features):
         super(BiaffineAttention, self).__init__()
@@ -1023,7 +1013,6 @@ class BiaffineAttention(nn.Layer):
 class REDecoder(nn.Layer):
     def __init__(self, hidden_size=768, hidden_dropout_prob=0.1):
         super(REDecoder, self).__init__()
-        # TODO scale_grad_by_freq=true
         self.entity_emb = nn.Embedding(3, hidden_size)
         projection = nn.Sequential(
             nn.Linear(hidden_size * 2, hidden_size),
@@ -1144,13 +1133,10 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
 
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.layoutxlm.config["hidden_dropout_prob"])
-        # self.extractor.apply(self.init_weights)
 
     def init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, nn.Linear):
-            # Slightly different from the TF version which uses truncated_normal for initialization
-            # cf https://github.com/pytorch/pytorch/pull/5617
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0, std=0.02, shape=layer.weight.shape))
