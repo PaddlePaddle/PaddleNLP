@@ -45,6 +45,10 @@ int main(int argc, char* argv[]) {
   if (FLAGS_use_gpu) {
     config.EnableUseGpu(100, 0);
   }
+  auto pass_builder = config.pass_builder();
+  // TODO(Steffy-zxf): delete embedding_eltwise_layernorm_fuse_pass to avoid IR
+  // optimization.
+  pass_builder->DeletePass("embedding_eltwise_layernorm_fuse_pass");
   auto predictor = paddle_infer::CreatePredictor(config);
 
   std::vector<std::string> data{
@@ -73,11 +77,11 @@ int main(int argc, char* argv[]) {
                                                      {6, "O"}};
   for (size_t i = 0; i < data.size(); i++) {
     size_t seq_len = data[i].size();
-    size_t start = i * max_seq_len;
+    // +1 for the concated CLS token
+    size_t start = i * max_seq_len + 1;
     size_t end = start + seq_len;
-    std::cout << data[i] << " : ";
     for (size_t j = start; j < end; j++) {
-      std::cout << label_map[preds[j]];
+      std::cout << preds[j] << " ";
     }
     std::cout << std::endl;
   }

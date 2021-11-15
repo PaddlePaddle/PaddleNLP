@@ -338,6 +338,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "gpt3-13B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
+            "gpt2-xl-en": gpt_vocab_link,
+            "gpt2-large-en": gpt_vocab_link,
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
             "gpt2-small-en": gpt_vocab_link,
@@ -345,6 +347,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
+            "gpt2-xl-en": gpt_merges_link,
+            "gpt2-large-en": gpt_merges_link,
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
             "gpt2-small-en": gpt_merges_link,
@@ -353,6 +357,8 @@ class GPTTokenizer(PretrainedTokenizer):
     pretrained_init_configuration = {
         "gpt3-13B-en": {},
         "gpt3-1.3B-en": {},
+        "gpt2-xl-en": {},
+        "gpt2-large-en": {},
         "gpt2-medium-en": {},
         "gpt2-en": {},
         "gpt2-small-en": {},
