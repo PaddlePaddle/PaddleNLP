@@ -551,7 +551,7 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              | ✅              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
-|CLTR_               | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
+|CTRL_               | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
@@ -594,7 +594,7 @@ Transformer预训练模型适用任务汇总
 .. _Blenderbot: https://arxiv.org/pdf/2004.13637.pdf
 .. _Blenderbot-Small: https://arxiv.org/pdf/2004.13637.pdf
 .. _ConvBert: https://arxiv.org/abs/2008.02496
-.. _CLTR: https://arxiv.org/abs/1909.05858
+.. _CTRL: https://arxiv.org/abs/1909.05858
 .. _DistilBert: https://arxiv.org/abs/1910.01108
 .. _ELECTRA: https://arxiv.org/abs/2003.10555
 .. _ERNIE: https://arxiv.org/abs/1904.09223
@@ -607,7 +607,7 @@ Transformer预训练模型适用任务汇总
 .. _RoBERTa: https://arxiv.org/abs/1907.11692
 .. _RoFormer: https://arxiv.org/abs/2104.09864
 .. _SKEP: https://arxiv.org/abs/2005.05635
-.. _SqueezeBert:: https://arxiv.org/abs/2006.11316
+.. _SqueezeBert: https://arxiv.org/abs/2006.11316
 .. _TinyBert: https://arxiv.org/abs/1909.10351
 .. _UnifiedTransformer: https://arxiv.org/abs/2006.16779
 .. _UNIMO: https://arxiv.org/abs/2012.15409
