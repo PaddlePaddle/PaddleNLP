@@ -24,7 +24,7 @@ pip install numpy
     ```shell
     bash run_xfun_ser.sh
 
-    # 结果如下
+    # 结果如下:
     # best metrics: {'precision': 0.8514686248331108, 'recall': 0.9354602126879354, 'f1': 0.8914904770225406}
     ```
 
@@ -32,6 +32,9 @@ pip install numpy
 2. ``Relation Extraction`` 任务启动Fine-tuning的方式如下：
     ```shell
     bash run_xfun_re.sh
+
+    # 结果如下:
+    # best metrics: {'precision': 0.6788935658448587, 'recall': 0.7743484224965707, 'f1': 0.7234860621595642}
     ```
 
 ## Reference
