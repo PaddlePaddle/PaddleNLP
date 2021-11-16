@@ -271,6 +271,52 @@ void update_KV_cache_kernelLauncher_v2(T** key_cache,
   }
 }
 
+template <typename T>
+__global__ void apply_logits_mask_kernel(int vocab_size_padded,
+                                         int vocab_size,
+                                         int beam_width,
+                                         T* log_probs,
+                                         const bool* finished,
+                                         const T* logits_mask = nullptr) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+  int bbid = blockIdx.y;  // batch_size * beam_size: index
+
+  bool finish = (finished != nullptr) ? finished[bbid] : false;
+
+  if (!finish) {
+    if (logits_mask) {
+      for (int i = tid + bid * blockDim.x; i < vocab_size;
+           i += blockDim.x * gridDim.x) {
+        log_probs[i + bbid * vocab_size_padded] += logits_mask[i];
+      }
+    }
+  }
+}
+
+template <typename T>
+void apply_logits_mask_kernelLauncher(T* log_probs,
+                                      const bool* finished,
+                                      int batch_size,
+                                      int beam_width,
+                                      int vocab_size_padded,
+                                      int vocab_size,
+                                      cudaStream_t stream,
+                                      const T* logits_mask) {
+  if (logits_mask == nullptr) return;
+
+  dim3 block(256);
+  dim3 grid((vocab_size_padded + block.x - 1) / block.x,
+            beam_width * batch_size);
+
+  apply_logits_mask_kernel<T><<<grid, block, 0, stream>>>(vocab_size_padded,
+                                                          vocab_size,
+                                                          beam_width,
+                                                          log_probs,
+                                                          finished,
+                                                          logits_mask);
+}
+
 template void init_kernelLauncher_v2(bool* finished,
                                      bool* alive_finished,
                                      int* sequence_length,
@@ -370,5 +416,25 @@ template void update_KV_cache_kernelLauncher_v2(half** key_cache,
                                                 const int decoder_layers,
                                                 cudaStream_t stream,
                                                 const int memory_max_seq_len);
+
+template void apply_logits_mask_kernelLauncher(
+    float* log_probs,
+    const bool* finished,
+    int batch_size,
+    int beam_width,
+    int vocab_size_padded,
+    int vocab_size,
+    cudaStream_t stream,
+    const float* logits_mask = nullptr);
+
+template void apply_logits_mask_kernelLauncher(
+    half* log_probs,
+    const bool* finished,
+    int batch_size,
+    int beam_width,
+    int vocab_size_padded,
+    int vocab_size,
+    cudaStream_t stream,
+    const half* logits_mask = nullptr);
 
 }  // end of name space fastertransformer

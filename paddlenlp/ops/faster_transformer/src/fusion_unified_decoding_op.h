@@ -16,9 +16,9 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
+#include "fastertransformer/decoding_beamsearch.h"
+#include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/open_decoder.h"
-#include "fastertransformer/transformer_beamsearch.h"
-#include "fastertransformer/transformer_sampling.h"
 #include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
@@ -81,5 +81,4 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const float& len_penalty,
     const bool& normalize_before,
     const bool& pos_bias,
-    const std::string& hidden_act,
-    const float& alpha);
+    const std::string& hidden_act);

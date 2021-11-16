@@ -53,6 +53,8 @@ private:
   DataType_ *decoder_buf_;
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
+  DataType_ *trans_out_buf_;
+  DataType_ *lm_normed_result_buf_;
   DataType_ *logits_buf_;
   int *word_ids_buf_;
   bool *finished_buf_;
@@ -92,10 +94,15 @@ public:
                    const int is_fuse_qkv = false,
                    const bool normalization_before = true,
                    const int pos_offset = 0,
-                   const ActivationType act = ActivationType::RELU)
+                   const ActivationType act = ActivationType::RELU,
+                   const bool pos_bias = false,
+                   const float temperature = 1.0,
+                   const float repeat_penalty = 1.0,
+                   const bool prefix_lm = false)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
+    args_.memory_max_seq_len_ = memory_max_seq_len;
     args_.head_num_ = head_num;
     args_.size_per_head_ = size_per_head;
     args_.hidden_units_ = head_num * size_per_head;
@@ -108,6 +115,12 @@ public:
     args_.normalization_before_ = normalization_before;
     args_.pos_offset_ = pos_offset;
     args_.act_ = act;
+
+    args_.pos_bias_ = pos_bias;
+    args_.temperature_ = temperature;
+    args_.repeat_penalty_ = repeat_penalty;
+
+    args_.prefix_lm_ = prefix_lm;
 
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;
@@ -148,10 +161,16 @@ public:
     size_t decoder_workspace_size = decoder_->getWorkspaceSize();  // type T
     size_t decoder_normed_result_buffer_size =
         args_.batch_size_ * args_.hidden_units_;  // type T
-    size_t cache_size =
-        args_.batch_size_ * args_.seq_len_ * args_.hidden_units_;  // type T
+
+    size_t cache_size = (prefix_lm)
+                            ? (args_.batch_size_ *
+                               (args_.seq_len_ + args_.memory_max_seq_len_) *
+                               args_.hidden_units_)
+                            : (args_.batch_size_ * args_.seq_len_ *
+                               args_.hidden_units_);  // type T
     size_t mem_cache_size =
-        args_.batch_size_ * memory_max_seq_len * args_.hidden_units_;  // type T
+        (prefix_lm) ? 0 : (args_.batch_size_ * memory_max_seq_len *
+                           args_.hidden_units_);  // type T
     size_t logits_buf_size =
         args_.batch_size_ * args_.vocab_size_padded_;  // type T
 
@@ -212,7 +231,7 @@ public:
     size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
         (cache_size * 4 + mem_cache_size * 2) * args_.decoder_layers_ +
-        decoder_normed_result_buffer_size;
+        decoder_normed_result_buffer_size * 3;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
         ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
@@ -250,9 +269,23 @@ public:
                   1 * cache_size * args_.decoder_layers_;
 
     decoder_buf_ = V_cache_[0] + cache_size * args_.decoder_layers_;
-    decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
-    // Used for post-norm.
-    embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
+
+    if (prefix_lm) {
+      trans_out_buf_ = (decoder_buf_ + decoder_workspace_size);
+      lm_normed_result_buf_ =
+          (trans_out_buf_ + decoder_normed_result_buffer_size);
+
+      decoder_normed_result_buf_ =
+          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
+      // Used for post-norm.
+      embedding_buf_ =
+          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
+    } else {
+      decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
+      // Used for post-norm.
+      embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
+    }
+
     logits_buf_ =
         decoder_normed_result_buf_ + decoder_normed_result_buffer_size;
     word_ids_buf_ = (int *)(logits_buf_ + logits_buf_size);
@@ -398,31 +431,86 @@ public:
       embedding_bias_ptr = padded_embedding_bias;
     }
 
-    int cache_size =
-        args_.batch_size_ * args_.seq_len_ * args_.hidden_units_;  // type T
+    size_t cache_size = (args_.prefix_lm_)
+                            ? (args_.batch_size_ *
+                               (args_.seq_len_ + args_.memory_max_seq_len_) *
+                               args_.hidden_units_)
+                            : (args_.batch_size_ * args_.seq_len_ *
+                               args_.hidden_units_);  // type T
+
+    if (args_.prefix_lm_) {
+      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+        init_cache_kernel_launcher(param[layer].k_cache,
+                                   param[layer].v_cache,
+                                   decoding_params.memory_sequence_length,
+                                   K_cache_[0] + layer * cache_size,
+                                   V_cache_[0] + layer * cache_size,
+                                   args_.head_num_,
+                                   args_.size_per_head_,
+                                   args_.memory_max_seq_len_,
+                                   args_.batch_size_,
+                                   1,
+                                   decoding_params.stream);
+      }
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+    }
 
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       if (args_.normalization_before_) {
-        embedding_lookup_sine_position_encoding_kernel_launcher(
-            from_tensor_[0],
-            decoding_params.embedding_table,
-            decoding_params.position_encoding_table +
-                (step - 1) * args_.hidden_units_,
-            word_ids_buf_,
-            args_.batch_size_,
-            args_.hidden_units_,
-            decoding_params.stream);
+        if (args_.prefix_lm_) {
+          embeddings_kernel_launcher(from_tensor_[0],
+                                     decoding_params.embedding_table,
+                                     decoding_params.position_encoding_table,
+                                     decoding_params.type_table,
+                                     decoding_params.memory_sequence_length,
+                                     decoding_params.type_id,
+                                     word_ids_buf_,
+                                     step,
+                                     args_.batch_size_,
+                                     args_.hidden_units_,
+                                     args_.pos_bias_,
+                                     decoding_params.stream);
+        } else {
+          embedding_lookup_sine_position_encoding_kernel_launcher(
+              from_tensor_[0],
+              decoding_params.embedding_table,
+              decoding_params.position_encoding_table +
+                  (step - 1) * args_.hidden_units_,
+              word_ids_buf_,
+              args_.batch_size_,
+              args_.hidden_units_,
+              decoding_params.stream);
+        }
       } else {
-        // TODO(gongenlei): Only support Bart temporarily.
-        embedding_position_lookups_bart_kernel_launcher(
-            embedding_buf_,
-            decoding_params.embedding_table,
-            decoding_params.position_encoding_table +
-                (step - 1 + args_.pos_offset_) * args_.hidden_units_,
-            word_ids_buf_,
-            args_.batch_size_,
-            args_.hidden_units_,
-            decoding_params.stream);
+        if (args_.prefix_lm_) {
+          embeddings_kernel_launcher(embedding_buf_,
+                                     decoding_params.embedding_table,
+                                     decoding_params.position_encoding_table,
+                                     decoding_params.type_table,
+                                     decoding_params.memory_sequence_length,
+                                     decoding_params.type_id,
+                                     word_ids_buf_,
+                                     step,
+                                     args_.batch_size_,
+                                     args_.hidden_units_,
+                                     args_.pos_bias_,
+                                     decoding_params.stream);
+        } else {
+          // TODO(gongenlei): Only support Bart temporarily.
+          embedding_position_lookups_bart_kernel_launcher(
+              embedding_buf_,
+              decoding_params.embedding_table,
+              decoding_params.position_encoding_table +
+                  (step - 1 + args_.pos_offset_) * args_.hidden_units_,
+              word_ids_buf_,
+              args_.batch_size_,
+              args_.hidden_units_,
+              decoding_params.stream);
+        }
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -467,18 +555,21 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-        decoder_->forward(from_tensor_[from_id],
-                          decoding_params.memory_tensor,
-                          K_cache_[0] + layer * cache_size,
-                          V_cache_[0] + layer * cache_size,
-                          K_mem_cache_[layer],
-                          V_mem_cache_[layer],
-                          decoding_params.memory_sequence_length,
-                          from_tensor_[out_id],
-                          step,
-                          args_.seq_len_,
-                          true,
-                          finished_buf_);
+
+        decoder_->forward(
+            from_tensor_[from_id],
+            (args_.prefix_lm_) ? nullptr : decoding_params.memory_tensor,
+            K_cache_[0] + layer * cache_size,
+            V_cache_[0] + layer * cache_size,
+            (args_.prefix_lm_) ? nullptr : K_mem_cache_[layer],
+            (args_.prefix_lm_) ? nullptr : V_mem_cache_[layer],
+            decoding_params.memory_sequence_length,
+            from_tensor_[out_id],
+            step,
+            args_.seq_len_,
+            !args_.prefix_lm_, /* is_cross_attention */
+            finished_buf_,
+            (args_.prefix_lm_) ? args_.memory_max_seq_len_ : -1);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -489,11 +580,91 @@ public:
       if (step > min_trg_len) {
         DataType_ alpha = (DataType_)1.0f;
         DataType_ beta = (DataType_)0.0f;
-        if (args_.normalization_before_) {
-          layer_norm(from_tensor_[out_id],
-                     decoding_params.layernorm.gamma,
-                     decoding_params.layernorm.beta,
-                     decoder_normed_result_buf_,
+
+        if (args_.prefix_lm_) {
+          if (args_.normalization_before_) {
+            layer_norm(from_tensor_[out_id],
+                       decoding_params.layernorm.gamma,
+                       decoding_params.layernorm.beta,
+                       decoder_normed_result_buf_,
+                       m,
+                       k,
+                       decoding_params.stream);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+            // trans here
+            cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                                decoding_params.cublas_handle,
+                                                CUBLAS_OP_N,
+                                                CUBLAS_OP_N,
+                                                k,
+                                                m,
+                                                k,
+                                                &alpha,
+                                                decoding_params.trans_kernel,
+                                                AType_,
+                                                k,
+                                                decoder_normed_result_buf_,
+                                                BType_,
+                                                k,
+                                                &beta,
+                                                trans_out_buf_,
+                                                CType_,
+                                                k,
+                                                decoding_params.stream,
+                                                cublasAlgoMap_,
+                                                cublas_workspace_);
+          } else {
+            // trans here
+            cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                                decoding_params.cublas_handle,
+                                                CUBLAS_OP_N,
+                                                CUBLAS_OP_N,
+                                                k,
+                                                m,
+                                                k,
+                                                &alpha,
+                                                decoding_params.trans_kernel,
+                                                AType_,
+                                                k,
+                                                from_tensor_[out_id],
+                                                BType_,
+                                                k,
+                                                &beta,
+                                                trans_out_buf_,
+                                                CType_,
+                                                k,
+                                                decoding_params.stream,
+                                                cublasAlgoMap_,
+                                                cublas_workspace_);
+          }
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          // add bias decoding_params.trans_bias
+          add_bias_act_kernelLauncher(trans_out_buf_,
+                                      decoding_params.trans_bias,
+                                      m,
+                                      k,
+                                      args_.act_,
+                                      decoding_params.stream);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          layer_norm(trans_out_buf_,
+                     decoding_params.lm_layernorm.gamma,
+                     decoding_params.lm_layernorm.beta,
+                     lm_normed_result_buf_,
                      m,
                      k,
                      decoding_params.stream);
@@ -514,7 +685,7 @@ public:
                                               embedding_kernel_ptr,
                                               AType_,
                                               n,
-                                              decoder_normed_result_buf_,
+                                              lm_normed_result_buf_,
                                               BType_,
                                               k,
                                               &beta,
@@ -524,34 +695,87 @@ public:
                                               decoding_params.stream,
                                               cublasAlgoMap_,
                                               cublas_workspace_);
+
         } else {
-          // Post-norm
-          cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
-                                              decoding_params.cublas_handle,
-                                              CUBLAS_OP_N,
-                                              CUBLAS_OP_N,
-                                              n,
-                                              m,
-                                              k,
-                                              &alpha,
-                                              embedding_kernel_ptr,
-                                              AType_,
-                                              n,
-                                              from_tensor_[out_id],
-                                              BType_,
-                                              k,
-                                              &beta,
-                                              logits_buf_,
-                                              CType_,
-                                              n,
-                                              decoding_params.stream,
-                                              cublasAlgoMap_,
-                                              cublas_workspace_);
-        }
+          if (args_.normalization_before_) {
+            layer_norm(from_tensor_[out_id],
+                       decoding_params.layernorm.gamma,
+                       decoding_params.layernorm.beta,
+                       decoder_normed_result_buf_,
+                       m,
+                       k,
+                       decoding_params.stream);
+
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
 #endif
+
+            cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                                decoding_params.cublas_handle,
+                                                CUBLAS_OP_N,
+                                                CUBLAS_OP_N,
+                                                n,
+                                                m,
+                                                k,
+                                                &alpha,
+                                                embedding_kernel_ptr,
+                                                AType_,
+                                                n,
+                                                decoder_normed_result_buf_,
+                                                BType_,
+                                                k,
+                                                &beta,
+                                                logits_buf_,
+                                                CType_,
+                                                n,
+                                                decoding_params.stream,
+                                                cublasAlgoMap_,
+                                                cublas_workspace_);
+          } else {
+            // Post-norm
+            cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                                decoding_params.cublas_handle,
+                                                CUBLAS_OP_N,
+                                                CUBLAS_OP_N,
+                                                n,
+                                                m,
+                                                k,
+                                                &alpha,
+                                                embedding_kernel_ptr,
+                                                AType_,
+                                                n,
+                                                from_tensor_[out_id],
+                                                BType_,
+                                                k,
+                                                &beta,
+                                                logits_buf_,
+                                                CType_,
+                                                n,
+                                                decoding_params.stream,
+                                                cublasAlgoMap_,
+                                                cublas_workspace_);
+          }
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+        }
+
+        if (decoding_params.logits_mask) {
+          apply_logits_mask_kernelLauncher(logits_buf_,
+                                           finished_buf_,
+                                           args_.batch_size_,
+                                           1,
+                                           args_.vocab_size_padded_,
+                                           args_.vocab_size_,
+                                           decoding_params.stream,
+                                           decoding_params.logits_mask);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+        }
 
         if (args_.candidate_num_ != 0) {
           // top k sampling

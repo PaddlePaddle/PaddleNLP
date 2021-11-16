@@ -816,6 +816,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
+                length_penalty=0.6,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -870,6 +871,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
             pos_bias=True)
 
@@ -967,6 +969,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
+                length_penalty=0.6,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -1019,6 +1022,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
             pos_bias=False)
 

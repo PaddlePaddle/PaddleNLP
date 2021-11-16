@@ -56,8 +56,7 @@ public:
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
 
-  const T *logits_mask_T = nullptr;
-  const float *logits_mask = nullptr;
+  const T *logits_mask = nullptr;
 
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
@@ -99,8 +98,14 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float probability_threshold_;
   size_t cub_temp_storage_size_{0};
   bool normalization_before_{true};
-  int pos_offset_{0};  // for position embedding
+  int pos_offset_{0};     // For BART position embedding
+  bool pos_bias_{false};  // For Unified position embedding
   ActivationType act_{ActivationType::RELU};
+
+  int memory_max_seq_len_{0};
+  float temperature_{1.0};
+  float repeat_penalty_{1.0};
+  bool prefix_lm_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {

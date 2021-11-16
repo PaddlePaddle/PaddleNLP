@@ -495,8 +495,6 @@ public:
       embedding_bias_ptr = padded_embedding_bias;
     }
 
-    // int cache_size = m * args_.seq_len_ * args_.hidden_units_;  // type T
-
     int cache_size =
         (args_.prefix_lm_)
             ? (m * (args_.seq_len_ + args_.memory_max_seq_len_) *
@@ -505,17 +503,26 @@ public:
 
     if (args_.prefix_lm_) {
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        init_cache_kernel_launcher(param[layer].k_cache,
-                                   param[layer].v_cache,
-                                   decoding_params.memory_sequence_length,
-                                   K_cache_[1] + layer * cache_size,
-                                   V_cache_[1] + layer * cache_size,
-                                   args_.head_num_,
-                                   args_.size_per_head_,
-                                   args_.memory_max_seq_len_,
-                                   args_.batch_size_ * args_.beam_width_,
-                                   1,
-                                   decoding_params.stream);
+        // Use batch major
+        // put k/v_buf from shape [B, H, L, Dh]
+        // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
+        transpose_cache_batch_major_kernelLauncher(
+            K_cache_[1] + layer * cache_size,
+            V_cache_[1] + layer * cache_size,
+            param[layer].k_cache,
+            param[layer].v_cache,
+            decoding_params.memory_sequence_length,
+            args_.batch_size_ * args_.beam_width_,
+            args_.memory_max_seq_len_,
+            args_.seq_len_ + args_.memory_max_seq_len_,
+            args_.size_per_head_,
+            args_.head_num_,
+            decoding_params.stream);
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
       }
     }
 
@@ -618,20 +625,37 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        decoder_->forward(
-            from_tensor_[from_id],
-            (args_.prefix_lm_) ? nullptr : decoding_params.memory_tensor,
-            K_cache_[kv_cache_id] + layer * cache_size,
-            V_cache_[kv_cache_id] + layer * cache_size,
-            (args_.prefix_lm_) ? nullptr : K_mem_cache_[layer],
-            (args_.prefix_lm_) ? nullptr : V_mem_cache_[layer],
-            decoding_params.memory_sequence_length,
-            from_tensor_[out_id],
-            step,
-            args_.seq_len_,
-            !args_.prefix_lm_, /* is_cross_attention */
-            keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
-            (args_.prefix_lm_) ? args_.memory_max_seq_len_ : -1);
+        if (args_.prefix_lm_) {
+          decoder_->forward_v2(
+              from_tensor_[from_id],
+              nullptr,
+              K_cache_[kv_cache_id] + layer * cache_size,
+              V_cache_[kv_cache_id] + layer * cache_size,
+              nullptr,
+              nullptr,
+              nullptr,
+              from_tensor_[out_id],
+              step + args_.memory_max_seq_len_,
+              args_.seq_len_ + args_.memory_max_seq_len_,
+              false, /* is_cross_attention */
+              keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
+              args_.memory_max_seq_len_,
+              decoding_params.memory_sequence_length);
+        } else {
+          decoder_->forward(
+              from_tensor_[from_id],
+              decoding_params.memory_tensor,
+              K_cache_[kv_cache_id] + layer * cache_size,
+              V_cache_[kv_cache_id] + layer * cache_size,
+              K_mem_cache_[layer],
+              V_mem_cache_[layer],
+              decoding_params.memory_sequence_length,
+              from_tensor_[out_id],
+              step,
+              args_.seq_len_,
+              true, /* is_cross_attention */
+              keep_alive_beam_ ? alive_finished_buf_ : finished_buf_);
+        }
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -824,6 +848,21 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+
+        if (decoding_params.logits_mask) {
+          apply_logits_mask_kernelLauncher(tmp_logits_buf_,
+                                           finished_buf_,
+                                           args_.batch_size_,
+                                           args_.beam_width_,
+                                           args_.vocab_size_padded_,
+                                           args_.vocab_size_,
+                                           decoding_params.stream,
+                                           decoding_params.logits_mask);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+        }
 
         // Beamsearch
         if (is_fuse_topk_softMax_) {

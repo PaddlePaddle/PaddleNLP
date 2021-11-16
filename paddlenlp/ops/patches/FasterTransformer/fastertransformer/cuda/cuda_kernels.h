@@ -143,4 +143,14 @@ void init_cache_kernel_launcher(const float* cache_k,
                                 int beam_size,
                                 cudaStream_t stream);
 
+template <typename T>
+void apply_logits_mask_kernelLauncher(T* log_probs,
+                                      const bool* finished,
+                                      int batch_size,
+                                      int beam_width,
+                                      int vocab_size_padded,
+                                      int vocab_size,
+                                      cudaStream_t stream,
+                                      const T* logits_mask = nullptr);
+
 }  // namespace fastertransformer
