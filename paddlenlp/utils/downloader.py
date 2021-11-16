@@ -31,7 +31,7 @@ try:
 except:
 
     class tqdm(object):
-        def __init__(self, total=None):
+        def __init__(self, total=None, **kwargs):
             self.total = total
             self.n = 0
 
@@ -206,7 +206,7 @@ def _download(url, path, md5sum=None):
         total_size = req.headers.get('content-length')
         with open(tmp_fullname, 'wb') as f:
             if total_size:
-                with tqdm(total=(int(total_size) + 1023) // 1024) as pbar:
+                with tqdm(total=(int(total_size) + 1023) // 1024, unit='B', unit_scale=True) as pbar:
                     for chunk in req.iter_content(chunk_size=1024):
                         f.write(chunk)
                         pbar.update(1)

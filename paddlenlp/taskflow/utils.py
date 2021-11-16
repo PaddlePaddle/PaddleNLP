@@ -45,12 +45,14 @@ def download_file(save_dir, filename, url, md5=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
-    logger.disable()
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
+            logger.disable()
             get_path_from_url(url, save_dir, md5)
     else:
+        logger.info("Downloading {} from {}".format(filename, url))
+        logger.disable()
         get_path_from_url(url, save_dir, md5)
     logger.enable()
     return fullname
