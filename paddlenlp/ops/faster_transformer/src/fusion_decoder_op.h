@@ -56,10 +56,15 @@ std::vector<paddle::Tensor> DecoderCUDAForward(
     const paddle::Tensor& ffn_inter_bias,
     const paddle::Tensor& ffn_out_weight,
     const paddle::Tensor& ffn_out_bias,
-    const paddle::Tensor& old_self_cache,
+    const paddle::Tensor& old_self_cache_key,
+    const paddle::Tensor& old_self_cache_value,
     const paddle::Tensor& old_mem_cache,
+    const int step,
     paddle::Tensor& decoder_output,
-    paddle::Tensor& new_self_cache,
+    paddle::Tensor& new_self_cache_key,
+    paddle::Tensor& new_self_cache_value,
     paddle::Tensor& new_mem_cache,
     int n_head,
-    int size_per_head);
+    int size_per_head,
+    int memory_hidden_dim,
+    bool is_fuse_qkv);
