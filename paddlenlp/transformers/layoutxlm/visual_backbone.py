@@ -1,5 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 Microsoft Research The HuggingFace Inc. team. All rights reserved.
+# Copyright 2021 Microsoft Research and The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ from paddle import ParamAttr
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
-from yacs.config import CfgNode
+from paddle.utils import try_import
 
 
 def read_config(fp=None):
@@ -32,7 +32,8 @@ def read_config(fp=None):
         dir_name = os.path.dirname(os.path.abspath(__file__))
         fp = os.path.join(dir_name, "visual_backbone.yaml")
     with open(fp, "r") as fin:
-        cfg = CfgNode().load_cfg(fin)
+        yacs = try_import("yacs")
+        cfg = yacs.config.CfgNode().load_cfg(fin)
     cfg.freeze()
     return cfg
 
