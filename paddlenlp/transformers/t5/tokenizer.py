@@ -17,6 +17,8 @@ from paddle.utils import try_import
 from ..albert.tokenizer import AlbertEnglishTokenizer
 import warnings
 
+__all__ = ['T5Tokenizer', ]
+
 
 class T5Tokenizer(AlbertEnglishTokenizer):
     """

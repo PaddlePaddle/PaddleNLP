@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import math
 
 import numpy as np
@@ -26,7 +25,12 @@ import paddle.nn.functional as F
 from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
 
-logger = logging.getLogger(__name__)
+__all__ = [
+    'T5Model',
+    "T5PretrainedModel",
+    'T5ForConditionalGeneration',
+    'T5EncoderModel',
+]
 
 
 def finfo(dtype):
@@ -570,7 +574,7 @@ class T5Block(nn.Layer):
         return outputs  # hidden-states, present_key_value_states, (self-attention position bias), (self-attention weights), (cross-attention position bias), (cross-attention weights)
 
 
-class T5PreTrainedModel(PretrainedModel):
+class T5PretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained T5 models. It provides T5 related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -1043,7 +1047,7 @@ class T5Stack(nn.Layer):
 
 
 @register_base_model
-class T5Model(T5PreTrainedModel):
+class T5Model(T5PretrainedModel):
     """
     The bare T5 Model transformer outputting raw hidden-states without any specific head on top.
 
@@ -1312,7 +1316,7 @@ class T5Model(T5PreTrainedModel):
         return decoder_outputs + encoder_output
 
 
-class T5ForConditionalGeneration(T5PreTrainedModel):
+class T5ForConditionalGeneration(T5PretrainedModel):
     """
     The T5 Model transformer with a language modeling head on top.
 
@@ -1603,7 +1607,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                     raise e
 
 
-class T5EncoderModel(T5PreTrainedModel):
+class T5EncoderModel(T5PretrainedModel):
     """
     The bare T5 Model transformer outputting encoder's raw hidden-states 
     without any specific head on top.
