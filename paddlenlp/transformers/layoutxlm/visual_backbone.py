@@ -32,8 +32,8 @@ def read_config(fp=None):
         dir_name = os.path.dirname(os.path.abspath(__file__))
         fp = os.path.join(dir_name, "visual_backbone.yaml")
     with open(fp, "r") as fin:
-        yacs = try_import("yacs")
-        cfg = yacs.config.CfgNode().load_cfg(fin)
+        yacs_config = try_import("yacs.config")
+        cfg = yacs_config.CfgNode().load_cfg(fin)
     cfg.freeze()
     return cfg
 
