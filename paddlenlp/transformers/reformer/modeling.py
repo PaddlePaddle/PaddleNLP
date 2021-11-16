@@ -34,6 +34,7 @@ from ...utils.log import logger
 
 __all__ = [
     "ReformerModel",
+    "ReformerPretrainedModel",
     "ReformerForSequenceClassification",
     "ReformerForQuestionAnswering",
     "ReformerModelWithLMHead",
@@ -2295,7 +2296,7 @@ class ReformerClassificationHead(nn.Layer):
         return hidden_states
 
 
-class ReformerPreTrainedModel(PretrainedModel):
+class ReformerPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained Reformer models. It provides Reformer related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -2487,7 +2488,7 @@ class ReformerPreTrainedModel(PretrainedModel):
 
 
 @register_base_model
-class ReformerModel(ReformerPreTrainedModel):
+class ReformerModel(ReformerPretrainedModel):
     """
     The bare Reformer Model transformer outputting raw hidden-states without any specific head on top.
 
@@ -2927,7 +2928,7 @@ class ReformerModel(ReformerPreTrainedModel):
         return input_ids, attention_mask, position_ids, input_shape
 
 
-class ReformerModelWithLMHead(ReformerPreTrainedModel):
+class ReformerModelWithLMHead(ReformerPretrainedModel):
     """
     The Reformer Model transformer with a language modeling head on top.
 
@@ -3095,7 +3096,7 @@ class ReformerModelWithLMHead(ReformerPreTrainedModel):
         return inputs_dict
 
 
-class ReformerForMaskedLM(ReformerPreTrainedModel):
+class ReformerForMaskedLM(ReformerPretrainedModel):
     """
     The Reformer Model transformer with a masked language modeling head on top.
 
@@ -3220,7 +3221,7 @@ class ReformerForMaskedLM(ReformerPreTrainedModel):
                 ) if masked_lm_loss is not None else output
 
 
-class ReformerForSequenceClassification(ReformerPreTrainedModel):
+class ReformerForSequenceClassification(ReformerPretrainedModel):
     """
     The Reformer Model transformer with a sequence classification head on top (linear layer).
 
@@ -3350,7 +3351,7 @@ class ReformerForSequenceClassification(ReformerPreTrainedModel):
         return ((loss, ) + output) if loss is not None else output
 
 
-class ReformerForQuestionAnswering(ReformerPreTrainedModel):
+class ReformerForQuestionAnswering(ReformerPretrainedModel):
     """
     Reformer Model with a span classification head on top for extractive question-answering tasks like
     SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
