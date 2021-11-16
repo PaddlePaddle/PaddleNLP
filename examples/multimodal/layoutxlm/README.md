@@ -8,16 +8,20 @@
 ### 配置环境
 环境依赖
 - cv2
-- numpy
+- sentencepiece
+- yacs
 
 安装命令：
 ```shell
 pip install opencv-python
-pip install numpy
+pip install sentencepiece
+pip install yacs
 ```
 
 ### 数据准备
-处理好的XFUND中文数据集下载地址：https://bj.bcebos.com/v1/paddlenlp/datasets/XFUND.zip
+处理好的XFUND中文数据集下载地址：https://bj.bcebos.com/v1/paddlenlp/datasets/XFUND.zip 。
+
+下载并解压该数据集，解压后将数据集放置在当前目录下。
 
 ### 执行Fine-tuning
 1. ``Semantic Entity Recognition`` 任务启动Fine-tuning的方式如下：
@@ -27,7 +31,6 @@ pip install numpy
     # 结果如下:
     # best metrics: {'precision': 0.8514686248331108, 'recall': 0.9354602126879354, 'f1': 0.8914904770225406}
     ```
-
 
 2. ``Relation Extraction`` 任务启动Fine-tuning的方式如下：
     ```shell
