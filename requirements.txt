@@ -4,3 +4,5 @@ colorlog
 colorama
 seqeval
 multiprocess
+yacs
+numpy
