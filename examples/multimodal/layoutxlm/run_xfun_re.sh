@@ -4,7 +4,7 @@ python ./run_xfun_re.py \
     --model_name_or_path "layoutxlm-base-uncased" \
     --max_seq_length 512 \
     --train_data_dir "XFUND/zh_train/image" \
-    --train_label_path "XFUND/zh_val/xfun_normalize_train.json" \
+    --train_label_path "XFUND/zh_train/xfun_normalize_train.json" \
     --eval_data_dir "XFUND/zh_val/image" \
     --eval_label_path "XFUND/zh_val/xfun_normalize_val.json" \
     --num_train_epochs 200 \
