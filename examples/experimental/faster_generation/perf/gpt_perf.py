@@ -23,25 +23,9 @@ from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
 
 
-def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
-    """
-    Post-process the decoded sequence.
-    """
-    eos_pos = len(seq) - 1
-    for i, idx in enumerate(seq):
-        if idx == eos_idx:
-            eos_pos = i
-            break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
-    return seq
-
-
-def prepare_input(tokenizer, sentences, pad_id):
-    word_pad = Pad(pad_id, dtype="int64")
-    tokenized = tokenizer(sentences, return_length=True)
+def prepare_input(tokenizer, sentences):
+    word_pad = Pad(tokenizer.pad_token_id, dtype="int64")
+    tokenized = tokenizer(sentences)
     inputs = word_pad([i["input_ids"] for i in tokenized])
     input_ids = paddle.to_tensor(inputs)
     return input_ids
@@ -89,18 +73,9 @@ def do_predict(args):
     model = GPTLMHeadModel.from_pretrained(args.model_name_or_path)
     # Set evaluate mode
     model.eval()
-    sentences = [
-        "I love that girl, but <mask> does not <mask> me.",
-        "She is so <mask> that I can not help glance at <mask>.",
-        "Nothing's gonna <mask> my love for you.",
-        "Drop everything now. Meet me in the pouring <mask>. Kiss me on the sidewalk.",
-    ]
+    sentences = ["<|endoftext|>" for _ in range(4)]
 
-    bos_id = model.bart.config['bos_token_id']
-    eos_id = model.bart.config['eos_token_id']
-    pad_id = model.bart.config['pad_token_id']
-
-    input_ids = prepare_input(tokenizer, sentences, pad_id)
+    input_ids = prepare_input(tokenizer, sentences)
 
     # Define model
     faster_bart = model
@@ -114,13 +89,12 @@ def do_predict(args):
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize()
                 start = time.perf_counter()
-            finished_seq, _ = faster_bart.generate(
+            output, _ = faster_bart.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
-                top_p=args.top_p,
-                num_beams=args.beam_size)
+                top_p=args.top_p)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
@@ -132,24 +106,22 @@ def do_predict(args):
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize()
                 start = time.perf_counter()
-            finished_seq, _ = faster_bart.generate(
+            output, _ = faster_bart.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                num_beams=args.beam_size,
                 use_fast=False)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
     device = torch.device("cuda:0")
-    hf_model = hf_gpt_model.from_pretrained("facebook/" +
-                                            args.model_name_or_path)
+    hf_model = hf_gpt_model.from_pretrained(args.model_name_or_path[:-3])
     hf_model.to(device)
     hf_model.eval()
-    hf_input_ids = prepare_input(tokenizer, sentences, pad_id)
+    hf_input_ids = prepare_input(tokenizer, sentences)
     hf_input_ids = torch.tensor(hf_input_ids.numpy())
     hf_input_ids = hf_input_ids.to(device)
 
@@ -166,7 +138,8 @@ def do_predict(args):
                 hf_input_ids,
                 do_sample=do_sample,
                 max_length=args.max_length + 1,
-                top_k=1)
+                top_k=args.top_k,
+                top_p=args.top_p)
         logger.info("Average test time for hf decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
