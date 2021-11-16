@@ -92,6 +92,26 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
 
+    def __call__(self,
+                 text,
+                 text_pair=None,
+                 max_seq_len=None,
+                 stride=0,
+                 is_split_into_words=False,
+                 pad_to_max_seq_len=False,
+                 truncation_strategy="longest_first",
+                 return_position_ids=False,
+                 return_token_type_ids=False,
+                 return_attention_mask=True,
+                 return_length=False,
+                 return_overflowing_tokens=False,
+                 return_special_tokens_mask=False):
+        return super(T5Tokenizer, self).__call__(
+            text, text_pair, max_seq_len, stride, is_split_into_words,
+            pad_to_max_seq_len, truncation_strategy, return_position_ids,
+            return_token_type_ids, return_attention_mask, return_length,
+            return_overflowing_tokens, return_special_tokens_mask)
+
     def _add_eos_if_not_present(self, token_ids):
         """Do not add eos again if user already added it."""
         if len(token_ids) > 0 and token_ids[-1] == self.eos_token_id:

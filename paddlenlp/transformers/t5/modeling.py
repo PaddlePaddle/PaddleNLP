@@ -1284,7 +1284,7 @@ class T5Model(T5PretrainedModel):
                 tokenizer = T5Tokenizer.from_pretrained('t5-base')
                 model = T5Model.from_pretrained('t5-base')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
                 outputs = model(**inputs)
@@ -1444,7 +1444,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 tokenizer = T5Tokenizer.from_pretrained('t5-base')
                 model = T5ForConditionalGeneration.from_pretrained('t5-base')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=inputs["input_ids"])
 
@@ -1681,7 +1681,7 @@ class T5EncoderModel(T5PretrainedModel):
                 tokenizer = T5Tokenizer.from_pretrained('t5-base')
                 model = T5EncoderModel.from_pretrained('t5-base')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
                 outputs = model(**inputs)
