@@ -122,8 +122,7 @@ def do_predict(args):
                 temperature=args.temperature,
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
-                decode_strategy="sampling",
-                use_fast=True)
+                decode_strategy="sampling")
             output_sequence = out_seq.numpy()
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (

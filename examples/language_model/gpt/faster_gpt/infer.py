@@ -45,11 +45,11 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
+        default="../build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--batch_size", default=1, type=int, help="Batch size. ")
+        "--batch_size", default=4, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -122,9 +122,9 @@ def do_predict(args):
                 temperature=args.temperature,
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
-                decode_strategy="sampling",
-                use_fast=True)
+                decode_strategy="sampling")
             output_sequence = out_seq.numpy()
+
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
