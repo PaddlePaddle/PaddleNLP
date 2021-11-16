@@ -48,9 +48,13 @@ def download_file(save_dir, filename, url, md5=None):
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
+            logger.disable()
             get_path_from_url(url, save_dir, md5)
     else:
+        logger.info("Downloading {} from {}".format(filename, url))
+        logger.disable()
         get_path_from_url(url, save_dir, md5)
+    logger.enable()
     return fullname
 
 
