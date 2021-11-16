@@ -82,6 +82,7 @@ hf_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese", use_fast=True)
 batches = [
     data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
 ]
+
 for batch_data in batches:
     encoded_inputs = hf_tokenizer(batch_data)
 
@@ -112,9 +113,6 @@ print("The throughput of paddle BertTokenizer: {:,.2f} tokens/s".format((
 hf_tokenizer = AutoTokenizer.from_pretrained(
     "bert-base-chinese", use_fast=False)
 
-batches = [
-    data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
-]
 for batch_data in batches:
     encoded_inputs = hf_tokenizer(batch_data)
 
@@ -138,9 +136,7 @@ lookup_table = tf.lookup.StaticVocabularyTable(
                 vocab_list, out_type=tf.int64), dtype=tf.int64),
         value_dtype=tf.int64),
     num_oov_buckets=1)
-batches = [
-    data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
-]
+
 tf_tokenizer = tf_text.BertTokenizer(lookup_table)
 
 for batch_data in batches:

@@ -70,5 +70,7 @@ from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
+from .layoutxlm.modeling import *
+from .layoutxlm.tokenizer import *
 from .t5.modeling import *
 from .t5.tokenizer import *
