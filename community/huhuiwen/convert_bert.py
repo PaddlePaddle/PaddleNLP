@@ -38,8 +38,6 @@ huggingface_to_paddle = {
 def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
                                          paddle_dump_path):
 
-    import torch
-    import paddle
     pytorch_state_dict = torch.load(pytorch_checkpoint_path, map_location="cpu")
     paddle_state_dict = OrderedDict()
     for k, v in pytorch_state_dict.items():
@@ -66,6 +64,13 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
 
 
 if __name__ == "__main__":
+
+    pytorch_state_dict = torch.load(
+        "/Users/huhuiwen01/Downloads/huhuiwen/mengzi-oscar-base/pytorch_model.bin",
+        map_location="cpu")
+    for key, value in pytorch_state_dict.items():
+        print(key, value.shape)
+    '''
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--pytorch_checkpoint_path",
@@ -82,3 +87,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     convert_pytorch_checkpoint_to_paddle(args.pytorch_checkpoint_path,
                                          args.paddle_dump_path)
+    '''
