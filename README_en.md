@@ -70,13 +70,13 @@ ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
 
 # Dependency Parsing
 ddp = Taskflow("dependency_parsing")
-ddp("百度是一家高科技公司")
->>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
+>>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
 
 # Sentiment Analysis
 senta = Taskflow("sentiment_analysis")
-senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
->>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
+senta("这个产品用起来真的很流畅，我非常喜欢")
+>>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
 ```
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
