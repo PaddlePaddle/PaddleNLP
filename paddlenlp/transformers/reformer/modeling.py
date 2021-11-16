@@ -2781,7 +2781,7 @@ class ReformerModel(ReformerPretrainedModel):
                 model = ReformerModel.from_pretrained('reformer-crime-and-punishment')
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
                 outputs = model(**inputs)
@@ -3039,7 +3039,7 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
                 model = ReformerModelWithLMHead.from_pretrained('reformer-crime-and-punishment')
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=inputs["input_ids"])
 
@@ -3188,7 +3188,7 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
                 model = ReformerForMaskedLM.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=inputs["input_ids"])
 
@@ -3315,7 +3315,7 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
                 model = ReformerForSequenceClassification.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs, labels=paddle.to_tensor([0]))
 
@@ -3455,7 +3455,7 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
                 model = ReformerForQuestionAnswering.from_pretrained('reformer-crime-and-punishment', is_decoder=False)
                 model.eval()
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
 
