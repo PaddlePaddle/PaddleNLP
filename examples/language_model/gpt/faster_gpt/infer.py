@@ -45,11 +45,11 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
+        default="../build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--batch_size", default=1, type=int, help="Batch size. ")
+        "--batch_size", default=4, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -57,11 +57,11 @@ def parse_args():
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
         "--topp",
-        default=0.0,
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
-        "--max_out_len", default=32, type=int, help="Maximum output length. ")
+        "--max_length", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--start_token",
         default="<|endoftext|>",
@@ -92,29 +92,19 @@ def do_predict(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
-    model = model_class.from_pretrained(
-        args.model_name_or_path, max_predict_len=args.max_out_len)
+    model = model_class.from_pretrained(args.model_name_or_path)
     model.eval()
 
     bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
     eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
 
     # Define model
-    gpt = FasterGPT(
-        model=model,
-        topk=args.topk,
-        topp=args.topp,
-        max_out_len=args.max_out_len,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        temperature=args.temperature,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+    gpt = model
 
     # Set evaluate mode
     gpt.eval()
     input_ids = np.array(
-        [[bos_id] for i in range(args.batch_size * 1)]).astype("int32").reshape(
+        [[bos_id] for i in range(args.batch_size * 1)]).astype("int64").reshape(
             [args.batch_size, 1])
     input_ids = paddle.to_tensor(input_ids)
 
@@ -124,38 +114,24 @@ def do_predict(args):
             if 50 == i:
                 paddle.fluid.core._cuda_synchronize(place)
                 start = time.time()
-            out_seq = gpt(input_ids)
-        paddle.fluid.core._cuda_synchronize(place)
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
-        output_sequence = out_seq.numpy().transpose()
-    for i in range(args.batch_size):
-        print("========== Sample-%d ==========" % i)
-        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
-
-    input_ids = paddle.cast(input_ids, "int64")
-    with paddle.no_grad():
-        for i in range(100):
-            # For warmup. 
-            if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
-                start = time.time()
-            out_seq, _ = model.generate(
-                input_ids=input_ids,
-                max_length=args.max_out_len,
-                decode_strategy="sampling",
-                temperature=args.temperature,
+            out_seq, _ = gpt.generate(
+                input_ids,
                 top_k=args.topk,
-                top_p=1.0,
-                num_return_sequences=1)
+                top_p=args.topp,
+                max_length=args.max_length,
+                temperature=args.temperature,
+                bos_token_id=bos_id,
+                eos_token_id=eos_id,
+                decode_strategy="sampling")
+            output_sequence = out_seq.numpy()
+
         paddle.fluid.core._cuda_synchronize(place)
-        logger.info(
-            "Average test time for origin generate api decoding is %f ms" % (
-                (time.time() - start) / 50 * 1000))
+        logger.info("Average test time for decoding is %f ms" % (
+            (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
-        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
+        print(tokenizer.convert_ids_to_string(output_sequence[i]))
 
 
 if __name__ == "__main__":

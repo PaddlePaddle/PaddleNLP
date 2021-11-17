@@ -875,7 +875,7 @@ class InferGptDecoding(nn.Layer):
             temperature=temperature,
             use_fp16_decoding=self.use_fp16_decoding)
 
-        output_ids = output_ids[input_ids.shape[-1]:, :]
+        output_ids = output_ids[paddle.shape(input_ids)[-1]:, :]
         return output_ids
 
 
@@ -1500,5 +1500,5 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decoding_strategy=decoding_strategy)
         return ids
