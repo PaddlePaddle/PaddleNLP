@@ -104,6 +104,7 @@ def infer(args):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_return_sequences,
+            use_fp16_decoding=args.use_fp16_decoding,
             use_fast=args.faster)
 
         total_time += (time.time() - start_time)
