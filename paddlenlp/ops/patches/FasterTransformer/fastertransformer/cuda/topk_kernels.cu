@@ -21,15 +21,17 @@
 
 namespace fastertransformer {
 
-__global__ void ker_curand_setup(curandState_t* state, const int size) {
+__global__ void ker_curand_setup(curandState_t* state,
+                                 const int size,
+                                 const int seed) {
   // curand_init(clock(), blockIdx.x * blockDim.x + threadIdx.x, 0,
   // &state[blockIdx.x * blockDim.x + threadIdx.x]);
   // fix the seed to prevent the seed of different gpu are differnet in Tensor
   // Parallel
   if (threadIdx.x + blockIdx.x * blockDim.x < size)
-    curand_init(0,
+    curand_init(seed,
                 blockIdx.x * blockDim.x + threadIdx.x,
-                0,
+                seed,
                 &state[blockIdx.x * blockDim.x + threadIdx.x]);
 }
 
@@ -38,7 +40,8 @@ void ker_curand_setupLauncher(curandState_t* state,
                               cudaStream_t stream) {
   dim3 block(256);
   dim3 grid((int)(ceil(args.batch_size_ * 1.0 / 256)));
-  ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_);
+  int seed = clock();
+  ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
 }
 
 

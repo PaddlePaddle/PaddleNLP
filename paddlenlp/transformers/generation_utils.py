@@ -716,17 +716,16 @@ class GenerationMixin(object):
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
+            model_kwargs = args.pop('model_kwargs')
+            args.update(model_kwargs)
             try:
                 if not hasattr(self, '_faster_entry'):
                     self._build_faster(args)
                 if self._faster_entry:
-                    model_kwargs = args.pop('model_kwargs')
                     faster_args = {}
                     for arg_name in self._faster_entry.__code__.co_varnames:
                         if arg_name in args.keys():
                             faster_args[arg_name] = args[arg_name]
-                        if arg_name in model_kwargs.keys():
-                            faster_args[arg_name] = model_kwargs[arg_name]
                     output_ids = self._faster_entry(**faster_args)
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
