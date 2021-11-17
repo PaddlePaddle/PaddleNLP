@@ -43,7 +43,6 @@ parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threa
 parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
-parser.add_argument("--epochs", type=int, default=0, help="The predict epochs for benchmark.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -107,25 +106,6 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-        if args.benchmark:
-            import auto_log
-            pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(
-                model_name="ernie-tiny",
-                model_precision=precision,
-                batch_size=self.batch_size,
-                data_shape="dynamic",
-                save_path=args.save_log_path,
-                inference_config=config,
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
-
     def predict(self, data, tokenizer, label_map):
         """
         Predicts the data labels.
@@ -137,9 +117,6 @@ class Predictor(object):
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
-        if args.benchmark:
-            self.autolog.times.start()
-
         examples = []
         for text in data:
             example = {"text": text}
@@ -155,24 +132,16 @@ class Predictor(object):
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         ): fn(samples)
 
-        if args.benchmark:
-            self.autolog.times.stamp()
-
         input_ids, segment_ids = batchify_fn(examples)
         self.input_handles[0].copy_from_cpu(input_ids)
         self.input_handles[1].copy_from_cpu(segment_ids)
         self.predictor.run()
         logits = self.output_handle.copy_to_cpu()
-        if args.benchmark:
-            self.autolog.times.stamp()
 
         probs = softmax(logits, axis=1)
         idx = np.argmax(probs, axis=1)
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
-
-        if args.benchmark:
-            self.autolog.times.end(stamp=True)
 
         return labels
 
@@ -199,9 +168,10 @@ if __name__ == "__main__":
         print('Data: {} \t Label: {}'.format(text, results[idx]))
 
     # Just for benchmark
-    if args.epochs > 0:
+    if args.benchmark:
         start = time.time()
-        for epoch in range(args.epochs):
+        epochs = 10
+        for epoch in range(epochs):
             epoch_start = time.time()
             for batch in batches:
                 labels = predictor.predict(batch, tokenizer, label_map)
@@ -209,7 +179,4 @@ if __name__ == "__main__":
             print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end -
                                                                   epoch_start)))
         end = time.time()
-        print("Predict time {:.4f} s/epoch".format((end - start) / args.epochs))
-
-    if args.benchmark:
-        predictor.autolog.report()
+        print("Predict time {:.4f} s/epoch".format((end - start) / epochs))

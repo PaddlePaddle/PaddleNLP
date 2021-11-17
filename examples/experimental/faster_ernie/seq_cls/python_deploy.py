@@ -31,7 +31,7 @@ parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GP
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
-parser.add_argument("--epochs", type=int, default=0, help="The predict epochs for benchmark.")
+parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -112,9 +112,10 @@ if __name__ == "__main__":
         print(text, " : ", results[idx])
 
     # Just for benchmark
-    if args.epochs > 0:
+    if args.benchmark:
         start = time.time()
-        for epoch in range(args.epochs):
+        epochs = 10
+        for epoch in range(epochs):
             epoch_start = time.time()
             for batch in batches:
                 labels = predictor.predict(batch, label_map=label_map)
@@ -122,4 +123,4 @@ if __name__ == "__main__":
             print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end -
                                                                   epoch_start)))
         end = time.time()
-        print("Predict time {:.4f} s/epoch".format((end - start) / args.epochs))
+        print("Predict time {:.4f} s/epoch".format((end - start) / epochs))
