@@ -50,6 +50,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
     const int& eos_id,
     const float& temperature,
     cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   auto input_dims = input.shape();
   int batch_size_ = input_dims[0];
@@ -62,6 +63,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = cublas_handle_;
+  decoding_params.cublaslt_handle = cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(word_emb.place());
 
@@ -133,6 +135,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
+    params[i].cublaslt_handle = cublaslt_handle_;
 
     params[i].request_batch_size = batch_size_;
     params[i].request_max_mem_seq_len = start_len;
@@ -234,6 +237,8 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
   auto stream = word_embedding.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
+  cublasLtHandle_t cublaslt_handle_;
+  cublasLtCreate(&cublaslt_handle_);
   cublasSetStream(cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
@@ -274,6 +279,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                  eos_id,
                                                  temperature,
                                                  cublas_handle_,
+                                                 cublaslt_handle_,
                                                  stream);
   } else {
     ret = gpt2_kernel<paddle::DataType::FLOAT32>(input,
@@ -311,9 +317,11 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                  eos_id,
                                                  temperature,
                                                  cublas_handle_,
+                                                 cublaslt_handle_,
                                                  stream);
   }
 
   cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

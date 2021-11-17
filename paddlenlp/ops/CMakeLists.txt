@@ -28,7 +28,7 @@ option(WITH_TRANSFORMER "Compiled with Transformer."                            
 option(WITH_GPT         "Compiled with GPT."                                        ON)
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." OFF)
-option(WITH_DECODER     "Compile with Transformer Decoder"                          OFF)
+option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          OFF)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 option(WITH_BART        "Compile with BART"                                         ON)

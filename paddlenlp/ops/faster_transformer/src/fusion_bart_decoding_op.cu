@@ -78,6 +78,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     float beam_search_diversity_rate_,
     float alpha,
     cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2")
@@ -107,6 +108,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
 
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = cublas_handle_;
+  decoding_params.cublaslt_handle = cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
@@ -127,6 +129,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
+    params[i].cublaslt_handle = cublaslt_handle_;
 
     if (decoding_strategy == "beam_search" ||
         decoding_strategy == "beam_search_v2") {
@@ -385,6 +388,8 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
   auto stream = input.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
+  cublasLtHandle_t cublaslt_handle_;
+  cublasLtCreate(&cublaslt_handle_);
   cublasSetStream(cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
@@ -442,6 +447,7 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
           beam_search_diversity_rate,
           alpha,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -497,6 +503,7 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
           beam_search_diversity_rate,
           alpha,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -509,5 +516,6 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
   }
 
   cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }
