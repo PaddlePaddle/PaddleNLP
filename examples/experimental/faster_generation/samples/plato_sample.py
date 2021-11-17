@@ -34,23 +34,25 @@ def post_process_response(token_ids, tokenizer):
 
 
 inputs = ['你好啊，你今年多大了']
-print("Model input:", inputs)
-inputs = tokenizer.dialogue_encode(
+
+inputs_ids = tokenizer.dialogue_encode(
     inputs,
     add_start_token_as_response=True,
     return_tensors=True,
     is_split_into_words=False)
 
 outputs, _ = model.generate(
-    input_ids=inputs['input_ids'],
-    token_type_ids=inputs['token_type_ids'],
-    position_ids=inputs['position_ids'],
-    attention_mask=inputs['attention_mask'],
+    input_ids=inputs_ids['input_ids'],
+    token_type_ids=inputs_ids['token_type_ids'],
+    position_ids=inputs_ids['position_ids'],
+    attention_mask=inputs_ids['attention_mask'],
     max_length=64,
     decode_strategy='sampling',
     top_k=5)
 
 result = post_process_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)
-print(result)
+
+print("Model input:", inputs)
+print("Result:", result)
 # 我今年23岁了,你今年多大了?

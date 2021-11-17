@@ -519,6 +519,11 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'early_stopping != False' is not supported yet in the faster version"
             )
+        if kwargs['forced_eos_token_id'] is not None:
+            # not support for forced_eos_token_id yet in the faster version
+            raise AttributeError(
+                "'forced_eos_token_id != None' is not supported yet in the faster version"
+            )
         self.prepare_faster_entry(kwargs)
 
     @paddle.no_grad()
@@ -585,7 +590,7 @@ class GenerationMixin(object):
                 BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ 
                 for more details. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
-                sequence length in the "beam_search" strategy. The larger this
+                sequence length in the "beam_searszch" strategy. The larger this
                 param is, the more that the model would generate shorter 
                 sequences. Default to 0.0, which means no penalty.
             early_stopping (bool, optional): Whether to stop searching in the 
@@ -715,7 +720,7 @@ class GenerationMixin(object):
 
         assert (
             decode_strategy in ["greedy_search", "sampling", "beam_search"]
-        ), "`decode_strategy` must be one of greedy_search, sampling or beam_search but received {}.".format(
+        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy)
 
         if getattr(self, '_faster_entry', None) is not False and use_fast:
@@ -1024,7 +1029,6 @@ class GenerationMixin(object):
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
-
         batch_beam_size, cur_len = input_ids.shape
         origin_len = cur_len
 

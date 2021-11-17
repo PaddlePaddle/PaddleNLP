@@ -98,7 +98,7 @@ def do_predict(args):
                 top_p=args.top_p,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
+        logger.info("Average test time for fast decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
     with paddle.no_grad():

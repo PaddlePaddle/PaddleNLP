@@ -48,7 +48,7 @@ def parse_args():
         help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
     parser.add_argument(
-        "--beam_size",
+        "--num_beams",
         default=4,
         type=int,
         help="The parameters for beam search. ")
@@ -108,10 +108,10 @@ def do_predict(args):
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                num_beams=args.beam_size,
+                num_beams=args.num_beams,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
+        logger.info("Average test time for fast decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
     with paddle.no_grad():

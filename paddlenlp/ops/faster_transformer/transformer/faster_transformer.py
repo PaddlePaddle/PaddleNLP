@@ -766,14 +766,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
-                                      use_cache=True,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
+                                      position_ids, attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
         decoding_type_id = token_type_ids[:, -1]
         token_type_ids = token_type_ids[:, :-1]
@@ -787,7 +781,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": True,
-            "cache": cache,
             "seq_len": seq_len,
             "decoding_type_id": paddle.cast(
                 decoding_type_id, dtype="int32")
@@ -934,14 +927,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
-                                      use_cache=True,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
+                                      position_ids, attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
         decoding_type_id = token_type_ids[:, -1]
         token_type_ids = token_type_ids[:, :-1]
@@ -955,7 +942,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": True,
-            "cache": cache,
             "seq_len": seq_len,
             "decoding_type_id": paddle.cast(
                 decoding_type_id, dtype="int32")
