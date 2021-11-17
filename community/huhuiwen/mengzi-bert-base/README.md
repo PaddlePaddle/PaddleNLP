@@ -13,7 +13,7 @@
 ```python
 from paddlenlp import BertModel, BertTokenzier
 tokenizer = BertTokenzier.from_pretrained('mengzi-bert-base')
-model = BertModel.from_pretrained('mengzi-bert-base')
+model = BertForMakedLM.from_pretrained('mengzi-bert-base')
 
 text  = "欢迎使用百度飞桨！"
 inputs = tokenizer(text)

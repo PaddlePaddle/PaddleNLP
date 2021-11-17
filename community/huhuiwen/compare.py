@@ -13,7 +13,8 @@ def compare():
     pt_inputs = torch.tensor([inputs])
     pd_inputs = paddle.to_tensor([inputs])
 
-    pt_model = hgnlp.BertForMaskedLM.from_pretrained('torch/mengzi-bert-base/')
+    pt_model = hgnlp.BertForMaskedLM.from_pretrained(
+        'Langboat/mengzi-bert-base/')
     pt_model.eval()
     with torch.no_grad():
         pt_outputs = pt_model(pt_inputs)[0]
@@ -39,7 +40,7 @@ def compare_fin():
     pd_inputs = paddle.to_tensor([inputs])
 
     pt_model = hgnlp.BertForMaskedLM.from_pretrained(
-        'torch/mengzi-bert-base-fin/')
+        'Langboat/mengzi-bert-base-fin/')
     pt_model.eval()
     with torch.no_grad():
         pt_outputs = pt_model(pt_inputs)[0]

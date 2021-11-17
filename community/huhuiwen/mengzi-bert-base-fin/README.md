@@ -13,7 +13,7 @@
 ```python
 from paddlenlp import BertModel, BertTokenzier
 tokenizer = BertTokenzier.from_pretrained('mengzi-bert-base-fin')
-model = BertModel.from_pretrained('mengzi-bert-base-fin')
+model = BertForMakedLM.from_pretrained('mengzi-bert-base-fin')
 
 text  = "股市指某支新发行股票在定价和配置后的交易市场。"
 inputs = tokenizer(text)
