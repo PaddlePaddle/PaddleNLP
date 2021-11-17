@@ -127,6 +127,10 @@ def do_train():
         collate_fn=trans_func,
         return_list=True)
 
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
+
     num_training_steps = len(train_data_loader) * args.epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
