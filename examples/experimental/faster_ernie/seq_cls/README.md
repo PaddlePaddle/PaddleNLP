@@ -45,7 +45,7 @@ seq_cls/
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python train.py --device gpu --save_dir ckpt/ --batch_size 32 --max_seq_length 128
+python train.py --device gpu --save_dir checkpoint/ --batch_size 32 --max_seq_length 128
 ```
 
 可支持配置的参数：
