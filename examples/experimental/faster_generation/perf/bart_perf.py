@@ -39,7 +39,7 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
-        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
+        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large']. "
     )
     parser.add_argument(
         "--decode_strategy",
