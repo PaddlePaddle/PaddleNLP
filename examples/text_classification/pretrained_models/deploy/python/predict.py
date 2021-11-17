@@ -15,6 +15,7 @@
 import argparse
 import os
 import sys
+import time
 
 import numpy as np
 import paddle
@@ -42,6 +43,7 @@ parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threa
 parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
+parser.add_argument("--epochs", type=int, default=0, help="The predict epochs for benchmark.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -181,9 +183,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     test_ds = load_dataset("chnsenticorp", splits=["test"])
     data = [d["text"] for d in test_ds]
     batches = [
@@ -197,5 +197,19 @@ if __name__ == "__main__":
         results.extend(predictor.predict(batch_data, tokenizer, label_map))
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
+
+    # Just for benchmark
+    if args.epochs > 0:
+        start = time.time()
+        for epoch in range(args.epochs):
+            epoch_start = time.time()
+            for batch in batches:
+                labels = predictor.predict(batch, tokenizer, label_map)
+            epoch_end = time.time()
+            print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end -
+                                                                  epoch_start)))
+        end = time.time()
+        print("Predict time {:.4f} s/epoch".format((end - start) / args.epochs))
+
     if args.benchmark:
         predictor.autolog.report()
