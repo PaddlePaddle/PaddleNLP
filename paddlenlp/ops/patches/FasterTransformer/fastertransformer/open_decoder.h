@@ -437,7 +437,7 @@ public:
       } else {
         // post-normalization
         if (memory_max_seq_len == -1) {
-          masked_multi_head_attention(norm_from_tensor_buf_,
+          masked_multi_head_attention(from_tensor,
                                       key_cache_,
                                       value_cache_,
                                       masked_output_buf_,
@@ -445,7 +445,7 @@ public:
                                       step,
                                       decoder_max_seq_len);
         } else {
-          self_multi_head_attention(norm_from_tensor_buf_,
+          self_multi_head_attention(from_tensor,
                                     memory_sequence_length,
                                     key_cache_,
                                     value_cache_,
