@@ -14,9 +14,10 @@ limitations under the License. */
 
 #include <gflags/gflags.h>
 
+#include <codecvt>
 #include <iostream>
+#include <locale>
 #include <numeric>
-
 #include "paddle/include/paddle_inference_api.h"
 
 DEFINE_string(model_file, "", "Directory of the inference model.");
@@ -68,20 +69,18 @@ int main(int argc, char* argv[]) {
   auto output_names = predictor->GetOutputNames();
   GetOutput(predictor.get(), output_names[0], &logits, &max_seq_len);
   GetOutput(predictor.get(), output_names[1], &preds, &max_seq_len);
-  std::unordered_map<int64_t, std::string> label_map{{0, "B-PER"},
-                                                     {1, "I-PER"},
-                                                     {2, "B-ORG"},
-                                                     {3, "I-ORG"},
-                                                     {4, "B-LOC"},
-                                                     {5, "I-LOC"},
-                                                     {6, "O"}};
+  std::string label_map[] = {
+      "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "O"};
+  std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
   for (size_t i = 0; i < data.size(); i++) {
-    size_t seq_len = data[i].size();
+    std::wstring wdata = converter.from_bytes(data[i]);
+    size_t seq_len = wdata.size();
     // +1 for the concated CLS token
     size_t start = i * max_seq_len + 1;
     size_t end = start + seq_len;
+    std::cout << "Text: " << data[i] << "\tLabel: ";
     for (size_t j = start; j < end; j++) {
-      std::cout << preds[j] << " ";
+      std::cout << label_map[preds[j]] << " ";
     }
     std::cout << std::endl;
   }
