@@ -87,7 +87,7 @@ def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
             label += [ignore_label] * (max_seq_len - len(label))
         labels.append(label)
 
-    labels = np.array(labels)
+    labels = np.array(labels, dtype="int64")
     seq_lens = np.array(seq_lens)
     return texts, labels, seq_lens
 
@@ -126,6 +126,10 @@ def do_train():
         batch_size=args.batch_size,
         collate_fn=trans_func,
         return_list=True)
+
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
     num_training_steps = len(train_data_loader) * args.epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,

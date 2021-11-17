@@ -73,7 +73,14 @@ def evaluate(model, criterion, metric, data_loader):
 
 
 def create_dataloader(dataset, mode='train', batch_size=1):
+    def trans_fn(example):
+        return {
+            "text": example["text"],
+            "label": np.array(
+                example["label"], dtype="int64")
+        }
 
+    dataset.map(trans_fn)
     shuffle = True if mode == 'train' else False
     if mode == 'train':
         batch_sampler = paddle.io.DistributedBatchSampler(
