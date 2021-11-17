@@ -96,7 +96,7 @@ def do_predict(args):
 
     num_loop = 100
     with paddle.no_grad():
-        for i in range(100):
+        for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
@@ -108,13 +108,14 @@ def do_predict(args):
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                num_beams=args.beam_size)
+                num_beams=args.beam_size,
+                use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
     with paddle.no_grad():
-        for i in range(100):
+        for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2

@@ -712,6 +712,12 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+
+        assert (
+            decode_strategy in ["greedy_search", "sampling", "beam_search"]
+        ), "`decode_strategy` must be one of greedy_search, sampling or beam_search but received {}.".format(
+            decode_strategy)
+
         if getattr(self, '_faster_entry', None) is not False and use_fast:
             args = locals()
             args.pop('self')
@@ -860,11 +866,6 @@ class GenerationMixin(object):
                 return self.beam_search(
                     input_ids, beam_scorer, logits_processors, max_length,
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs)
-
-        else:
-            raise ValueError(
-                '`decode_strategy` must be one of "greedy_search", "sampling" '
-                'and "beam_search".')
 
     def greedy_search(self, input_ids, logits_processors, max_length,
                       pad_token_id, eos_token_id, **model_kwargs):

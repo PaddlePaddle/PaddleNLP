@@ -854,6 +854,13 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
+        else:
+            model_kwargs = {
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len
+            }
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -1015,6 +1022,13 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
+        else:
+            model_kwargs = {
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len
+            }
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)

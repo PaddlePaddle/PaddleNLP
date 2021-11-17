@@ -39,14 +39,13 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
-        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
+        help="The model name to specify the bart to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt2-large-en']. "
     )
     parser.add_argument(
         "--decode_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
-    )
+        help="The decoding strategy. Can be one of [greedy_search, sampling]")
     parser.add_argument(
         "--top_k",
         default=4,
@@ -85,7 +84,7 @@ def do_predict(args):
 
     num_loop = 100
     with paddle.no_grad():
-        for i in range(100):
+        for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
@@ -96,13 +95,14 @@ def do_predict(args):
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
-                top_p=args.top_p)
+                top_p=args.top_p,
+                use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
     with paddle.no_grad():
-        for i in range(100):
+        for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
