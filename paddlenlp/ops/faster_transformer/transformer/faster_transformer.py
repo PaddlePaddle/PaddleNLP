@@ -804,6 +804,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
     def forward(self,
                 input_ids,
+                token_type_ids,
+                position_ids,
+                attention_mask,
                 seq_len=None,
                 max_length=128,
                 top_k=4,
@@ -815,8 +818,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6,
-                **model_kwargs):
+                length_penalty=0.6):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -825,7 +827,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(
             self._model, 'pad_token_id', None)
 
-        temperature = model_kwargs.pop('temperature', 1.0)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
@@ -833,14 +834,22 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-        model_kwargs["seq_len"] = seq_len
-        if self._decode_strategy.startswith("beam_search") and num_beams > 1:
+        if self._decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_beams, **model_kwargs)
-
-        elif self._decode_strategy == "sampling" and num_return_sequences > 1:
+                input_ids,
+                expand_size=num_beams,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif self._decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_return_sequences, **model_kwargs)
+                input_ids,
+                expand_size=num_return_sequences,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -957,6 +966,9 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
     def forward(self,
                 input_ids,
+                token_type_ids,
+                position_ids,
+                attention_mask,
                 seq_len=None,
                 max_length=128,
                 top_k=4,
@@ -968,8 +980,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6,
-                **model_kwargs):
+                length_penalty=0.6):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -978,7 +989,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(
             self._model, 'pad_token_id', None)
 
-        temperature = model_kwargs.pop('temperature', 1.0)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
@@ -986,13 +996,22 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-        model_kwargs["seq_len"] = seq_len
-        if self._decode_strategy.startswith("beam_search") and num_beams > 1:
+        if self._decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_beams, **model_kwargs)
-        elif self._decode_strategy == "sampling" and num_return_sequences > 1:
+                input_ids,
+                expand_size=num_beams,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif self._decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_return_sequences, **model_kwargs)
+                input_ids,
+                expand_size=num_return_sequences,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)

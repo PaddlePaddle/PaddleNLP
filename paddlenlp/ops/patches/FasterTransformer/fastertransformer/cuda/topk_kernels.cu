@@ -563,12 +563,12 @@ __global__ void topk_stage_2_opt3_sampling(
       }
     }
     if (finished_buf != nullptr) {
-      finished_buf[batch_id] = ids[batch_id] == end_id ? 1 : 0;
       if (sequence_length != nullptr) {
         sequence_length[batch_id] = finished_buf[batch_id]
                                         ? sequence_length[batch_id]
                                         : sequence_length[batch_id] + 1;
       }
+      finished_buf[batch_id] = ids[batch_id] == end_id ? 1 : 0;
     }
   }
 }
@@ -1279,11 +1279,11 @@ __global__ void sampling(int* topk_tmp_id_buf,
       }
     }
     if (finished_buf != nullptr) {
-      finished_buf[bid] = ids[bid] == end_id ? 1 : 0;
       if (sequence_length != nullptr) {
         sequence_length[bid] =
             finished_buf[bid] ? sequence_length[bid] : sequence_length[bid] + 1;
       }
+      finished_buf[bid] = ids[bid] == end_id ? 1 : 0;
     }
   }
 }
