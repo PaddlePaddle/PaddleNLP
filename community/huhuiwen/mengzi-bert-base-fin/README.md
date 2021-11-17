@@ -15,6 +15,11 @@ from paddlenlp import BertModel, BertTokenzier
 tokenizer = BertTokenzier.from_pretrained('mengzi-bert-base-fin')
 model = BertModel.from_pretrained('mengzi-bert-base-fin')
 
+text  = "股市指某支新发行股票在定价和配置后的交易市场。"
+inputs = tokenizer(text)
+inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+output = model(**inputs)
+print(outputs)
 ```
 
 # 权重来源

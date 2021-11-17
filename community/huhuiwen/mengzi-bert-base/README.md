@@ -15,6 +15,12 @@ from paddlenlp import BertModel, BertTokenzier
 tokenizer = BertTokenzier.from_pretrained('mengzi-bert-base')
 model = BertModel.from_pretrained('mengzi-bert-base')
 
+text  = "欢迎使用百度飞桨！"
+inputs = tokenizer(text)
+inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+output = model(**inputs)
+print(outputs)
+
 ```
 
 # 权重来源

@@ -65,26 +65,19 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
 
 if __name__ == "__main__":
 
-    pytorch_state_dict = torch.load(
-        "/Users/huhuiwen01/Downloads/huhuiwen/mengzi-oscar-base/pytorch_model.bin",
-        map_location="cpu")
-    for key, value in pytorch_state_dict.items():
-        print(key, value.shape)
-    '''
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--pytorch_checkpoint_path",
-        default="/Users/huhuiwen01/Downloads/huhuiwen/mengzi-bert-base/pytorch_model.bin",
+        default="/mengzi-bert-base/pytorch_model.bin",
         type=str,
         required=False,
         help="Path to the Pytorch checkpoint path.")
     parser.add_argument(
         "--paddle_dump_path",
-        default="/Users/huhuiwen01/Downloads/huhuiwen/mengzi-bert-base-pd/model_state.pdparams",
+        default="/mengzi-bert-base-pd/model_state.pdparams",
         type=str,
         required=False,
         help="Path to the output Paddle model.")
     args = parser.parse_args()
     convert_pytorch_checkpoint_to_paddle(args.pytorch_checkpoint_path,
                                          args.paddle_dump_path)
-    '''
