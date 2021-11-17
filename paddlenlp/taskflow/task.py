@@ -91,7 +91,7 @@ class Task(metaclass=abc.ABCMeta):
 
     def _prepare_static_mode(self):
         """
-        Construct the input data and executor in the PaddlePaddele static mode. 
+        Construct the input data and predictor in the PaddlePaddele static mode. 
         """
         place = paddle.get_device()
         if place == 'cpu':

@@ -42,75 +42,66 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 
 ![ERNIE-CTM总体结构](../doc/img/ernie_ctm_model.png)
 
-### Finetune任务
+### WordTag增量训练
 
-在微调任务中提供了一个百科知识标注的的任务，旨在解析中文词汇的知识标注，在该词性体系中覆盖了所有中文词汇的词类体系，包括各类实体词与非实体词（如概念、实体/专名、语法词等），下面是提供了微调任务的具体的执行流程。
+在微调任务中提供了一个百科知识标注的任务，旨在解析中文词汇的知识标注，在该词性体系中覆盖了所有中文词汇的词类体系，包括各类实体词与非实体词（如概念、实体/专名、语法词等）。下面提供了在WordTag模型上进行增量训练的具体执行流程。
 
 #### 代码结构说明
 
 ```text
 wordtag/
 ├── data.py # 训练数据处理脚本
-├── download.py # 获取微调数据集脚本
-├── eval.py # 验证脚本
 ├── metric.py # 模型效果验证指标脚本
+├── predict.py # 预测脚本
 ├── README.md # 使用说明
-└── train.py  # 训练脚本
+├── train.py  # 训练脚本
+└── utils.py  # 工具函数
 
 ```
 
 #### 数据准备
 
-我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
+我们提供了少数样本用以示例增量训练。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz && tar -zxvf wordtag_dataset.tar.gz
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset_v2.tar.gz && tar -zxvf wordtag_dataset_v2.tar.gz
 ```
 解压之后
 
 ```text
-
 data/
-├── classifier_labels.txt # 句子分类集合文本
-├── eval.txt # 验证集
-├── tags.txt # 命名实体集合
+├── dev.txt # 验证集
+├── tags.txt # WordTag标签集合
 └── train.json  # 训练数据
 ```
 
-训练使用的数据可以由用户根据实际的应用场景，自己组织数据。每行数据都由tokens、tags、cls_label组成，tags采用 BIOES 标注体系，cls_label是整个句子的分类，包含"编码/引用/列表","外语句子","古文/古诗句","其他文本"四种，由于目前发布的预训练模型针对的是现代文，因此前三种文本只用于训练文本分类，不用于训练序列标注。
-
-训练样本示例如下：
+训练样本示例如下，每个单词以"\type"的形式标记其词性或实体类别
 
 ```text
-{"tokens": ["1", ".", "1", ".", "8", "车", "辆", "自", "动", "驾", "驶", "及", "控", "制", " ", "8"], "tags": ["B-数量词", "I-数量词", "I-数量词", "I-数量词", "E-数量词", "B-物体类", "E-物体类", "B-场景事件", "I-场景事件", "I-场景事件", "E-场景事件", "S-连词", "B-场景事件", "E-场景事件", "S-w", "S-数量词"], "cls_label": "编码/引用/列表"}
-{"tokens": ["亦", "在", "空", "中", "捕", "食", "，", "边", "飞", "翔", "边", "捕", "食", "。"], "tags": ["S-词汇用语", "S-介词", "B-位置方位", "E-位置方位", "B-场景事件", "E-场景事件", "S-w", "S-词汇用语", "B-场景事件", "E-场景事件", "S-词汇用语", "B-场景事件", "E-场景事件", "S-w"], "cls_label": "其他文本"}
+砚台\物体类 与\连词 笔\物体类 、\w 墨\物体类 、\w 纸\物体类 是\肯定词 中国\世界地区类 传统\修饰词 的\助词 文房四宝\词汇用语 。\w
+《\w 全球化与中国：理论与发展趋势\作品类_实体 》\w 是\肯定词 2010年\时间类 经济管理出版社\组织机构类 出版\场景事件 的\助词 图书\作品类_概念 ，\w 作者\人物类_概念 是\肯定词 余永定\人物类_实体 、\w 路爱国\人物类_实体 、\w 高海红\人物类_实体 。\w
 ```
 
-#### 单卡训练
+WordTag模型使用了**BIOES标注体系**，用户可以在`tags.txt`标签文件中按照该标注体系自定义添加词性或命名实体类别，标签文件示例：
 
-```bash
-export CUDA_VISIBLE_DEVICES=0
-python -u train.py \
+```text
+B-组织机构类_企事业单位
+I-组织机构类_企事业单位
+E-组织机构类_企事业单位
+S-组织机构类_企事业单位
+```
+
+#### 模型训练
+
+```shell
+python -m paddle.distributed.launch --gpus "0"  train.py \
     --max_seq_len 128 \
     --batch_size 32   \
-    --learning_rate 1e-4 \
+    --learning_rate 5e-5 \
     --num_train_epochs 3 \
     --logging_steps 10 \
     --save_steps 100 \
-    --output_dir ./tmp/ \
-    --device "gpu"
-```
-
-#### 多卡训练
-```bash
-python -m paddle.distributed.launch --gpus "0,1"  train.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --learning_rate 1e-4 \
-    --num_train_epochs 3 \
-    --logging_steps 10 \
-    --save_steps 100 \
-    --output_dir ./tmp/ \
+    --output_dir ./output \
     --device "gpu"
 ```
 
@@ -126,21 +117,25 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py \
 
 
 
-### 模型评估
+### 模型预测
 
 通过加载训练过程中保存的模型，可以对验证集数据进行验证，启动方式如下：
 
-```bash
-python -u eval.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --init_ckpt_dir ./tmp/ernie_ctm_ft_model_93.pdparams \
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch --gpus "0" predict.py \
+    --params_path ./output/model_300/model_state.pdparams \
+    --batch_size 32 \
+    --linking True \
+    --term_schema_path ../termtree/termtree_type.csv \
+    --term_data_path ./data/TermTree.v1.0 \
     --device "gpu"
 ```
 
-其中 init_ckpt_dir 是模型加载路径，请根据具体的模型路径填写该项。
-
-**NOTICE** 由于提供的微调数据集的数据量比较小，微调后的模型效果有限，因此我们也提供专业的WordTag（中文词类知识标注工具），知识标注效果更优详细信息见 [WordTag](../wordtag) 。
+重要参数释义如下
+- `linking` 是否将WordTag预测结果与TermTree进行映射。
+- `term_schema_path` 表示termtree词类体系文件。
+- `term_data_path` 百科知识树文件，包含所有的term集。
 
 
 ## ERNIE-CTM后续计划
