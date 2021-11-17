@@ -607,151 +607,295 @@ public:
     try {
       /* masked multi-head attention */
       /* layernorm(from_tensor) -> norm_from_tensor_buf_ */
-
-      layer_norm(from_tensor,
-                 param_.self_layernorm.gamma,
-                 param_.self_layernorm.beta,
-                 norm_from_tensor_buf_,
-                 m,
-                 hidden_units_,
-                 param_.stream);
-
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-      PUSH_RANGE("Transformer/slf_attn")
-      masked_multi_head_attention_v2(norm_from_tensor_buf_,
-                                     key_cache_,
-                                     value_cache_,
-                                     masked_output_buf_,
-                                     finished,
-                                     step,
-                                     decoder_max_seq_len,
-                                     max_input_len,
-                                     input_lengths);
-      POP_RANGE
+      if (normalization_before_) {
+        layer_norm(from_tensor,
+                   param_.self_layernorm.gamma,
+                   param_.self_layernorm.beta,
+                   norm_from_tensor_buf_,
+                   m,
+                   hidden_units_,
+                   param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-
-      if (is_cross_attention == true) {
-        /*
-            add bias to masked_output_buf_
-            masked_output_buf_ + from_tensor -> masked_output_buf_
-            norm(masked_output_buf_) -> norm_masked_output_buf_
-        */
-        add_bias_input_layernorm_2_kernelLauncher(
-            from_tensor,
-            param_.cross_layernorm.gamma,
-            param_.cross_layernorm.beta,
-            param_.self_attention.attention_output_weight.bias,
-            masked_output_buf_,
-            norm_masked_output_buf_,
-            m,
-            hidden_units_,
-            param_.stream);
-#ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-        // For Attention is All You Need decoder
-        /* cross attention with memory */
-        cross_multi_head_attention(norm_masked_output_buf_,
-                                   memory_tensor,
-                                   key_mem_cache_,
-                                   value_mem_cache_,
-                                   cross_output_buf_,
-                                   memory_sequence_length,
-                                   finished,
-                                   param_.request_max_mem_seq_len,
-                                   step);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-        /*
-            cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
-            norm(cross_otuput_buf) -> normed_last_context (input for ffn)
-        */
-        add_bias_input_layernorm_2_kernelLauncher(
-            masked_output_buf_,
-            param_.ffn_layernorm.gamma,
-            param_.ffn_layernorm.beta,
-            param_.cross_attention.attention_output_weight.bias,
-            cross_output_buf_,
-            norm_cross_output_buf_,
-            m,
-            hidden_units_,
-            param_.stream);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-        ffn(norm_cross_output_buf_,
-            ffn_inner_buf_,
-            decoder_output,
-            m,
-            4 * t_parallel_param_.local_hidden_units_,
-            hidden_units_,
-            ActivationType::RELU);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-        add_bias_input_kernelLauncher(decoder_output,
-                                      param_.ffn.output_weight.bias,
-                                      cross_output_buf_,
-                                      m,
-                                      hidden_units_,
-                                      param_.stream);
-      } else {
-        add_bias_input_layernorm_2_kernelLauncher(
-            from_tensor,
-            param_.ffn_layernorm.gamma,
-            param_.ffn_layernorm.beta,
-            param_.self_attention.attention_output_weight.bias,
-            masked_output_buf_,
-            norm_masked_output_buf_,
-            m,
-            hidden_units_,
-            param_.stream);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-        PUSH_RANGE("Transformer/MLP")
-        ffn(norm_masked_output_buf_,
-            ffn_inner_buf_,
-            decoder_output,
-            m,
-            4 * t_parallel_param_.local_hidden_units_,
-            hidden_units_,
-            ActivationType::GELU);
+        PUSH_RANGE("Transformer/slf_attn")
+        masked_multi_head_attention_v2(norm_from_tensor_buf_,
+                                       key_cache_,
+                                       value_cache_,
+                                       masked_output_buf_,
+                                       finished,
+                                       step,
+                                       decoder_max_seq_len,
+                                       max_input_len,
+                                       input_lengths);
         POP_RANGE
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-        add_bias_input_kernelLauncher(decoder_output,
-                                      param_.ffn.output_weight.bias,
-                                      masked_output_buf_,
-                                      m,
-                                      hidden_units_,
-                                      param_.stream);
-      }
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-    }
 
-    catch (std::runtime_error &error) {
+        if (is_cross_attention == true) {
+          /*
+              add bias to masked_output_buf_
+              masked_output_buf_ + from_tensor -> masked_output_buf_
+              norm(masked_output_buf_) -> norm_masked_output_buf_
+          */
+          add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              param_.cross_layernorm.gamma,
+              param_.cross_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          // For Attention is All You Need decoder
+          /* cross attention with memory */
+          cross_multi_head_attention(norm_masked_output_buf_,
+                                     memory_tensor,
+                                     key_mem_cache_,
+                                     value_mem_cache_,
+                                     cross_output_buf_,
+                                     memory_sequence_length,
+                                     finished,
+                                     param_.request_max_mem_seq_len,
+                                     step);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          /*
+              cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
+              norm(cross_otuput_buf) -> normed_last_context (input for ffn)
+          */
+          add_bias_input_layernorm_2_kernelLauncher(
+              masked_output_buf_,
+              param_.ffn_layernorm.gamma,
+              param_.ffn_layernorm.beta,
+              param_.cross_attention.attention_output_weight.bias,
+              cross_output_buf_,
+              norm_cross_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          ffn(norm_cross_output_buf_,
+              ffn_inner_buf_,
+              decoder_output,
+              m,
+              4 * t_parallel_param_.local_hidden_units_,
+              hidden_units_,
+              ActivationType::RELU);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          add_bias_input_kernelLauncher(decoder_output,
+                                        param_.ffn.output_weight.bias,
+                                        cross_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
+        } else {
+          add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              param_.ffn_layernorm.gamma,
+              param_.ffn_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          PUSH_RANGE("Transformer/MLP")
+          ffn(norm_masked_output_buf_,
+              ffn_inner_buf_,
+              decoder_output,
+              m,
+              4 * t_parallel_param_.local_hidden_units_,
+              hidden_units_,
+              ActivationType::GELU);
+          POP_RANGE
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          add_bias_input_kernelLauncher(decoder_output,
+                                        param_.ffn.output_weight.bias,
+                                        masked_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
+        }
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+      } else {
+        // post-normalization
+        PUSH_RANGE("Transformer/slf_attn")
+        masked_multi_head_attention_v2(from_tensor,
+                                       key_cache_,
+                                       value_cache_,
+                                       masked_output_buf_,
+                                       finished,
+                                       step,
+                                       decoder_max_seq_len,
+                                       max_input_len,
+                                       input_lengths);
+        POP_RANGE
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            from_tensor,
+            param_.self_layernorm.gamma,
+            param_.self_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf_,
+            norm_masked_output_buf_,
+            m,
+            hidden_units_,
+            param_.stream);
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        if (is_cross_attention == true) {
+          // For Attention is All You Need decoder
+          /* cross attention with memory */
+          cross_multi_head_attention(norm_masked_output_buf_,
+                                     memory_tensor,
+                                     key_mem_cache_,
+                                     value_mem_cache_,
+                                     cross_output_buf_,
+                                     memory_sequence_length,
+                                     finished,
+                                     param_.request_max_mem_seq_len,
+                                     step);
+
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          /*
+              cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
+              norm(cross_otuput_buf) -> normed_last_context (input for ffn)
+          */
+          add_bias_input_layernorm_2_kernelLauncher(
+              norm_masked_output_buf_,
+              param_.cross_layernorm.gamma,
+              param_.cross_layernorm.beta,
+              param_.cross_attention.attention_output_weight.bias,
+              cross_output_buf_,
+              norm_cross_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+          ffn(norm_cross_output_buf_,
+              ffn_inner_buf_,
+              ffn_out_buf_,
+              m,
+              4 * t_parallel_param_.local_hidden_units_,
+              hidden_units_,
+              act_);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          add_bias_input_kernelLauncher(ffn_out_buf_,
+                                        param_.ffn.output_weight.bias,
+                                        norm_cross_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          layer_norm(ffn_out_buf_,
+                     param_.ffn_layernorm.gamma,
+                     param_.ffn_layernorm.beta,
+                     decoder_output,
+                     m,
+                     hidden_units_,
+                     param_.stream);
+        } else {
+          PUSH_RANGE("Transformer/MLP")
+          ffn(norm_masked_output_buf_,
+              ffn_inner_buf_,
+              ffn_out_buf_,
+              m,
+              4 * t_parallel_param_.local_hidden_units_,
+              hidden_units_,
+              act_);
+          POP_RANGE
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          add_bias_input_kernelLauncher(ffn_out_buf_,
+                                        param_.ffn.output_weight.bias,
+                                        norm_masked_output_buf_,
+                                        m,
+                                        hidden_units_,
+                                        param_.stream);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+
+          layer_norm(ffn_out_buf_,
+                     param_.ffn_layernorm.gamma,
+                     param_.ffn_layernorm.beta,
+                     decoder_output,
+                     m,
+                     hidden_units_,
+                     param_.stream);
+        }
+      }
+    } catch (std::runtime_error &error) {
       throw error;
     }
+
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
   }
 
   size_t getContextWorkspaceSize(const int seq_len,
