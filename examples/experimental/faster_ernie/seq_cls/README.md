@@ -45,7 +45,7 @@ seq_cls/
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python train.py --device gpu --save_dir checkpoint/ --batch_size 32 --max_seq_length 128
+python train.py --device gpu --save_dir checkpoints/ --batch_size 32 --max_seq_length 128
 ```
 
 可支持配置的参数：
@@ -78,7 +78,7 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --save_dir=./checkpoint/model_900/ --output_path=./export
+python export_model.py --save_dir=./checkpoints/model_900/ --output_path=./export
 ```
 其中`save_dir`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
@@ -88,7 +88,7 @@ python export_model.py --save_dir=./checkpoint/model_900/ --output_path=./export
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --device gpu --save_dir ckpt/model_900
+python predict.py --device gpu --save_dir checkpoints/model_900
 ```
 
 将待预测数据如以下示例：
