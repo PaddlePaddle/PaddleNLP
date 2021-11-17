@@ -17,6 +17,7 @@ import argparse
 import os
 import random
 import time
+import distutils.util
 
 import numpy as np
 import paddle
@@ -39,6 +40,8 @@ parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
+parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -84,7 +87,6 @@ def create_dataloader(dataset, mode='train', batch_size=1):
 
 def do_train():
     paddle.set_device(args.device)
-
     set_seed(args.seed)
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
@@ -122,6 +124,8 @@ def do_train():
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
     global_step = 0
     tic_train = time.time()
@@ -129,8 +133,11 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
             texts = to_tensor(texts)
-            logits, predictions = model(texts)
-            loss = criterion(logits, labels)
+            with paddle.amp.auto_cast(
+                    args.use_amp,
+                    custom_white_list=["fused_feedforward", "fused_attention"]):
+                logits, predictions = model(texts)
+                loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(logits, labels)
             metric.update(correct)
@@ -143,11 +150,15 @@ def do_train():
                     % (global_step, epoch, step, loss, acc,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
-            loss.backward()
-            optimizer.step()
+            if args.use_amp:
+                scaler.scale(loss).backward()
+                scaler.minimize(optimizer, loss)
+            else:
+                loss.backward()
+                optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % 100 == 0 and rank == 0:
+            if global_step % 100 == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)

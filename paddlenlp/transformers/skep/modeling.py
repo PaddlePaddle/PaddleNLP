@@ -15,9 +15,15 @@
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
+from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import compare_version
 
+if compare_version(paddle.version.full_version, "2.2.0") >= 0:
+    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+    from paddle.text import ViterbiDecoder
+else:
+    from paddlenlp.layers.crf import ViterbiDecoder
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -536,8 +542,7 @@ class SkepCrfForTokenClassification(nn.Layer):
         self.crf = LinearChainCrf(
             self.num_classes, crf_lr=0.2, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
-        self.viterbi_decoder = ViterbiDecoder(
-            self.crf.transitions, with_start_stop_tag=False)
+        self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
     def forward(self,
                 input_ids,

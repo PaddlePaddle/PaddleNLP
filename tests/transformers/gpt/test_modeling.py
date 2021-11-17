@@ -20,6 +20,8 @@ import random
 from common_test import CommonTest
 import unittest
 
+from tests.transformers.electra.test_modeling import TestElectraForSequenceClassification
+
 
 def create_input_data(config, seed=None):
     '''

@@ -503,6 +503,36 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
+        "gpt2-xl-en": { # 1558M
+            "vocab_size": 50257,
+            "hidden_size": 1600,
+            "num_hidden_layers": 48,
+            "num_attention_heads": 25,
+            "intermediate_size": 6400,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
+        "gpt2-large-en": { # 774M
+            "vocab_size": 50257,
+            "hidden_size": 1280,
+            "num_hidden_layers": 36,
+            "num_attention_heads": 20,
+            "intermediate_size": 5120,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
         "gpt2-medium-en": { #345M
             "vocab_size": 50304,
             "hidden_size": 1024,
@@ -519,7 +549,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eol_token_id": 198,
         },
         "gpt2-en": { #117M
-            "vocab_size": 50304,
+            "vocab_size": 50257,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -556,8 +586,14 @@ class GPTPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "gpt2-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-en.pdparams",
             "gpt2-medium-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "gpt2-large-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-large-en.pdparams",
+            "gpt2-xl-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-xl-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -759,7 +795,7 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.arange(
                 past_length,
                 paddle.shape(input_ids)[-1] + past_length,
-                dtype='int64')
+                dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
@@ -1081,6 +1117,18 @@ class GPTLMHeadModel(GPTPretrainedModel):
             return logits, cached_kvs
         else:
             return logits
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterGPT
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == "beam_search":
+            raise AttributeError(
+                "'beam_search' is not supported yet in the faster version of GPT"
+            )
+        self._faster_entry = FasterGPT(
+            self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
