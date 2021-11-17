@@ -796,6 +796,21 @@ public:
 #endif
         }
 
+        if (args_.temperature_ != 1.0) {
+          apply_temperature_penalty_kernelLauncher(
+              logits_buf_,
+              (DataType_)args_.temperature_,
+              args_.batch_size_,
+              args_.vocab_size_,
+              n,
+              decoding_params.stream);
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
+        }
+
         if (args_.candidate_num_ != 0) {
           // top k sampling
           update_logits_without_softmax(logits_buf_,

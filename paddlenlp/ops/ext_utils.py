@@ -34,7 +34,7 @@ if CUDA_HOME and not os.path.exists(CUDA_HOME):
     # Clear it for other non-CUDA situations.
     CUDA_HOME = None
 
-LOADED_EXT = []
+LOADED_EXT = set()
 
 
 def _get_files(path):
@@ -250,7 +250,7 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
                 ops = load_op_meta_info_and_register_op(ext_filepath)
-                LOADED_EXT.extend(ops)
+                LOADED_EXT = set.union(LOADED_EXT, set(ops))
                 return ops
 
     # write setup file and jit compile
@@ -261,7 +261,7 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # Load a shared library (if exists) only to register op.
         if os.path.exists(ext_filepath):
             ops = load_op_meta_info_and_register_op(ext_filepath)
-            LOADED_EXT.extend(ops)
+            LOADED_EXT = set.union(LOADED_EXT, set(ops))
             return ops
     else:
         # Import as callable python api
