@@ -99,7 +99,7 @@ def evaluation(model, data_loader, args, tokenizer):
             num_return_sequences=args.num_return_sequences,
             bos_token_id=tokenizer.cls_token_id,
             eos_token_id=tokenizer.mask_token_id,
-            use_fast=True)
+            use_fp16_decoding=args.use_fp16_decoding)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %

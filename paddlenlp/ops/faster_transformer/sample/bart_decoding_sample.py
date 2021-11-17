@@ -138,7 +138,7 @@ def do_predict(args):
                 num_beams=args.beam_size,
                 diversity_rate=args.diversity_rate,
                 length_penalty=args.length_penalty,
-                use_fast=True)
+                use_fp16_decoding=args.use_fp16_decoding)
 
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
