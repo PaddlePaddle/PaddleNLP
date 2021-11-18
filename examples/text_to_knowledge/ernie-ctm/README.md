@@ -128,7 +128,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 
 ## 自定义模型一键预测
 
-Taskflow支持加载增量训练后的模型进行一键预测，通过`params_path`指定模型路径，通过`tag_path`指定标签文件路径
+Taskflow支持加载增量训练后的模型进行一键预测，通过`params_path`指定模型路径，通过`tag_path`指定标签文件路径即可
 ```shell
 from paddlenlp import Taskflow
 

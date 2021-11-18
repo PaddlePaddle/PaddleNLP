@@ -98,11 +98,11 @@ python predict.py --max_seq_len 128 --batch_size 2
 
 ## WordTag进阶使用
 
-### Taskflow自定义模型一键预测
+### 自定义模型一键预测
 
-参见[WordTag增量训练示例](../ernie-ctm)
+用户可以使用自有数据对WordTag模型进行增量训练，然后使用Taskflow进行一键预测，参见[WordTag增量训练示例](../ernie-ctm)。
 
-### Taskflow自定义Term-Linking
+### 自定义Term-Linking
 
 Taskflow默认使用TermTreeV1.0实现Term-Linking, 用户也可以基于自己的TermTree实现Term-Linking，参见[自定义TermTree](../termtree)。
 
