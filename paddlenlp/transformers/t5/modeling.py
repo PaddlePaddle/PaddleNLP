@@ -866,6 +866,7 @@ class T5Stack(nn.Layer):
                 use_cache=False,
                 output_attentions=False,
                 output_hidden_states=False):
+        assert input_ids is not None, "input_ids can not be None"
         input_shape = input_ids.shape
         input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
 
@@ -1622,6 +1623,7 @@ class T5EncoderModel(T5PretrainedModel):
         super().__init__()
         self.t5 = t5
         del self.t5.decoder
+        paddle.device.cuda.empty_cache()
 
         self.init_weights()
 
