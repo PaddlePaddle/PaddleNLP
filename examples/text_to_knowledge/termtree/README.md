@@ -46,21 +46,19 @@ termtree.add_term(term="平原上的火焰",
 termtree.save("./")
 ```
 
-API说明
+#### API说明
 
-```python
-def add_term()
-```
+## def add_term()
 
-**参数**
-term (str): 待增加的term名称。
-base (str): term属于概念词（cb）还是实体词（eb）。
-term_type (str): term的主类别。
-sub_type (Optional[List[str]], optional): term的辅助类别或细分类别，非必选。
-sub_terms (Optional[List[str]], optional): 用于描述同类同名的term集，非必选。
-alias (Optional[List[str]], optional): term的常用别名，非必选。
-alias_ext (Optional[List[str]], optional): term的常用扩展别名，非必选。
-data (Optional[Dict[str, Any]], optional): 以dict形式构造该term节点，非必选。
+- **参数**
+ - term (str): 待增加的term名称。
+ - base (str): term属于概念词（cb）还是实体词（eb）。
+ - term_type (str): term的主类别。
+ - sub_type (Optional[List[str]], optional): term的辅助类别或细分类别，非必选。
+ - sub_terms (Optional[List[str]], optional): 用于描述同类同名的term集，非必选。
+ - alias (Optional[List[str]], optional): term的常用别名，非必选。
+ - alias_ext (Optional[List[str]], optional): term的常用扩展别名，非必选。
+ - data (Optional[Dict[str, Any]], optional): 以dict形式构造该term节点，非必选。
 
 
 ### 自定义Term-Linking
