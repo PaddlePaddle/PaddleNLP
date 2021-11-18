@@ -179,10 +179,14 @@ class WordTagTask(Task):
                  batch_size=1,
                  params_path=None,
                  tag_path=None,
+                 term_schema_path=None,
+                 term_data_path=None,
                  **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         self._tag_path = tag_path
         self._params_path = params_path
+        self._term_schema_path = term_schema_path
+        self._term_data_path = term_data_path
         self._linking = self.kwargs[
             'linking'] if 'linking' in self.kwargs else False
         if self._tag_path is None:
@@ -192,12 +196,14 @@ class WordTagTask(Task):
         self._tags_to_index, self._index_to_tags = self._load_labels(self._tag_path)
             
         self._construct_tokenizer(model)
-        term_schema_path = download_file(self._task_path, "termtree_type.csv",
-                                         URLS['termtree_type'][0],
-                                         URLS['termtree_type'][1])
-        term_data_path = download_file(self._task_path, "TermTree.V1.0",
-                                       URLS['TermTree.V1.0'][0],
-                                       URLS['TermTree.V1.0'][1])
+        if self._term_schema_path is None:
+            term_schema_path = download_file(self._task_path, "termtree_type.csv",
+                                            URLS['termtree_type'][0],
+                                            URLS['termtree_type'][1])
+        if self._term_data_path is None:
+            term_data_path = download_file(self._task_path, "TermTree.V1.0",
+                                        URLS['TermTree.V1.0'][0],
+                                        URLS['TermTree.V1.0'][1])
         self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
                                            self._linking)
         
@@ -207,7 +213,7 @@ class WordTagTask(Task):
         self._summary_num = 2
 
         if self._params_path:
-            self._task_path, self.custom_model_name = os.path.abspath(self._params_path).rsplit("/", 1)
+            self._task_path = os.path.abspath(self._params_path).rsplit("/", 1)[0]
 
         self._load_static_model(self._params_path)
 

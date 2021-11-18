@@ -93,7 +93,7 @@ def transfer_str_to_example(sample):
     text = ""
     tags = []
     items = sample.split(" ")
-    items = [item.split("\\") for item in items]
+    items = [item.rsplit("/", 1) for item in items]
     for w, t in items:
         text += w
         if len(w) == 1:

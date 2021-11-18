@@ -69,17 +69,16 @@ wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset_v2.tar.g
 
 ```text
 data/
-├── TermTree.V1.0 # 百科知识树V1.0
 ├── dev.txt # 验证集
 ├── tags.txt # WordTag标签集合
 └── train.json  # 训练数据
 ```
 
-训练样本示例如下，每个单词以"\type"的形式标记其词性或实体类别，单词之间使用空格作为单词切分标记
+训练样本示例如下，每个单词以"/type"的形式标记其词性或实体类别，单词之间使用空格作为切分标记
 
 ```text
-砚台\物体类 与\连词 笔\物体类 、\w 墨\物体类 、\w 纸\物体类 是\肯定词 中国\世界地区类 传统\修饰词 的\助词 文房四宝\词汇用语 。\w
-《\w 全球化与中国：理论与发展趋势\作品类_实体 》\w 是\肯定词 2010年\时间类 经济管理出版社\组织机构类 出版\场景事件 的\助词 图书\作品类_概念 ，\w 作者\人物类_概念 是\肯定词 余永定\人物类_实体 、\w 路爱国\人物类_实体 、\w 高海红\人物类_实体 。\w
+砚台/物体类 与/连词 笔/物体类 、/w 墨/物体类 、/w 纸/物体类 是/肯定词 中国/世界地区类 传统/修饰词 的/助词 文房四宝/词汇用语 。/w
+《/w 全球化与中国：理论与发展趋势/作品类_实体 》/w 是/肯定词 2010年/时间类 经济管理出版社/组织机构类 出版/场景事件 的/助词 图书/作品类_概念 ，/w 作者/人物类_概念 是/肯定词 余永定/人物类_实体 、/w 路爱国/人物类_实体 、/w 高海红/人物类_实体 。/w
 ```
 
 WordTag模型使用了**BIOES标注体系**，用户可以在标签文件中（该示例为`tags.txt`）按照该标注体系自定义添加词性或命名实体类别，标签文件示例：
@@ -124,19 +123,8 @@ export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" predict.py \
     --params_path ./output/model_300/model_state.pdparams \
     --batch_size 32 \
-    --linking True \
-    --term_schema_path ../termtree/termtree_type.csv \
-    --term_data_path ./data/TermTree.v1.0 \
     --device "gpu"
 ```
-
-重要参数释义如下
-- `linking` 是否将WordTag预测结果与TermTree进行映射。
-- `term_schema_path` 表示termtree词类体系文件。
-- `term_data_path` 百科知识树文件，包含所有的term集。
-
-
-### Taskflow一键预测
 
 
 ## ERNIE-CTM后续计划

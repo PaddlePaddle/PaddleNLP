@@ -28,7 +28,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 
 from data import transfer_str_to_example, convert_example, load_dict
-from utils import decode, reset_offset, TermTree, LABEL_TO_SCHEMA
+from utils import decode, reset_offset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -38,9 +38,6 @@ parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum tot
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', type=str, choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--term_schema_path', type=str, default="../termtree/termtree_type.csv", help="The termtree types file.")
-parser.add_argument('--term_data_path', type=str, default="./data/TermTree.V1.0", help="The termtere data.")
-parser.add_argument('--linking', type=bool, default=False, help="Whether to link the wordtag result with termtree")
 args = parser.parse_args()
 # yapf: enable
 
@@ -85,11 +82,6 @@ def do_predict(data,
         _, pred_tags = viterbi_decoder(logits, seq_len)
         all_pred_tags.extend(pred_tags.numpy().tolist())
     results = decode(data, all_pred_tags, summary_num, idx_to_tags)
-
-    if args.linking:
-        termtree = TermTree.from_dir(args.term_schema_path, args.term_data_path, True)
-        for res in results:
-            term_linking(res, LABEL_TO_SCHEMA)
     return results
 
 
