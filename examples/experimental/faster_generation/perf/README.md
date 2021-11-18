@@ -14,7 +14,6 @@
 运行如下命令即可bart性能测试：
 
 ```sh
-export CUDA_VISIBLE_DEVICES=1
 python bart_perf.py \
     --model_name_or_path=bart-base \
     --decode_strategy=sampling \
@@ -27,7 +26,6 @@ python bart_perf.py \
 运行如下命令即可启动gpt性能测试：
 
 ```sh
-export CUDA_VISIBLE_DEVICES=1
 python gpt_perf.py \
     --model_name_or_path=gpt2-en \
     --decode_strategy=sampling \
