@@ -11,27 +11,23 @@
 
 #使用示例：
 ```python
-from paddlenlp import BertModel, BertTokenzier
-tokenizer = BertTokenzier.from_pretrained('huhuiwen/mengzi-bert-base')
-model = BertForMakedLM.from_pretrained('huhuiwen/mengzi-bert-base')
+from paddlenlp import BertForMaskedLM, BertTokenizer
+tokenizer = BertTokenizer.from_pretrained('huhuiwen/mengzi-bert-base')
+model = BertForMaskedLM.from_pretrained('huhuiwen/mengzi-bert-base')
 
-text  = "法国的首都是巴黎。"
-inputs = tokenizer(text)
-tokens = ['[CLS]'] + tokenizer.tokenize(text) + ['[SEP]']
 
-for i in range(1, len(tokens)-1):
-    tmp = tokens[:i] + ['[MASK]'] + tokens[i+1:]
-    masked_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tmp)])
-    segment_ids = paddle.to_tensor([[0]*len(tmp)])
+tokens = ['[CLS]', '我', '的', '[MASK]','很', '可', '爱','。', '[SEP]']
+masked_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tokens)])
+segment_ids = paddle.to_tensor([[0] * len(tokens)])
 
-    outputs = model(masked_ids, token_type_ids=segment_ids)
-    prediction_scores = outputs
-    print(tmp)
-    # 打印被预测的字符
-    prediction_index = paddle.argmax(prediction_scores[0, i]).item()
-    predicted_token = tokenizer.convert_ids_to_tokens([prediction_index])[0]
-    print(predicted_token)
-
+outputs = model(masked_ids, token_type_ids=segment_ids)
+prediction_scores = outputs
+prediction_index = paddle.argmax(prediction_scores[0, 3]).item()
+predicted_token = tokenizer.convert_ids_to_tokens([prediction_index])[0]
+print(tokens)
+#['[CLS]', '我', '的', '[MASK]', '很', '可', '爱', '。', '[SEP]']
+print(predicted_token)
+#猫
 ```
 
 # 权重来源

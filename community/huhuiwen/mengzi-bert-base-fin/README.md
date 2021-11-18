@@ -11,26 +11,23 @@
 
 #使用示例：
 ```python
-from paddlenlp import BertModel, BertTokenzier
-tokenizer = BertTokenzier.from_pretrained('huhuiwen/mengzi-bert-base-fin')
-model = BertForMakedLM.from_pretrained('huhuiwen/mengzi-bert-base-fin')
+from paddlenlp import BertForMaskedLM, BertTokenizer
+tokenizer = BertTokenizer.from_pretrained('huhuiwen/mengzi-bert-base-fin')
+model = BertForMaskedLM.from_pretrained('huhuiwen/mengzi-bert-base-fin')
 
-text  = "股市指某支新发行股票在定价和配置后的交易市场。"
-inputs = tokenizer(text)
-tokens = ['[CLS]'] + tokenizer.tokenize(text) + ['[SEP]']
 
-for i in range(1, len(tokens)-1):
-    tmp = tokens[:i] + ['[MASK]'] + tokens[i+1:]
-    masked_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tmp)])
-    segment_ids = paddle.to_tensor([[0]*len(tmp)])
+tokens = ['[CLS]', '[MASK]','是', '商', '品','交','换','的','产','物','。', '[SEP]']
+masked_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tokens)])
+segment_ids = paddle.to_tensor([[0] * len(tokens)])
 
-    outputs = model(masked_ids, token_type_ids=segment_ids)
-    prediction_scores = outputs
-    print(tmp)
-    # 打印被预测的字符
-    prediction_index = paddle.argmax(prediction_scores[0, i]).item()
-    predicted_token = tokenizer.convert_ids_to_tokens([prediction_index])[0]
-    print(predicted_token)
+outputs = model(masked_ids, token_type_ids=segment_ids)
+prediction_scores = outputs
+prediction_index = paddle.argmax(prediction_scores[0, 3]).item()
+predicted_token = tokenizer.convert_ids_to_tokens([prediction_index])[0]
+print(tokens)
+#['[CLS]', '[MASK]','是', '商', '品','交','换','的','产','物','。', '[SEP]']
+print(predicted_token)
+#它
 ```
 
 # 权重来源

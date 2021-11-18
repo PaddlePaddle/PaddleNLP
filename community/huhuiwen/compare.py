@@ -5,22 +5,21 @@ import transformers as hgnlp
 
 
 def compare():
-    bert = ppnlp.BertModel.from_pretrained('huhuiwen/mengzi-bert-base/')
-    tokenizer = ppnlp.BertTokenizer.from_pretrained(
-        'huhuiwen/mengzi-bert-base/')
+    bert = ppnlp.BertModel.from_pretrained('huhuiwen/mengzi-bert-base')
+    tokenizer = ppnlp.BertTokenizer.from_pretrained('huhuiwen/mengzi-bert-base')
     inputs = tokenizer("Welcome to use PaddleNLP!")['input_ids']
 
     pt_inputs = torch.tensor([inputs])
     pd_inputs = paddle.to_tensor([inputs])
 
     pt_model = hgnlp.BertForMaskedLM.from_pretrained(
-        'Langboat/mengzi-bert-base/')
+        'Langboat/mengzi-bert-base')
     pt_model.eval()
     with torch.no_grad():
         pt_outputs = pt_model(pt_inputs)[0]
 
     pd_model = ppnlp.BertForMaskedLM.from_pretrained(
-        'huhuiwen/mengzi-bert-base/')
+        'huhuiwen/mengzi-bert-base')
     pd_model.eval()
     with paddle.no_grad():
         pd_outputs = torch.from_numpy(pd_model(pd_inputs).numpy())
@@ -31,22 +30,22 @@ def compare():
 
 
 def compare_fin():
-    bert = ppnlp.BertModel.from_pretrained('huhuiwen/mengzi-bert-base-fin/')
+    bert = ppnlp.BertModel.from_pretrained('huhuiwen/mengzi-bert-base-fin')
     tokenizer = ppnlp.BertTokenizer.from_pretrained(
-        'huhuiwen/mengzi-bert-base-fin/')
+        'huhuiwen/mengzi-bert-base-fin')
     inputs = tokenizer("Welcome to use PaddleNLP!")['input_ids']
 
     pt_inputs = torch.tensor([inputs])
     pd_inputs = paddle.to_tensor([inputs])
 
     pt_model = hgnlp.BertForMaskedLM.from_pretrained(
-        'Langboat/mengzi-bert-base-fin/')
+        'Langboat/mengzi-bert-base-fin')
     pt_model.eval()
     with torch.no_grad():
         pt_outputs = pt_model(pt_inputs)[0]
 
     pd_model = ppnlp.BertForMaskedLM.from_pretrained(
-        'huhuiwen/mengzi-bert-base-fin/')
+        'huhuiwen/mengzi-bert-base-fin')
     pd_model.eval()
     with paddle.no_grad():
         pd_outputs = torch.from_numpy(pd_model(pd_inputs).numpy())
