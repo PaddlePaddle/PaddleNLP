@@ -46,7 +46,7 @@ termtree.add_term(term="平原上的火焰",
 termtree.save("./")
 ```
 
-### Taskflow自定义Term-Linking
+### 自定义Term-Linking
 
 下面是在Taskflow中使用自定义TermTree的示例，新增的term-"平原上的火焰"实现了Term-Linking:
 作品类_实体(wordtag_label) -> 影视作品_eb_平原上的火焰(term_id)
