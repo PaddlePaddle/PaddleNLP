@@ -98,37 +98,13 @@ python predict.py --max_seq_len 128 --batch_size 2
 
 ## WordTag进阶使用
 
-### 增量训练
+### Taskflow自定义模型一键预测
 
 参见[WordTag增量训练示例](../ernie-ctm)
 
-## Taskflow自定义模型一键预测
-
-Taskflow支持加载增量训练后的模型进行一键预测，通过`params_path`指定模型路径，通过`tag_path`指定标签文件路径
-```shell
-from paddlenlp import Taskflow
-
-my_wordtag = Taskflow("knowledge_mining", params_path="./output/model_300/model_state.pdparams", tag_path="./data/tags.txt")
-
-my_wordtag("美人鱼是周星驰执导的一部电影")
-# [{'text': '美人鱼是周星驰执导的一部电影', 'items': [{'item': '美人鱼', 'offset': 0, 'wordtag_label': '作品类_实体', 'length': 3, 'termid': '作品与出版物_eb_美人鱼'}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '周星驰', 'offset': 4, 'wordtag_label': '人物类_实体', 'length': 3, 'termid': '人物_eb_周星驰'}, {'item': '执导', 'offset': 7, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_执导'}, {'item': '的', 'offset': 9, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '一部', 'offset': 10, 'wordtag_label': '数量词', 'length': 2}, {'item': '电影', 'offset': 12, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]
-```
-
 ### Taskflow自定义Term-Linking
 
-Taskflow默认使用TermTreeV1.0实现Term-Linking, 用户也可以基于TermTreeV1.0维护自己的TermTree，参见[自定义TermTree](../termtree)。
-
-下面是在Taskflow中使用自定义TermTree的示例，新增的term-"平原上的火焰"实现了Term-Linking:
-作品类_实体(wordtag_label) -> 影视作品_eb_平原上的火焰(term_id)
-
-```shell
-from paddlenlp import Taskflow
-
-wordtag = Taskflow("knowledge_mining", term_schema_path="termtree_type.csv", term_data_path="termtree_data")
-
-wordtag("《平原上的火焰》是今年新上映的电影")
-# [{'text': '《平原上的火焰》是今年新上映的电影', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '平原上的火焰', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 6, 'termid': '影视作品_eb_平原上的火焰'}, {'item': '》', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 8, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '今年', 'offset': 9, 'wordtag_label': '时间类', 'length': 2, 'termid': '时间阶段_cb_今年'}, {'item': '新', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_新'}, {'item': '上映', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_上映'}, {'item': '的', 'offset': 14, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '电影', 'offset': 15, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]
-```
+Taskflow默认使用TermTreeV1.0实现Term-Linking, 用户也可以基于自己的TermTree实现Term-Linking，参见[自定义TermTree](../termtree)。
 
 ## WordTag后续计划
 
