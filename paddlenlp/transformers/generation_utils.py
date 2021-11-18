@@ -733,11 +733,7 @@ class GenerationMixin(object):
                 if not hasattr(self, '_faster_entry'):
                     self._build_faster(args)
                 if self._faster_entry:
-                    faster_args = {}
-                    for arg_name in self._faster_entry.__code__.co_varnames:
-                        if arg_name in args.keys():
-                            faster_args[arg_name] = args[arg_name]
-                    output_ids = self._faster_entry(**faster_args)
+                    output_ids = self._faster_entry(**args)
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
                         output_ids = output_ids[:, :
@@ -1335,7 +1331,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         cur_len = input_ids.shape[-1]
         if cur_len < self.min_length:
-            logits[:, self.eos_token_id] = -1e9
+            logits[:, self.eos_token_id] = -float("inf")
         return logits
 
 
@@ -1439,7 +1435,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_bos_token_id
-            ]] = -1e9
+            ]] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
@@ -1463,6 +1459,6 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_eos_token_id
-            ]] = -1e9
+            ]] = -float("inf")
             scores[:, self.forced_eos_token_id] = 0
         return scores

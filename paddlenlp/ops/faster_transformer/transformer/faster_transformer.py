@@ -671,7 +671,8 @@ class FasterGPT(GPTPretrainedModel):
                 pad_token_id=None,
                 temperature=0,
                 decode_strategy="sample",
-                num_return_sequences=1):
+                num_return_sequences=1,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -814,7 +815,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 num_beams=4,
                 diversity_rate=0.0,
                 temperature=1.0,
-                num_return_sequences=1):
+                num_return_sequences=1,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -975,7 +977,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 pad_token_id=None,
                 diversity_rate=0.0,
                 temperature=1.0,
-                num_return_sequences=1):
+                num_return_sequences=1,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)

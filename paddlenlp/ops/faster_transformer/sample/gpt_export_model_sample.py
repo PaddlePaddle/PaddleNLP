@@ -24,7 +24,7 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import GPTModel, GPTLMHeadModel
+from paddlenlp.transformers import GPTLMHeadModel
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 from paddlenlp.utils.log import logger

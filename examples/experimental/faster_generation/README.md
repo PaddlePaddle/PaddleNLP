@@ -29,7 +29,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 | FasterTransformer | ✅  | ❌  | ✅  | ❌ | ✅  | ✅ | ✅ |
 | TurboTransformer  | ❌  | ❌  | ❌  | ❌ | ❌  | ❌ | ❌ |
 | LightSeq          | ✅  | ❌  | ✅  | ❌ | ✅  | ✅ | ❌ |
-| PaddleNLP         | ✅  | ✅  | ✅  | ✅ | ✅  | ✅ | ✅ |
+| PaddleNLP         | ✅  | ✅  | ✅  | ❌ | ✅  | ✅ | ✅ |
 
 ## Performence
 
