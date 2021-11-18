@@ -39,6 +39,7 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
+        choices=['gpt2-en', 'gpt2-medium-en', 'gpt2-large-en'],
         help="The model name to specify the bart to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt2-large-en']. "
     )
     parser.add_argument(

@@ -12,24 +12,18 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 易用性强。功能的入口为model.generate，与非加速版生成api的使用方法相同，当满足加速条件时使用jit编译高性能算子并用于生成，不满足则自动切换回原版生成api。
 
 ### Inference Model Support
-下表为PaddleNLP FasterGeneration与其他业界主流加速库的模型支持情况对比（GPU）。
+下表为PaddleNLP FasterGeneration的预训练模型支持情况（GPU）。
 
-|  Library | GPT | BART | UnifiedTransformer | UNIMO-text|
-|  ------  | ----| -----| ------------------ | --------- |
-| FasterTransformer | ✅  | ❌  | ❌  | ❌ |
-| TurboTransformer  | ❌  | ❌  | ❌  | ❌ |
-| LightSeq          | ✅  | ✅  | ❌  | ❌ |
-| PaddleNLP         | ✅  | ✅  | ✅  | ✅ |
+|  Library | GPT | BART | UnifiedTransformer |
+|  ------  | ----| -----| ------------------ |
+| PaddleNLP         | ✅  | ✅  | ✅  |
 
-### Decode stategy Support
-下表为PaddleNLP FasterGeneration与其他业界主流加速库的解码策略支持情况对比。
+### Decode Strategy Support
+下表为PaddleNLP FasterGeneration与的解码策略支持情况。
 
-|  Library | BeamSearch | BeamSearch(with grown topk) | Diverse Sibling Search |Diverse Beam Search| Top-K Sampling | Top-P Sampling| Forced Decoding |
+|  Library | Beam Search | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
 |  ------  | ----| -----| ------| -----|------- | ---|------ |
-| FasterTransformer | ✅  | ❌  | ✅  | ❌ | ✅  | ✅ | ✅ |
-| TurboTransformer  | ❌  | ❌  | ❌  | ❌ | ❌  | ❌ | ❌ |
-| LightSeq          | ✅  | ❌  | ✅  | ❌ | ✅  | ✅ | ❌ |
-| PaddleNLP         | ✅  | ✅  | ✅  | ❌ | ✅  | ✅ | ✅ |
+| PaddleNLP         | ✅  | ✅  | ✅   | ✅  | ✅ | ✅ |
 
 ## Performence
 
@@ -84,7 +78,7 @@ Result: 对影成三人。
 
 - [examples/dialogue/unified_transformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer)
 - [examples/language_model/gpt/faster_gpt](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt)
-- [examples/text_generation/unimo-text/faster_unimo](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo)
+- [examples/text_generation/unimo-text](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text)
 - [examples/text_summarization/bart](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart)
 
 **NOTE:** 如果`model.generate`的参数不满足高性能版本的要求。程序会做出提示并自动切换为非加速版本，提示类似于：

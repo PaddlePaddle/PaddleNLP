@@ -20,7 +20,7 @@ model = UNIMOLMHeadModel.from_pretrained(model_name)
 tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
 
-def post_process_response(token_ids, tokenizer):
+def postprocess_response(token_ids, tokenizer):
     """Post-process the decoded sequence. Truncate from the first <eos>."""
     eos_pos = len(token_ids)
     for i, tok_id in enumerate(token_ids):
@@ -50,7 +50,7 @@ outputs, _ = model.generate(
     decode_strategy='beam_search',
     num_beams=2)
 
-result = post_process_response(outputs[0].numpy(), tokenizer)
+result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)
 
 print("Model input:", inputs)

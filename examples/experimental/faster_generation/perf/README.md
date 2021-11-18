@@ -1,4 +1,4 @@
-# Performance
+# FasterGeneration Performance
 
 以下性能数据为原版generate方法、FasterGeneration和[HuggingFace](https://github.com/huggingface/transformers)的generate方法三者的对比数据。
 

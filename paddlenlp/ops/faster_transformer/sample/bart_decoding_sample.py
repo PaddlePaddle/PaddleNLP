@@ -22,7 +22,7 @@ from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
 
 
-def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
+def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
     """
     Post-process the decoded sequence.
     """
@@ -147,7 +147,7 @@ def do_predict(args):
         # Output
         finished_seq = finished_seq.numpy()
         for ins in finished_seq:
-            generated_ids = post_process_seq(ins, bos_id, eos_id)
+            generated_ids = postprocess_seq(ins, bos_id, eos_id)
             print(tokenizer.convert_ids_to_string(generated_ids))
 
 

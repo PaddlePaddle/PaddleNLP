@@ -590,7 +590,7 @@ class GenerationMixin(object):
                 BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ 
                 for more details. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
-                sequence length in the "beam_searszch" strategy. The larger this
+                sequence length in the "beam_search" strategy. The larger this
                 param is, the more that the model would generate shorter 
                 sequences. Default to 0.0, which means no penalty.
             early_stopping (bool, optional): Whether to stop searching in the 

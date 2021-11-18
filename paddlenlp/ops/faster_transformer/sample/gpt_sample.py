@@ -112,7 +112,7 @@ def do_predict(args):
         for i in range(100):
             # For warmup. 
             if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
+                paddle.device.cuda.synchronize(place)
                 start = time.time()
             out_seq, _ = gpt.generate(
                 input_ids,
@@ -126,7 +126,7 @@ def do_predict(args):
                 use_fp16_decoding=args.use_fp16_decoding)
             output_sequence = out_seq.numpy()
 
-        paddle.fluid.core._cuda_synchronize(place)
+        paddle.device.cuda.synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy()
