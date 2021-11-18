@@ -97,7 +97,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     data = [
-        '陈霖捷执导了一部电影',
+        '美人鱼是周星驰执导的一部电影',
     ]
 
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))

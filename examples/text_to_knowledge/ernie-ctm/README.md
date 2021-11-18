@@ -69,6 +69,7 @@ wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset_v2.tar.g
 
 ```text
 data/
+├── TermTree.V1.0 # 百科知识树V1.0
 ├── dev.txt # 验证集
 ├── tags.txt # WordTag标签集合
 └── train.json  # 训练数据
@@ -118,8 +119,6 @@ python -m paddle.distributed.launch --gpus "0"  train.py \
 
 ### 模型预测
 
-通过加载训练过程中保存的模型，可以对验证集数据进行验证，启动方式如下：
-
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" predict.py \
@@ -135,6 +134,9 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 - `linking` 是否将WordTag预测结果与TermTree进行映射。
 - `term_schema_path` 表示termtree词类体系文件。
 - `term_data_path` 百科知识树文件，包含所有的term集。
+
+
+### Taskflow一键预测
 
 
 ## ERNIE-CTM后续计划
