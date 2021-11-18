@@ -145,11 +145,13 @@ ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德�
 
 #### 依存关系可视化
 
+句法树可视化示例：
+
 ```python
 from paddlenlp import Taskflow
 
 ddp = Taskflow("dependency_parsing", return_visual=True)
-result = ddp("百度是一家高科技公司")[0]['visual']
+result = ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")[0]['visual']
 import cv2
 cv2.imwrite('test.png', result)
 ```
