@@ -39,6 +39,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
 parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
 args = parser.parse_args()
