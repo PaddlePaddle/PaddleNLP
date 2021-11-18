@@ -260,7 +260,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             start_id_,
             end_id_,
             beam_search_diversity_rate_,
-            false,       /*is_fuse_topk_softMax*/
+            true,        /*is_fuse_topk_softMax*/
             true,        /*is_fuse_qkv*/
             false,       /*keep_alive_beam*/
             len_penalty, /*alpha not used for this case*/
@@ -291,9 +291,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             start_id_,
             end_id_,
             beam_search_diversity_rate_,
-            false, /*is_fuse_topk_softMax*/
-            true,  /*is_fuse_qkv*/
-            true,  /*keep_alive_beam*/
+            true, /*is_fuse_topk_softMax*/
+            true, /*is_fuse_qkv*/
+            true, /*keep_alive_beam*/
             len_penalty,
             normalize_before,
             0, /*pos_offset BART only for now*/

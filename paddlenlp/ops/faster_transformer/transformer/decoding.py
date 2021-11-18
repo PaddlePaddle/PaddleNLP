@@ -1156,17 +1156,13 @@ class InferUnifiedDecoding(nn.Layer):
                         restore_data=True,
                         reserve_var=True), [1, 0])
             ]
-            if self._decoding_strategy != "beam_search":
-                self.sub_modules["linear_bias"] = [
-                    transfer_param(
-                        self._model.lm_head.decoder_bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
-                ]
-            else:
-                self.sub_modules[
-                    "linear_bias"] = [self._model.lm_head.decoder_bias]
+            self.sub_modules["linear_bias"] = [
+                transfer_param(
+                    self._model.lm_head.decoder_bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
         else:
             for mod in self._model.encoder.layers:
                 self.sub_modules["slf_q_weight"].append(
@@ -1249,7 +1245,7 @@ class InferUnifiedDecoding(nn.Layer):
                 length_penalty=1.0,
                 diversity_rate=0.0,
                 pos_bias=True,
-                rel_len=False):
+                rel_len=True):
         decoding_strategy = self._decoding_strategy
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
