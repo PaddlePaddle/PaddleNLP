@@ -50,6 +50,7 @@ def convert_example(example,
         text_pair = example["text_b"]
     else:
         text = example["text"]
+        text_pair = None
     encoded_inputs = tokenizer(
         text=text, text_pair=text_pair, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
