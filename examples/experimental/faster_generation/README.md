@@ -22,7 +22,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 下表为PaddleNLP FasterGeneration与的解码策略支持情况。
 
 |  Library | Beam Search | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
-|  ------  |:----:| :-----:| :------:| :-----:|:-------: | :---:|------ |
+|  ------  |:----:| :-----:| :------:| :-----:|:-------: | :---:|
 | PaddleNLP         | ✅  | ✅  | ✅   | ✅  | ✅ | ✅ |
 
 ## Performence
