@@ -14,7 +14,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration的预训练模型支持情况（GPU）。
 
-|  Library\Model Type | Decoder | Encoder-Decoder | Prefix-LM |
+|  Library\Model Structure | Decoder | Encoder-Decoder | Prefix-LM |
 |  ------  | :----:| :-----:| :------------------: |
 | PaddleNLP         | GPT  | BART  | UnifiedTransformer  |
 
