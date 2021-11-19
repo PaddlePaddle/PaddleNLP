@@ -32,6 +32,7 @@ from utils import convert_example
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--dataset", choices=["chnsenticorp", "xnli"], default="chnsenticorp", type=str, help="Dataset for classfication tasks.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
@@ -39,6 +40,9 @@ parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initi
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
+parser.add_argument("--save_steps", default=100, type=int, help="The interval steps to save checkppoints.")
+parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -113,7 +117,9 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    train_ds, dev_ds, test_ds = load_dataset(
+        args.dataset, splits=["train", "dev", "test"])
+
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=len(train_ds.label_list))
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
@@ -121,7 +127,8 @@ def do_train():
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_seq_length,
+        is_pair=args.dataset == "xnli")
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -182,7 +189,7 @@ def do_train():
             acc = metric.accumulate()
 
             global_step += 1
-            if global_step % 10 == 0 and rank == 0:
+            if global_step % args.logging_steps == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -196,11 +203,14 @@ def do_train():
                 optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % 100 == 0 and rank == 0:
+
+            if global_step % args.valid_steps == 0 and rank == 0:
+                evaluate(model, criterion, metric, dev_data_loader)
+
+            if global_step % args.save_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                evaluate(model, criterion, metric, dev_data_loader)
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
 

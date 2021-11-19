@@ -14,7 +14,11 @@
 import numpy as np
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
+def convert_example(example,
+                    tokenizer,
+                    max_seq_length=512,
+                    is_test=False,
+                    is_pair=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -40,7 +44,14 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
+
+    if is_pair:
+        text = example["text_a"]
+        text_pair = example["text_b"]
+    else:
+        text = example["text"]
+    encoded_inputs = tokenizer(
+        text=text, text_pair=text_pair, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
