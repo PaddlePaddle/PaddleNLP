@@ -1,17 +1,3 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from functools import partial
 import argparse
 import os
@@ -27,12 +13,32 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase
+from base_model import SemanticIndexBase,SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
 from tqdm import tqdm 
 from milvus_recall import RecallByMilvus
+from ernie_modeling import ErnieModel
+
+def search_in_milvus(text_embedding):
+    collection_name = 'wanfang1'
+    partition_tag = 'partition_2'
+    client = RecallByMilvus()
+    status, results = client.search(collection_name=collection_name, vectors=text_embedding.tolist(), partition_tag=partition_tag)
+    # print(status)
+    # print(resultes)
+    corpus_file="data/milvus_data.csv"
+    id2corpus = gen_id2corpus(corpus_file)
+    # print(status)
+    # print(results)
+    for line in results:
+        for item in line:
+            idx=item.id
+            distance=item.distance
+            text=id2corpus[idx]
+            print(idx,text,distance)
+
 
 
 if __name__ == "__main__":
@@ -42,9 +48,6 @@ if __name__ == "__main__":
     batch_size=1
     params_path='checkpoints/train_0.001/model_40/model_state.pdparams'
     paddle.set_device(device)
-    rank = paddle.distributed.get_rank()
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     trans_func = partial(
@@ -57,25 +60,22 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+    # pretrained_model=ErnieModel.from_pretrained("ernie-1.0")
 
-    model = SemanticIndexBase(
+    model = SemanticIndexBaseStatic(
         pretrained_model, output_emb_size=output_emb_size)
-    model = paddle.DataParallel(model)
 
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
         state_dict = paddle.load(params_path)
         model.set_dict(state_dict)
-        logger.info("Loaded parameters from %s" % params_path)
+        print("Loaded parameters from %s" % params_path)
     else:
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
 
-    id2corpus={0:'外语阅读焦虑与英语成绩及性别的关系'}
-
-    # id2corpus = gen_id2corpus(args.corpus_file)
+    id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
 
     # conver_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
@@ -88,21 +88,36 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    # Need better way to get inner model of DataParallel
-    inner_model = model._layers
+    all_embeddings = []
+    # pretrained_model.eval()
+    # with paddle.no_grad():
+    #     for batch_data in corpus_data_loader:
+    #         input_ids, token_type_ids = batch_data
+    #         input_ids = paddle.to_tensor(input_ids)
+    #         token_type_ids = paddle.to_tensor(token_type_ids)
+    #         print(input_ids)
+    #         print(token_type_ids)
 
-    # final_index = build_index(args, corpus_data_loader, inner_model)
+    #         token_embeddings,text_embeddings = pretrained_model(input_ids, token_type_ids)
+    #         # text_embeddings=pretrained_model(input_ids, token_type_ids)
+    #         # print(token_embeddings)
+    #         all_embeddings.append(text_embeddings)
+    # print(all_embeddings)
 
     all_embeddings = []
+    model.eval()
+    with paddle.no_grad():
+        for batch_data in corpus_data_loader:
+            input_ids, token_type_ids = batch_data
+            input_ids = paddle.to_tensor(input_ids)
+            token_type_ids = paddle.to_tensor(token_type_ids)
 
-    for text_embeddings in tqdm(inner_model.get_semantic_embedding(corpus_data_loader)):
-        all_embeddings.append(text_embeddings.numpy())
+            text_embeddings = model(input_ids, token_type_ids)
+            all_embeddings.append(text_embeddings)
 
     text_embedding=all_embeddings[0]
     print(text_embedding.shape)
-    collection_name = 'wanfang1'
-    partition_tag = 'partition_2'
-    client = RecallByMilvus()
-    status, resultes = client.search(collection_name=collection_name, vectors=text_embedding.tolist(), partition_tag=partition_tag)
-    print(status)
-    print(resultes)
+    print(text_embedding)
+    search_in_milvus(text_embedding)
+    
+

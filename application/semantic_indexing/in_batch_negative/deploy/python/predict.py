@@ -178,15 +178,11 @@ class Predictor(object):
         logits = self.output_handle.copy_to_cpu()
         if args.benchmark:
             self.autolog.times.stamp()
-
-        probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-
+            
         if args.benchmark:
             self.autolog.times.end(stamp=True)
 
-        return probs
+        return logits
 
 
 if __name__ == "__main__":
