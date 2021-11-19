@@ -25,7 +25,7 @@ from utils import construct_dict_map, decode, search, find_topk
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, default="./output/nptag_ft_model_100/model_state.pdparams", required=True, help="The path to model parameters to be loaded.")
+parser.add_argument("--params_path", type=str, default="./output/model_100/model_state.pdparams", required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain name_category_map.json.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
