@@ -23,7 +23,6 @@ from paddle.io import BatchSampler, DataLoader
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Tuple, Stack
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
-from paddlenlp.ops import FasterBART
 from utils import convert_example, compute_metrics
 
 summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
@@ -93,7 +92,7 @@ def parse_args():
         help='The number of beams for beam search.')
     parser.add_argument(
         '--length_penalty',
-        default=2.0,
+        default=0.6,
         type=float,
         help='The exponential penalty to the sequence length for beam search.')
     parser.add_argument(
@@ -116,11 +115,6 @@ def parse_args():
         action='store_true',
         help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. '
     )
-    parser.add_argument(
-        '--decoding_lib',
-        type=str,
-        default='../../../paddlenlp/ops/build/lib/libdecoding_op.so',
-        help='The decoding lib of faster transformer. ')
     parser.add_argument(
         "--batch_size",
         default=64,
@@ -145,18 +139,6 @@ def parse_args():
         type=int,
         default=100,
         help="Log every X updates steps.")
-    parser.add_argument(
-        "--rel_len",
-        type=bool,
-        default=False,
-        help="Indicating whether `max_out_len` in is the length relative to that of source text. It is suggest to set a small `max_target_length` and use `rel_len=True`."
-    )
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        default=0.6,
-        help="The power number in length penalty calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`."
-    )
     args = parser.parse_args()
     return args
 
@@ -207,12 +189,6 @@ def generate(args):
         collate_fn=batchify_fn,
         return_list=True)
     data_loader.pin_memory = False
-    if args.faster:
-        model = FasterBART(
-            model,
-            decoding_strategy=args.decode_strategy,
-            decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
 
     model.eval()
     total_time = 0.0
@@ -221,9 +197,9 @@ def generate(args):
     all_labels = []
     for step, batch in enumerate(data_loader):
         input_ids, _, mem_seq_lens, _, labels = batch
-        preds = model.generate(
+        preds, _ = model.generate(
             input_ids=input_ids,
-            mem_seq_lens=mem_seq_lens,
+            seq_lens=mem_seq_lens,
             max_length=args.max_target_length,
             min_length=args.min_target_length,
             decode_strategy=args.decode_strategy,
@@ -233,25 +209,13 @@ def generate(args):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             diversity_rate=args.diversity_rate,
-            rel_len=args.rel_len,
-            alpha=args.alpha,
-            use_cache=True)
+            use_fast=args.faster)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %
                   (step, total_time / args.logging_steps))
             total_time = 0.0
-
-        if args.faster:
-            if args.decode_strategy == "beam_search":
-                preds = preds.numpy().transpose([1, 2, 0])
-                all_preds.extend([item[0] for item in preds])
-            elif args.decode_strategy in ["greedy_search", "sampling"]:
-                preds = preds.numpy().transpose([1, 0])
-                all_preds.extend(preds)
-        else:
-            preds, scores = preds
-            all_preds.extend(preds.numpy())
+        all_preds.extend(preds.numpy())
         all_labels.extend(labels.numpy())
         start_time = time.time()
 

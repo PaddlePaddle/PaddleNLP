@@ -193,7 +193,7 @@ python generate.py \
 
 ### 模型高性能预测
 
-在模型预测阶段，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。只需在上述模型预测上添加三个参数即可：分别是`faster`，`use_fp16_decoding`，`decoding_lib`。
+在模型预测阶段，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。只需在上述模型预测上添加两个参数即可：分别是`faster`，`use_fp16_decoding`。
 
 ```shell
 # GPU启动，预测仅支持单卡
@@ -215,14 +215,11 @@ python generate.py \
     --logging_steps=100 \
     --faster \
     --use_fp16_decoding \
-    --decoding_lib=../../../paddlenlp/ops/build/lib/libdecoding_op.so \
-    --alpha=0.0 \
     --device=gpu
 ```
 其中新增参数释义如下：
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
 - `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
-- `decoding_lib` 如果不存在，将使用 JIT 自动编译所需的动态库。如果需要自行编译，可参考[自定义OP编译使用](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E7%BC%96%E8%AF%91%E8%87%AA%E5%AE%9A%E4%B9%89op) ，然后设定为编译出的高性能自定义 OP的动态库的位置即可。
 
 ## 参考文献
 1. Lewis M , Liu Y , Goyal N , et al. [BART: Denoising Sequence-to-Sequence Pre-training for Natural

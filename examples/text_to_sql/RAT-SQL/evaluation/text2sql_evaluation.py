@@ -15,9 +15,6 @@
 Calculating the exact accuracy. For select, where and others schema, it will be
 seen as right if has different order. This script refers to https://github.com/taoyds/spider。
 """
-
-from __future__ import division
-
 import sys
 import os
 import traceback
