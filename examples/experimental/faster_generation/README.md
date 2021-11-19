@@ -14,15 +14,15 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration的预训练模型支持情况（GPU）。
 
-|  Library | GPT | BART | UnifiedTransformer |
-|  ------  | ----| -----| ------------------ |
-| PaddleNLP         | ✅  | ✅  | ✅  |
+|  Library\Model Type | Decoder | Encoder-Decoder | Prefix-LM |
+|  ------  | :----:| :-----:| :------------------: |
+| PaddleNLP         | GPT  | BART  | UnifiedTransformer  |
 
 ### Decode Strategy Support
 下表为PaddleNLP FasterGeneration与的解码策略支持情况。
 
 |  Library | Beam Search | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
-|  ------  | ----| -----| ------| -----|------- | ---|------ |
+|  ------  |:----:| :-----:| :------:| :-----:|:-------: | :---:|------ |
 | PaddleNLP         | ✅  | ✅  | ✅   | ✅  | ✅ | ✅ |
 
 ## Performence
