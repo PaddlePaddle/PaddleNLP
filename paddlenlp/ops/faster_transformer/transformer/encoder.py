@@ -232,7 +232,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self, need_build=True):
+def enable_faster_encoder(self):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -270,14 +270,13 @@ def enable_faster_encoder(self, need_build=True):
             layer.forward = layer._ft_forward
 
     if not self.training:
-        if need_build:
-            try:
-                load("FasterTransformer", verbose=True)
-            except Exception:
-                logger.warning(
-                    "Exception occurs when using FasterTransformer. " \
-                    "The original forward will be involved. ")
-                return self
+        try:
+            load("FasterTransformer", verbose=True)
+        except Exception:
+            logger.warning(
+                "Exception occurs when using FasterTransformer. " \
+                "The original forward will be involved. ")
+            return self
         for layer in self.children():
             layer.apply(init_func)
     return self
