@@ -24,7 +24,7 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import GPTModel, GPTLMHeadModel
+from paddlenlp.transformers import GPTLMHeadModel
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 from paddlenlp.utils.log import logger
@@ -112,7 +112,7 @@ def do_predict(args):
         for i in range(100):
             # For warmup. 
             if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
+                paddle.device.cuda.synchronize(place)
                 start = time.time()
             out_seq, _ = gpt.generate(
                 input_ids,
@@ -122,10 +122,11 @@ def do_predict(args):
                 temperature=args.temperature,
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
-                decode_strategy="sampling")
+                decode_strategy="sampling",
+                use_fp16_decoding=args.use_fp16_decoding)
             output_sequence = out_seq.numpy()
 
-        paddle.fluid.core._cuda_synchronize(place)
+        paddle.device.cuda.synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy()

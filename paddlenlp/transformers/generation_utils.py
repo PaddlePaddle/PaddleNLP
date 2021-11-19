@@ -519,6 +519,11 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'early_stopping != False' is not supported yet in the faster version"
             )
+        if kwargs['forced_eos_token_id'] is not None:
+            # not support for forced_eos_token_id yet in the faster version
+            raise AttributeError(
+                "'forced_eos_token_id != None' is not supported yet in the faster version"
+            )
         self.prepare_faster_entry(kwargs)
 
     @paddle.no_grad()
@@ -712,22 +717,23 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+
+        assert (
+            decode_strategy in ["greedy_search", "sampling", "beam_search"]
+        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+            decode_strategy)
+
         if getattr(self, '_faster_entry', None) is not False and use_fast:
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
+            model_kwargs = args.pop('model_kwargs')
+            args.update(model_kwargs)
             try:
                 if not hasattr(self, '_faster_entry'):
                     self._build_faster(args)
                 if self._faster_entry:
-                    model_kwargs = args.pop('model_kwargs')
-                    faster_args = {}
-                    for arg_name in self._faster_entry.__code__.co_varnames:
-                        if arg_name in args.keys():
-                            faster_args[arg_name] = args[arg_name]
-                        if arg_name in model_kwargs.keys():
-                            faster_args[arg_name] = model_kwargs[arg_name]
-                    output_ids = self._faster_entry(**faster_args)
+                    output_ids = self._faster_entry(**args)
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
                         output_ids = output_ids[:, :
@@ -861,11 +867,6 @@ class GenerationMixin(object):
                 return self.beam_search(
                     input_ids, beam_scorer, logits_processors, max_length,
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs)
-
-        else:
-            raise ValueError(
-                '`decode_strategy` must be one of "greedy_search", "sampling" '
-                'and "beam_search".')
 
     def greedy_search(self, input_ids, logits_processors, max_length,
                       pad_token_id, eos_token_id, **model_kwargs):
@@ -1024,7 +1025,6 @@ class GenerationMixin(object):
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
-
         batch_beam_size, cur_len = input_ids.shape
         origin_len = cur_len
 
@@ -1331,7 +1331,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         cur_len = input_ids.shape[-1]
         if cur_len < self.min_length:
-            logits[:, self.eos_token_id] = -1e9
+            logits[:, self.eos_token_id] = -float("inf")
         return logits
 
 
@@ -1435,7 +1435,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_bos_token_id
-            ]] = -1e9
+            ]] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
@@ -1459,6 +1459,6 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_eos_token_id
-            ]] = -1e9
+            ]] = -float("inf")
             scores[:, self.forced_eos_token_id] = 0
         return scores

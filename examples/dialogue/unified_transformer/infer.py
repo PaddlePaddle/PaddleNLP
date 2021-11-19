@@ -5,7 +5,6 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
-from paddlenlp.ops import FasterUnifiedTransformer
 
 from utils import print_args, set_seed, create_data_loader, select_response
 
@@ -34,7 +33,6 @@ def parse_args():
     parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
     parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
     parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
-    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -104,6 +102,7 @@ def infer(args):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_return_sequences,
+            use_fp16_decoding=args.use_fp16_decoding,
             use_fast=args.faster)
 
         total_time += (time.time() - start_time)
