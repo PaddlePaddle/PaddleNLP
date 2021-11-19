@@ -39,6 +39,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
 parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
 args = parser.parse_args()
@@ -87,7 +88,7 @@ def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
             label += [ignore_label] * (max_seq_len - len(label))
         labels.append(label)
 
-    labels = np.array(labels)
+    labels = np.array(labels, dtype="int64")
     seq_lens = np.array(seq_lens)
     return texts, labels, seq_lens
 
@@ -126,6 +127,10 @@ def do_train():
         batch_size=args.batch_size,
         collate_fn=trans_func,
         return_list=True)
+
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
     num_training_steps = len(train_data_loader) * args.epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
