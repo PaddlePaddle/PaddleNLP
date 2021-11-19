@@ -1,6 +1,6 @@
 # FasterGeneration Performance
 
-以下性能数据为原版generate方法和FasterGeneration对比数据。
+以下性能数据为非加速版generate方法和FasterGeneration对比数据。
 
 - **测试设备:** Tesla V100-SXM2-16GB
 - **Batch Size:** 4

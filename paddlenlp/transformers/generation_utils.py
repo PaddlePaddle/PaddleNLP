@@ -751,7 +751,7 @@ class GenerationMixin(object):
                 self._convert_to_faster(args)
                 logger.warning(e)
                 logger.warning(
-                    "FasterGenerate is not available, "
+                    "FasterGeneration is not available, "
                     "and the original version would be used instead.")
 
         # params check
