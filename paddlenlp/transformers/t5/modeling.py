@@ -603,6 +603,7 @@ class T5PretrainedModel(PretrainedModel):
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
             "feed_forward_proj": "relu",
+            "add_decoder": True
         },
         "t5-base": {
             "tie_word_embeddings": True,
@@ -621,6 +622,7 @@ class T5PretrainedModel(PretrainedModel):
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
             "feed_forward_proj": "relu",
+            "add_decoder": True
         },
         "t5-large": {
             "tie_word_embeddings": True,
@@ -639,6 +641,7 @@ class T5PretrainedModel(PretrainedModel):
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
             "feed_forward_proj": "relu",
+            "add_decoder": True
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -1095,6 +1098,10 @@ class T5Model(T5PretrainedModel):
             The epsilon used by the layer normalization layers. Defaults to `1e-6`.
         feed_forward_proj (str, optional):
             The non-linear activation function (function or string) in the feed forward layer in the residual attention block. If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
+        feed_forward_proj (str, optional):
+            The non-linear activation function (function or string) in the feed forward layer in the residual attention block. If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
+        add_decoder (bool, optional):
+            Whether to add decoder layer. Defaults to `True`.
     """
 
     def __init__(self,
@@ -1113,7 +1120,8 @@ class T5Model(T5PretrainedModel):
                  relative_attention_num_buckets=32,
                  dropout_rate=0.1,
                  layer_norm_epsilon=1e-06,
-                 feed_forward_proj="relu"):
+                 feed_forward_proj="relu",
+                 add_decoder=True):
         super().__init__()
         self.tie_word_embeddings = tie_word_embeddings
         self.pad_token_id = pad_token_id
@@ -1138,19 +1146,19 @@ class T5Model(T5PretrainedModel):
             d_ff,
             self.shared,
             is_decoder=False)
-
-        self.decoder = T5Stack(
-            d_model,
-            num_decoder_layers,
-            layer_norm_epsilon,
-            dropout_rate,
-            relative_attention_num_buckets,
-            d_kv,
-            num_heads,
-            feed_forward_proj,
-            d_ff,
-            self.shared,
-            is_decoder=True)
+        if add_decoder:
+            self.decoder = T5Stack(
+                d_model,
+                num_decoder_layers,
+                layer_norm_epsilon,
+                dropout_rate,
+                relative_attention_num_buckets,
+                d_kv,
+                num_heads,
+                feed_forward_proj,
+                d_ff,
+                self.shared,
+                is_decoder=True)
 
         self.init_weights()
 
@@ -1616,14 +1624,71 @@ class T5EncoderModel(T5PretrainedModel):
     Args:
         t5 (:class:`T5Model`):
             An instance of :class:`T5Model`.
-
+        
     """
+    pretrained_init_configuration = {
+        "t5-small": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 512,
+            "d_kv": 64,
+            "d_ff": 2048,
+            "num_layers": 6,
+            "num_decoder_layers": 6,
+            "num_heads": 8,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu",
+            "add_decoder": False
+        },
+        "t5-base": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 768,
+            "d_kv": 64,
+            "d_ff": 3072,
+            "num_layers": 12,
+            "num_decoder_layers": 12,
+            "num_heads": 12,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu",
+            "add_decoder": False
+        },
+        "t5-large": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 64,
+            "d_ff": 4096,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 16,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu",
+            "add_decoder": False
+        }
+    }
 
     def __init__(self, t5):
         super().__init__()
         self.t5 = t5
-        del self.t5.decoder
-        paddle.device.cuda.empty_cache()
 
         self.init_weights()
 
@@ -1643,7 +1708,7 @@ class T5EncoderModel(T5PretrainedModel):
                 output_attentions=False,
                 output_hidden_states=False):
         r"""
-        The T5Model forward method, overrides the `__call__()` special method.
+        The T5EncoderModel forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor, optional):
