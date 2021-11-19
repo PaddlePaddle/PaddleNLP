@@ -4,7 +4,7 @@ FasterGeneration加速生成API
 
 FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
 
-功能底层依托于 `FasterTransformer <https://github.com/NVIDIA/FasterTransformer>`_ ，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于 `model.generate` 函数。功能的开启和关闭通过传入 `use_fast` 参数进行控制（默认为开启状态）。该功能具有如下特性：
+功能底层依托于 `FasterTransformer <https://github.com/NVIDIA/FasterTransformer>`_ ，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于 `model.generate` 函数。功能的开启和关闭通过传入 `use_faster` 参数进行控制（默认为开启状态）。该功能具有如下特性：
 
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
@@ -63,13 +63,13 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
         input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search')
     ...
 
-可以看到，FasterGeneration的使用方法与 `model.generate()` 相同，只需传入输入tensor和解码相关参数即可，使用非常简便。如果要使用非加速版的 `model.generate()` 方法，只需传入 `use_fast=False` 即可，示例如下：
+可以看到，FasterGeneration的使用方法与 `model.generate()` 相同，只需传入输入tensor和解码相关参数即可，使用非常简便。如果要使用非加速版的 `model.generate()` 方法，只需传入 `use_faster=False` 即可，示例如下：
 
 .. code-block::
 
     ...
     outputs, _ = model.generate(
-        input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search', use_fast=False)
+        input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search', use_faster=False)
     ...
 
 .. note::
