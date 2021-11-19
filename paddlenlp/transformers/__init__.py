@@ -74,4 +74,3 @@ from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
-from .mbart50.tokenizer import *
