@@ -549,7 +549,7 @@ class GenerationMixin(object):
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
-                 use_fast=True,
+                 use_faster=True,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -617,7 +617,7 @@ class GenerationMixin(object):
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
-            use_fast: (bool, optional): Whether to use faster entry of model 
+            use_faster: (bool, optional): Whether to use faster entry of model 
                 for generation. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
@@ -723,7 +723,7 @@ class GenerationMixin(object):
         ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy)
 
-        if getattr(self, '_faster_entry', None) is not False and use_fast:
+        if getattr(self, '_faster_entry', None) is not False and use_faster:
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
@@ -751,7 +751,7 @@ class GenerationMixin(object):
                 self._convert_to_faster(args)
                 logger.warning(e)
                 logger.warning(
-                    "FasterGenerate is not available, "
+                    "FasterGeneration is not available, "
                     "and the original version would be used instead.")
 
         # params check

@@ -209,7 +209,7 @@ def generate(args):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             diversity_rate=args.diversity_rate,
-            use_fast=args.faster)
+            use_faster=args.faster)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %
