@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask
+from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
@@ -38,7 +38,11 @@ TASKS = {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
                 "linking": True,
-            }
+            },
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'knowledge_mining-nptag',
+            },
         },
         "default": {
             "model": "wordtag"
@@ -161,7 +165,7 @@ TASKS = {
         "default": {
             "model": "csc-ernie-1.0"
         }
-    }
+    },
 }
 
 

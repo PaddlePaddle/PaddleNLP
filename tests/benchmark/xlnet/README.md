@@ -20,5 +20,10 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 3. 进入xlnet测试目录，执行脚本
 ```script
 cd PaddleNLP
+
+# 不打开profile选项，执行
 bash tests/benchmark/xlnet/run_all.sh
+
+# 打开profile选项，执行
+bash tests/benchmark/xlnet/run_all.sh on
 ```
