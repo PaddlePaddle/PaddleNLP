@@ -19,9 +19,15 @@ def read_data(fname, word2idx):
     """
     Data is processed into a one-dimensional vector, and each value is the code corresponding to a word.
     The two sentences are separated by special characters < EOS >.
-    :param fname: data filename
-    :param word2idx: word dict
-    :return: word vectors
+    
+    Args:
+        fname (str):
+            data filename
+        word2idx (dict):
+            word dict
+    
+    Returns:
+        list: return word vectors
     """
     if os.path.isfile(fname):
         with open(fname) as f:
@@ -47,8 +53,12 @@ def read_data(fname, word2idx):
 def load_vocab(fname):
     """
     load word dict
-    :param fname: filename of the vocav file
-    :return: word dict
+
+    Args:
+        fname (str): filename of the vocav file
+    
+    Returns:
+        dict: word dict
     """
     word2idx = {}
     with open(fname, "r") as f:
@@ -61,8 +71,12 @@ def load_vocab(fname):
 def load_data(config):
     """
     load data
-    :param config: config
-    :return: word dict, and train, valid, test data
+    
+    Args:
+        config: config
+    
+    Returns:
+        word dict, and train, valid, test data
     """
     vocab_path = os.path.join(config.data_dir,
                               "%s.vocab.txt" % config.data_name)

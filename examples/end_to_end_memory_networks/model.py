@@ -17,17 +17,21 @@ from paddle import nn
 import numpy as np
 
 
-class MenN2N(nn.Layer):
+class MemN2N(nn.Layer):
     """
     End to End Memory Networks model
+
+    reference paper: https://arxiv.org/pdf/1503.08895v5.pdf
     """
 
     def __init__(self, config):
         """
         Model initialization
-        :param config: model configuration, see config.yaml for more detail
+        
+        Args:
+            config: model configuration, see config.yaml for more detail
         """
-        super(MenN2N, self).__init__()
+        super(MemN2N, self).__init__()
         self.nwords = config.nwords
         self.init_hid = config.init_hid
         self.init_std = config.init_std
@@ -38,37 +42,24 @@ class MenN2N(nn.Layer):
         self.max_grad_norm = config.max_grad_norm
         self.batch_size = config.batch_size
 
-        # self.show = config.show
         self.checkpoint_dir = config.checkpoint_dir
 
         normal_attr = paddle.framework.ParamAttr(
             initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.A = nn.Embedding(self.nwords, self.edim, weight_attr=normal_attr)
-
-        # normal_attr = paddle.framework.ParamAttr(
-        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.C = nn.Embedding(self.nwords, self.edim, weight_attr=normal_attr)
 
         # Temporal Encoding
-        # normal_attr = paddle.framework.ParamAttr(
-        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.T_A = nn.Embedding(
             self.mem_size, self.edim, weight_attr=normal_attr)
-
-        # normal_attr = paddle.framework.ParamAttr(
-        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
         self.T_C = nn.Embedding(
             self.mem_size, self.edim, weight_attr=normal_attr)
 
-        # 用于将q进行线性映射的H矩阵
-        # normal_attr = paddle.framework.ParamAttr(
-        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        # Linear mapping for q
         self.H = nn.Linear(
             self.edim, self.edim, weight_attr=normal_attr, bias_attr=False)
 
-        # 用于输出的W矩阵
-        # normal_attr = paddle.framework.ParamAttr(
-        #     initializer=paddle.nn.initializer.Normal(std=self.init_std))
+        # output mapping
         self.W = nn.Linear(
             self.edim, self.nwords, weight_attr=normal_attr, bias_attr=False)
 

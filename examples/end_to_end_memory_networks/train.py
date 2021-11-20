@@ -20,20 +20,24 @@ import paddle
 from paddle import nn
 import numpy as np
 
-from model import MenN2N
+from model import MemN2N
 from config import Config
 from eval import eval
 from data import load_data
 
 
-def train_single_epoch(model: MenN2N, lr, data, config):
+def train_single_epoch(model: MemN2N, lr, data, config):
     """
     train one epoch
-    :param model: model to be trained
-    :param lr: the learning rate of this epoch
-    :param data: training data
-    :param config: configs
-    :return: average loss
+
+    Args:
+        model (MemN2N): model to be trained
+        lr (float): the learning rate of this epoch
+        data: training data
+        config: configs
+
+    Returns:
+        float: average loss
     """
     model.train()
     N = int(math.ceil(len(data) / config.batch_size))  # total train N batchs
@@ -78,9 +82,18 @@ def train_single_epoch(model: MenN2N, lr, data, config):
     return total_loss / N / config.batch_size
 
 
-def train(model: MenN2N, train_data, valid_data, config):
+def train(model: MemN2N, train_data, valid_data, config):
     """
     do train
+
+    Args:
+        model (MemN2N): the model to be evaluate
+        train_data: training data
+        valid_data: validating data
+        config: model and training configs
+    
+    Returns:
+        no return
     """
     lr = config.init_lr
 
@@ -146,7 +159,7 @@ if __name__ == '__main__':
     random.seed(config.srand)
     paddle.seed(config.srand)
 
-    model = MenN2N(config)
+    model = MemN2N(config)
     if config.recover_train:
         model_path = os.path.join(config.checkpoint_dir, config.model_name)
         state_dict = paddle.load(model_path)

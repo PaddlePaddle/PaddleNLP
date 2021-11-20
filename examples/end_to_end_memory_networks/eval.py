@@ -19,20 +19,24 @@ import paddle
 from paddle import nn
 import numpy as np
 
-from model import MenN2N
+from model import MemN2N
 from data import load_data
 from config import Config
 
 
 @paddle.no_grad()
-def eval(model: MenN2N, data, config, mode="Test"):
+def eval(model: MemN2N, data, config, mode="Test"):
     """
-    测试
-    :param model: 用来测试的模型
-    :param data: 测试数据
-    :param config: 配置信息
-    :param mode: 本论测试的Mode(Valid 或 Test)
-    :return: 平均loss
+    evaluate the model performance
+
+    Args:
+        model (MemN2N): the model to be evaluate
+        data: evaluation data
+        config: model and eval configs
+        mode: Valid or Test
+    
+    Returns:
+        average loss
     """
     model.eval()
     lossfn = nn.CrossEntropyLoss(reduction='sum')
@@ -74,7 +78,10 @@ def eval(model: MenN2N, data, config, mode="Test"):
     return total_loss / N / config.batch_size
 
 
-def test(model: MenN2N, test_data, config):
+def test(model: MemN2N, test_data, config):
+    """
+    test the model performance
+    """
     test_loss = eval(model, test_data, config, "Test")
     test_perplexity = math.exp(test_loss)
     print("Perplexity on Test: %f" % test_perplexity)
@@ -92,7 +99,7 @@ if __name__ == '__main__':
 
     print("vacab size is %d" % config.nwords)
 
-    model = MenN2N(config)
+    model = MemN2N(config)
 
     model_path = os.path.join(config.checkpoint_dir, config.model_name)
     state_dict = paddle.load(model_path)

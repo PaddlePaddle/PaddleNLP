@@ -19,7 +19,7 @@ import paddle
 import numpy as np
 
 from data import load_data
-from model import MenN2N
+from model import MemN2N
 from train import train
 from eval import test
 from config import Config
@@ -47,7 +47,7 @@ if __name__ == '__main__':
         random.seed(config.srand)
         paddle.seed(config.srand)
 
-        model = MenN2N(config)
+        model = MemN2N(config)
         train(model, train_data, valid_data, config)
 
         test_ppl = test(model, test_data, config)
