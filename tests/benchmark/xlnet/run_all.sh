@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+profile=${1:-"off"}
+
 # 提供可稳定复现性能的脚本，默认在标准docker环境内py37执行： paddlepaddle/paddle:latest-gpu-cuda10.1-cudnn7  paddle=2.1.2  py=37
 # 执行目录：需说明
 export BENCHMARK_ROOT=/workspace
@@ -31,11 +33,11 @@ for model_mode in ${model_mode_list[@]}; do
           for bs_item in ${bs_item_list[@]}; do
               echo "index is speed, 1gpus, begin, ${model_name}"
               run_mode=sp
-              CUDA_VISIBLE_DEVICES=0 bash $BENCHMARK_ROOT/PaddleNLP/tests/benchmark/xlnet/run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} 1000 ${model_mode}     #  (5min)
+              CUDA_VISIBLE_DEVICES=0 bash $BENCHMARK_ROOT/PaddleNLP/tests/benchmark/xlnet/run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} 300 ${model_mode} ${profile}     #  (5min)
               sleep 60
               echo "index is speed, 8gpus, run_mode is multi_process, begin, ${model_name}"
               run_mode=mp
-              CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash $BENCHMARK_ROOT/PaddleNLP/tests/benchmark/xlnet/run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} 1000 ${model_mode}
+              CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash $BENCHMARK_ROOT/PaddleNLP/tests/benchmark/xlnet/run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} 300 ${model_mode} ${profile}
               sleep 60
           done
     done

@@ -40,3 +40,4 @@ from .nlvr2 import *
 from .vqa2 import *
 from .nlpcc13_evsam05_thu import *
 from .nlpcc13_evsam05_hit import *
+from .xnli import *

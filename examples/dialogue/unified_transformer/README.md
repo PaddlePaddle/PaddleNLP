@@ -160,10 +160,6 @@ python infer.py \
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
 - `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
 
-同时，如果需要自行额外编译所需的动态库，PaddleNLP 也提供了可以自行编译自定义 op 文档，具体的编译方法可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译完成后，指定：
-- `decoding_lib` 表示编译出的高性能自定义 op 的动态库的位置。
-即可完成相关的动态库的导入。
-
 程序运行结束后会将预测生成的response保存在`output_path`中。同时终端中会输出评估结果。
 
 采用预训练模型及微调模型在测试集上有如下结果：
@@ -184,7 +180,7 @@ python infer.py \
 export CUDA_VISIBLE_DEVICES=0
 python interaction.py \
     --model_name_or_path=plato-mini \
-    --min_dec_len=1 \
+    --min_dec_len=0 \
     --max_dec_len=64 \
     --num_return_sequences=20 \
     --decode_strategy=sampling \
