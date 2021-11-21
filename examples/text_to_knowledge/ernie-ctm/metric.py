@@ -31,7 +31,6 @@ class SequenceAccuracy(paddle.metric.Metric):
         active_acc = label.reshape([-1]) != ignore_index
         active_pred = pred.masked_select(active_acc)
         active_labels = label.masked_select(active_acc)
-
         correct = active_pred.equal(active_labels)
         return correct
 
