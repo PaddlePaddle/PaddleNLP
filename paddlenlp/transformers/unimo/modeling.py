@@ -57,6 +57,25 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-lcsts-new": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
         "unimo-text-1.0-large": {
             "vocab_size": 12800,
             "hidden_size": 1024,
@@ -82,6 +101,8 @@ class UNIMOPretrainedModel(PretrainedModel):
         "model_state": {
             "unimo-text-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0.pdparams",
+            "unimo-text-1.0-lcsts-new":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
             "unimo-text-1.0-large":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large.pdparams",
         }
@@ -441,13 +462,30 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
         outputs = self.unimo(input_ids, token_type_ids, position_ids,
                              attention_mask, use_cache, cache)
+
         sequence_output = outputs[0] if use_cache else outputs
+
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
             cache = outputs[1]
             return logits, cache
         else:
             return logits
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterUNIMOText
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        self._faster_entry = FasterUNIMOText(
+            self,
+            decode_strategy=decode_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution

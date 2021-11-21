@@ -70,3 +70,9 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
+from .ctrl.modeling import *
+from .ctrl.tokenizer import *
+from .layoutxlm.modeling import *
+from .layoutxlm.tokenizer import *
+from .mbart.modeling import *
+from .mbart.tokenizer import *

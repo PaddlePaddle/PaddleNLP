@@ -56,6 +56,7 @@ class BartPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "pad_token_id": 1,
             "eos_token_id": 2,
+            "forced_eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 768,
             "num_encoder_layers": 6,
@@ -76,6 +77,7 @@ class BartPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "pad_token_id": 1,
             "eos_token_id": 2,
+            "forced_eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 1024,
             "num_encoder_layers": 12,
@@ -115,10 +117,6 @@ class BartPretrainedModel(PretrainedModel):
                         std=self.init_std if hasattr(self, "init_std") else
                         self.bart.config["init_std"],
                         shape=layer.weight.shape))
-        elif isinstance(layer, (nn.TransformerEncoderLayer,
-                                nn.TransformerDecoderLayer)):
-            if layer.activation == F.gelu:
-                layer.activation = partial(F.gelu, approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
@@ -391,6 +389,7 @@ class BartModel(BartPretrainedModel):
                  bos_token_id=0,
                  pad_token_id=1,
                  eos_token_id=2,
+                 forced_eos_token_id=2,
                  decoder_start_token_id=2,
                  d_model=768,
                  num_encoder_layers=6,
@@ -761,30 +760,17 @@ class BartForConditionalGeneration(BartPretrainedModel):
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterBART
-        decoding_strategy = kwargs.get('decode_strategy')
-        model_kwargs = kwargs['model_kwargs']
-        use_fp16_decoding = model_kwargs.get('use_fp16_decoding', False)
-        # TODO(guosheng): Currently, beam_search_v2 in FasterTransformer uses
-        # t2t beam search which has some difference with beam search in generation
-        # api on finish queue addition and early-stop criterion, and it seems
-        # lead to poor performance on bart cnn-sum model, thus we disable it temporarily.
-        if decoding_strategy == 'beam_search':
-            return False
-        # Some checks on kwargs. For example, FasterBART needs `mem_seq_lens` as
-        # one input while BART not, thus check whether `mem_seq_lens` in kwargs.
-        if model_kwargs.get('mem_seq_lens', None) is None:
-            return False
-        # Assume no args change among multi-turns run to convert parameters only
-        # once. Additionaly, use some converted args as default values instead of
-        # converting args to allow overriding.
-        # TODO(guosheng): maybe use weakref for the model in faster model
-        self._faster_entry = partial(
-            FasterBART(
-                self,
-                decoding_strategy=decoding_strategy,
-                use_fp16_decoding=use_fp16_decoding).generate,
-            alpha=kwargs.get('length_penalty'),
-            rel_len=False)
+        decode_strategy = kwargs.get('decode_strategy')
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        self._faster_entry = FasterBART(
+            self,
+            decode_strategy=decode_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def forward(self,
