@@ -15,6 +15,7 @@
 import argparse
 import os
 import sys
+import time
 
 import numpy as np
 import paddle
@@ -26,10 +27,11 @@ from paddlenlp.datasets import load_dataset
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
-parser.add_argument("--batch_size", type=int, default=1, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -108,3 +110,17 @@ if __name__ == "__main__":
 
     for idx, text in enumerate(data):
         print(text, " : ", results[idx])
+
+    # Just for benchmark
+    if args.benchmark:
+        start = time.time()
+        epochs = 10
+        for epoch in range(epochs):
+            epoch_start = time.time()
+            for batch in batches:
+                labels = predictor.predict(batch, label_map=label_map)
+            epoch_end = time.time()
+            print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end -
+                                                                  epoch_start)))
+        end = time.time()
+        print("Predict time {:.4f} s/epoch".format((end - start) / epochs))

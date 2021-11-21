@@ -81,12 +81,17 @@ class UNIMOTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "unimo-text-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-lcsts-new":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-large":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
         }
     }
     pretrained_init_configuration = {
         "unimo-text-1.0": {
+            "do_lower_case": True
+        },
+        "unimo-text-1.0-lcsts-new": {
             "do_lower_case": True
         },
         "unimo-text-1.0-large": {

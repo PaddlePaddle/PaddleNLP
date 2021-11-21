@@ -24,7 +24,7 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import GPTModel, GPTLMHeadModel
+from paddlenlp.transformers import GPTLMHeadModel
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 from paddlenlp.utils.log import logger
@@ -104,7 +104,7 @@ def do_predict(args):
     # Set evaluate mode
     gpt.eval()
     input_ids = np.array(
-        [[bos_id] for i in range(args.batch_size * 1)]).astype("int32").reshape(
+        [[bos_id] for i in range(args.batch_size * 1)]).astype("int64").reshape(
             [args.batch_size, 1])
     input_ids = paddle.to_tensor(input_ids)
 
@@ -112,7 +112,7 @@ def do_predict(args):
         for i in range(100):
             # For warmup. 
             if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
+                paddle.device.cuda.synchronize(place)
                 start = time.time()
             out_seq, _ = gpt.generate(
                 input_ids,
@@ -120,20 +120,19 @@ def do_predict(args):
                 top_p=args.topp,
                 max_length=args.max_length,
                 temperature=args.temperature,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                num_beam=4,
-                decode_strategy="beam_search",
-                use_fast=True)
+                bos_token_id=bos_id,
+                eos_token_id=eos_id,
+                decode_strategy="sampling",
+                use_fp16_decoding=args.use_fp16_decoding)
             output_sequence = out_seq.numpy()
 
-        paddle.fluid.core._cuda_synchronize(place)
+        paddle.device.cuda.synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
-        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
+        print(tokenizer.convert_ids_to_string(output_sequence[i]))
 
 
 if __name__ == "__main__":
