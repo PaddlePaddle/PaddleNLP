@@ -30,10 +30,9 @@ def check_cuda(use_cuda, err = \
 
 
 if __name__ == "__main__":
-    
+
     import paddle
     paddle.enable_static()
-
 
     check_cuda(True)
 

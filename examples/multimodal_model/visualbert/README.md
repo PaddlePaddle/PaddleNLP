@@ -188,7 +188,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir $LOG_DIR VQA2/run_vqa2.
     --batch_size 64 \
     --learning_rate 2e-5 \
     --save_steps 10000 \
-    --num_train_epochs 10 
+    --num_train_epochs 10
 ```
 
 `input_dir`: 数据根目录
@@ -251,7 +251,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir $LOG_DIR NLVR2/run_nl
 |       └── detectron_fix_144 -> /mnt/ssd/X_NLVR/data/detectron_fix_144
 ├── run_pretrain.py # 模型预训练程序
 ├── vqa-coco-pretrain.sh # coco captions 预训练脚本
-├── nlvr2-coco-pretrain.sh 
+├── nlvr2-coco-pretrain.sh
 ├── vqa-pretrain.sh # vqa2 预训练脚本
 ├── nlvr2-pretrain.sh # nlvr2 预训练脚本
 ├── vqa-finetune.sh # vqa2 微调脚本
@@ -264,8 +264,8 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir $LOG_DIR NLVR2/run_nl
 **（1）COCO 预提取图像特征**
 
 `X_COCO` : 下载链接
-> 链接：https://pan.baidu.com/s/1xRZBrxRst3oqtaXdjP5lrA 
-提取码：7s29 
+> 链接：https://pan.baidu.com/s/1xRZBrxRst3oqtaXdjP5lrA
+提取码：7s29
 --来自百度网盘超级会员V5的分享
 
 `coco_detectron_fix_100`: `X_COCO/data/detectron_fix_100` 经过分卷压缩，包含 `.part00`-`.part32` 33 个压缩文件，每个2G，是`pddlenlp.dataset.coco_captions`和`pddlenlp.dataset.vqa2`数据集对应的图像特征
@@ -273,8 +273,8 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir $LOG_DIR NLVR2/run_nl
 
 **（2）NLVR 预提取图像特征**
 `X_NLVR` : 下载链接
-> 链接：https://pan.baidu.com/s/1vdR6OcCxo6aEJLS4Wl4PPQ 
-提取码：13pc 
+> 链接：https://pan.baidu.com/s/1vdR6OcCxo6aEJLS4Wl4PPQ
+提取码：13pc
 --来自百度网盘超级会员V5的分享
 
 `nlvr_detectron_fix_144`: `X_NLVR/data/detectron_fix_144` 包含 `.part00`~`.part14` 15 个压缩文件，每个2G，是`pddlenlp.dataset.nlvr2`数据集对应的图像特征

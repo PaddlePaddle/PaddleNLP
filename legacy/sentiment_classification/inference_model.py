@@ -13,6 +13,7 @@ from run_classifier import create_model
 import utils
 import reader
 
+
 def do_save_inference_model(args):
     if args.use_cuda:
         dev_count = fluid.core.get_cuda_device_count()
@@ -20,9 +21,9 @@ def do_save_inference_model(args):
     else:
         dev_count = int(os.environ.get('CPU_NUM', 1))
         place = fluid.CPUPlace()
-    
+
     exe = fluid.Executor(place)
-    
+
     test_prog = fluid.Program()
     startup_prog = fluid.Program()
 
@@ -36,7 +37,7 @@ def do_save_inference_model(args):
 
     test_prog = test_prog.clone(for_test=True)
     exe.run(startup_prog)
-    
+
     assert (args.init_checkpoint)
 
     if args.init_checkpoint:
@@ -53,6 +54,7 @@ def do_save_inference_model(args):
 
     print("save inference model at %s" % (args.inference_model_dir))
 
+
 def inference(exe, test_program, test_pyreader, fetch_list, infer_phrase):
     """
     Inference Function
@@ -61,12 +63,15 @@ def inference(exe, test_program, test_pyreader, fetch_list, infer_phrase):
     test_pyreader.start()
     while True:
         try:
-            np_props = exe.run(program=test_program, fetch_list=fetch_list, return_numpy=True)
+            np_props = exe.run(program=test_program,
+                               fetch_list=fetch_list,
+                               return_numpy=True)
             for probs in np_props[0]:
                 print("%d\t%f\t%f" % (np.argmax(probs), probs[0], probs[1]))
         except fluid.core.EOFException:
             test_pyreader.reset()
             break
+
 
 def test_inference_model(args):
     if args.use_cuda:
@@ -75,7 +80,7 @@ def test_inference_model(args):
     else:
         dev_count = int(os.environ.get('CPU_NUM', 1))
         place = fluid.CPUPlace()
-    
+
     exe = fluid.Executor(place)
     test_prog = fluid.Program()
     startup_prog = fluid.Program()
@@ -92,7 +97,8 @@ def test_inference_model(args):
     exe = fluid.Executor(place)
     exe.run(startup_prog)
 
-    processor = reader.SentaProcessor(data_dir=args.data_dir,
+    processor = reader.SentaProcessor(
+        data_dir=args.data_dir,
         vocab_path=args.vocab_path,
         random_seed=args.random_seed,
         max_seq_len=args.max_seq_len)
@@ -107,14 +113,14 @@ def test_inference_model(args):
         params_filename="params.pdparams")
 
     infer_data_generator = processor.data_generator(
-        batch_size=args.batch_size/dev_count,
+        batch_size=args.batch_size / dev_count,
         phase="infer",
         epoch=1,
         shuffle=False)
-    
+
     infer_pyreader.set_sample_list_generator(infer_data_generator)
-    inference(exe, test_prog, infer_pyreader,
-        [probs.name], "infer")
+    inference(exe, test_prog, infer_pyreader, [probs.name], "infer")
+
 
 if __name__ == "__main__":
     import paddle

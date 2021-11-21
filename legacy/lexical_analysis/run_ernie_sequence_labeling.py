@@ -116,11 +116,10 @@ def do_train(args):
                 feed_list=train_ret['feed_list'],
                 model="ernie",
                 place=place)
-            
+
             clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=1.0)
             optimizer = fluid.optimizer.Adam(
-                learning_rate=args.base_learning_rate, 
-                grad_clip=clip)
+                learning_rate=args.base_learning_rate, grad_clip=clip)
             optimizer.minimize(train_ret["avg_cost"])
 
     lower_mem, upper_mem, unit = fluid.contrib.memory_usage(

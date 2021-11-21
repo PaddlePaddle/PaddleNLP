@@ -72,6 +72,7 @@ def check_xpu(use_xpu, err = \
     except Exception as e:
         pass
 
+
 def check_version():
     """
     Log error and exit when the installed version of paddlepaddle is

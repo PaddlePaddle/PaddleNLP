@@ -17,7 +17,6 @@ split unicom file
 
 import io
 
-
 with io.open("../data/unicom", "r", encoding="utf8") as unicom_file:
     with io.open("./unicom_infer", "w", encoding="utf8") as infer_file:
         with io.open("./unicom_label", "w", encoding="utf8") as label_file:

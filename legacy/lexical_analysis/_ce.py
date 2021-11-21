@@ -7,28 +7,30 @@ from kpi import CostKpi
 from kpi import DurationKpi
 from kpi import AccKpi
 
-each_step_duration_card1 = DurationKpi('each_step_duration_card1', 0.01, 0, actived=True)
+each_step_duration_card1 = DurationKpi(
+    'each_step_duration_card1', 0.01, 0, actived=True)
 train_cost_card1 = CostKpi('train_cost_card1', 0.03, 0, actived=False)
 train_precision_card1 = CostKpi('train_precision_card1', 0.03, 0, actived=True)
 train_recall_card1 = CostKpi('train_recall_card1', 0.03, 0, actived=True)
 train_f1_card1 = CostKpi('train_f1_card1', 0.03, 0, actived=True)
-each_step_duration_card4 = DurationKpi('each_step_duration_card4', 0.01, 0, actived=True)
+each_step_duration_card4 = DurationKpi(
+    'each_step_duration_card4', 0.01, 0, actived=True)
 train_cost_card4 = CostKpi('train_cost_card4', 0.03, 0, actived=True)
 train_precision_card4 = CostKpi('train_precision_card4', 0.05, 0, actived=True)
 train_recall_card4 = CostKpi('train_recall_card4', 0.03, 0, actived=True)
 train_f1_card4 = CostKpi('train_f1_card4', 0.05, 0, actived=True)
 
 tracking_kpis = [
-        each_step_duration_card1,
-        train_cost_card1,
-        train_precision_card1,
-        train_recall_card1,
-        train_f1_card1,
-        each_step_duration_card4,
-        train_cost_card4,
-        train_precision_card4,
-        train_recall_card4,
-        train_f1_card4,
+    each_step_duration_card1,
+    train_cost_card1,
+    train_precision_card1,
+    train_recall_card1,
+    train_f1_card1,
+    each_step_duration_card4,
+    train_cost_card4,
+    train_precision_card4,
+    train_recall_card4,
+    train_f1_card4,
 ]
 
 

@@ -214,7 +214,8 @@ class ArgConfig(object):
         data_g.add_arg("infer_data_dir", str, None,
                        "Directory path to infer data.")
         data_g.add_arg("vocab_path", str, None, "Vocabulary path.")
-        data_g.add_arg("tokenizer", str, None, "Whether or not use user defined tokenizer")
+        data_g.add_arg("tokenizer", str, None,
+                       "Whether or not use user defined tokenizer")
         data_g.add_arg("batch_size", int, 32,
                        "Total examples' number in batch for training.")
 

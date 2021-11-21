@@ -43,7 +43,9 @@ METRIC_CLASSES = {
     "nlvr2": Accuracy,
 }
 
-MODEL_CLASSES = {"visualbert": (VisualBertForQuestionAnswering, BertTokenizer), }
+MODEL_CLASSES = {
+    "visualbert": (VisualBertForQuestionAnswering, BertTokenizer),
+}
 
 
 def parse_args():
@@ -68,13 +70,12 @@ def parse_args():
         "--bert_model_name",
         default="bert-base-uncased",
         type=str,
-        help="Path to bert model or shortcut name selected in the list: "
-        + ", ".join(
+        help="Path to bert model or shortcut name selected in the list: " +
+        ", ".join(
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])),
-        )
+            ], [])), )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -182,12 +183,15 @@ def parse_args():
         help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
+
+
 # ===================================================================
 
 _num_answers = 10
 # ===================================================================
 
 SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)')
+
 
 def tokenize(sentence):
     sentence = sentence.lower()
@@ -229,7 +233,9 @@ class VocabDict:
         inds = [self.word2idx(w) for w in tokenize(sentence)]
         return inds
 
+
 # ===================================================================
+
 
 def compute_answer_scores(answers, num_of_answers, unk_idx):
     scores = np.zeros((num_of_answers), np.float32)
@@ -238,10 +244,12 @@ def compute_answer_scores(answers, num_of_answers, unk_idx):
             scores[answer] = 0
         else:
             answer_count = answers.count(answer)
-            scores[answer] = min(np.float32(answer_count)*0.3, 1)
+            scores[answer] = min(np.float32(answer_count) * 0.3, 1)
     return scores
 
+
 # ===================================================================
+
 
 def set_seed(args):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
@@ -252,12 +260,14 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
+
 def masked_unk_softmax(x, dim, mask_idx):
     x1 = paddle.nn.functional.softmax(x, axis=dim)
     x1[:, mask_idx] = 0
     x1_sum = paddle.sum(x1, axis=1, keepdim=True)
     y = x1 / x1_sum
     return y
+
 
 def compute_score_with_logits(logits, labels):
     logits = masked_unk_softmax(logits, 1, 0)
@@ -266,6 +276,7 @@ def compute_score_with_logits(logits, labels):
     one_hots = paddle.nn.functional.one_hot(logits, num_classes=labels.shape[1])
     scores = (one_hots * labels)
     return scores
+
 
 @paddle.no_grad()
 def evaluate_vqa(model, data_loader):
@@ -299,25 +310,25 @@ def evaluate_vqa(model, data_loader):
         val_labels.append(labels.detach().cpu().numpy())
         # if (idx+1) % 200 == 0:
         #     print("eval batch:{}/{} batch_acc: {}, _batch_loss: {}".format(idx+1, len(data_loader), _batch_acc.detach().cpu().numpy(), loss.mean().detach().cpu().numpy()))
-            
+
     # val_acc_avg /= val_counter
     # print("val_acc_avg", val_acc_avg.detach().cpu().numpy())
     val_loss_avg = val_loss_sum / val_counter
     val_loss_avg = val_loss_avg.detach().cpu().numpy()
     val_probs = np.concatenate(val_probs, 0)
     val_labels = np.concatenate(val_labels, 0)
-    
-    val_acc_avg = paddle.sum(compute_score_with_logits(paddle.to_tensor(val_probs), paddle.to_tensor(val_labels))) / val_labels.shape[0]
+
+    val_acc_avg = paddle.sum(
+        compute_score_with_logits(
+            paddle.to_tensor(val_probs), paddle.to_tensor(
+                val_labels))) / val_labels.shape[0]
     val_acc_avg = val_acc_avg.detach().cpu().numpy()
-    print(
-            "eval loss: %f, acc: %s"
-            % (
-                val_loss_avg,
-                val_acc_avg,
-                ),
-            )
+    print("eval loss: %f, acc: %s" % (
+        val_loss_avg,
+        val_acc_avg, ), )
     model.train()
-    
+
+
 @paddle.no_grad()
 def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
@@ -363,6 +374,7 @@ def evaluate(model, loss_fct, metric, data_loader):
         print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
 
+
 def prepare_train_features_single(example, tokenizer, answer_dict, args):
     image_name = example['image_name']
     image_id = example['image_id']
@@ -379,25 +391,28 @@ def prepare_train_features_single(example, tokenizer, answer_dict, args):
     answer_scores = np.zeros(answer_dict.num_vocab, np.float32)
     answers_idx[:len(answers)] = (
         [answer_dict.word2idx(ans) for ans in answers])
-    ans_idx = (
-        [answer_dict.word2idx(ans) for ans in answers])
-    answer_scores = (compute_answer_scores(ans_idx,
-                                answer_dict.num_vocab,
-                                answer_dict.UNK_idx))
-    label = paddle.to_tensor(answer_scores, dtype=paddle.float32) # float tensor for loss computation
+    ans_idx = ([answer_dict.word2idx(ans) for ans in answers])
+    answer_scores = (compute_answer_scores(ans_idx, answer_dict.num_vocab,
+                                           answer_dict.UNK_idx))
+    label = paddle.to_tensor(
+        answer_scores,
+        dtype=paddle.float32)  # float tensor for loss computation
 
     # load image feature
     if "train" in feature_path:
-        folder = osp.join(args.input_dir, "data/detectron_fix_100/fc6/vqa/train2014")
+        folder = osp.join(args.input_dir,
+                          "data/detectron_fix_100/fc6/vqa/train2014")
     elif "val" in feature_path:
-        folder = osp.join(args.input_dir, "data/detectron_fix_100/fc6/vqa/val2014")
-    
-    
+        folder = osp.join(args.input_dir,
+                          "data/detectron_fix_100/fc6/vqa/val2014")
+
     detectron_features = np.load(os.path.join(folder, feature_path))
     visual_embeds = paddle.to_tensor(detectron_features)
-    visual_token_type_ids = paddle.zeros(visual_embeds.shape[:-1], dtype=paddle.int64)
-    visual_attention_mask = paddle.ones(visual_embeds.shape[:-1], dtype=paddle.int64)
-    
+    visual_token_type_ids = paddle.zeros(
+        visual_embeds.shape[:-1], dtype=paddle.int64)
+    visual_attention_mask = paddle.ones(
+        visual_embeds.shape[:-1], dtype=paddle.int64)
+
     # two sentence for training: (a) Question ? (b) [MASK]
     tokens_a = tokenizer.tokenize(" ".join(question_tokens)) + ["?", "[MASK]"]
     tokens_b = None
@@ -414,34 +429,34 @@ def prepare_train_features_single(example, tokenizer, answer_dict, args):
         input_type_ids.append(0)
     tokens.append("[SEP]")
     input_type_ids.append(0)
-    
+
     if tokens_b:
         for token in tokens_b:
             tokens.append(token)
             input_type_ids.append(1)
         tokens.append("[SEP]")
         input_type_ids.append(1)
-    
+
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
     input_ids = paddle.to_tensor(input_ids, dtype=paddle.int64)
     token_type_ids = paddle.to_tensor(input_type_ids)
     # The mask has 1 for real tokens and 0 for padding tokens. Only real tokens are attended to.
     attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
-    
+
     data = {
         "input_ids": input_ids,
-        "token_type_ids": token_type_ids,    
-        "attention_mask": attention_mask,    
+        "token_type_ids": token_type_ids,
+        "attention_mask": attention_mask,
         "question_id": question_id,
         "visual_embeds": visual_embeds,
         "visual_token_type_ids": visual_token_type_ids,
         "visual_attention_mask": visual_attention_mask,
         "label": label,
     }
-    
-    return data 
-    
-    
+
+    return data
+
+
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -460,33 +475,31 @@ def do_train(args):
     answers_vqa_fullname = train_ds.vocab_info['filepath']
     answer_dict = VocabDict(answers_vqa_fullname)
     tokenizer = tokenizer_class.from_pretrained(args.bert_model_name)
-    trans_func = partial(prepare_train_features_single, 
-                         tokenizer=tokenizer,
-                         answer_dict=answer_dict, 
-                         args=args)
+    trans_func = partial(
+        prepare_train_features_single,
+        tokenizer=tokenizer,
+        answer_dict=answer_dict,
+        args=args)
 
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=False)
-    
-    batchify_fn = lambda samples, fn=Dict(
-        {
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "attention_mask": Pad(axis=0, pad_val=0),
-            "visual_embeds": Pad(axis=0),
-            "visual_token_type_ids": Pad(axis=0),
-            "visual_attention_mask": Pad(axis=0),
-            "label": Pad(axis=0),
-        }
-    ): fn(samples)
+
+    batchify_fn = lambda samples, fn=Dict({
+        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        "attention_mask": Pad(axis=0, pad_val=0),
+        "visual_embeds": Pad(axis=0),
+        "visual_token_type_ids": Pad(axis=0),
+        "visual_attention_mask": Pad(axis=0),
+        "label": Pad(axis=0), }): fn(samples)
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-    
+
     dev_ds = load_dataset('vqa2', splits='minival')
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
@@ -497,10 +510,11 @@ def do_train(args):
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-    
+
     # ===================================================================
 
-    num_classes = 3129 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 3129 if train_ds.label_list == None else len(
+        train_ds.label_list)
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
@@ -551,7 +565,7 @@ def do_train(args):
                 "labels": batch[6],
                 "return_dict": return_dict
             }
-            
+
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
@@ -561,14 +575,15 @@ def do_train(args):
                     prediction_logits = outputs[1].cpu().detach().numpy()
                 else:
                     loss = outputs['loss']
-                    prediction_logits = outputs['prediction_logits'].cpu().detach().numpy()
+                    prediction_logits = outputs['prediction_logits'].cpu(
+                    ).detach().numpy()
             loss = loss / args.gradient_accumulation_steps
-            
+
             if args.use_amp:
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-                
+
             if global_step % args.gradient_accumulation_steps == 0:
                 if args.use_amp:
                     scaler.minimize(optimizer, loss)
@@ -576,7 +591,7 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                
+
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
@@ -586,11 +601,11 @@ def do_train(args):
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
-                
+
                 # evaluate(model, loss_fct, metric, dev_data_loader)
                 evaluate_vqa(model, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
-                
+
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "%s_ft_model_%d.pdparams" %

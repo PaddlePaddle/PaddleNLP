@@ -25,6 +25,7 @@ import six
 import json
 import argparse
 
+
 def str2bool(value):
     """
     String to Boolean
@@ -38,6 +39,7 @@ class ArgumentGroup(object):
     """
     Argument Class
     """
+
     def __init__(self, parser, title, des):
         self._group = parser.add_argument_group(title=title, description=des)
 
@@ -58,6 +60,7 @@ class PDConfig(object):
     """
     A high-level api for handling argument configs.
     """
+
     def __init__(self, json_file=""):
         """
         Init funciton for PDConfig.
@@ -71,40 +74,64 @@ class PDConfig(object):
         parser = argparse.ArgumentParser()
 
         run_type_g = ArgumentGroup(parser, "Running type options", "")
-        run_type_g.add_arg("do_train", bool, False, "Whether to perform training.")
-        run_type_g.add_arg("do_val", bool, False, "Whether to perform evaluation.")
-        run_type_g.add_arg("do_infer", bool, False, "Whether to perform inference.")
-        run_type_g.add_arg("do_save_inference_model", bool, False, "Whether to perform save inference model.")
+        run_type_g.add_arg("do_train", bool, False,
+                           "Whether to perform training.")
+        run_type_g.add_arg("do_val", bool, False,
+                           "Whether to perform evaluation.")
+        run_type_g.add_arg("do_infer", bool, False,
+                           "Whether to perform inference.")
+        run_type_g.add_arg("do_save_inference_model", bool, False,
+                           "Whether to perform save inference model.")
 
         model_g = ArgumentGroup(parser, "Model config options", "")
-        model_g.add_arg("model_type", str, "cnn_net", "Model type to run the task.",
-            choices=["bow_net","cnn_net", "lstm_net", "bilstm_net", "gru_net", "textcnn_net"])
-        model_g.add_arg("num_labels", int, 3 , "Number of labels for classification")
-        model_g.add_arg("init_checkpoint", str, None, "Init checkpoint to resume training from.")
-        model_g.add_arg("save_checkpoint_dir", str, None, "Directory path to save checkpoints")
-        model_g.add_arg("inference_model_dir", str, None, "Directory path to save inference model")
-
+        model_g.add_arg(
+            "model_type",
+            str,
+            "cnn_net",
+            "Model type to run the task.",
+            choices=[
+                "bow_net", "cnn_net", "lstm_net", "bilstm_net", "gru_net",
+                "textcnn_net"
+            ])
+        model_g.add_arg("num_labels", int, 3,
+                        "Number of labels for classification")
+        model_g.add_arg("init_checkpoint", str, None,
+                        "Init checkpoint to resume training from.")
+        model_g.add_arg("save_checkpoint_dir", str, None,
+                        "Directory path to save checkpoints")
+        model_g.add_arg("inference_model_dir", str, None,
+                        "Directory path to save inference model")
 
         data_g = ArgumentGroup(parser, "Data config options", "")
-        data_g.add_arg("data_dir", str, None, "Directory path to training data.")
+        data_g.add_arg("data_dir", str, None,
+                       "Directory path to training data.")
         data_g.add_arg("vocab_path", str, None, "Vocabulary path.")
         data_g.add_arg("vocab_size", str, None, "Vocabulary size.")
-        data_g.add_arg("max_seq_len", int, 128, "Number of words of the longest sequence.")
+        data_g.add_arg("max_seq_len", int, 128,
+                       "Number of words of the longest sequence.")
 
         train_g = ArgumentGroup(parser, "Training config options", "")
-        train_g.add_arg("lr", float, 0.002, "The Learning rate value for training.")
+        train_g.add_arg("lr", float, 0.002,
+                        "The Learning rate value for training.")
         train_g.add_arg("epoch", int, 10, "Number of epoches for training.")
-        train_g.add_arg("use_cuda", bool, False, "If set, use GPU for training.")
-        train_g.add_arg("batch_size", int, 256, "Total examples' number in batch for training.")
-        train_g.add_arg("skip_steps", int, 10, "The steps interval to print loss.")
-        train_g.add_arg("save_steps", int, 1000, "The steps interval to save checkpoints.")
-        train_g.add_arg("validation_steps", int, 1000, "The steps interval to evaluate model performance.")
+        train_g.add_arg("use_cuda", bool, False,
+                        "If set, use GPU for training.")
+        train_g.add_arg("batch_size", int, 256,
+                        "Total examples' number in batch for training.")
+        train_g.add_arg("skip_steps", int, 10,
+                        "The steps interval to print loss.")
+        train_g.add_arg("save_steps", int, 1000,
+                        "The steps interval to save checkpoints.")
+        train_g.add_arg("validation_steps", int, 1000,
+                        "The steps interval to evaluate model performance.")
         train_g.add_arg("random_seed", int, 0, "Random seed.")
 
         log_g = ArgumentGroup(parser, "Logging options", "")
         log_g.add_arg("verbose", bool, False, "Whether to output verbose log")
-        log_g.add_arg("task_name", str, None, "The name of task to perform emotion detection")
-        log_g.add_arg('enable_ce', bool, False, 'If set, run the task with continuous evaluation logs.')
+        log_g.add_arg("task_name", str, None,
+                      "The name of task to perform emotion detection")
+        log_g.add_arg('enable_ce', bool, False,
+                      'If set, run the task with continuous evaluation logs.')
 
         custom_g = ArgumentGroup(parser, "Customize options", "")
 
@@ -130,7 +157,8 @@ class PDConfig(object):
 
         for name in self.json_config:
             # use `six.string_types` but not `str` for compatible with python2 and python3
-            if not isinstance(self.json_config[name], (int, float, bool, six.string_types)):
+            if not isinstance(self.json_config[name],
+                              (int, float, bool, six.string_types)):
                 continue
 
             if name in self.arglist:
@@ -167,7 +195,8 @@ class PDConfig(object):
         name = new_arg[0]
         dtype = new_arg[1]
         dvalue = new_arg[2]
-        desc = new_arg[3] if len(new_arg) == 4 else "Description is not provided."
+        desc = new_arg[3] if len(
+            new_arg) == 4 else "Description is not provided."
 
         self.add_arg(name, dtype, dvalue, desc)
         return self

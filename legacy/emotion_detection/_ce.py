@@ -7,20 +7,26 @@ from kpi import CostKpi
 from kpi import DurationKpi
 from kpi import AccKpi
 
-each_step_duration_emotion_detection_card1 = DurationKpi('each_step_duration_emotion_detection_card1', 0.08, 0, actived=True)
-train_loss_emotion_detection_card1 = CostKpi('train_loss_emotion_detection_card1', 0.05, 0, actived=False)
-train_acc_emotion_detection_card1 = CostKpi('train_acc_emotion_detection_card1', 0.05, 0, actived=True)
-each_step_duration_emotion_detection_card4 = DurationKpi('each_step_duration_emotion_detection_card4', 0.08, 0, actived=True)
-train_loss_emotion_detection_card4 = CostKpi('train_loss_emotion_detection_card4', 0.05, 0, actived=False)
-train_acc_emotion_detection_card4 = CostKpi('train_acc_emotion_detection_card4', 0.05, 0, actived=True)
+each_step_duration_emotion_detection_card1 = DurationKpi(
+    'each_step_duration_emotion_detection_card1', 0.08, 0, actived=True)
+train_loss_emotion_detection_card1 = CostKpi(
+    'train_loss_emotion_detection_card1', 0.05, 0, actived=False)
+train_acc_emotion_detection_card1 = CostKpi(
+    'train_acc_emotion_detection_card1', 0.05, 0, actived=True)
+each_step_duration_emotion_detection_card4 = DurationKpi(
+    'each_step_duration_emotion_detection_card4', 0.08, 0, actived=True)
+train_loss_emotion_detection_card4 = CostKpi(
+    'train_loss_emotion_detection_card4', 0.05, 0, actived=False)
+train_acc_emotion_detection_card4 = CostKpi(
+    'train_acc_emotion_detection_card4', 0.05, 0, actived=True)
 
 tracking_kpis = [
-        each_step_duration_emotion_detection_card1,
-        train_loss_emotion_detection_card1,
-        train_acc_emotion_detection_card1,
-        each_step_duration_emotion_detection_card4,
-        train_loss_emotion_detection_card4,
-        train_acc_emotion_detection_card4,
+    each_step_duration_emotion_detection_card1,
+    train_loss_emotion_detection_card1,
+    train_acc_emotion_detection_card1,
+    each_step_duration_emotion_detection_card4,
+    train_loss_emotion_detection_card4,
+    train_acc_emotion_detection_card4,
 ]
 
 

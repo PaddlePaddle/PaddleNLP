@@ -122,7 +122,6 @@ class Cote(DatasetBuilder):
                         "entity": entity
                     }
 
-
     def get_labels(self):
         """
         Return labels of the COTE.

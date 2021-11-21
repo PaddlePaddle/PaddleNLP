@@ -114,13 +114,14 @@ def do_train(args):
     cfg_dict = dict(json.loads(open(config_path).read()))
 
     if args.depth_mult < 1.0:
-        depth = round(cfg_dict["init_args"][0]['num_hidden_layers'] * args.depth_mult)
-        cfg_dict["init_args"][0]['num_hidden_layers'] = depth 
+        depth = round(cfg_dict["init_args"][0]['num_hidden_layers'] *
+                      args.depth_mult)
+        cfg_dict["init_args"][0]['num_hidden_layers'] = depth
         kept_layers_index = {}
-        for idx, i in enumerate(range(1, depth+1)):
+        for idx, i in enumerate(range(1, depth + 1)):
             kept_layers_index[idx] = math.floor(i / args.depth_mult) - 1
 
-    os.rename(config_path, config_path+'_bak')
+    os.rename(config_path, config_path + '_bak')
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(cfg_dict, ensure_ascii=False))
 
@@ -132,7 +133,7 @@ def do_train(args):
     origin_model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
 
-    os.rename(config_path+'_bak', config_path)
+    os.rename(config_path + '_bak', config_path)
 
     sp_config = supernet(expand_ratio=[1.0, args.width_mult])
     model = Convert(sp_config).convert(model)
@@ -147,7 +148,8 @@ def do_train(args):
             params.set_value(sd[name])
         else:
             idx = int(name.strip().split('.')[3])
-            mapping_name = name.replace('.'+str(idx)+'.', '.'+str(kept_layers_index[idx])+'.')
+            mapping_name = name.replace('.' + str(idx) + '.',
+                                        '.' + str(kept_layers_index[idx]) + '.')
             params.set_value(sd[mapping_name])
 
     best_config = utils.dynabert_config(ofa_model, args.width_mult)

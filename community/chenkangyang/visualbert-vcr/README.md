@@ -18,7 +18,7 @@ token_type_ids_list = []
 attention_mask_list = []
 inputs_dict = {}
 
-for item in inputs: 
+for item in inputs:
     input_ids_list.append(paddle.to_tensor(item['input_ids']).unsqueeze(0))
     token_type_ids_list.append(paddle.to_tensor(item['token_type_ids']).unsqueeze(0))
     attention_mask_list.append(paddle.to_tensor(item['attention_mask']).unsqueeze(0))
@@ -27,7 +27,7 @@ inputs_dict = {
     "input_ids": paddle.concat(input_ids_list, axis=0).unsqueeze(0),
     "token_type_ids": paddle.concat(token_type_ids_list, axis=0).unsqueeze(0),
     "attention_mask": paddle.concat(attention_mask_list, axis=0).unsqueeze(0)
-} 
+}
 
 visual_embeds = paddle.ones([100,512]).unsqueeze(0)
 visual_embeds = visual_embeds.expand(shape=[1, 2, *visual_embeds.shape])

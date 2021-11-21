@@ -68,7 +68,6 @@ class EmoTectProcessor(object):
             os.path.join(self.data_dir, "infer.tsv"), self.vocab,
             self.num_examples, "infer", epoch, max_seq_len)
 
-
     def get_labels(self):
         """
         Return Labels
@@ -97,16 +96,20 @@ class EmoTectProcessor(object):
         """
         if phase == "train":
             return fluid.io.batch(
-                self.get_train_examples(self.data_dir, epoch, self.max_seq_len), batch_size)
+                self.get_train_examples(self.data_dir, epoch, self.max_seq_len),
+                batch_size)
         elif phase == "dev":
             return fluid.io.batch(
-                self.get_dev_examples(self.data_dir, epoch, self.max_seq_len), batch_size)
+                self.get_dev_examples(self.data_dir, epoch, self.max_seq_len),
+                batch_size)
         elif phase == "test":
             return fluid.io.batch(
-                self.get_test_examples(self.data_dir, epoch, self.max_seq_len), batch_size)
+                self.get_test_examples(self.data_dir, epoch, self.max_seq_len),
+                batch_size)
         elif phase == "infer":
             return fluid.io.batch(
-                self.get_infer_examples(self.data_dir, epoch, self.max_seq_len), batch_size)
+                self.get_infer_examples(self.data_dir, epoch, self.max_seq_len),
+                batch_size)
         else:
             raise ValueError(
                 "Unknown phase, which should be in ['train', 'dev', 'test', 'infer']."

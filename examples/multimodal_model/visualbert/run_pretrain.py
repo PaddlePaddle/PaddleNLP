@@ -13,13 +13,17 @@ import numpy as np
 import paddle
 from paddlenlp.data import Dict, Pad
 from paddlenlp.datasets.dataset import load_dataset
-from paddlenlp.transformers import (BertTokenizer, VisualBertModel, LinearDecayWithWarmup, VisualBertForPreTraining)
+from paddlenlp.transformers import (BertTokenizer, VisualBertModel,
+                                    LinearDecayWithWarmup,
+                                    VisualBertForPreTraining)
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
-MODEL_CLASSES = {"visualbert": (VisualBertModel, VisualBertForPreTraining, BertTokenizer), }
+MODEL_CLASSES = {
+    "visualbert": (VisualBertModel, VisualBertForPreTraining, BertTokenizer),
+}
 
 
 def parse_args():
@@ -34,13 +38,12 @@ def parse_args():
         "--bert_model_name",
         default="bert-base-uncased",
         type=str,
-        help="Path to bert model or shortcut name selected in the list: "
-        + ", ".join(
+        help="Path to bert model or shortcut name selected in the list: " +
+        ", ".join(
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])),
-        )
+            ], [])), )
     parser.add_argument(
         "--model_name_or_path",
         default="visualbert-vqa-coco-pre",
@@ -68,7 +71,8 @@ def parse_args():
         "--image_feature_type",
         default="coco_detectron_fix_100",
         type=str,
-        help="`coco_detectron_fix_100` for vqa-coco-pre; `coco_detectron_fix_144` for nlvr2-coco-pre; `coco_detectron_fix_100` for vqa-pre; `nlvr2_detectron_fix_144` for nlvr2-pre; ")
+        help="`coco_detectron_fix_100` for vqa-coco-pre; `coco_detectron_fix_144` for nlvr2-coco-pre; `coco_detectron_fix_100` for vqa-pre; `nlvr2_detectron_fix_144` for nlvr2-pre; "
+    )
     parser.add_argument(
         "--dataset",
         default="coco_captions",
@@ -157,6 +161,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 def set_seed(args):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
     # consistency after sharding.
@@ -166,6 +171,7 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
+
 class WorkerInitObj(object):
     def __init__(self, seed):
         self.seed = seed
@@ -174,6 +180,7 @@ class WorkerInitObj(object):
         np.random.seed(seed=self.seed + id)
         random.seed(self.seed + id)
 
+
 def perform_truncate(max_seq_length, text_a, text_b):
     if text_b is None:
         len_total = len(text_a) + 2
@@ -181,15 +188,17 @@ def perform_truncate(max_seq_length, text_a, text_b):
     else:
         len_total = len(text_a) + len(text_b) + 3
         if len_total > max_seq_length:
-            take_away_from_ctx = min((len_total - max_seq_length + 1) // 2, max(len(text_a) - 32, 0))
+            take_away_from_ctx = min((len_total - max_seq_length + 1) // 2,
+                                     max(len(text_a) - 32, 0))
             take_away_from_answer = len_total - max_seq_length + take_away_from_ctx
             # Follows VCR, perform truncate from the front...
             text_a = text_a[take_away_from_ctx:]
             text_b = text_b[take_away_from_answer:]
-    
+
     return text_a, text_b
-    
-def random_word(tokens, tokenizer, probability = 0.15):
+
+
+def random_word(tokens, tokenizer, probability=0.15):
     """
     Masking some random tokens for Language Model task with probabilities as in the original BERT paper.
     :param tokens: list of str, tokenized sentence.
@@ -210,8 +219,8 @@ def random_word(tokens, tokenizer, probability = 0.15):
 
             # 10% randomly change token to random token
             elif prob < 0.9:
-                tokens[i] = random.choice(list(tokenizer.vocab.idx_to_token.items()))[1]
-
+                tokens[i] = random.choice(
+                    list(tokenizer.vocab.idx_to_token.items()))[1]
 
             # -> rest 10% randomly keep current token
 
@@ -221,49 +230,64 @@ def random_word(tokens, tokenizer, probability = 0.15):
             except KeyError:
                 # For unknown words (should not occur with BPE vocab)
                 output_label.append(tokenizer.vocab["[UNK]"])
-                logger.warning("Cannot find token '{}' in vocab. Using [UNK] insetad".format(token))
+                logger.warning(
+                    "Cannot find token '{}' in vocab. Using [UNK] insetad".
+                    format(token))
         else:
             # no masking token (will be ignored by loss function later)
             output_label.append(-1)
 
     return tokens, output_label
 
+
 def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
-    
+
     feature = None
-    
-    image_feature_type=args.image_feature_type
-    
+
+    image_feature_type = args.image_feature_type
+
     if image_feature_type == "coco_detectron_fix_100":
         image_id = example['image_id']
         split_name = example['split_name']
-        image_file_name = "COCO_{}2014_{:0>12d}.npy".format(split_name, image_id)
+        image_file_name = "COCO_{}2014_{:0>12d}.npy".format(split_name,
+                                                            image_id)
         if "train" in image_file_name:
-            folder = osp.join(args.input_dir, "data/detectron_fix_100/fc6/vqa/train2014")
+            folder = osp.join(args.input_dir,
+                              "data/detectron_fix_100/fc6/vqa/train2014")
         elif "val" in image_file_name:
-            folder = osp.join(args.input_dir, "data/detectron_fix_100/fc6/vqa/val2014")
+            folder = osp.join(args.input_dir,
+                              "data/detectron_fix_100/fc6/vqa/val2014")
         image_feat_variable = np.load(osp.join(folder, image_file_name))
-        visual_token_type_ids = np.zeros(image_feat_variable.shape[:-1], dtype=np.int64)
-        visual_attention_mask = np.ones(image_feat_variable.shape[:-1], dtype=np.int64)
+        visual_token_type_ids = np.zeros(
+            image_feat_variable.shape[:-1], dtype=np.int64)
+        visual_attention_mask = np.ones(
+            image_feat_variable.shape[:-1], dtype=np.int64)
         visual_embeds = image_feat_variable.copy()
         visual_token_type_ids = visual_token_type_ids.copy()
         visual_attention_mask = visual_attention_mask.copy()
-        
+
     elif image_feature_type == "coco_detectron_fix_144":
         image_id = example['image_id']
         split_name = example['split_name']
-        image_file_name = "COCO_{}2014_{:0>12d}.npy".format(split_name, image_id)
+        image_file_name = "COCO_{}2014_{:0>12d}.npy".format(split_name,
+                                                            image_id)
         if "train" in image_file_name:
-            folder = osp.join(args.input_dir, "data/detectron_fix_144/nlvr2/train/feature_1024dim")
+            folder = osp.join(
+                args.input_dir,
+                "data/detectron_fix_144/nlvr2/train/feature_1024dim")
         elif "val" in image_file_name:
-            folder = osp.join(args.input_dir, "data/detectron_fix_144/nlvr2/val/feature_1024dim")
+            folder = osp.join(
+                args.input_dir,
+                "data/detectron_fix_144/nlvr2/val/feature_1024dim")
         image_feat_variable = np.load(osp.join(folder, image_file_name))
-        visual_token_type_ids = np.zeros(image_feat_variable.shape[:-1], dtype=np.int64)
-        visual_attention_mask = np.ones(image_feat_variable.shape[:-1], dtype=np.int64)
+        visual_token_type_ids = np.zeros(
+            image_feat_variable.shape[:-1], dtype=np.int64)
+        visual_attention_mask = np.ones(
+            image_feat_variable.shape[:-1], dtype=np.int64)
         visual_embeds = image_feat_variable.copy()
         visual_token_type_ids = visual_token_type_ids.copy()
         visual_attention_mask = visual_attention_mask.copy()
-            
+
     elif image_feature_type == "nlvr2_detectron_fix_144":
         caption_a = example['caption_a']
         label = example['label']
@@ -271,47 +295,60 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
         feature_path_0 = example['feature_path_0']
         feature_path_1 = example['feature_path_1']
         if "train" in identifier:
-            folder = osp.join(args.input_dir, "data/detectron_fix_144/train/feature_1024dim")
+            folder = osp.join(args.input_dir,
+                              "data/detectron_fix_144/train/feature_1024dim")
         elif "dev" in identifier:
-            folder = osp.join(args.input_dir, "data/detectron_fix_144/dev/feature_1024dim")
+            folder = osp.join(args.input_dir,
+                              "data/detectron_fix_144/dev/feature_1024dim")
         elif "test1" in identifier:
-            folder = osp.join(args.input_dir, "data/detectron_fix_144/test1/feature_1024dim")
-            
+            folder = osp.join(args.input_dir,
+                              "data/detectron_fix_144/test1/feature_1024dim")
+
         detectron_features_0 = np.load(os.path.join(folder, feature_path_0))
         detectron_features_1 = np.load(os.path.join(folder, feature_path_1))
-        detectron_features = np.concatenate((detectron_features_0, detectron_features_1), axis = 0)
-            
+        detectron_features = np.concatenate(
+            (detectron_features_0, detectron_features_1), axis=0)
+
         visual_embeds = detectron_features.copy()
-            
-        visual_embeddings_type_0 = np.zeros(detectron_features_0.shape[0], dtype=np.int64)
-        visual_embeddings_type_1 = np.ones(detectron_features_1.shape[0], dtype=np.int64)
-        visual_embeddings_type = np.concatenate((visual_embeddings_type_0, visual_embeddings_type_1), axis = 0, dtype=np.int64)
+
+        visual_embeddings_type_0 = np.zeros(
+            detectron_features_0.shape[0], dtype=np.int64)
+        visual_embeddings_type_1 = np.ones(
+            detectron_features_1.shape[0], dtype=np.int64)
+        visual_embeddings_type = np.concatenate(
+            (visual_embeddings_type_0, visual_embeddings_type_1),
+            axis=0,
+            dtype=np.int64)
         visual_token_type_ids = visual_embeddings_type.copy()
-        visual_attention_mask = np.ones(visual_embeds.shape[:-1], dtype=np.int64)
-        
+        visual_attention_mask = np.ones(
+            visual_embeds.shape[:-1], dtype=np.int64)
+
         # example["visual_embeds"] = visual_embeds.copy()
         # example["visual_token_type_ids"] = visual_token_type_ids.copy()
         # example["visual_attention_mask"] = visual_attention_mask.copy()
-    
+
     else:
         raise NotImplementedError("Please use image features from disk")
-        
-    feature = OrderedDict({"visual_embeds": visual_embeds,
-                            "visual_token_type_ids": visual_token_type_ids,
-                            "visual_attention_mask": visual_attention_mask})
+
+    feature = OrderedDict({
+        "visual_embeds": visual_embeds,
+        "visual_token_type_ids": visual_token_type_ids,
+        "visual_attention_mask": visual_attention_mask
+    })
     visual_len = feature["visual_embeds"].shape[0]
     assert visual_len == 100 or visual_len == 144
-        
+
     # Two sentence:
     # task1: masked language modeling
     # task2: are those sampled two sentence matched both matched ?
-    
+
     # Single sentence:
     # task1: masked language modeling
     if is_two_sentence:
         tokens_a = tokenizer.tokenize(example['caption_a'])
         tokens_b = tokenizer.tokenize(example['caption_b'])
-        tokens_a, tokens_b = perform_truncate(args.max_seq_length, tokens_a, tokens_b)
+        tokens_a, tokens_b = perform_truncate(args.max_seq_length, tokens_a,
+                                              tokens_b)
         raw_tokens_a, raw_tokens_b = tokens_a.copy(), tokens_b.copy()
         tokens_a, t1_label = random_word(tokens_a, tokenizer, args.mask_prob)
         tokens_b, t2_label = random_word(tokens_b, tokenizer, args.mask_prob)
@@ -330,7 +367,7 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
         raw_tokens.append("[CLS]")
         token_type_ids.append(0)
         raw_token_type_ids.append(0)
-        
+
         for token in tokens_a:
             tokens.append(token)
             token_type_ids.append(0)
@@ -359,8 +396,9 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
         # tokens are attended to.
         attention_mask = [1] * len(input_ids)
-        
-        sentence_image_labels = np.array([1]) if example['is_correct'] == True else np.array([0])
+
+        sentence_image_labels = np.array(
+            [1]) if example['is_correct'] == True else np.array([0])
 
         while len(lm_label_ids) < len(tokens) + visual_len:
             lm_label_ids.append(-1)
@@ -375,29 +413,32 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
             "labels": lm_label_ids.copy(),
             "sentence_image_labels": sentence_image_labels.copy()
         })
-                    
+
     else:
         if args.dataset == "vqa2":
             question_tokens = example['question_str']
             answers = example['answers']
             answer = np.random.choice(answers)
-            tokens_a = tokenizer.tokenize(question_tokens) + tokenizer.tokenize(answer)
+            tokens_a = tokenizer.tokenize(question_tokens) + tokenizer.tokenize(
+                answer)
 
         elif args.dataset == "nlvr2":
             tokens_a = tokenizer.tokenize(example['caption_a'])
-            
-        else: 
-            NotImplementedError("Unsupported dataset {} for single sentence language modeling".format(args.dataset))
+
+        else:
+            NotImplementedError(
+                "Unsupported dataset {} for single sentence language modeling".
+                format(args.dataset))
 
         raw_tokens_a = tokens_a.copy()
-        
+
         tokens_a, t1_label = random_word(tokens_a, tokenizer, args.mask_prob)
         # concatenate lm labels and account for CLS, SEP, SEP
         lm_label_ids = ([-1] + t1_label + [-1])
         # (b) For single sequences:
         #  tokens:   [CLS] the dog is hairy . [SEP]
         #  type_ids: 0   0   0   0  0     0 0
-        
+
         tokens = []
         raw_tokens = []
         token_type_ids = []
@@ -406,7 +447,7 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
         raw_tokens.append("[CLS]")
         token_type_ids.append(0)
         raw_token_type_ids.append(0)
-    
+
         for token in tokens_a:
             tokens.append(token)
             token_type_ids.append(0)
@@ -420,7 +461,7 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
 
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         raw_input_ids = tokenizer.convert_tokens_to_ids(raw_tokens)
-        
+
         while len(lm_label_ids) < len(tokens) + visual_len:
             lm_label_ids.append(-1)
 
@@ -436,14 +477,15 @@ def prepare_train_features_single(example, tokenizer, is_two_sentence, args):
             "attention_mask": attention_mask.copy(),
             "labels": lm_label_ids.copy()
         })
-                       
+
         if args.dataset == "nlvr2":
             feature.update({
                 "visual_token_type_ids": visual_token_type_ids.copy(),
                 "visual_attention_mask": visual_attention_mask.copy(),
-            })     
-    
+            })
+
     return feature
+
 
 def create_dataloader(dataset,
                       mode='train',
@@ -487,6 +529,7 @@ def create_dataloader(dataset,
 
     return dataloader
 
+
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
     paddle.set_device(args.device)
@@ -502,8 +545,7 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.bert_model_name)
 
     # Loads or initializes a model.
-    pretrained_models = list(model_class.pretrained_init_configuration.keys(
-    ))
+    pretrained_models = list(model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models:
         # model = model_class(
         #     base_class(**model_class.pretrained_init_configuration[
@@ -523,7 +565,7 @@ def do_train(args):
                 model.set_state_dict(
                     paddle.load(
                         osp.join(args.model_name_or_path,
-                                     "model_state.pdparams")))
+                                 "model_state.pdparams")))
             else:
                 raise ValueError(
                     "initialize a model from ckpt need model_name "
@@ -558,50 +600,45 @@ def do_train(args):
         train_dataset = load_dataset(args.dataset, splits=["train"])
         is_two_sentence = False
     else:
-        
-        raise NotImplementedError("Only support `coco_captions` dataset for visualbert pretrain")
-    
+
+        raise NotImplementedError(
+            "Only support `coco_captions` dataset for visualbert pretrain")
+
     print("load data done, total : %s s" % (time.time() - tic_load_data))
 
     # Reads data and generates mini-batches.
     if is_two_sentence:
-        data_collator = lambda samples, fn=Dict(
-            {
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-                "attention_mask": Pad(axis=0, pad_val=0),
-                "visual_embeds": Pad(axis=0),
-                "visual_token_type_ids": Pad(axis=0),
-                "visual_attention_mask": Pad(axis=0, pad_val=1),
-                "labels": Pad(axis=0, pad_val=-1),
-                "sentence_image_labels": Pad(axis=0),
-            }
-        ): fn(samples)
+        data_collator = lambda samples, fn=Dict({
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "attention_mask": Pad(axis=0, pad_val=0),
+            "visual_embeds": Pad(axis=0),
+            "visual_token_type_ids": Pad(axis=0),
+            "visual_attention_mask": Pad(axis=0, pad_val=1),
+            "labels": Pad(axis=0, pad_val=-1),
+            "sentence_image_labels": Pad(axis=0), }): fn(samples)
     else:
-        data_collator = lambda samples, fn=Dict(
-            {
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-                "attention_mask": Pad(axis=0, pad_val=0),
-                "visual_embeds": Pad(axis=0),
-                "visual_token_type_ids": Pad(axis=0),
-                "visual_attention_mask": Pad(axis=0, pad_val=1),
-                "labels": Pad(axis=0, pad_val=-1),
-            }
-        ): fn(samples)
-    
-    trans_func = partial(prepare_train_features_single, 
-                         tokenizer=tokenizer,
-                         is_two_sentence=is_two_sentence,
-                         args=args)
+        data_collator = lambda samples, fn=Dict({
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "attention_mask": Pad(axis=0, pad_val=0),
+            "visual_embeds": Pad(axis=0),
+            "visual_token_type_ids": Pad(axis=0),
+            "visual_attention_mask": Pad(axis=0, pad_val=1),
+            "labels": Pad(axis=0, pad_val=-1), }): fn(samples)
+
+    trans_func = partial(
+        prepare_train_features_single,
+        tokenizer=tokenizer,
+        is_two_sentence=is_two_sentence,
+        args=args)
     train_dataset = train_dataset.map(trans_func, lazy=True)
-        
+
     train_data_loader = create_dataloader(
         train_dataset,
         batch_size=args.train_batch_size,
         mode='train',
         data_collator=data_collator)
-    
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
@@ -610,7 +647,7 @@ def do_train(args):
                                          args.warmup_steps)
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
-    
+
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
@@ -680,7 +717,7 @@ def do_train(args):
                     "labels": batch[6],
                     "return_dict": return_dict
                 }
-              
+
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
@@ -692,7 +729,7 @@ def do_train(args):
                     loss = outputs['loss']
                     # prediction_logits = outputs['prediction_logits'].cpu().detach().numpy()
                     # seq_relationship_logits = outputs['seq_relationship_logits'].cpu().detach().numpy()
-            
+
             if args.use_amp:
                 scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
@@ -703,7 +740,7 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
             t_loss += loss.detach()
-           
+
             if global_step % args.logging_steps == 0:
                 local_loss = (t_loss - log_loss) / args.logging_steps
                 if (paddle.distributed.get_world_size() > 1):
@@ -735,7 +772,7 @@ def do_train(args):
             if global_step % args.save_steps == 0:
                 if paddle.distributed.get_rank() == 0:
                     output_dir = osp.join(args.output_dir,
-                                              "model_%d.pdparams" % global_step)
+                                          "model_%d.pdparams" % global_step)
                     if not osp.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
@@ -751,23 +788,19 @@ def do_train(args):
                         "epoch": epoch,
                         "step": step,
                     }
-                    with open(
-                            osp.join(output_dir, "model_config.json"),
-                            'w') as f:
+                    with open(osp.join(output_dir, "model_config.json"),
+                              'w') as f:
                         json.dump(config_to_save, f)
-                    with open(
-                            osp.join(output_dir, "run_states.json"),
-                            'w') as f:
+                    with open(osp.join(output_dir, "run_states.json"),
+                              'w') as f:
                         json.dump(run_states, f)
                     paddle.save(model.state_dict(),
-                                osp.join(output_dir,
-                                             "model_state.pdparams"))
+                                osp.join(output_dir, "model_state.pdparams"))
                     tokenizer.save_pretrained(output_dir)
                     paddle.save(optimizer.state_dict(),
                                 osp.join(output_dir, "model_state.pdopt"))
                     if len(log_list) > 0:
-                        with open(osp.join(output_dir, "train.log"),
-                                  'w') as f:
+                        with open(osp.join(output_dir, "train.log"), 'w') as f:
                             for log in log_list:
                                 if len(log.strip()) > 0:
                                     f.write(log.strip() + '\n')
@@ -775,12 +808,14 @@ def do_train(args):
                 del train_data_loader
                 return
 
+
 def print_arguments(args):
     """print arguments"""
     print('-----------  Configuration Arguments -----------')
     for arg, value in sorted(vars(args).items()):
         print('%s: %s' % (arg, value))
     print('------------------------------------------------')
+
 
 if __name__ == "__main__":
     args = parse_args()

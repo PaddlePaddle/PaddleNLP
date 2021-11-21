@@ -31,22 +31,21 @@ dtype_float = paddle.get_default_dtype()
 
 class VisualBertEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings and visual embeddings."""
+
     def __init__(
-        self,
-        vocab_size=30522,
-        hidden_size=768,
-        visual_embedding_dim=512,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        layer_norm_eps=1e-12,
-        special_visual_initialize=True,
-        pad_token_id=1,
-    ):
+            self,
+            vocab_size=30522,
+            hidden_size=768,
+            visual_embedding_dim=512,
+            hidden_dropout_prob=0.1,
+            max_position_embeddings=512,
+            type_vocab_size=2,
+            layer_norm_eps=1e-12,
+            special_visual_initialize=True,
+            pad_token_id=1, ):
         super(VisualBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size,
-                                            hidden_size,
-                                            padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(
+            vocab_size, hidden_size, padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -55,14 +54,14 @@ class VisualBertEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer(
-            "position_ids",
-            paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids",
+                             paddle.arange(max_position_embeddings).expand(
+                                 (1, -1)))
 
         # For Visual Features
         # Token type and position embedding for image features
-        self.visual_token_type_embeddings = nn.Embedding(
-            type_vocab_size, hidden_size)
+        self.visual_token_type_embeddings = nn.Embedding(type_vocab_size,
+                                                         hidden_size)
         self.visual_position_embeddings = nn.Embedding(max_position_embeddings,
                                                        hidden_size)
 
@@ -79,15 +78,14 @@ class VisualBertEmbeddings(nn.Layer):
         self.visual_projection = nn.Linear(visual_embedding_dim, hidden_size)
 
     def forward(
-        self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-    ):
+            self,
+            input_ids=None,
+            token_type_ids=None,
+            position_ids=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None, ):
         if input_ids is not None:
             input_shape = input_ids.shape
         else:
@@ -114,8 +112,8 @@ class VisualBertEmbeddings(nn.Layer):
 
         if visual_embeds is not None:
             if visual_token_type_ids is None:
-                visual_token_type_ids = paddle.ones(visual_embeds.shape[:-1],
-                                                    dtype=paddle.int64)
+                visual_token_type_ids = paddle.ones(
+                    visual_embeds.shape[:-1], dtype=paddle.int64)
 
             visual_embeds = self.visual_projection(visual_embeds)
             visual_token_type_ids = visual_token_type_ids.astype(paddle.int64)
@@ -152,11 +150,12 @@ class VisualBertEmbeddings(nn.Layer):
                 visual_position_embeddings = visual_position_embeddings / image_text_alignment_mask.unsqueeze(
                     -1)
 
-                visual_position_ids = paddle.zeros(*visual_embeds.shape[:-1],
-                                                   dtype=paddle.int64)
+                visual_position_ids = paddle.zeros(
+                    *visual_embeds.shape[:-1], dtype=paddle.int64)
 
                 # When fine-tuning the detector , the image_text_alignment is sometimes padded too long.
-                if visual_position_embeddings.shape[1] != visual_embeds.shape[1]:
+                if visual_position_embeddings.shape[1] != visual_embeds.shape[
+                        1]:
                     if visual_position_embeddings.shape[
                             1] < visual_embeds.shape[1]:
                         raise ValueError(
@@ -164,16 +163,15 @@ class VisualBertEmbeddings(nn.Layer):
                             f"should be the same as `visual_embeds` length: {visual_embeds.shape[1]}"
                         )
                     visual_position_embeddings = visual_position_embeddings[:, :
-                                                                            visual_embeds
-                                                                            .
+                                                                            visual_embeds.
                                                                             shape[
                                                                                 1], :]
 
                 visual_position_embeddings = visual_position_embeddings + self.visual_position_embeddings(
                     visual_position_ids)
             else:
-                visual_position_ids = paddle.zeros(visual_embeds.shape[:-1],
-                                                   dtype=paddle.int64)
+                visual_position_ids = paddle.zeros(
+                    visual_embeds.shape[:-1], dtype=paddle.int64)
                 visual_position_embeddings = self.visual_position_embeddings(
                     visual_position_ids)
 
@@ -208,14 +206,13 @@ class VisualBertEncoder(nn.Layer):
         self.layer = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        head_mask=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
-    ):
+            self,
+            hidden_states,
+            attention_mask=None,
+            head_mask=None,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=False, ):
         """
         Returns:
         last_hidden_state: ``padle.Tensor`` of shape `(batch_size, sequence_length, hidden_size)`
@@ -253,14 +250,16 @@ class VisualBertEncoder(nn.Layer):
             all_hidden_states = all_hidden_states + (hidden_states, )
 
         if not return_dict:
-            return tuple(v for v in [
-                hidden_states,
-                all_hidden_states,
-                all_self_attentions,
-            ] if v is not None)
-        return OrderedDict(last_hidden_state=hidden_states,
-                           hidden_states=all_hidden_states,
-                           attentions=all_self_attentions)
+            return tuple(v
+                         for v in [
+                             hidden_states,
+                             all_hidden_states,
+                             all_self_attentions,
+                         ] if v is not None)
+        return OrderedDict(
+            last_hidden_state=hidden_states,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions)
 
 
 class VisualBertPooler(nn.Layer):
@@ -313,8 +312,8 @@ class VisualBertLMPredictionHead(nn.Layer):
             hidden_states, self.decoder_weight,
             transpose_y=True) + self.decoder_bias
         return hidden_states
-    
-    
+
+
 class VisualBertPreTrainingHeads(nn.Layer):
     """
     Perform language modeling task and next sentence classification task.
@@ -339,8 +338,8 @@ class VisualBertPreTrainingHeads(nn.Layer):
                  activation,
                  embedding_weights=None):
         super(VisualBertPreTrainingHeads, self).__init__()
-        self.predictions = VisualBertLMPredictionHead(hidden_size, vocab_size,
-                                                activation, embedding_weights)
+        self.predictions = VisualBertLMPredictionHead(
+            hidden_size, vocab_size, activation, embedding_weights)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -430,7 +429,7 @@ class VisualBertPreTrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "eos_token_id": 2,
         },
-         "visualbert-vqa-coco-pre": {
+        "visualbert-vqa-coco-pre": {
             "vocab_size": 30522,
             "hidden_size": 768,
             "visual_embedding_dim": 2048,
@@ -604,18 +603,18 @@ class VisualBertPreTrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range") else
                         self.visual_bert.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
             # weight 1.0, bias 0.0
-        
+
         # if isinstance(layer, nn.Linear) and layer.bias is not None:
         #     # bias 0.0
 
-    
+
 @register_base_model
 class VisualBertModel(VisualBertPreTrainedModel):
     """
@@ -671,6 +670,7 @@ class VisualBertModel(VisualBertPreTrainedModel):
             token type and position type embeddings are copied to the respective visual embedding layers.
 
     """
+
     def __init__(self,
                  vocab_size=30522,
                  hidden_size=768,
@@ -729,21 +729,20 @@ class VisualBertModel(VisualBertPreTrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_attention_mask=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_attention_mask=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None, ):
         r"""
         The VisualBertModel forward method, overrides the `__call__()` special method.
         
@@ -924,7 +923,13 @@ class VisualBertModel(VisualBertPreTrainedModel):
             (attention_mask, visual_attention_mask),
             axis=-1)  # (batch_size, seq_len)
         batch_size, combined_seq_length = combined_attention_mask.shape
-        extended_attention_mask = paddle.concat([combined_attention_mask[b].broadcast_to([combined_seq_length, combined_seq_length]).unsqueeze(0).unsqueeze(0) for b in range(batch_size)], axis=0)
+        extended_attention_mask = paddle.concat(
+            [
+                combined_attention_mask[b].broadcast_to(
+                    [combined_seq_length, combined_seq_length]).unsqueeze(0)
+                .unsqueeze(0) for b in range(batch_size)
+            ],
+            axis=0)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         embedding_output = self.embeddings(
@@ -934,9 +939,8 @@ class VisualBertModel(VisualBertPreTrainedModel):
             inputs_embeds=inputs_embeds,
             visual_embeds=visual_embeds,
             visual_token_type_ids=visual_token_type_ids,
-            image_text_alignment=image_text_alignment,
-        )
-        
+            image_text_alignment=image_text_alignment, )
+
         if self.bypass_transformer and visual_embeds is not None:
             text_length = input_ids.shape[1]
             text_embedding_output = embedding_output[:, :text_length, :]
@@ -951,8 +955,7 @@ class VisualBertModel(VisualBertPreTrainedModel):
                 attention_mask=text_extended_attention_mask,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-            )
+                return_dict=return_dict, )
             sequence_output = encoded_outputs[0]
             concatenated_input = paddle.concat(
                 (sequence_output, visual_embedding_output), axis=1)
@@ -968,8 +971,7 @@ class VisualBertModel(VisualBertPreTrainedModel):
                 head_mask=head_mask,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-            )
+                return_dict=return_dict, )
             if not return_dict:
                 sequence_output = encoder_outputs[0]
             else:
@@ -985,8 +987,7 @@ class VisualBertModel(VisualBertPreTrainedModel):
             last_hidden_state=sequence_output,
             pooled_output=pooled_output,
             hidden_states=encoder_outputs['hidden_states'],
-            attentions=encoder_outputs['attentions'],
-        )
+            attentions=encoder_outputs['attentions'], )
 
 
 class VisualBertForPreTraining(VisualBertPreTrainedModel):
@@ -997,6 +998,7 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
     visual_bert (:class:`VisualBertModel`):
         An instance of :class `VisualBertModel`.
     """
+
     def __init__(self, visual_bert):
         super(VisualBertForPreTraining, self).__init__()
         self.visual_bert = visual_bert
@@ -1004,34 +1006,34 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
             self.visual_bert.config["hidden_size"],
             self.visual_bert.config["vocab_size"],
             self.visual_bert.config["hidden_act"],
-            embedding_weights=self.visual_bert.embeddings.word_embeddings.weight)
-        
+            embedding_weights=self.visual_bert.embeddings.word_embeddings.
+            weight)
+
         self.apply(self.init_weights)
-    
+
     def get_predctions_decoder_weight(self):
         return self.cls.predictions.decoder_weight
-    
+
     def get_predctions_decoder_bias(self):
         return self.cls.predictions.decoder_weight
-    
+
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_attention_mask=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        labels=None,
-        sentence_image_labels=None,
-    ):
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_attention_mask=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            labels=None,
+            sentence_image_labels=None, ):
         r"""
         Args:
             input_ids (Tensor):
@@ -1150,19 +1152,21 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
             image_text_alignment=image_text_alignment,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+            return_dict=return_dict, )
 
         if not return_dict:
             sequence_output, pooled_output = outputs[:2]
         else:
-            sequence_output, pooled_output = outputs['last_hidden_state'], outputs['pooled_output']
-            
-        prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
+            sequence_output, pooled_output = outputs[
+                'last_hidden_state'], outputs['pooled_output']
+
+        prediction_scores, seq_relationship_score = self.cls(sequence_output,
+                                                             pooled_output)
 
         total_loss = None
         if labels is not None and sentence_image_labels is not None:
-            total_size = attention_mask.shape[-1] + visual_attention_mask.shape[-1]
+            total_size = attention_mask.shape[-1] + visual_attention_mask.shape[
+                -1]
             if labels.shape[-1] != total_size:
                 raise ValueError(
                     f"The labels provided should have same sequence length as total attention mask."
@@ -1170,12 +1174,18 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
                 )
 
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
-            masked_lm_loss = loss_fct(prediction_scores.reshape([-1, self.visual_bert.config["vocab_size"]]), labels.flatten())
-            sentence_image_loss = loss_fct(seq_relationship_score.reshape([-1, 2]), sentence_image_labels.flatten())
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape(
+                    [-1, self.visual_bert.config["vocab_size"]]),
+                labels.flatten())
+            sentence_image_loss = loss_fct(
+                seq_relationship_score.reshape([-1, 2]),
+                sentence_image_labels.flatten())
             total_loss = masked_lm_loss + sentence_image_loss
 
         if labels is not None and sentence_image_labels is None:
-            total_size = attention_mask.shape[-1] + visual_attention_mask.shape[-1]
+            total_size = attention_mask.shape[-1] + visual_attention_mask.shape[
+                -1]
             if labels.shape[-1] != total_size:
                 raise ValueError(
                     f"The labels provided should have same sequence length as total attention mask."
@@ -1183,19 +1193,22 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
                 )
 
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
-            total_loss = loss_fct(prediction_scores.reshape([-1, self.visual_bert.config["vocab_size"]]), labels.flatten())
+            total_loss = loss_fct(
+                prediction_scores.reshape(
+                    [-1, self.visual_bert.config["vocab_size"]]),
+                labels.flatten())
 
         if not return_dict:
             output = (prediction_scores, seq_relationship_score) + outputs[2:]
-            return ((total_loss,) + output) if total_loss is not None else output
+            return (
+                (total_loss, ) + output) if total_loss is not None else output
 
         return OrderedDict(
             loss=total_loss,
             prediction_logits=prediction_scores,
             seq_relationship_logits=seq_relationship_score,
             hidden_states=outputs["hidden_states"],
-            attentions=outputs["attentions"],
-        )
+            attentions=outputs["attentions"], )
 
 
 class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
@@ -1213,6 +1226,7 @@ class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
         If None, use the same value as `hidden_dropout_prob` of `VisualBertModel`
         instance `visualbert`. Defaults to `None`.
     """
+
     def __init__(self, visual_bert, num_classes=2, dropout=None):
 
         super(VisualBertForQuestionAnswering, self).__init__()
@@ -1226,22 +1240,21 @@ class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_attention_mask=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        labels=None,
-    ):
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_attention_mask=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            labels=None, ):
         r"""
             labels (Tensor, optional):
                 Labels for computing the sequence classification/regression loss. Indices should be in :obj:`[0, ...,
@@ -1319,8 +1332,7 @@ class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
             image_text_alignment=image_text_alignment,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict
-        )
+            return_dict=return_dict)
 
         if not return_dict:
             sequence_output = outputs[0]
@@ -1330,11 +1342,13 @@ class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
         # --> gather_index_list 
         # --> (batch_size, seq_length=len(gather_index_list), hidden_size)
         index_to_gather = index_to_gather.astype(paddle.int64)
-        pooled_output = paddle.concat([
-            paddle.gather(sequence_output[b], index_to_gather[b], axis=0).unsqueeze(0)
-            for b in range(input_shape[0])
-        ],
-                                      axis=0) 
+        pooled_output = paddle.concat(
+            [
+                paddle.gather(
+                    sequence_output[b], index_to_gather[b], axis=0).unsqueeze(0)
+                for b in range(input_shape[0])
+            ],
+            axis=0)
         pooled_output = self.dropout(pooled_output)
         logits = self.cls(pooled_output)
         # logits = paddle.transpose(logits, perm=[self.num_classes, 0, 1])
@@ -1354,8 +1368,7 @@ class VisualBertForQuestionAnswering(VisualBertPreTrainedModel):
             loss=loss,
             logits=reshaped_logits,
             hidden_states=outputs['hidden_states'],
-            attentions=outputs['attentions'],
-        )
+            attentions=outputs['attentions'], )
 
 
 class VisualBertForVisualReasoning(VisualBertPreTrainedModel):
@@ -1373,6 +1386,7 @@ class VisualBertForVisualReasoning(VisualBertPreTrainedModel):
         If None, use the same value as `hidden_dropout_prob` of `VisualBertModel`
         instance `visualbert`. Defaults to `None`.
     """
+
     def __init__(self, visual_bert, num_classes=2, dropout=None):
         super(VisualBertForVisualReasoning, self).__init__()
         self.num_classes = num_classes
@@ -1383,24 +1397,23 @@ class VisualBertForVisualReasoning(VisualBertPreTrainedModel):
         self.cls = nn.Linear(self.visual_bert.config["hidden_size"],
                              self.num_classes)
         self.apply(self.init_weights)
-    
+
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_attention_mask=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        labels=None,
-    ):
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_attention_mask=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            labels=None, ):
         r"""
         labels (Tensor, optional):
                 Labels for computing the sequence classification/regression loss. Indices should be in :obj:`[0, ...,
@@ -1475,35 +1488,33 @@ class VisualBertForVisualReasoning(VisualBertPreTrainedModel):
             image_text_alignment=image_text_alignment,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict
-        )
-        
+            return_dict=return_dict)
+
         if not return_dict:
             pooled_output = outputs[1]
         else:
             pooled_output = outputs['pooled_output']
-            
+
         pooled_output = self.dropout(pooled_output)
         logits = self.cls(pooled_output)
         reshaped_logits = paddle.reshape(logits, shape=[-1, self.num_classes])
-        
+
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels.flatten())
 
         if not return_dict:
-            output = (logits,) + outputs[2:]
-            return ((loss,) + output) if loss is not None else output
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else output
 
         return OrderedDict(
             loss=loss,
             logits=reshaped_logits,
             hidden_states=outputs["hidden_states"],
-            attentions=outputs["attentions"],
-        )
+            attentions=outputs["attentions"], )
 
-        
+
 class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
     """
     VisualBert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and
@@ -1519,6 +1530,7 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
         If None, use the same value as `hidden_dropout_prob` of `VisualBertModel`
         instance `visualbert`. Defaults to `None`.
     """
+
     def __init__(self, visual_bert, num_classes=1, dropout=None):
         super(VisualBertForMultipleChoice, self).__init__()
         self.num_classes = num_classes
@@ -1529,24 +1541,23 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
         self.cls = nn.Linear(self.visual_bert.config["hidden_size"],
                              self.num_classes)
         self.apply(self.init_weights)
-        
+
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        visual_embeds=None,
-        visual_attention_mask=None,
-        visual_token_type_ids=None,
-        image_text_alignment=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        labels=None,
-    ):
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            visual_embeds=None,
+            visual_attention_mask=None,
+            visual_token_type_ids=None,
+            image_text_alignment=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            labels=None, ):
         r"""
             labels (Tensor, optional):
                 Labels for computing the sequence classification/regression loss. Indices should be in :obj:`[0, ...,
@@ -1610,33 +1621,32 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
 
         """
         return_dict = return_dict if return_dict is not None else False
-        num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+        num_choices = input_ids.shape[
+            1] if input_ids is not None else inputs_embeds.shape[1]
 
-        input_ids = input_ids.reshape([-1, input_ids.shape[-1]]) if input_ids is not None else None
-        attention_mask = attention_mask.reshape([-1, attention_mask.shape[-1]]) if attention_mask is not None else None
-        token_type_ids = token_type_ids.reshape([-1, token_type_ids.shape[-1]]) if token_type_ids is not None else None
-        position_ids = position_ids.reshape([-1, position_ids.shape[-1]]) if position_ids is not None else None
-        inputs_embeds = (
-            inputs_embeds.reshape([-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
-            if inputs_embeds is not None
-            else None
-        )
+        input_ids = input_ids.reshape(
+            [-1, input_ids.shape[-1]]) if input_ids is not None else None
+        attention_mask = attention_mask.reshape(
+            [-1,
+             attention_mask.shape[-1]]) if attention_mask is not None else None
+        token_type_ids = token_type_ids.reshape(
+            [-1,
+             token_type_ids.shape[-1]]) if token_type_ids is not None else None
+        position_ids = position_ids.reshape(
+            [-1, position_ids.shape[-1]]) if position_ids is not None else None
+        inputs_embeds = (inputs_embeds.reshape(
+            [-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
+                         if inputs_embeds is not None else None)
 
-        visual_embeds = (
-            visual_embeds.reshape([-1, visual_embeds.shape[-2], visual_embeds.shape[-1]])
-            if visual_embeds is not None
-            else None
-        )
-        visual_attention_mask = (
-            visual_attention_mask.reshape([-1, visual_attention_mask.shape[-1]])
-            if visual_attention_mask is not None
-            else None
-        )
-        visual_token_type_ids = (
-            visual_token_type_ids.reshape([-1, visual_token_type_ids.shape[-1]])
-            if visual_token_type_ids is not None
-            else None
-        )
+        visual_embeds = (visual_embeds.reshape(
+            [-1, visual_embeds.shape[-2], visual_embeds.shape[-1]])
+                         if visual_embeds is not None else None)
+        visual_attention_mask = (visual_attention_mask.reshape(
+            [-1, visual_attention_mask.shape[-1]])
+                                 if visual_attention_mask is not None else None)
+        visual_token_type_ids = (visual_token_type_ids.reshape(
+            [-1, visual_token_type_ids.shape[-1]])
+                                 if visual_token_type_ids is not None else None)
 
         outputs = self.visual_bert(
             input_ids,
@@ -1651,8 +1661,7 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
             image_text_alignment=image_text_alignment,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+            return_dict=return_dict, )
         if not return_dict:
             pooled_output = outputs[1]
         else:
@@ -1668,12 +1677,11 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
             loss = loss_fct(reshaped_logits, labels)
 
         if not return_dict:
-            output = (reshaped_logits,) + outputs[2:]
-            return ((loss,) + output) if loss is not None else output
+            output = (reshaped_logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else output
 
         return OrderedDict(
             loss=loss,
             logits=reshaped_logits,
             hidden_states=outputs["hidden_states"],
-            attentions=outputs["attentions"],
-        )
+            attentions=outputs["attentions"], )

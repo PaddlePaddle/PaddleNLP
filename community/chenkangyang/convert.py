@@ -4,16 +4,43 @@ import torch
 paddle.set_device("cpu")
 
 model_pair_list = [
-            ["./uclanlp/visualbert-vqa/pytorch_model.bin", "./paddle_visualbert/visualbert-vqa/model_state.pdparams"],
-            ["./uclanlp/visualbert-vqa-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-vqa-pre/model_state.pdparams"],
-            ["./uclanlp/visualbert-vqa-coco-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-vqa-coco-pre/model_state.pdparams"],
-            ["./uclanlp/visualbert-nlvr2/pytorch_model.bin", "./paddle_visualbert/visualbert-nlvr2/model_state.pdparams"],
-            ["./uclanlp/visualbert-nlvr2-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-nlvr2-pre/model_state.pdparams"],
-            ["./uclanlp/visualbert-nlvr2-coco-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-nlvr2-coco-pre/model_state.pdparams"],
-            ["./uclanlp/visualbert-vcr/pytorch_model.bin", "./paddle_visualbert/visualbert-vcr/model_state.pdparams"],
-            ["./uclanlp/visualbert-vcr-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-vcr-pre/model_state.pdparams"],
-            ["./uclanlp/visualbert-vcr-coco-pre/pytorch_model.bin", "./paddle_visualbert/visualbert-vcr-coco-pre/model_state.pdparams"],
-        ]
+    [
+        "./uclanlp/visualbert-vqa/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vqa/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-vqa-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vqa-pre/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-vqa-coco-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vqa-coco-pre/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-nlvr2/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-nlvr2/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-nlvr2-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-nlvr2-pre/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-nlvr2-coco-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-nlvr2-coco-pre/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-vcr/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vcr/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-vcr-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vcr-pre/model_state.pdparams"
+    ],
+    [
+        "./uclanlp/visualbert-vcr-coco-pre/pytorch_model.bin",
+        "./paddle_visualbert/visualbert-vcr-coco-pre/model_state.pdparams"
+    ],
+]
 
 # State_dict's keys mapping: from torch to paddle
 keys_dict = {
@@ -37,8 +64,10 @@ keys_dict = {
     # about cls predictions
     'cls.predictions.transform.dense': 'cls.predictions.transform',
     'cls.predictions.decoder.weight': 'cls.predictions.decoder_weight',
-    'cls.predictions.transform.LayerNorm.weight': 'cls.predictions.layer_norm.weight',
-    'cls.predictions.transform.LayerNorm.bias': 'cls.predictions.layer_norm.bias',
+    'cls.predictions.transform.LayerNorm.weight':
+    'cls.predictions.layer_norm.weight',
+    'cls.predictions.transform.LayerNorm.bias':
+    'cls.predictions.layer_norm.bias',
     'cls.predictions.bias': 'cls.predictions.decoder_bias'
 }
 
@@ -52,17 +81,22 @@ for model_pair in model_pair_list:
         for k in keys_dict:
             if k in paddle_key:
                 paddle_key = paddle_key.replace(k, keys_dict[k])
-        if ('linear' in paddle_key) or ('proj' in paddle_key) or ('vocab' in  paddle_key and 'weight' in  paddle_key) or ("cls.weight" in paddle_key) or ('pooler.dense.weight' in paddle_key) or ('transform.weight' in paddle_key) or ('seq_relationship.weight' in paddle_key):
-            paddle_state_dict[paddle_key] = paddle.to_tensor(
-                torch_state_dict[torch_key].cpu().numpy().transpose())
+        if ('linear' in paddle_key) or ('proj' in paddle_key) or (
+                'vocab' in paddle_key and 'weight' in paddle_key) or (
+                    "cls.weight" in paddle_key) or (
+                        'pooler.dense.weight' in paddle_key) or (
+                            'transform.weight' in paddle_key) or (
+                                'seq_relationship.weight' in paddle_key):
+            paddle_state_dict[paddle_key] = paddle.to_tensor(torch_state_dict[
+                torch_key].cpu().numpy().transpose())
         else:
-            paddle_state_dict[paddle_key] = paddle.to_tensor(
-                torch_state_dict[torch_key].cpu().numpy())
+            paddle_state_dict[paddle_key] = paddle.to_tensor(torch_state_dict[
+                torch_key].cpu().numpy())
 
         print("torch: ", torch_key, "\t", torch_state_dict[torch_key].shape)
         print("paddle: ", paddle_key, "\t", paddle_state_dict[paddle_key].shape,
-            "\n")
+              "\n")
 
     paddle.save(paddle_state_dict, paddle_model_path)
     print("Saved to: ", paddle_model_path)
-    print("="*50)
+    print("=" * 50)

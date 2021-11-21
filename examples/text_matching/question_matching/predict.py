@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
     y_probs = predict(model, test_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
-    
+
     with open(args.result_file, 'w', encoding="utf-8") as f:
         for y_pred in y_preds:
             f.write(str(y_pred) + "\n")

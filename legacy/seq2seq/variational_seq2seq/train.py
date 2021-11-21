@@ -89,8 +89,7 @@ def main():
             inference_program = fluid.default_main_program().clone(
                 for_test=True)
 
-            clip=fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=max_grad_norm)
+            clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=max_grad_norm)
 
             learning_rate = fluid.layers.create_global_var(
                 name="learning_rate",

@@ -1,0 +1,17 @@
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/__init__.py:107: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import MutableMapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/rcsetup.py:20: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Iterable, Mapping
+/home/chenkangyang/anaconda3/envs/paddle/lib/python3.7/site-packages/matplotlib/colors.py:53: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3,and in 3.9 it will stop working
+  from collections import Sized
+/mnt/data/kychen/workspace/paddle_visual_bert/PaddleNLP/paddlenlp/transformers/transformer/modeling.py:85: DeprecationWarning: invalid escape sequence \_
+  """
+[32m[2021-11-06 22:45:57,899] [    INFO][0m - Already cached /home/chenkangyang/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt[0m
+W1106 22:45:57.927567  6595 device_context.cc:404] Please NOTE: device: 8, GPU Compute Capability: 6.1, Driver API Version: 10.2, Runtime API Version: 10.2
+W1106 22:45:57.933411  6595 device_context.cc:422] device: 8, cuDNN Version: 7.6.
+Traceback (most recent call last):
+  File "run_pretrain.py", line 478, in <module>
+    do_train(args)
+  File "run_pretrain.py", line 361, in do_train
+    os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+FileNotFoundError: [Errno 2] No such file or directory: 'data/'

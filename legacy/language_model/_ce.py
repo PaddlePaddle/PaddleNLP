@@ -6,10 +6,12 @@ sys.path.append(os.environ['ceroot'])
 from kpi import CostKpi
 from kpi import DurationKpi
 
-lstm_language_model_static_loss_card1 = CostKpi('lstm_language_model_static_loss_card1', 0.01, 0)
+lstm_language_model_static_loss_card1 = CostKpi(
+    'lstm_language_model_static_loss_card1', 0.01, 0)
 lstm_language_model_static_duration_card1 = DurationKpi(
     'lstm_language_model_static_duration_card1', 0.03, 0, actived=True)
-lstm_language_model_padding_loss_card1 = CostKpi('lstm_language_model_padding_loss_card1', 0.01, 0)
+lstm_language_model_padding_loss_card1 = CostKpi(
+    'lstm_language_model_padding_loss_card1', 0.01, 0)
 lstm_language_model_padding_duration_card1 = DurationKpi(
     'lstm_language_model_padding_duration_card1', 0.03, 0, actived=True)
 

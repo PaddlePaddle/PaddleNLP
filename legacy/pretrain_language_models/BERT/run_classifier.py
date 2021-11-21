@@ -149,7 +149,7 @@ def get_device_num():
 def main(args):
     bert_config = BertConfig(args.bert_config_path)
     bert_config.print_config()
-    
+
     if args.use_xpu:
         paddle.enable_static()
 
@@ -159,7 +159,7 @@ def main(args):
     elif args.use_xpu:
         xpu_id = int(os.getenv('FLAGS_selected_xpus', '0'))
         place = fluid.XPUPlace(xpu_id)
-        dev_count = len([place])       
+        dev_count = len([place])
     else:
         place = fluid.CPUPlace()
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))

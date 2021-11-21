@@ -67,13 +67,12 @@ def parse_args():
         "--bert_model_name",
         default="bert-base-uncased",
         type=str,
-        help="Path to bert model or shortcut name selected in the list: "
-        + ", ".join(
+        help="Path to bert model or shortcut name selected in the list: " +
+        ", ".join(
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])),
-        )
+            ], [])), )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -181,7 +180,10 @@ def parse_args():
         help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
+
+
 # ===================================================================
+
 
 def set_seed(args):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
@@ -239,8 +241,9 @@ def evaluate(model, loss_fct, metric, data_loader):
         print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
 
+
 def prepare_train_features_single(example, tokenizer, args):
-    
+
     caption_a = example['caption_a']
     label = example['label']
     identifier = example['identifier']
@@ -248,41 +251,49 @@ def prepare_train_features_single(example, tokenizer, args):
     feature_path_1 = example['feature_path_1']
 
     if "train" in identifier:
-        folder = osp.join(args.input_dir, "data/detectron_fix_144/train/feature_1024dim")
+        folder = osp.join(args.input_dir,
+                          "data/detectron_fix_144/train/feature_1024dim")
     elif "dev" in identifier:
-        folder = osp.join(args.input_dir, "data/detectron_fix_144/dev/feature_1024dim")
+        folder = osp.join(args.input_dir,
+                          "data/detectron_fix_144/dev/feature_1024dim")
     elif "test1" in identifier:
-        folder = osp.join(args.input_dir, "data/detectron_fix_144/test1/feature_1024dim")
-    
+        folder = osp.join(args.input_dir,
+                          "data/detectron_fix_144/test1/feature_1024dim")
+
     detectron_features_0 = np.load(os.path.join(folder, feature_path_0))
     detectron_features_1 = np.load(os.path.join(folder, feature_path_1))
-    detectron_features = np.concatenate((detectron_features_0, detectron_features_1), axis = 0)
+    detectron_features = np.concatenate(
+        (detectron_features_0, detectron_features_1), axis=0)
     visual_embeds = paddle.to_tensor(detectron_features)
-    
+
     visual_embeddings_type_0 = np.zeros(detectron_features_0.shape[0])
     visual_embeddings_type_1 = np.ones(detectron_features_1.shape[0])
-    visual_embeddings_type = np.concatenate((visual_embeddings_type_0, visual_embeddings_type_1), axis = 0)
-    visual_token_type_ids = paddle.to_tensor(visual_embeddings_type, dtype=paddle.int64)
-    
-    visual_attention_mask = paddle.ones(visual_embeds.shape[:-1], dtype=paddle.int64)
-    
-    bert_feature = tokenizer.encode(caption_a, return_attention_mask=True, max_seq_len=args.max_seq_length)
-    
+    visual_embeddings_type = np.concatenate(
+        (visual_embeddings_type_0, visual_embeddings_type_1), axis=0)
+    visual_token_type_ids = paddle.to_tensor(
+        visual_embeddings_type, dtype=paddle.int64)
+
+    visual_attention_mask = paddle.ones(
+        visual_embeds.shape[:-1], dtype=paddle.int64)
+
+    bert_feature = tokenizer.encode(
+        caption_a, return_attention_mask=True, max_seq_len=args.max_seq_length)
+
     label = paddle.to_tensor(label, dtype=paddle.int64)
-    
+
     data = {
         "input_ids": bert_feature["input_ids"],
-        "token_type_ids": bert_feature["token_type_ids"],    
-        "attention_mask": bert_feature["attention_mask"],  
+        "token_type_ids": bert_feature["token_type_ids"],
+        "attention_mask": bert_feature["attention_mask"],
         "visual_embeds": visual_embeds,
         "visual_token_type_ids": visual_token_type_ids,
         "visual_attention_mask": visual_attention_mask,
         "labels": label,
     }
-    
-    return data 
-    
-    
+
+    return data
+
+
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -299,32 +310,28 @@ def do_train(args):
 
     train_ds = load_dataset('nlvr2', splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.bert_model_name)
-    trans_func = partial(prepare_train_features_single, 
-                         tokenizer=tokenizer,
-                         args=args)
+    trans_func = partial(
+        prepare_train_features_single, tokenizer=tokenizer, args=args)
 
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=False)
-    
-    batchify_fn = lambda samples, fn=Dict(
-        {
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "attention_mask": Pad(axis=0, pad_val=0),
-            "visual_embeds": Pad(axis=0),
-            "visual_token_type_ids": Pad(axis=0),
-            "visual_attention_mask": Pad(axis=0),
-            "labels": Pad(axis=0),
-        }
-    ): fn(samples)
+
+    batchify_fn = lambda samples, fn=Dict({
+        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        "attention_mask": Pad(axis=0, pad_val=0),
+        "visual_embeds": Pad(axis=0),
+        "visual_token_type_ids": Pad(axis=0),
+        "visual_attention_mask": Pad(axis=0),
+        "labels": Pad(axis=0), }): fn(samples)
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-    
+
     dev_ds = load_dataset('nlvr2', splits='dev')
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
@@ -335,7 +342,7 @@ def do_train(args):
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-    
+
     # ===================================================================
 
     num_classes = 2 if train_ds.label_list == None else len(train_ds.label_list)
@@ -389,7 +396,7 @@ def do_train(args):
                 "labels": batch[6],
                 "return_dict": return_dict
             }
-            
+
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
@@ -399,9 +406,10 @@ def do_train(args):
                     prediction_logits = outputs[1].cpu().detach().numpy()
                 else:
                     loss = outputs['loss']
-                    prediction_logits = outputs['prediction_logits'].cpu().detach().numpy()
+                    prediction_logits = outputs['prediction_logits'].cpu(
+                    ).detach().numpy()
             loss = loss / args.gradient_accumulation_steps
-            
+
             if args.use_amp:
                 scaler.scale(loss).backward()
             else:
@@ -414,7 +422,7 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-            
+
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
@@ -424,10 +432,10 @@ def do_train(args):
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
-                
+
                 evaluate(model, loss_fct, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
-                
+
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "%s_ft_model_%d.pdparams" %

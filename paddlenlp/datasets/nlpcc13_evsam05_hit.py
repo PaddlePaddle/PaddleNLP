@@ -76,7 +76,8 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
             lines = []
             for line in f.readlines():
                 if not line.startswith(" "):
-                    if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
+                    if not line.startswith('#') and (len(line) == 1 or
+                                                     line.split()[0].isdigit()):
                         lines.append(line.strip())
                 else:
                     lines.append("")
@@ -93,12 +94,10 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                         "ID": ID,
                         "FORM": FORM,
                         "LEMMA": LEMMA,
-                        "CPOS": CPOS, 
+                        "CPOS": CPOS,
                         "POS": POS,
                         "FEATS": FEATS,
-                        "HEAD": HEAD, 
+                        "HEAD": HEAD,
                         "DEPREL": DEPREL,
                     }
                 start = i + 1
-
-        

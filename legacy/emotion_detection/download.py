@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Download script, download dataset and pretrain models.
 """
@@ -30,10 +29,11 @@ import requests
 
 
 def usage():
-    desc = ("\nDownload datasets and pretrained models for EmotionDetection task.\n"
-    "Usage:\n"
-    "   1. python download.py dataset\n"
-    "   2. python download.py model\n")
+    desc = (
+        "\nDownload datasets and pretrained models for EmotionDetection task.\n"
+        "Usage:\n"
+        "   1. python download.py dataset\n"
+        "   2. python download.py model\n")
     print(desc)
 
 
@@ -71,8 +71,9 @@ def download(url, filename, md5sum):
         if retry < retry_limit:
             retry += 1
         else:
-            raise RuntimeError("Cannot download dataset ({0}) with retry {1} times.".
-                    format(url, retry_limit))
+            raise RuntimeError(
+                "Cannot download dataset ({0}) with retry {1} times.".format(
+                    url, retry_limit))
         try:
             start = time.time()
             size = 0
@@ -87,7 +88,10 @@ def download(url, filename, md5sum):
                             fout.write(chunk)
                             size += len(chunk)
                             pr = '>' * int(size * 50 / filesize)
-                            print('\r[Process ]: %s%.2f%%' % (pr, float(size / filesize*100)), end='')
+                            print(
+                                '\r[Process ]: %s%.2f%%' %
+                                (pr, float(size / filesize * 100)),
+                                end='')
             end = time.time()
             print("\n[CostTime]: %.2f s" % (end - start))
         except Exception as e:
@@ -150,4 +154,3 @@ if __name__ == '__main__':
         download_model(pwd)
     else:
         usage()
-

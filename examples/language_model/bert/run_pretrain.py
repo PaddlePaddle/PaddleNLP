@@ -242,6 +242,7 @@ def create_input_specs():
         input_ids, segment_ids, position_ids, input_mask, masked_lm_positions
     ]
 
+
 class PretrainingDataset(Dataset):
     def __init__(self, input_file, max_pred_length):
         self.input_file = input_file
@@ -325,7 +326,8 @@ def do_train(args):
     if args.to_static:
         specs = create_input_specs()
         model = paddle.jit.to_static(model, input_spec=specs)
-        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
+        logger.info("Successfully to apply @to_static with specs: {}".format(
+            specs))
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

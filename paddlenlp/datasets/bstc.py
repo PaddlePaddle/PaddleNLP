@@ -108,8 +108,9 @@ class BSTC(DatasetBuilder):
                 dir_list.sort(key=lambda x: int(x))
                 for dir_name in dir_list:
                     filenames = [
-                        f for f in
-                        os.listdir(os.path.join(source_full_dir, dir_name))
+                        f
+                        for f in os.listdir(
+                            os.path.join(source_full_dir, dir_name))
                         if not f.startswith('.')
                     ]
                     filenames.sort(key=lambda x: int(x[x.find('-') + 1:-5]))

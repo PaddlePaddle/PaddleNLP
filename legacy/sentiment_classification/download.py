@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Download script, download dataset and pretrain models.
 """
@@ -28,12 +27,15 @@ import hashlib
 import tarfile
 import requests
 
+
 def usage():
-    desc = ("\nDownload datasets and pretrained models for Sentiment Classification task.\n"
+    desc = (
+        "\nDownload datasets and pretrained models for Sentiment Classification task.\n"
         "Usage:\n"
         "   1. python download.py dataset\n"
         "   2. python download.py model\n")
     print(desc)
+
 
 def extract(fname, dir_path):
     """
@@ -49,6 +51,7 @@ def extract(fname, dir_path):
     except Exception as e:
         raise e
 
+
 def download(url, filename):
     """
     Download file
@@ -60,8 +63,9 @@ def download(url, filename):
         if retry < retry_limit:
             retry += 1
         else:
-            raise RuntimeError("Cannot download dataset ({0}) with retry {1} times.".
-                format(url, retry_limit))
+            raise RuntimeError(
+                "Cannot download dataset ({0}) with retry {1} times.".format(
+                    url, retry_limit))
         try:
             start = time.time()
             size = 0
@@ -76,18 +80,22 @@ def download(url, filename):
                             fout.write(chunk)
                             size += len(chunk)
                             pr = '>' * int(size * 50 / filesize)
-                            print('\r[Process ]: %s%.2f%%' % (pr, float(size / filesize*100)), end='')
+                            print(
+                                '\r[Process ]: %s%.2f%%' %
+                                (pr, float(size / filesize * 100)),
+                                end='')
             end = time.time()
             print("\n[CostTime]: %.2f s" % (end - start))
         except Exception as e:
             print(e)
+
 
 def download_dataset(dir_path):
     BASE_URL = "https://baidu-nlp.bj.bcebos.com/"
     DATASET_NAME = "sentiment_classification-dataset-1.0.0.tar.gz"
     file_path = os.path.join(dir_path, DATASET_NAME)
     url = BASE_URL + DATASET_NAME
-    
+
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     # download dataset
@@ -97,6 +105,7 @@ def download_dataset(dir_path):
     print("Extracting dataset: %s" % file_path)
     extract(file_path, dir_path)
     os.remove(file_path)
+
 
 def download_model(dir_path):
     BASE_URL = "https://baidu-nlp.bj.bcebos.com/"
@@ -113,11 +122,12 @@ def download_model(dir_path):
     extract(model_path, dir_path)
     os.remove(model_path)
 
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         usage()
         sys.exit(1)
-    
+
     if sys.argv[1] == "dataset":
         pwd = os.path.join(os.path.dirname(__file__), "./")
         download_dataset(pwd)

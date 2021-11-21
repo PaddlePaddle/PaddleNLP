@@ -16,6 +16,7 @@ from ..bert.tokenizer import BertTokenizer
 
 __all__ = ['VisualBertTokenizer']
 
+
 class VisualBertTokenizer(BertTokenizer):
     """
     Constructs a VisualBert tokenizer. `VisualBertTokenizer` is identical to `BertTokenizer` and runs end-to-end 

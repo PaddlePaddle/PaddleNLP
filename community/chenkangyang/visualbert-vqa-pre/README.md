@@ -12,7 +12,7 @@ inputs['input_ids'] = paddle.to_tensor([inputs['input_ids']])
 inputs['token_type_ids'] = paddle.to_tensor([inputs['token_type_ids']])
 inputs['attention_mask'] = paddle.to_tensor([inputs['attention_mask']])
 
-visual_embeds = paddle.ones([100, 2048]).unsqueeze(0) 
+visual_embeds = paddle.ones([100, 2048]).unsqueeze(0)
 visual_token_type_ids = paddle.ones(visual_embeds.shape[:-1], dtype=paddle.int64)
 visual_attention_mask = paddle.ones(visual_embeds.shape[:-1], dtype=paddle.int64)
 
