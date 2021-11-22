@@ -128,7 +128,7 @@ def do_predict(args):
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                num_beams=args.beam_size,
+                num_beams=args.num_beams,
                 use_faster=False)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
@@ -156,7 +156,9 @@ def do_predict(args):
                 hf_input_ids,
                 do_sample=do_sample,
                 max_length=args.max_length + 1,
-                top_k=1)
+                top_k=args.top_k,
+                top_p=args.top_p,
+                num_beams=args.num_beams)
         logger.info("Average test time for hf decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
