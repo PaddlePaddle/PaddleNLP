@@ -602,8 +602,7 @@ class T5PretrainedModel(PretrainedModel):
             "dropout_rate": 0.1,
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": True
+            "feed_forward_proj": "relu"
         },
         "t5-base": {
             "tie_word_embeddings": True,
@@ -621,8 +620,7 @@ class T5PretrainedModel(PretrainedModel):
             "dropout_rate": 0.1,
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": True
+            "feed_forward_proj": "relu"
         },
         "t5-large": {
             "tie_word_embeddings": True,
@@ -640,8 +638,7 @@ class T5PretrainedModel(PretrainedModel):
             "dropout_rate": 0.1,
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": True
+            "feed_forward_proj": "relu"
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -698,7 +695,7 @@ class T5PretrainedModel(PretrainedModel):
                 paddle.normal(
                     mean=0.0, std=factor * 1.0,
                     shape=layer.shared.weight.shape))
-        elif isinstance(layer, (T5ForConditionalGeneration, T5EncoderModel)):
+        elif isinstance(layer, (T5ForConditionalGeneration, )):
             layer.t5.shared.weight.set_value(
                 paddle.normal(
                     mean=0.0,
@@ -1100,8 +1097,7 @@ class T5Model(T5PretrainedModel):
             The non-linear activation function (function or string) in the feed forward layer in the residual attention block. If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
         feed_forward_proj (str, optional):
             The non-linear activation function (function or string) in the feed forward layer in the residual attention block. If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
-        add_decoder (bool, optional):
-            Whether to add decoder layer. Defaults to `True`.
+
     """
 
     def __init__(self,
@@ -1120,8 +1116,7 @@ class T5Model(T5PretrainedModel):
                  relative_attention_num_buckets=32,
                  dropout_rate=0.1,
                  layer_norm_epsilon=1e-06,
-                 feed_forward_proj="relu",
-                 add_decoder=True):
+                 feed_forward_proj="relu"):
         super().__init__()
         self.tie_word_embeddings = tie_word_embeddings
         self.pad_token_id = pad_token_id
@@ -1146,19 +1141,18 @@ class T5Model(T5PretrainedModel):
             d_ff,
             self.shared,
             is_decoder=False)
-        if add_decoder:
-            self.decoder = T5Stack(
-                d_model,
-                num_decoder_layers,
-                layer_norm_epsilon,
-                dropout_rate,
-                relative_attention_num_buckets,
-                d_kv,
-                num_heads,
-                feed_forward_proj,
-                d_ff,
-                self.shared,
-                is_decoder=True)
+        self.decoder = T5Stack(
+            d_model,
+            num_decoder_layers,
+            layer_norm_epsilon,
+            dropout_rate,
+            relative_attention_num_buckets,
+            d_kv,
+            num_heads,
+            feed_forward_proj,
+            d_ff,
+            self.shared,
+            is_decoder=True)
 
         self.init_weights()
 
@@ -1614,151 +1608,3 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
-
-
-class T5EncoderModel(T5PretrainedModel):
-    """
-    The bare T5 Model transformer outputting encoder's raw hidden-states 
-    without any specific head on top.
-
-    Args:
-        t5 (:class:`T5Model`):
-            An instance of :class:`T5Model`.
-        
-    """
-    pretrained_init_configuration = {
-        "t5-small": {
-            "tie_word_embeddings": True,
-            "pad_token_id": 0,
-            "bos_token_id": 0,
-            "eos_token_id": 1,
-            "vocab_size": 32128,
-            "d_model": 512,
-            "d_kv": 64,
-            "d_ff": 2048,
-            "num_layers": 6,
-            "num_decoder_layers": 6,
-            "num_heads": 8,
-            "relative_attention_num_buckets": 32,
-            "dropout_rate": 0.1,
-            "layer_norm_epsilon": 1e-06,
-            "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": False
-        },
-        "t5-base": {
-            "tie_word_embeddings": True,
-            "pad_token_id": 0,
-            "bos_token_id": 0,
-            "eos_token_id": 1,
-            "vocab_size": 32128,
-            "d_model": 768,
-            "d_kv": 64,
-            "d_ff": 3072,
-            "num_layers": 12,
-            "num_decoder_layers": 12,
-            "num_heads": 12,
-            "relative_attention_num_buckets": 32,
-            "dropout_rate": 0.1,
-            "layer_norm_epsilon": 1e-06,
-            "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": False
-        },
-        "t5-large": {
-            "tie_word_embeddings": True,
-            "pad_token_id": 0,
-            "bos_token_id": 0,
-            "eos_token_id": 1,
-            "vocab_size": 32128,
-            "d_model": 1024,
-            "d_kv": 64,
-            "d_ff": 4096,
-            "num_layers": 24,
-            "num_decoder_layers": 24,
-            "num_heads": 16,
-            "relative_attention_num_buckets": 32,
-            "dropout_rate": 0.1,
-            "layer_norm_epsilon": 1e-06,
-            "initializer_factor": 1.0,
-            "feed_forward_proj": "relu",
-            "add_decoder": False
-        }
-    }
-
-    def __init__(self, t5):
-        super().__init__()
-        self.t5 = t5
-
-        self.init_weights()
-
-    def get_input_embeddings(self):
-        return self.t5.shared
-
-    def set_input_embeddings(self, new_embeddings):
-        self.t5.shared = new_embeddings
-        self.t5.encoder.set_input_embeddings(new_embeddings)
-
-    def get_encoder(self):
-        return self.t5.encoder
-
-    def forward(self,
-                input_ids=None,
-                attention_mask=None,
-                output_attentions=False,
-                output_hidden_states=False):
-        r"""
-        The T5EncoderModel forward method, overrides the `__call__()` special method.
-
-        Args:
-            input_ids (Tensor, optional):
-                See :class:`T5Model`.
-            attention_mask (Tensor, optional):
-                See :class:`T5Model`.
-            output_attentions (bool, optional):
-                See :class:`T5Model`.
-            output_hidden_states (bool, optional):
-                See :class:`T5Model`.
-
-        Returns:
-            tuple: Returns tuple (`last_hidden_state`, `hidden_states`, `attentions`)
-
-            With the fields:
-
-            - `last_hidden_state` (Tensor):
-                Sequence of hidden-states at the last layer of the encoder of the model.
-                It's data type should be float32 and 
-                its shape is [batch_size, sequence_length, hidden_size].
-
-            - `hidden_states` (tuple(Tensor), optional)
-                returned when ``output_hidden_states=True`` is passed.
-                Tuple of `Tensor` (one for the output of the embeddings + one for the output of encoder each layer) of shape `(batch_size, sequence_length, hidden_size)`.
-
-            - `attentions` (tuple(Tensor), optional):
-                returned when `output_attentions=True` is passed.
-                tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data 
-                type of float32 and its shape is [batch_size, num_heads, sequence_length, sequence_length].
-
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import T5EncoderModel, T5Tokenizer
-
-                tokenizer = T5Tokenizer.from_pretrained('t5-base')
-                model = T5EncoderModel.from_pretrained('t5-base')
-
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-
-                outputs = model(**inputs)
-                last_hidden_state = outputs[0]
-
-        """
-        encoder_output = self.t5.encoder(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
-
-        return encoder_output
