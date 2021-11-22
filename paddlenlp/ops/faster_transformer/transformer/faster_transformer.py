@@ -1110,10 +1110,16 @@ class FasterBART(BartPretrainedModel):
         decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
             self._model, 'decoder_start_token_id', None)
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder)
-            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
-            encoder_output = self.encoder(input_ids)
-            self.encoder = disable_faster_encoder(self.encoder)
+            try:
+                self.encoder = enable_faster_encoder(self.encoder)
+                assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+                encoder_output = self.encoder(input_ids)
+                self.encoder = disable_faster_encoder(self.encoder)
+            except Exception as e:
+                self.encoder = disable_faster_encoder(self.encoder)
+                logger.warning(
+                    "Exception occurs when using FasterEncoder. " \
+                    "The original TransformerEncoder forward will be involved. ")
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
