@@ -16,6 +16,7 @@ import argparse
 import os
 
 import numpy as np
+import pandas as pd
 import paddle
 import paddlenlp as ppnlp
 from scipy.special import softmax
@@ -201,6 +202,16 @@ class Predictor(object):
 
         return labels
 
+def read(src_path, is_predict=False):
+    data=pd.read_csv(src_path,sep='\t')
+    for index, row in data.iterrows():
+        # print(row)
+        text_a=row['query']
+        text_b=row['title']
+        label=row['label']
+        if(type(text_a)!=str):
+            print(row)
+        yield {"query": text_a, "title": text_b, "label": label}
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
@@ -211,7 +222,9 @@ if __name__ == "__main__":
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
         'ernie-gram-zh')
 
-    test_ds = load_dataset("lcqmc", splits=["test"])
+    # test_ds = load_dataset("lcqmc", splits=["test"])
+    input_file='data/wanfang_test.csv'
+    test_ds = load_dataset(read,src_path=input_file, lazy=False)
 
     data = [{'query': d['query'], 'title': d['title']} for d in test_ds]
 

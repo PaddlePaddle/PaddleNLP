@@ -20,6 +20,7 @@ import random
 import time
 
 import numpy as np
+import pandas as pd
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
@@ -72,14 +73,22 @@ def predict(model, data_loader):
 
         return batch_probs
 
+def read(src_path, is_predict=False):
+    data=pd.read_csv(src_path,sep='\t')
+    for index, row in data.iterrows():
+        # print(row)
+        text_a=row['query']
+        text_b=row['title']
+        label=row['label']
+        if(type(text_a)!=str):
+            print(row)
+        yield {"query": text_a, "title": text_b, "label": label}
+
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # If you want to use ernie1.0 model, plesace uncomment the following code
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-
     pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
         'ernie-gram-zh')
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
@@ -96,8 +105,12 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    # test_file='data/wanfang_test.csv'
+    # train_ds=read(file_output)
+    valid_ds = load_dataset(read,src_path=args.input_file, lazy=False)
+    
+    # valid_ds = load_dataset(
+    #     read_text_pair, data_path=args.input_file, lazy=False)
 
     valid_data_loader = create_dataloader(
         valid_ds,
@@ -119,9 +132,11 @@ if __name__ == "__main__":
     y_probs = predict(model, valid_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    
+    valid_ds = load_dataset(read,src_path=args.input_file, lazy=False)
     for idx, y_pred in enumerate(y_preds):
         text_pair = valid_ds[idx]
         text_pair["pred_label"] = y_pred
         print(text_pair)
+        if(idx>3):
+            break
