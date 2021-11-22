@@ -292,7 +292,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         memory_max_seq_len,
         start_id_,
         end_id_,
-        beam_search_diversity_rate_);
+        beam_search_diversity_rate_,
+        true);  // is_fuse_topk_softMax
 
     decoding_beam_search_->forward(params, decoding_params);
 
