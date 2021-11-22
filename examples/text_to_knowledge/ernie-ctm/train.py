@@ -18,15 +18,16 @@ import time
 import random
 from functools import partial
 
+import numpy as np
 import paddle
 from paddle.io import DataLoader
-import numpy as np
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.data import Stack, Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 
-from data import load_dataset, load_dict, convert_example
+from data import load_dict, convert_example, read_custom_data, create_dataloader
 from metric import SequenceAccuracy
 
 
@@ -35,20 +36,19 @@ def parse_args():
 
     # yapf: disable
     parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain train.json.")
-    parser.add_argument("--model_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
-    parser.add_argument("--output_dir", default="./outpout_dir", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
+    parser.add_argument("--output_dir", default="./output", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=5, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
-    parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.")
+    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
-    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
     parser.add_argument("--device", default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
@@ -56,52 +56,98 @@ def parse_args():
     return args
 
 
+def set_seed(seed):
+    """sets random seed"""
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
+
+
+@paddle.no_grad()
+def evaluate(model, metric, criterion, data_loader, tags, tags_to_idx):
+    model.eval()
+    metric.reset()
+    losses = []
+    for batch in data_loader():
+        input_ids, token_type_ids, seq_len, tags = batch
+        seq_logits, _ = model(input_ids,
+                              token_type_ids,
+                              lengths=seq_len,
+                              tag_labels=tags)
+        loss = criterion(seq_logits, seq_len, tags).mean()
+        losses.append(loss.numpy())
+        
+        correct = metric.compute(
+            pred=seq_logits.reshape([-1, len(tags_to_idx)]),
+            label=tags.reshape([-1]),
+            ignore_index=tags_to_idx["O"])
+        metric.update(correct)
+    acc = metric.accumulate()
+    logger.info("eval loss: %.5f, acc: %.5f" % (np.mean(losses), acc))
+    model.train()
+    metric.reset()
+
+
 def do_train(args):
     paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds = load_dataset(datafiles=('./data/train.json'))
-    tags_to_idx = load_dict("./data/tags.txt")
-    labels_to_idx = load_dict("./data/classifier_labels.txt")
-    tokenizer = ErnieCtmTokenizer.from_pretrained(args.model_dir)
+    set_seed(args.seed)
+
+    train_ds = load_dataset(read_custom_data,
+                            filename=os.path.join(args.data_dir, "train.txt"),
+                            is_test=False,
+                            lazy=False)
+    dev_ds = load_dataset(read_custom_data,
+                          filename=os.path.join(args.data_dir, "dev.txt"),
+                          is_test=False,
+                          lazy=False)
+    tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
+
+    tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
+    model = ErnieCtmWordtagModel.from_pretrained(
+        "wordtag",
+        num_tag=len(tags_to_idx),
+        num_cls_label=4,
+        ignore_index=tags_to_idx["O"])
+
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
         max_seq_len=args.max_seq_len,
-        tags_to_idx=tags_to_idx,
-        labels_to_idx=labels_to_idx)
-    train_ds.map(trans_func)
+        tags_to_idx=tags_to_idx)
 
-    ignore_label = tags_to_idx["O"]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
         Stack(dtype='int64'),  # seq_len
-        Pad(axis=0, pad_val=ignore_label, dtype='int64'),  # tags
-        Stack(dtype='int64'),  # cls_label
+        Pad(axis=0, pad_val=tags_to_idx["O"], dtype='int64'),  # tags
     ): fn(samples)
 
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True)
-    train_data_loader = DataLoader(
+    train_data_loader = create_dataloader(
         train_ds,
-        batch_sampler=train_batch_sampler,
-        num_workers=0,
-        collate_fn=batchify_fn,
-        return_list=True)
+        mode="train",
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
 
-    model = ErnieCtmWordtagModel.from_pretrained(
-        args.model_dir,
-        num_cls_label=len(labels_to_idx),
-        num_tag=len(tags_to_idx),
-        ignore_index=tags_to_idx["O"])
+    dev_data_loader = create_dataloader(
+        dev_ds,
+        mode="dev",
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
+
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_train_epochs)
+    num_training_steps = len(train_data_loader) * args.num_train_epochs
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          warmup)
@@ -123,10 +169,12 @@ def do_train(args):
     logger.info("Total steps: %s" % num_training_steps)
     logger.info("WarmUp steps: %s" % warmup)
 
-    cls_acc = paddle.metric.Accuracy()
-    seq_acc = SequenceAccuracy()
-    total_loss = 0
+    metric = SequenceAccuracy()
+    crf_lr = 0.1
+    crf = LinearChainCrf(len(tags_to_idx), crf_lr, with_start_stop_tag=False)
+    criterion = LinearChainCrfLoss(crf)
 
+    total_loss = 0
     global_step = 0
 
     for epoch in range(1, args.num_train_epochs + 1):
@@ -135,15 +183,14 @@ def do_train(args):
 
         for total_step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, token_type_ids, seq_len, tags, cls_label = batch
+            input_ids, token_type_ids, seq_len, tags = batch
 
-            outputs = model(
+            seq_logits, _ = model(
                 input_ids,
                 token_type_ids,
                 lengths=seq_len,
-                tag_labels=tags,
-                cls_label=cls_label)
-            loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
+                tag_labels=tags)
+            loss = criterion(seq_logits, seq_len, tags)
             loss = loss.mean()
             total_loss += loss
             loss.backward()
@@ -152,41 +199,27 @@ def do_train(args):
             optimizer.clear_grad()
             lr_scheduler.step()
 
-            cls_correct = cls_acc.compute(
-                pred=cls_logits.reshape([-1, len(labels_to_idx)]),
-                label=cls_label.reshape([-1]))
-            cls_acc.update(cls_correct)
-            seq_correct = seq_acc.compute(
-                pred=seq_logits.reshape([-1, len(tags_to_idx)]),
-                label=tags.reshape([-1]),
-                ignore_index=tags_to_idx["O"])
-            seq_acc.update(seq_correct)
-
-            if global_step % args.logging_steps == 0 and global_step != 0:
+            if global_step % args.logging_steps == 0 and rank == 0:
                 end_time = time.time()
                 speed = float(args.logging_steps) / (end_time - start_time)
                 logger.info(
-                    "[Training]["
-                    "epoch: %s/%s][step: %s/%s] loss: %6f, Classification Accuracy: %6f, Sequence Labeling Accuracy: %6f, speed: %6f"
-                    % (epoch, args.num_train_epochs, global_step,
-                       num_training_steps, total_loss / args.logging_steps,
-                       cls_acc.accumulate(), seq_acc.accumulate(), speed))
+                    "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, total_loss / args.logging_steps, speed))
                 start_time = time.time()
-                cls_acc.reset()
-                seq_acc.reset()
                 total_loss = 0
 
-            if (global_step % args.save_steps == 0 or global_step ==
-                    num_training_steps) and paddle.distributed.get_rank() == 0:
+            if (global_step % args.save_steps == 0 
+                    or global_step == num_training_steps) and rank == 0:
                 output_dir = os.path.join(args.output_dir,
-                                          "ernie_ctm_ft_model_%d.pdparams" %
-                                          (global_step))
+                                          "model_%d" % (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
+
+        evaluate(model, metric, criterion, dev_data_loader, tags, tags_to_idx)
 
 
 def print_arguments(args):

@@ -154,33 +154,51 @@ def post_process_sum(token_ids, tokenizer):
 
 def select_sum(ids, scores, tokenizer, max_dec_len=None,
                num_return_sequences=1):
-    ids = ids.numpy()
-    scores = scores.numpy()
-
-    if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
-        raise ValueError(
-            "the length of `ids` is {}, but the `num_return_sequences` is {}".
-            format(len(ids), num_return_sequences))
-
+    results = []
     group = []
     tmp = []
-    for pred, score in zip(ids, scores):
-        pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
-        num_token = len(pred_token_ids)
+    if scores is not None:
+        ids = ids.numpy()
+        scores = scores.numpy()
 
-        target = "".join(pred_tokens)
+        if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
+            raise ValueError(
+                "the length of `ids` is {}, but the `num_return_sequences` is {}".
+                format(len(ids), num_return_sequences))
 
-        # not ending
-        if max_dec_len is not None and num_token >= max_dec_len:
-            score -= 1e3
+        for pred, score in zip(ids, scores):
+            pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
+            num_token = len(pred_token_ids)
 
-        tmp.append([target, score])
-        if len(tmp) == num_return_sequences:
-            group.append(tmp)
-            tmp = []
+            target = "".join(pred_tokens)
 
-    results = []
-    for preds in group:
-        preds = sorted(preds, key=lambda x: -x[1])
-        results.append(preds[0][0])
+            # not ending
+            if max_dec_len is not None and num_token >= max_dec_len:
+                score -= 1e3
+
+            tmp.append([target, score])
+            if len(tmp) == num_return_sequences:
+                group.append(tmp)
+                tmp = []
+
+        for preds in group:
+            preds = sorted(preds, key=lambda x: -x[1])
+            results.append(preds[0][0])
+    else:
+        ids = ids.numpy()
+
+        for pred in ids:
+            pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
+            num_token = len(pred_token_ids)
+            response = "".join(pred_tokens)
+
+            # TODO: Support return scores in FT.
+            tmp.append([response])
+            if len(tmp) == num_return_sequences:
+                group.append(tmp)
+                tmp = []
+
+        for preds in group:
+            results.append(preds[0][0])
+
     return results
