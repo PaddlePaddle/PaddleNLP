@@ -29,7 +29,6 @@ __all__ = [
     'T5Model',
     "T5PretrainedModel",
     'T5ForConditionalGeneration',
-    'T5EncoderModel',
 ]
 
 
