@@ -87,15 +87,15 @@ class SimBERTTask(Task):
         if isinstance(inputs[0], str):
             if not len(inputs) == 2:
                 raise TypeError(
-                    "Invalid inputs, input text should be list[str, str] or list[list[str, str]].")
+                    "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].")
             inputs = [inputs]
         elif isinstance(inputs[0], list):
             if not (len(inputs[0]) == 2 and isinstance(inputs[0][0], str)):
                     raise TypeError(
-                        "Invalid inputs, input text should be list[str, str] or list[list[str, str]].") 
+                        "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].") 
         else:
             raise TypeError(
-                "Invalid inputs, input text should be list[str, str] or list[list[str, str]].")
+                "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].")
         return inputs
 
     def _preprocess(self, inputs):
