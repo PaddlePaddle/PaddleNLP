@@ -4,14 +4,11 @@ from collections import OrderedDict
 
 def from_local_dir():
     # From local dir path
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bert'))
+    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bert'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bart'))
+    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bart'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bigbird'))
+    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bigbird'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
 
@@ -26,14 +23,14 @@ def from_built_in_models():
 
 
 def from_community_models():
-    #From community-contributed pretrained models
+    # From community-contributed pretrained models
     tokenizer = AutoTokenizer.from_pretrained(
         ('yingyibiao/bert-base-uncased-sst-2-finetuned'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
     tokenizer = AutoTokenizer.from_pretrained(
         ('junnyu/ckiplab-bert-base-chinese-ner'))
-    #print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
 
 TOKENIZER_MAPPING_NAMES = OrderedDict([
@@ -62,6 +59,6 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 ])
 
 if __name__ == '__main__':
-    #from_local_dir()
-    #from_built_in_models()
+    from_local_dir()
+    from_built_in_models()
     from_community_models()

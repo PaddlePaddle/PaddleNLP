@@ -26,7 +26,7 @@ from paddlenlp.utils.log import logger
 
 __all__ = [
     "AutoModel",
-    "AutoModelForPreTraining",
+    "AutoModelForPretraining",
     "AutoModelWithLMHead",
     "AutoModelForMaskedLM",
     "AutoModelForSequenceClassification",
@@ -487,7 +487,7 @@ class AutoModel(_BaseAutoModelClass):
             dd
 
 
-class AutoModelForPreTraining(_BaseAutoModelClass):
+class AutoModelForPretraining(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations("pretraining")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_FOR_PRETRAINING_MAPPING_NAMES
