@@ -182,9 +182,8 @@ senta("作为老的四星酒店，房间依然很整洁，相当不错。机场�
 from paddlenlp import Taskflow
 
 matcher = Taskflow("text_matching")
-matcher(["世界上什么东西最小", "世界上什么东西最小？"])
+matcher([["世界上什么东西最小", "世界上什么东西最小？"]])
 >>> [{'query': '世界上什么东西最小', 'title': '世界上什么东西最小？', 'similarity': 0.992725}]
-
 
 matcher = Taskflow("text_matching", batch_size=2)
 matcher([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])

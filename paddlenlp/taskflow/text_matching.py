@@ -23,7 +23,7 @@ usage = r"""
          from paddlenlp import Taskflow
 
          matcher = Taskflow("text_matching")
-         matcher(["世界上什么东西最小", "世界上什么东西最小？"])
+         matcher([["世界上什么东西最小", "世界上什么东西最小？"]])
          '''
          [{'query': '世界上什么东西最小', 'title': '世界上什么东西最小？', 'similarity': 0.992725}]
          '''
@@ -84,18 +84,10 @@ class SimBERTTask(Task):
     
     def _check_input_text(self, inputs):
         inputs = inputs[0]
-        if isinstance(inputs[0], str):
-            if not len(inputs) == 2:
-                raise TypeError(
-                    "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].")
-            inputs = [inputs]
-        elif isinstance(inputs[0], list):
-            if not (len(inputs[0]) == 2 and isinstance(inputs[0][0], str)):
-                    raise TypeError(
-                        "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].") 
-        else:
+        if not all([isinstance(i, list) and i \
+            and all(i) and len(i) == 2 for i in inputs]):
             raise TypeError(
-                "Invalid inputs, input data type should be list[str, str] or list[list[str, str]].")
+                "Invalid input format.")
         return inputs
 
     def _preprocess(self, inputs):
