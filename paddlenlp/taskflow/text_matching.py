@@ -85,13 +85,12 @@ class SimBERTTask(Task):
     def _check_input_text(self, inputs):
         inputs = inputs[0]
         if isinstance(inputs[0], str):
-            if not (len(inputs) == 2 and isinstance(inputs[1], str)):
+            if not len(inputs) == 2:
                 raise TypeError(
                     "Invalid inputs, input text should be list[str, str] or list[list[str, str]].")
             inputs = [inputs]
         elif isinstance(inputs[0], list):
-            if not len(inputs[0]) == 2:
-                if not (isinstance(inputs[0][0], str) and isinstance(inputs[0][1], str)):
+            if not (len(inputs[0]) == 2 and isinstance(inputs[0][0], str)):
                     raise TypeError(
                         "Invalid inputs, input text should be list[str, str] or list[list[str, str]].") 
         else:
