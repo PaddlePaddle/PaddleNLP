@@ -1,5 +1,5 @@
 ============
-文本生成高性能加速
+Transformer高性能加速
 ============
 
 
@@ -35,16 +35,7 @@ JIT 自动编译
 
 目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
 
-以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
-
-目前支持 JIT 的预测加速 API 有：
-
-* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
-* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
-* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 `UNIMOText 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo>`_。
-* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_，`BART 预测加速使用示例-文本摘要 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_。
-具体使用方法可以参考 API 文档或是使用示例。
+以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。使用示例可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
 
 编译自定义OP
 ^^^^^^^^^^^^
@@ -156,68 +147,6 @@ Transformer decoding 示例代码
 
 其中，`decoding_gemm` 不同参数的意义可以参考 `FasterTransformer 文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 
-使用 GPT-2 decoding 高性能推理
-^^^^^^^^^^^^
-
-与 `FasterTransformer` 类似，可以通过一下方式调用 GPT-2 相关优化：
-
-.. code-block::
-
-    from paddlenlp.ops import FasterGPT
-    from paddlenlp.transformers import GPTModel, GPTForPretraining
-
-    MODEL_CLASSES = {
-        "gpt2-medium-en": (GPTForPretraining, GPTTokenizer),
-    }
-
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name)
-    model = model_class.from_pretrained(args.model_name)
-
-    # Define model
-    gpt = FasterGPT(
-        model=model,
-        topk=args.topk,
-        topp=args.topp,
-        max_out_len=args.max_out_len,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        temperature=args.temperature,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
-
-目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
-
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以如前文所述进行编译。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
-
-更详细的例子可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_，我们提供了更详细用例。
-
-GPT-2 decoding 示例代码
-""""""""""""
-
-使用 PaddlePaddle 仅执行 decoding 测试（float32）：
-
-.. code-block::
-
-    export CUDA_VISIBLE_DEVICES=0
-    python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
-
-其中，各个选项的意义如下：
-
-* `--model_name_or_path`: 预训练模型的名称或是路径。
-* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不指定或是不存在则将自动进行 jit 编译产出该 lib。
-* `--batch_size`: 一个 batch 内，样本数目的大小。
-* `--candidate_num`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
-* `--probability_threshold`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
-* `--max_seq_len`: 最长的生成长度。
-* `--start_token`: 字符串，表示任意生成的时候的开始 token。
-* `--end_token`: 字符串，生成的结束 token。
-* `--temperature`: temperature 的设定。
-* `--use_fp16_decoding`: 是否使用 fp16 进行推理。
-
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文。编译好后，可以在执行 `gpt_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
-
-
 C++ 预测库使用自定义 op
 ------------
 
@@ -310,38 +239,3 @@ PaddleNLP 准备
 
 预测所需要的模型文件，可以通过 `faster_transformer/README.md <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_translation/transformer/faster_transformer/README.md>`_ 文档中所记述的方式导出。
 
-执行 GPT decoding on PaddlePaddle
-""""""""""""
-
-如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `gpt_export_model_sample.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/gpt_export_model_sample.py>`_ 脚本获取预测库用模型，执行方式如下所示：
-
-.. code-block::
-
-    python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
-
-各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。
-
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文。编译好后，可以在执行 `gpt_export_model_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
-
-注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照前文中 **`Python 动态图使用自定义 op`** 编译出来的 lib，与 **`C++ 预测库使用自定义 op`** 编译产出不同。因此，在使用预测库前，还需要额外导出模型：
-
-  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
-  * 一次获取编译的基于预测库的可执行文件
-
-若是使用的模型是 gpt2-medium-en，保存之后，`infer_model/` 目录下组织的结构如下：
-
-.. code-block::
-
-    .
-    ├── gpt.pdiparams       # 保存的参数文件
-    ├── gpt.pdiparams.info  # 保存的一些变量描述信息，预测不会用到
-    ├── gpt.pdmodel         # 保存的模型文件
-    ├── merges.txt          # bpe
-    └── vocab.txt           # 词表
-
-同理，完成编译后，可以在 `build/bin/` 路径下将会看到 `gpt` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
-
-.. code-block::
-
-    cd bin/
-    ./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_file path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"
