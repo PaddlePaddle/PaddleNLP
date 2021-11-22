@@ -2,28 +2,28 @@
 
 FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
 
-功能底层依托于FasterTransformer，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于generate函数，关于该函数的详细介绍可以参考generate。功能的开启和关闭通过传入use_fast参数进行控制（默认为开启状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。
+功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数，关于该函数的详细介绍可以参考[generate](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html)。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为开启状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。
 
 ## Featrues
 
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
-- 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Beam Search、Length Penalty等子策略。
-- 解码速度快。最高可达原版python generate函数的**17倍**。HuggingFace generate函数的**8倍**。**并支持FP16混合精度计算**。
-- 易用性强。功能的入口为model.generate，与非加速版生成api的使用方法相同，当满足加速条件时使用jit编译高性能算子并用于生成，不满足则自动切换回原版生成api。
+- 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
+- 解码速度快。最高可达非加速版generate函数的**17倍**。HuggingFace generate函数的**8倍**。**并支持FP16混合精度计算**。
+- 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
 
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration的预训练模型支持情况（GPU）。
 
-|  Library | GPT | BART | UnifiedTransformer |
-|  ------  | ----| -----| ------------------ |
-| PaddleNLP         | ✅  | ✅  | ✅  |
+|Model Structure | Decoder | Encoder-Decoder | Prefix-LM |
+|---| :----:| :-----:| :------------------: |
+|Model Name| GPT2  | BART  | UnifiedTransformer  |
 
-### Decode Strategy Support
-下表为PaddleNLP FasterGeneration与的解码策略支持情况。
+### Decoding Strategy Support
+下表为PaddleNLP FasterGeneration的解码策略支持情况。
 
-|  Library | Beam Search | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
-|  ------  | ----| -----| ------| -----|------- | ---|------ |
-| PaddleNLP         | ✅  | ✅  | ✅   | ✅  | ✅ | ✅ |
+|  Library | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
+|  ------  | :-----:| :------:| :-----:|:-------: | :---:|
+| PaddleNLP         | ✅  | ✅   | ✅  | ✅ | ✅ |
 
 ## Performence
 
@@ -32,7 +32,7 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - **BART** (bart-base, batch_size=4, max_length=32) 图片
 - **GPT** (gpt2, batch_size=4, max_length=32) 图片
 
-更详细的性能数据请参见**这里**
+更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/perf)
 
 ## Quick Start
 
@@ -72,7 +72,7 @@ Model input: 花间一壶酒，独酌无相亲。举杯邀明月，
 Result: 对影成三人。
 ```
 
-编译只会进行一次，之后再次使用高性能解码就不用重新编译了。`samples`文件夹中的其他示例的使用方法相同。
+编译只会进行一次，之后再次使用高性能解码不需要重新编译了。`samples`文件夹中的其他示例的使用方法相同。
 
 除了以上示例之外，PaddleNLP的examples中所有使用了`model.generate`的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
 
@@ -85,7 +85,7 @@ Result: 对影成三人。
 
 ```sh
 [2021-11-17 14:21:06,132] [ WARNING] - 'min_length != 0' is not supported yet in the faster version
-[2021-11-17 14:21:06,132] [ WARNING] - FasterGenerate is not available, and the original version would be used instead.
+[2021-11-17 14:21:06,132] [ WARNING] - FasterGeneration is not available, and the original version would be used instead.
 ```
 
 根据提示修改对应参数即可使用FasterGeneration加速生成。
