@@ -3,12 +3,11 @@
 我们基于预训练模型 ERNIE-Gram 给出了单塔文本匹配的 2 种训练范式: Point-wise 和 Pair-wise。其中单塔 Point-wise 匹配模型适合直接对文本对进行 2 分类的应用场景: 例如判断 2 个文本是否为语义相似；Pair-wise 匹配模型适合将文本对相似度作为特征之一输入到上层排序模块进行排序的应用场景。
 
 ## 模型下载
-本项目使用语义匹配数据集 LCQMC 作为训练集 , 基于 ERNIE-Gram 预训练模型热启训练并开源了单塔 Point-wise 语义匹配模型， 用户可以直接基于这个模型对文本对进行语义匹配的 2 分类任务。
+本项目使用语义匹配数据集万方的真实场景的数据 为训练集 , 基于 ERNIE-Gram 预训练模型热启训练并开源了单塔 Point-wise 语义匹配模型， 用户可以直接基于这个模型对文本对进行语义匹配的 2 分类任务。
 
 | 模型  | dev acc |
 | ---- | ------- |
-| [ERNIE-1.0-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie1.0_zh_pointwise_matching_model.tar)  | 89.43 |
-| [ERNIE-Gram-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 90.60 |
+| [ERNIE-Gram-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 98.773% |
 
 ## 快速开始
 
@@ -25,15 +24,18 @@ ernie_matching/
 ├── model.py # Point-wise & Pair-wise 匹配模型组网
 ├── data.py # Point-wise & Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pointwise.py # Point-wise 单塔匹配模型训练脚本
-├── train_pairwise.py # Pair-wise 单塔匹配模型训练脚本
 ├── predict_pointwise.py # Point-wise 单塔匹配模型预测脚本，输出文本对是否相似: 0、1 分类
-├── predict_pairwise.py # Pair-wise 单塔匹配模型预测脚本，输出文本对的相似度打分
 └── train.py # 模型训练评估
 ```
 
 ### 模型训练
 
-我们以中文文本匹配公开数据集 LCQMC 为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行单塔 Point-wise 模型训练，并在开发集（dev.tsv）验证。Pair-wise 匹配模型只需要采用 `train_pairwise.py` 脚本即可。
+数据集使用的是万方的数据集，可以运行下面的命令，在训练集（wanfang_train.csv）上进行单塔 Point-wise 模型训练，并在测试集（wanfang_test.csv）验证。
+
+|  训练集 | 测试集 | 
+| ------------ | ------------ | 
+ |  59849| 29924 |
+
 
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
@@ -42,6 +44,11 @@ python -u -m paddle.distributed.launch --gpus "0" train_pointwise.py \
         --save_dir ./checkpoints \
         --batch_size 32 \
         --learning_rate 2E-5
+```
+也可以直接执行下面的命令：
+
+```
+sh train.sh
 ```
 
 可支持配置的参数：
@@ -80,17 +87,19 @@ checkpoints/
 
 **NOTE:**
 * 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
-* 如需使用ernie-tiny模型，则需要提前先安装sentencepiece依赖，如`pip install sentencepiece`
 
 ### 基于动态图模型预测
 
-我们用 LCQMC 的测试集作为预测数据,  测试数据示例如下，：
+我们用 万方 的测试集作为预测数据,  测试数据示例如下，：
 ```text
-谁有狂三这张高清的  这张高清图，谁有
-英雄联盟什么英雄最好    英雄联盟最好英雄是什么
-这是什么意思，被蹭网吗  我也是醉了，这是什么意思
-现在有什么动画片好看呢？    现在有什么好看的动画片吗？
-请问晶达电子厂现在的工资待遇怎么样要求有哪些    三星电子厂工资待遇怎么样啊
+基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试      基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测     1
+肺炎链球菌脑膜炎        儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点     1
+小学生  学习态度        数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养 1
+乙状结肠冗长症的诊断及手术治疗  乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗    1
+电动叉车线控转向系统建模与控制策略研究  电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术     1
+基于Python的京东        一种基于Python的商品评论数据智能获取与分析技术商品评论,Python,爬虫,分词,数据分析        1
+广西横县华支睾吸虫      广西横县集贸市场淡水鱼虾华支睾吸虫囊蚴感染调查淡水鱼、虾,华支睾吸虫,囊蚴,感染   1
+. 从国家自然科学基金申请和评审程序 探讨如何提高申请书质量       从国家自然科学基金申请和评审程序探讨如何提高申请书质量国家自然科学基金,申请书,评审程序,撰写提纲,写作技巧   1
 ```
 
 启动预测：
@@ -105,14 +114,19 @@ python -u -m paddle.distributed.launch --gpus "0" \
         --max_seq_length 64 \
         --input_file 'test.tsv'
 ```
+也可以直接执行下面的命令：
+
+```
+sh predict.sh
+```
 
 输出预测结果如下:
 ```text
-{'query': '谁有狂三这张高清的', 'title': '这张高清图，谁有', 'pred_label': 1}
-{'query': '英雄联盟什么英雄最好', 'title': '英雄联盟最好英雄是什么', 'pred_label': 1}
-{'query': '这是什么意思，被蹭网吗', 'title': '我也是醉了，这是什么意思', 'pred_label': 1}
-{'query': '现在有什么动画片好看呢？', 'title': '现在有什么好看的动画片吗？', 'pred_label': 1}
-{'query': '请问晶达电子厂现在的工资待遇怎么样要求有哪些', 'title': '三星电子厂工资待遇怎么样啊', 'pred_label': 0}
+{'query': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试', 'title': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测', 'label': 1, 'pred_label': 1}
+{'query': '肺炎链球菌脑膜炎', 'title': '儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点', 'label': 1, 'pred_label': 1}
+{'query': '小学生  学习态度', 'title': '数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养', 'label': 1, 'pred_label': 1}
+{'query': '乙状结肠冗长症的诊断及手术治疗', 'title': '乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗', 'label': 1, 'pred_label': 1}
+{'query': '电动叉车线控转向系统建模与控制策略研究', 'title': '电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术', 'label': 1, 'pred_label': 1}
 ```
 
 ### 基于静态图部署预测
@@ -121,12 +135,24 @@ python -u -m paddle.distributed.launch --gpus "0" \
 
 `python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
 
+也可以直接执行命令：
+
+```
+sh export.sh
+```
+
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 #### 预测部署
 导出静态图模型之后，可以基于静态图模型进行预测，`deploy/python/predict.py` 文件提供了静态图预测示例。执行如下命令：
 
 `python deploy/python/predict.py --model_dir ./output`
+
+也可以直接执行命令：
+
+```
+sh deploy.sh
+```
 
 ## Reference
 [1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.

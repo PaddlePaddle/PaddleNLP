@@ -105,12 +105,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
     ): [data for data in fn(samples)]
 
-    # test_file='data/wanfang_test.csv'
-    # train_ds=read(file_output)
     valid_ds = load_dataset(read,src_path=args.input_file, lazy=False)
-    
-    # valid_ds = load_dataset(
-    #     read_text_pair, data_path=args.input_file, lazy=False)
 
     valid_data_loader = create_dataloader(
         valid_ds,
