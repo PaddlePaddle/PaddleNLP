@@ -22,22 +22,22 @@ from .task import Task
 usage = r"""
          from paddlenlp import Taskflow
 
-         matcher = Taskflow("text_matching")
-         matcher([["世界上什么东西最小", "世界上什么东西最小？"]])
+         similarity = Taskflow("text_similarity")
+         similarity([["世界上什么东西最小", "世界上什么东西最小？"]])
          '''
          [{'query': '世界上什么东西最小', 'title': '世界上什么东西最小？', 'similarity': 0.992725}]
          '''
 
-         matcher = Taskflow("text_matching", batch_size=2)
-         matcher([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])
+         similarity = Taskflow("text_similarity", batch_size=2)
+         similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])
          '''
          [{'query': '光眼睛大就好看吗', 'title': '眼睛好看吗？', 'similarity': 0.7450271}, {'query': '小蝌蚪找妈妈怎么样', 'title': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
          '''
          """
 
-class SimBERTTask(Task):
+class TextSimilarityTask(Task):
     """
-    Text matching task using SimBERT to predict the similarity of sentence pair.
+    Text similarity task using SimBERT to predict the similarity of sentence pair.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
