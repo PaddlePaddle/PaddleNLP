@@ -70,7 +70,7 @@ usage = r"""
            [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}]
            '''
 
-           # 切换为已分词的输入形式
+           # 已分词方式
            ddp = Taskflow("dependency_parsing", segmented=True)
            ddp([["三亚", "是", "一座", "美丽", "的", "城市"]])
            '''
