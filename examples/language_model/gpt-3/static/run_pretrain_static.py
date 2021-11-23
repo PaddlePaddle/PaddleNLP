@@ -56,12 +56,6 @@ def create_data_holder(args):
         name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
         name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
-    """
-    attention_mask = paddle.static.data(
-        name="attention_mask",
-        shape=[-1, 1, args.max_seq_len, args.max_seq_len],
-        dtype="float32")
-    """
     position_ids = paddle.static.data(
         name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
     labels = paddle.static.data(
@@ -424,22 +418,6 @@ def do_train(args):
 
             global_step += 1
 
-            
-            # add nsight test
-            if step == 20:
-                core.nvprof_start()
-                core.nvprof_enable_record_event()
-                core.nvprof_nvtx_push(str(step))
-            if step == 25:
-                core.nvprof_nvtx_pop()
-                core.nvprof_stop()
-                sys.exit()
-            if step >= 20 and step < 25:
-                core.nvprof_nvtx_pop()
-                core.nvprof_nvtx_push(str(step))
-            #-----------------
-            
-            
             ret = exe.run(main_program,
                           feed=batch,
                           fetch_list=fetchs,

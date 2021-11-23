@@ -803,7 +803,6 @@ class GPTForPretraining(GPTPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
-        #with paddle.static.amp.fp16_guard():
         outputs = self.gpt(input_ids,
                         position_ids=position_ids,
                         attention_mask=attention_mask,
@@ -838,7 +837,6 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        #with paddle.static.amp.fp16_guard():
         masked_lm_loss = self.loss_func(prediction_scores,
                                         masked_lm_labels.unsqueeze(2))
 
