@@ -94,14 +94,13 @@ def do_predict(args):
         dtype='int64')
 
     with paddle.no_grad():
-        for i in range(1):
+        for i in range(100):
             # For warmup. 
-            if 0 == i:
+            if 50 == i:
                 start = time.time()
             paddle.device.cuda.synchronize()
             finished_seq, finished_scores = transformer(src_word=src_word)
         paddle.device.cuda.synchronize()
-        print(finished_seq)
         logger.info("Average test time for decoder is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
