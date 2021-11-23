@@ -20,7 +20,6 @@ import os
 import random
 import time
 import sys
-from paddle.fluid import core
 
 os.path.expandvars('$HOME')
 os.path.expanduser('~')
@@ -300,8 +299,8 @@ def do_train(args):
                 decay_step=args.decay_steps)
 
             clip = None
-            if args.grad_clip > 0:  
-                clip = paddle.fluid.clip.GradientClipByNorm(
+            if args.grad_clip > 0:
+                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
                 
 

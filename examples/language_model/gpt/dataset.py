@@ -390,8 +390,7 @@ class GPTDataset(paddle.io.Dataset):
                  build_data_file=False,
                  name="gpt",
                  max_seq_len=1024,
-                 seed=1234,
-                 use_pure_fp16=False):
+                 seed=1234):
         self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
@@ -399,7 +398,6 @@ class GPTDataset(paddle.io.Dataset):
         self.sample_ids = sample_ids
         self.sample_lens = sample_lens
         self.micro_batch_size = micro_batch_size
-        self.use_pure_fp16 = use_pure_fp16
 
         if documents is None:
             document_ids = np.arange(0, self.sample_lens.shape[0])
@@ -420,10 +418,7 @@ class GPTDataset(paddle.io.Dataset):
         seq_length = len(tokens)
 
         # The pad and eos tokens do not contribute the loss
-        if self.use_pure_fp16:
-            loss_mask = np.ones(seq_length, dtype="float16")
-        else:
-            loss_mask = np.ones(seq_length, dtype="float32")
+        loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
