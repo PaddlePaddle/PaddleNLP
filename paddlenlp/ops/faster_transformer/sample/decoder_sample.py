@@ -148,7 +148,6 @@ def do_predict(args):
                 memory_hidden_dim=args.d_model,
                 is_fuse_qkv=False)
         paddle.device.cuda.synchronize()
-        print(dec_output)
         logger.info("Average test time for decoder is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
