@@ -261,7 +261,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        false, /*is_fuse_topk_softMax*/
+        true,  /*is_fuse_topk_softMax*/
         false, /*is_fuse_qkv*/
         false, /*keep_alive_beam*/
         alpha,

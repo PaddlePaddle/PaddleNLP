@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=4, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
-        default=1,
+        default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(

@@ -1245,8 +1245,7 @@ __global__ void sampling(int* topk_tmp_id_buf,
                          const int candidate_num,
                          int random_num,
                          const int end_id,
-                         const int vocab_size,
-                         int seed) {
+                         const int vocab_size) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
   __shared__ float sum;
@@ -1265,11 +1264,8 @@ __global__ void sampling(int* topk_tmp_id_buf,
     }
 
     curandState_t local_state;
-    // TODO: fix randomly cannot work in some specific situation.
-    curand_init((T)(seed),
-                bid * candidate_num,
-                blockDim.x * candidate_num,
-                &local_state);
+    curand_init(
+        (T)0, bid * candidate_num, blockDim.x * candidate_num, &local_state);
     rand_num = (float)curand_uniform(&local_state) * sum;
 
     ids[bid] =
@@ -1308,9 +1304,6 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
                                          DecodingSamplingArguments args,
                                          cudaStream_t stream,
                                          const int batch_size) {
-  // TODO: check stochasticity.
-  std::minstd_rand engine;
-  int seed = std::random_device()();
   // This function would be called two or more times.
   // First time is used to get the workspace size, so we need to put
   // max batch size we want to use.
@@ -1364,8 +1357,7 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
                                                           candidate_num,
                                                           random_num,
                                                           end_id,
-                                                          vocab_size,
-                                                          seed);
+                                                          vocab_size);
   }
 }
 
@@ -1931,8 +1923,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
                                    const int vocab_size,
                                    const int random_num,
                                    const float prob_threshold,
-                                   T diversity_rate,
-                                   int seed) {
+                                   T diversity_rate) {
   typedef cub::BlockReduce<TopK<T, MAX_K>, THREADBLOCK_SIZE> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;
 
@@ -1973,8 +1964,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     }
 
     curandState_t local_state;
-    // TODO: fix randomly cannot work in some specific situation.
-    curand_init((T)(seed), block_id * MAX_K, blockDim.x * MAX_K, &local_state);
+    curand_init((T)0, block_id * MAX_K, blockDim.x * MAX_K, &local_state);
     T rand_num = (T)curand_uniform(&local_state) * (T)prob_threshold * sum;
 
     output_ids[block_id] = total.p[0] % vocab_size;
@@ -1990,18 +1980,13 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
   }
 }
 
-#define CASE_K(K, seed)                                                    \
+#define CASE_K(K)                                                          \
   case K:                                                                  \
     topK_topP_sampling_kernel<                                             \
         T,                                                                 \
         K,                                                                 \
-        block_size><<<batch_size, block_size, 0, stream>>>(output_ids,     \
-                                                           logits,         \
-                                                           vocab_size,     \
-                                                           random_num,     \
-                                                           prob_threshold, \
-                                                           0.0f,           \
-                                                           seed);          \
+        block_size><<<batch_size, block_size, 0, stream>>>(                \
+        output_ids, logits, vocab_size, random_num, prob_threshold, 0.0f); \
     break;
 
 template <typename T>
@@ -2013,10 +1998,6 @@ void topK_topP_sampling_kernel_kernelLauncher(void* workspace,
                                               DecodingSamplingArguments& args,
                                               cudaStream_t stream,
                                               const int batch_size) {
-  // TODO: verify stochasticity
-  std::minstd_rand engine;
-  int seed = std::random_device()();
-
   if (workspace == nullptr) {
     workspace_size = 0;
   } else {
@@ -2024,11 +2005,11 @@ void topK_topP_sampling_kernel_kernelLauncher(void* workspace,
     const int block_size = 256;
     const T prob_threshold = args.probability_threshold_;
     switch (args.candidate_num_) {
-      CASE_K(1, seed);
-      CASE_K(2, seed);
-      CASE_K(4, seed);
-      CASE_K(16, seed);
-      CASE_K(64, seed);
+      CASE_K(1);
+      CASE_K(2);
+      CASE_K(4);
+      CASE_K(16);
+      CASE_K(64);
       default:
         printf("[ERROR] Topk kernel does not support candidate_num = %d \n",
                args.candidate_num_);
