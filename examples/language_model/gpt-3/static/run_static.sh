@@ -1,9 +1,8 @@
 set -x
 export PADDLE_WITH_GLOO=0
 export FLAGS_call_stack_level=2
-#export FLAGS_allocator_strategy=naive_best_fit
+export FLAGS_allocator_strategy=naive_best_fit
 unset CUDA_VISIBLE_DEVICES
-export PYTHONPATH=$PYTHONPATH:../../../../
 
 rm -rf *.prototxt
 rm -rf core.*
@@ -12,10 +11,9 @@ rm -rf main_sharding*
 
 task_name="gpt-mp-sharding"
 rm -rf output/$task_name/log
-rm -rf output/$task_name/program_desc
 
-python3.8 -u  -m paddle.distributed.fleet.launch \
-    --gpus "6" \
+python -u  -m paddle.distributed.fleet.launch \
+    --gpus "4,5,6,7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en" \
@@ -23,15 +21,15 @@ python3.8 -u  -m paddle.distributed.fleet.launch \
     --output_dir "output/$task_name" \
     --max_seq_len 1024 \
     --micro_batch_size 8 \
-    --global_batch_size 8 \
-    --sharding_degree 1\
-    --mp_degree 1 \
+    --global_batch_size 16 \
+    --sharding_degree 2\
+    --mp_degree 2 \
     --dp_degree 1 \
     --pp_degree 1 \
     --use_sharding true \
-    --use_amp false \
-    --use_fp16 false \
-    --use_recompute false \
+    --use_amp true \
+    --use_fp16 true \
+    --use_recompute true \
     --max_lr 0.00015 \
     --min_lr 0.00001 \
     --max_steps 5000 \

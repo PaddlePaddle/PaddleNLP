@@ -89,7 +89,6 @@ def dist_optimizer(args, topo):
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
             "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
-            #"custom_black_list": ['c_softmax_with_cross_entropy'],
             "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
@@ -302,10 +301,6 @@ def do_train(args):
 
             clip = None
             if args.grad_clip > 0:  
-                """
-                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=args.grad_clip)
-                """
                 clip = paddle.fluid.clip.GradientClipByNorm(
                     clip_norm=args.grad_clip)
                 
@@ -351,8 +346,6 @@ def do_train(args):
     with open(program_desc_dir + "/startup_program.txt.%d" % worker_index,
               'w') as f:
         f.write(str(startup_program))
-
-    paddle.save(main_program, "./lenet.pdmodel")
 
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)

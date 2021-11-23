@@ -236,12 +236,7 @@ class MultiHeadAttention(nn.Layer):
             if attn_mask is not None:
                 product = product + attn_mask
             weights = F.softmax(product)
-        """
-        if attn_mask is not None:
-            product = product + attn_mask
 
-        weights = F.softmax(product)
-        """
         if self.dropout:
             weights = F.dropout(
                 weights,
@@ -755,12 +750,10 @@ class GPTModel(GPTPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        #attention_mask.stop_gradient = True
 
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            #tgt_mask=attention_mask,
             tgt_mask=None,
             use_cache=use_cache,
             cache=cache)

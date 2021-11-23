@@ -358,7 +358,6 @@ def create_pretrained_dataset(
                 batch_sampler=batch_sampler,
                 num_workers=1,
                 worker_init_fn=worker_init,
-                #collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
                 collate_fn=Tuple(Stack(), Stack(), Stack(), Stack()),
                 return_list=False)
         return data_loader
@@ -419,9 +418,6 @@ class GPTDataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # Attention mask for the attention calulate
-        #attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-        #                                                         seq_length))
 
         # The pad and eos tokens do not contribute the loss
         if self.use_pure_fp16:
@@ -431,8 +427,6 @@ class GPTDataset(paddle.io.Dataset):
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
-        #attention_mask = (attention_mask - 1.0) * 1e9
-        #attention_mask = attention_mask.astype("float32")
         labels = np.array(labels, dtype="int64")
         return [tokens, loss_mask, position_ids, labels]
 
