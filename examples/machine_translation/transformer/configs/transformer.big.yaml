@@ -69,7 +69,7 @@ label_smooth_eps: 0.1
 # decrease when meeting the end token. However, 'v2' always generates
 # longer results thus might do more calculation and be slower.
 beam_search_version: "v1"
-beam_size: 5
+beam_size: 4
 max_out_len: 1024
 # Indicating whether max_out_len in configurations is the length relative to
 # that of source text. Only works in `v2` temporarily.
@@ -77,6 +77,11 @@ use_rel_len: False
 # The power number in length penalty calculation. Only works in `v2` temporarily.
 # Please refer to GNMT <https://arxiv.org/pdf/1609.08144.pdf>.
 alpha: 0.6
+# Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation
+# <https://arxiv.org/abs/1611.08562>`_ for details. Bigger `diversity_rate`
+# would lead to more diversity. if `diversity_rate == 0` is equivalent to naive
+# BeamSearch. **NOTE**: Only works when using FasterTransformer temporarily.
+diversity_rate: 0.0
 # The number of decoded sentences to output.
 n_best: 1
 

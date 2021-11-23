@@ -17,6 +17,68 @@ TermTree（百科知识树）是一个描述所有中文词汇（包括概念、
 
 **注：** 与其他常见应用知识图谱不同，TermTree的核心是概念词，而非专名实体词。因为，在中文文本中，概念词的含义是相对稳定的，而专名实体词随应用变化（例如，不同电商有不同的商品实体集，不同的小说站有不同的小说实体集），因此，TermTree通过 “提供常用概念集 + 可插拔的应用实体集/应用知识图谱” 来达到支持不同的应用适配。
 
+## 自定义TermTree
+
+`termtree.py`文件中的TermTree类支持TermTree的加载、增加、保存操作，因为涉及到数据结构整体性和一致性，暂不支持删除和修改操作。下面提供了离线维护自定义TermTree的代码示例
+
+### 文件准备
+
+首先下载已有的TermTreeV1.0
+```shell
+wget https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz && tar -zxvf TermTree.V1.0.tar.gz
+```
+
+### TermTree维护与修改
+
+加载TermTreeV1.0，增加新的term
+```shell
+from termtree import TermTree
+
+# 加载百科知识树
+termtree = TermTree.from_dir("termtree_type.csv", "TermTree.V1.0")
+
+# 增加新term: 平原上的火焰
+termtree.add_term(term="平原上的火焰",
+                  base="eb",
+                  term_type="影视作品")
+
+# 保存修改, 执行后将在当前路径生成文件`termtree_data`，即新的自定义TermTree
+termtree.save("./")
+```
+
+#### API说明
+
+- ```python 
+  def add_term()
+  ```
+  
+- **参数**
+ - term (str): 待增加的term名称。
+ - base (str): term属于概念词（cb）还是实体词（eb）。
+ - term_type (str): term的主类别。
+ - sub_type (Optional[List[str]], optional): term的辅助类别或细分类别，非必选。
+ - sub_terms (Optional[List[str]], optional): 用于描述同类同名的term集，非必选。
+ - alias (Optional[List[str]], optional): term的常用别名，非必选。
+ - alias_ext (Optional[List[str]], optional): term的常用扩展别名，非必选。
+ - data (Optional[Dict[str, Any]], optional): 以dict形式构造该term节点，非必选。
+
+
+### 自定义Term-Linking
+
+Taskflow支持使用自定义TermTree实现自定义Term-Linking，该示例中"平原上的火焰"的Term-Linking如下:
+作品类_实体(wordtag_label) -> 影视作品_eb_平原上的火焰(term_id)
+
+```shell
+from paddlenlp import Taskflow
+
+wordtag = Taskflow("knowledge_mining", term_schema_path="termtree_type.csv", term_data_path="termtree_data")
+
+wordtag("《平原上的火焰》是今年新上映的电影")
+# [{'text': '《平原上的火焰》是今年新上映的电影', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '平原上的火焰', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 6, 'termid': '影视作品_eb_平原上的火焰'}, {'item': '》', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 8, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '今年', 'offset': 9, 'wordtag_label': '时间类', 'length': 2, 'termid': '时间阶段_cb_今年'}, {'item': '新', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_新'}, {'item': '上映', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_上映'}, {'item': '的', 'offset': 14, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '电影', 'offset': 15, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]
+```
+
+## 常见问题
+
 **常见问题1：为什么TermTree采用树状结构（Tree），而不是网状结构（Net/Graph）？**
 
 - 树结构是对知识空间的全划分，网状结构是对相关关系的描述和提炼。树结构更方便做到对词类体系的全面描述。

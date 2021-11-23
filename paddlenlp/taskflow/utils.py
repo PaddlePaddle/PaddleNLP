@@ -19,6 +19,8 @@ import json
 import warnings
 import contextlib
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import paddle
 from paddle.dataset.common import md5file
 from ..utils.log import logger
@@ -31,7 +33,7 @@ DOC_FORMAT = r"""
 DOWNLOAD_CHECK = False
 
 
-def download_file(save_dir, filename, url, md5=None, task=None):
+def download_file(save_dir, filename, url, md5=None):
     """
     Download the file from the url to specified directory. 
     Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use 
@@ -43,6 +45,26 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
+    fullname = os.path.join(save_dir, filename)
+    if os.path.exists(fullname):
+        if md5 and (not md5file(fullname) == md5):
+            logger.disable()
+            get_path_from_url(url, save_dir, md5)
+    else:
+        logger.info("Downloading {} from {}".format(filename, url))
+        logger.disable()
+        get_path_from_url(url, save_dir, md5)
+    logger.enable()
+    return fullname
+
+
+def download_check(task):
+    """
+    Check the resource statuc in the specified task.
+
+    Args:
+        task(string): The name of specified task. 
+    """
     logger.disable()
     global DOWNLOAD_CHECK
     if not DOWNLOAD_CHECK:
@@ -50,14 +72,7 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         checker = DownloaderCheck(task)
         checker.start()
         checker.join()
-    fullname = os.path.join(save_dir, filename)
-    if os.path.exists(fullname):
-        if md5 and (not md5file(fullname) == md5):
-            get_path_from_url(url, save_dir, md5)
-    else:
-        get_path_from_url(url, save_dir, md5)
     logger.enable()
-    return fullname
 
 
 def add_docstrings(*docstr):
@@ -262,7 +277,7 @@ class TermTree(object):
         return self._root
 
     def __load_type(self, file_path: str):
-        with open(file_path, "rt", newline="") as csvfile:
+        with open(file_path, "rt", newline="", encoding="utf8") as csvfile:
             file_handler = csv.DictReader(csvfile, delimiter="\t")
             for row in file_handler:
                 if row["type-1"] not in self:
@@ -420,18 +435,19 @@ class TermTree(object):
                 else:
                     return False, None
 
-    def build_from_dir(self, term_schema_path, term_data_path):
+    def build_from_dir(self, term_schema_path, term_data_path, linking=True):
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
             dir ([type]): [description]
         """
         self.__load_type(term_schema_path)
-        self.__load_file(term_data_path)
-        self.__build_sons()
+        if linking:
+            self.__load_file(term_data_path)
+            self.__build_sons()
 
     @classmethod
-    def from_dir(cls, term_schema_path, term_data_path) -> "TermTree":
+    def from_dir(cls, term_schema_path, term_data_path, linking) -> "TermTree":
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
@@ -441,7 +457,7 @@ class TermTree(object):
             TermTree: [description]
         """
         term_tree = cls()
-        term_tree.build_from_dir(term_schema_path, term_data_path)
+        term_tree.build_from_dir(term_schema_path, term_data_path, linking)
         return term_tree
 
     def __dfs(self,
@@ -487,3 +503,116 @@ class TermTree(object):
                 node = self[nid]
                 if node.node_type == "term":
                     print(node, file=fp)
+
+
+def levenstein_distance(s1: str, s2: str) -> int:
+    """Calculate minimal Levenstein distance between s1 and s2.
+
+    Args:
+        s1 (str): string
+        s2 (str): string
+
+    Returns:
+        int: the minimal distance.
+    """
+    m, n = len(s1) + 1, len(s2) + 1
+    
+    # Initialize
+    dp = [[0] * n for i in range(m)]
+    dp[0][0] = 0
+    for i in range(1, m):
+        dp[i][0] = dp[i - 1][0] + 1
+    for j in range(1, n):
+        dp[0][j] = dp[0][j - 1] + 1
+
+    for i in range(1, m):
+        for j in range(1, n):
+            if s1[i - 1] != s2[j - 1]:
+                dp[i][j] = min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1
+            else:
+                dp[i][j] = dp[i - 1][j - 1]
+    return dp[m - 1][n - 1]
+
+
+class BurkhardKellerNode(object):
+    """Node implementatation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
+
+    Args:
+        word (str): word of current node.
+    """
+
+    def __init__(self, word: str):
+        self.word = word
+        self.next = {}
+
+
+class BurkhardKellerTree(object):
+    """Implementataion of BK-Tree
+    """
+
+    def __init__(self):
+        self.root = None
+        self.nodes = {}
+
+    def __add(self, cur_node: BurkhardKellerNode, word: str):
+        """Insert a word into current tree. If tree is empty, set this word to root.
+
+        Args:
+            word (str): word to be inserted.
+        """
+        if self.root is None:
+            self.root = BurkhardKellerNode(word)
+            return
+        if word in self.nodes:
+            return
+        dist = levenstein_distance(word, cur_node.word)
+        if dist not in cur_node.next:
+            self.nodes[word] = cur_node.next[dist] = BurkhardKellerNode(word)
+        else:
+            self.__add(cur_node.next[dist], word)
+
+    def add(self, word: str):
+        """Insert a word into current tree. If tree is empty, set this word to root.
+
+        Args:
+            word (str): word to be inserted.
+        """
+        return self.__add(self.root, word)
+
+    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
+        res = []
+        if cur_node is None:
+            return res
+        dist = levenstein_distance(cur_node.word, s)
+        if dist <= threshold:
+            res.append((cur_node.word, dist))
+        start = max(dist - threshold, 1)
+        while start < dist + threshold:
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
+            res.extend(tmp_res)
+            start += 1
+        return res
+
+    def search_similar_word(self, word: str) -> List[str]:
+        """Search the most similar (minimal levenstain distance) word between `s`.
+
+        Args:
+            s (str): target word
+
+        Returns:
+            List[str]: similar words.
+        """
+        res = self.__search_similar_word(self.root, word)
+
+        def max_prefix(s1: str, s2: str) -> int:
+            res = 0
+            length = min(len(s1), len(s2))
+            for i in range(length):
+                if s1[i] == s2[i]:
+                    res += 1
+                else:
+                    break
+            return res
+
+        res.sort(key=lambda d: (d[1], -max_prefix(d[0], word)))
+        return res

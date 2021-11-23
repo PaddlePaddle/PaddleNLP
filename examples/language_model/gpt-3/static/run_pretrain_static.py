@@ -33,11 +33,13 @@ from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
 # Used to load the data_tools path, should import before dataset
-sys.path.insert(0, "../../")
+filepath = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(filepath, "../../"))
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
@@ -413,7 +415,13 @@ def do_train(args):
         valid_data_loader = valid_data_loader()
         test_data_loader = test_data_loader()
 
+        train_reader_cost = 0.0
+        train_run_cost = 0.0
+        reader_start = time.time()
         for step, batch in enumerate(train_data_loader()):
+            train_reader_cost += time.time() - reader_start
+            train_start = time.time()
+
             global_step += 1
 
             
@@ -438,20 +446,30 @@ def do_train(args):
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+            train_run_cost += time.time() - train_start
+
+            # Profile for model benchmark
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
                     loss_return, lr_return = ret
-                    speed = args.logging_freq / (time.time() - tic_train)
+                    #speed = args.logging_freq / (time.time() - tic_train)
+                    speed = args.logging_freq / (
+                        train_reader_cost + train_run_cost)
+                    avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, loss_return[0], speed,
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        % (global_step, epoch, step, loss_return[0],
+                           avg_reader_cost, 1. / speed, speed,
                            speed * args.global_batch_size * args.max_seq_len,
                            lr_return[0]))
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)
                 tic_train = time.time()
+                train_reader_cost = 0.0
+                train_run_cost = 0.0
 
             if args.check_accuracy:
                 if global_step >= args.max_steps:
@@ -477,7 +495,7 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
-                if global_step == args.save_steps:
+                if global_step <= args.save_steps:
                     model.init_config["init_args"][0].init_config.pop("topo",
                                                                       None)
                 model.save_pretrained(output_dir)
@@ -494,6 +512,8 @@ def do_train(args):
                              epoch, topo.is_last, eval_fetch, "test")
                 del train_data_loader
                 return
+            reader_start = time.time()
+
         epoch += 1
 
 

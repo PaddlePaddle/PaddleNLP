@@ -23,6 +23,8 @@
 └── utils.py                    # 通用函数工具
 ```
 
+* 注：论文中暂未开源融合字音特征的预训练模型参数(即MLM-phonetics)，所以本文提供的纠错模型是在ERNIE-1.0的参数上进行Finetune，纠错模型结构与论文保持一致。
+
 ## 安装依赖项
 ```
 pip install -r requirements.txt

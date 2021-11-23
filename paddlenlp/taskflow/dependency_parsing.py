@@ -63,6 +63,7 @@ usage = r"""
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
+
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
            ddp("百度是一家高科技公司")
            '''
@@ -148,8 +149,8 @@ class DDParserTask(Task):
 
     def _construct_input_spec(self):
         """
-       Construct the input spec for the convert dygraph model to static model.
-       """
+        Construct the input spec for the convert dygraph model to static model.
+        """
         self._input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),
