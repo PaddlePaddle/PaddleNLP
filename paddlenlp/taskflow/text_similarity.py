@@ -25,13 +25,13 @@ usage = r"""
          similarity = Taskflow("text_similarity")
          similarity([["世界上什么东西最小", "世界上什么东西最小？"]])
          '''
-         [{'query': '世界上什么东西最小', 'title': '世界上什么东西最小？', 'similarity': 0.992725}]
+         [{'text1': '世界上什么东西最小', 'text2': '世界上什么东西最小？', 'similarity': 0.992725}]
          '''
 
          similarity = Taskflow("text_similarity", batch_size=2)
          similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])
          '''
-         [{'query': '光眼睛大就好看吗', 'title': '眼睛好看吗？', 'similarity': 0.7450271}, {'query': '小蝌蚪找妈妈怎么样', 'title': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
+         [{'text1': '光眼睛大就好看吗', 'text2': '眼睛好看吗？', 'similarity': 0.74502707}, {'text1': '小蝌蚪找妈妈怎么样', 'text2': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
          '''
          """
 
@@ -172,8 +172,8 @@ class TextSimilarityTask(Task):
         final_results = []
         for text, similarity in zip(inputs['text'], inputs['result']):
             result = {}
-            result['query'] = text[0]
-            result['title'] = text[1]
+            result['text1'] = text[0]
+            result['text2'] = text[1]
             result['similarity'] = similarity
             final_results.append(result)
         return final_results
