@@ -291,7 +291,7 @@ class Predictor(object):
         # Postprocess time
         if args.benchmark:
             self.autolog.times.end(stamp=True)
-        return results
+        return results, preds_list
 
 
 if __name__ == "__main__":
@@ -306,13 +306,15 @@ if __name__ == "__main__":
             infer_ds += [line.strip()]
     predictor = Predictor(args.model_dir, args.device, args.max_seq_len)
 
-    results = predictor.predict(
+    results, preds_list = predictor.predict(
         infer_ds,
         word_vocab,
         label_vocab,
         normlize_vocab,
         batch_size=args.batch_size)
 
+    for idx, preds in enumerate(preds_list):
+        print("{}\t{}".format(idx, preds))
     # for idx, result in enumerate(results):
     #     print('Text: {}'.format(infer_ds[idx]))
     #     sent_tags = []
