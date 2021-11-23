@@ -72,3 +72,5 @@ from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
+from .layoutlm.modeling import *
+from .layoutlm.tokenizer import *
