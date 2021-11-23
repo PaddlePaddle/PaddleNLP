@@ -28,7 +28,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --pp_degree 1 \
     --use_sharding true \
     --use_amp true \
-    --use_fp16 true \
+    --amp_level "O2" \
     --use_recompute true \
     --max_lr 0.00015 \
     --min_lr 0.00001 \

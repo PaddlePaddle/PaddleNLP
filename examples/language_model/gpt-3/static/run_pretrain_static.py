@@ -91,7 +91,7 @@ def dist_optimizer(args, topo):
             "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
-            "use_pure_fp16": args.use_fp16,
+            "use_pure_fp16": args.amp_level=="O2",
             "use_fp16_guard": False
         }
     if args.use_sharding:
@@ -352,7 +352,7 @@ def do_train(args):
     test_program = main_program.clone(for_test=True)
     
     
-    if args.use_amp and args.use_fp16:
+    if args.use_amp and args.amp_level=="O2":
         optimizer.amp_init(place)
     
 
