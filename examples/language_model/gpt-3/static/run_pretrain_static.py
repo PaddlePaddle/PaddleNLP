@@ -88,7 +88,7 @@ def dist_optimizer(args, topo):
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
             "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
             "use_pure_fp16": args.amp_level=="O2",
