@@ -217,12 +217,7 @@ class Predictor(object):
                 warmup=0,
                 logger=logger)
 
-    def predict(self,
-                data,
-                word_vocab,
-                label_vocab,
-                normlize_vocab,
-                batch_size=1):
+    def predict(self, data, word_vocab, label_vocab, normlize_vocab):
         """
         Predicts the data labels.
 
@@ -232,7 +227,6 @@ class Predictor(object):
             word_vocab(obj:`dict`): The word id (key) to word str (value) map.
             label_vocab(obj:`dict`): The label id (key) to label str (value) map.
             normlize_vocab(obj:`dict`): The fullwidth char (key) to halfwidth char (value) map.
-            batch_size(obj:`int`, defaults to 1): The number of batch.
 
         Returns:
             results(obj:`dict`): All the predictions labels.
@@ -256,8 +250,8 @@ class Predictor(object):
         ): fn(samples)
 
         batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            examples[idx:idx + self.batch_size]
+            for idx in range(0, len(examples), self.batch_size)
         ]
 
         results = []
@@ -304,22 +298,14 @@ if __name__ == "__main__":
             encoding="utf-8") as fp:
         for line in fp.readlines():
             infer_ds += [line.strip()]
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_len)
-
-    results, preds_list = predictor.predict(
-        infer_ds,
-        word_vocab,
-        label_vocab,
-        normlize_vocab,
-        batch_size=args.batch_size)
+    predictor = Predictor(args.model_dir, args.device, args.max_seq_len,
+                          args.batch_size, args.use_tensorrt, args.precision,
+                          args.enable_mkldnn)
+    results, preds_list = predictor.predict(infer_ds, word_vocab, label_vocab,
+                                            normlize_vocab)
 
     for idx, preds in enumerate(preds_list):
         print("{}\t{}".format(idx, preds))
-    # for idx, result in enumerate(results):
-    #     print('Text: {}'.format(infer_ds[idx]))
-    #     sent_tags = []
-    #     sent, tags = result
-    #     sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
-    #     print('Result: {}\n'.format(sent_tag))
+
     if args.benchmark:
         predictor.autolog.report()

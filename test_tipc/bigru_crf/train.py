@@ -17,6 +17,7 @@ import time
 import ast
 import math
 import argparse
+import random
 from functools import partial
 
 import numpy as np
@@ -48,6 +49,13 @@ parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, he
 # yapf: enable
 
 
+def set_seed(seed):
+    """sets random seed"""
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
+
+
 @paddle.no_grad()
 def evaluate(model, metric, data_loader):
     model.eval()
@@ -68,7 +76,7 @@ def evaluate(model, metric, data_loader):
 
 def train(args):
     paddle.set_device(args.device)
-
+    set_seed(102)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
         paddle.distributed.init_parallel_env()
