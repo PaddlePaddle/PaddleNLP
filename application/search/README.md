@@ -1,15 +1,47 @@
-# 语义索引工业级别方案
+# 手把手搭建一个语义检索系统 
 
-语义索引技术是搜索引擎、推荐系统、广告系统在召回阶段的核心技术之一， 语义索引模型的效果直接决定了语义相关的物料能否被成功召回进入系统参与上层排序，从基础层面影响整个系统的效果。
+## 1. 场景概述
 
-语义索引库提供了前沿语义索引策略的训练、语义索引模型的效果评估方案、支持用户基于我们开源的语义索引模型进行文本 Pair 的相似度计算或者 Embedding 语义表示抽取。
+检索系统存在于我们日常使用的很多产品中，比如商品搜索系统、学术文献检索系统…
+
+这里我们提供了检索系统完整实现。限定场景是用户通过输入检索词query，快速得在海量数据中查找相似文档。
+
+所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户query字面本身，而是能精准捕捉到用户query后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语言模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
+
+## 2. 产品功能介绍
+
+通常检索业务的数据都比较庞大，都会分为召回（索引）、排序两个环节。通过召回模块获取候选结果，通过排序模块引入更多特征、或使用更复杂模型进行精细化排序。
+
+介绍下召回和排序的召回，召回阶段主要是从至少千万级别的候选集合里面，筛选出相关的文档，这样候选集合的数目就会大大降低，在之后的排序阶段就可以使用一些复杂的模型做精细化或者个性化的排序。排序是对召回方法的结果进行统一的打分，这个召回方法可能是多种方法的召回结果的聚合，经过统一的打分以后就能够选出最优的TopK的结果了。
+
+索引环节有两类方法：基于字面的关键词索引；语义索引。语义索引能够较好地表征语义信息，解决字面不相似但语义相似的情形。
+
+这里我们仅介绍语义索引的方法。排序阶段我们采用的是基于ERNIE-Gram的单塔语义索引。
+
+### 2.1 召回模块
+
+功能介绍：如何从千亿、万亿等海量数据中快速召回候选数据。这一步将得到文本的Embedding，并借助向量搜索引擎实现高效ANN，实现候选集召回。
+
+![](./img/recall_mindmap.png)
+
+我们针对大规模无监督数据、有监督数据两种情况推出两种语义索引方案，如上图：
+您可以参照此方案，快速建立语义索引。
+数据量要求：
+
+如果想进一步提升模型效果：还可以使用大规模业务数据，对预训练模型进行Post-Training，训练完以后得到预训练模型，再进行无监督的SimCSE。
+
+此外，如果您同时拥有监督数据和无监督数据，我们推荐将两种方案结合使用，这样能训练出更加强大的语义索引模型。对SimCSE之后的模型，通过in-batch negative方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，利用milvus就可以很高效的实现召回了。
+
+![](./img/recall_pipeline.png)
+
+### 2.2 排序模块
+
+基于预训练模型 ERNIE-Gram 训练单塔 Point-wise语义匹配模型。
 
 
-![](./img/semantic_indexing_architecture.png)
+## 3. 万方文献检索实践
 
-上图是开源的语义索引的工业级别的解决方案，首先是利用Ernie模型进行Post-Training，训练完以后得到预训练模型，然后再进行无监督的SimCSE进行无监督训练，最后利用in-batch negative方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，然后利用milvus就可以很方便的实现召回了。
-
-## 数据集介绍
+### 3.1 数据说明
 
 数据集来源于万方系统的点击数据，总共600万条，经过数据去重和过滤掉脏数据后，剩下的数据量是4017738条。数据的格式为：
 
@@ -27,7 +59,48 @@ Post-Training的时候使用的是全量的数据，使用了文本的query,titl
 |  无监督预训练 |  20000 | 300000 |7984598 |
 |  有监督训练 | 20000  | 300000 |3998 |
 
-## Post-Training
+
+
+### 3.2 技术方案和评估指标
+
+#### 3.2.1 技术方案
+
+**语义索引**：结合SimCSE和In-batch Negative方案，并采取Post-Training优化模型效果
+
+**排序**：使用ERNIE-Gram的单塔结构对召回后的数据精排序。
+
+首先是利用Ernie模型进行Post-Training，训练完以后得到预训练模型，然后再进行无监督的SimCSE进行无监督训练，最后利用in-batch negative方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，然后利用milvus就可以很方便的实现召回了。
+
+#### 3.2.2 评估指标
+
+### 3.3 运行环境和安装说明
+
+（1）运行环境
+
+a. 软件环境：
+
+```
+python 3.x
+paddlenlp                          2.1.1        
+paddlepaddle-gpu                   2.1.3.post101
+CUDA Version: 10.2
+NVIDIA Driver Version: 440.64.00 
+```
+b. 硬件环境：
+
+```
+NVIDIA Tesla V100 16GB x4卡
+```
+
+## 4. 动手实践——搭建自己的检索系统
+
+这里展示了能够从头至尾跑通的完整代码，您使用自己的业务数据，照着跑，能搭建出一个给定query，返回topN相关文档的小型检索系统。请参照我们给出的效果、性能数据，check自己的运行过程是否正确。
+
+### 4.1 召回阶段
+
+**召回模型训练**
+
+第一步：Post-Training
 
 训练教程请参考：
 
@@ -73,16 +146,17 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
 python3 ernie_static_to_dynamic.py
 ```
 
-## 无监督预训练
+第二步：无监督预训练
 
-### 数据格式
+无监督预训练的数据的数据格式为：
 
 ```
 煤矸石-污泥基活性炭介导强化污水厌氧消化
 睡眠障碍与常见神经系统疾病的关系睡眠觉醒障碍,神经系统疾病,睡眠,快速眼运动,细胞增殖,阿尔茨海默病
 ......
 ```
-### 训练
+
+下面是训练的过程：
 
 无监督预训练的教程请参考SimCSE的文档：
 
@@ -106,7 +180,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--test_set_file "./data/test.csv" 
 ```
 
-## 有监督训练
+第三步：有监督训练
 
 有监督训练的教程请参考InbatchNegative的文档：
 
@@ -129,7 +203,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --init_from_ckpt simcse/post_model_10000/model_state.pdparams
 ```
 
-## 效果评估
+召回阶段的效果评估：
 
 
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
@@ -138,11 +212,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 |  Inbatch-negative+simcse |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
 |  post+Inbatch-negative+simcse |  58.248 | 75.099| 79.813| 83.801|87.733| Ernie预训练，simcse无监督训训练，Inbatch-negative有监督训练|
 
+**召回系统搭建**
 
-
-## 召回系统
-
-### 效果展示
 我们首先展示一下系统的效果，首先输入的文本如下：
 
 ```
@@ -174,11 +245,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 ......
 
 ```
-### 数据生成
-我们基于万方和开源的数据集构造生成了面向语义索引的训练集、评估集、召回库。
 
-
-#### 构造训练集
+基于万方和开源的数据集构造生成了面向语义索引的召回库。
 
 数据集的样例如下，有两种，第一种是title+keywords进行拼接；第二种是一句话。
 
@@ -189,11 +257,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 ....
 ```
 
-
-#### Milvus召回
+数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索：
 
 我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1版本，搭建完以后启动milvus
-
 
 ```
 cd [Milvus root path]/core/milvus
@@ -202,6 +268,7 @@ cd scripts
 ./start_server.sh
 
 ```
+
 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量：
 
 ```
@@ -232,7 +299,6 @@ python3 embedding_insert.py
 |  数据量 |  时间 | 
 | ------------ | ------------ |
 |1000万条|12min24s|
-
 
 另外，milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
 
@@ -266,12 +332,130 @@ python3 inference.py
 
 ```
 
-## 排序系统
 
-+ Ernie-Gram精排
+### 4.2 排序阶段
 
+排序阶段使用的模型是ERNIE-Gram，ERNIE-Gram的详细运行步骤请参考下面的链接：
+
+
+https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/ernie_matching
+
+|  训练集 | 测试集 | 
+| ------------ | ------------ | 
+ |  59849| 29924 |
+
+
+数据集使用的是万方的数据集，可以运行下面的命令，在训练集（wanfang_train.csv）上进行单塔 Point-wise 模型训练，并在测试集（wanfang_test.csv）验证。
+```shell
+$ unset CUDA_VISIBLE_DEVICES
+python -u -m paddle.distributed.launch --gpus "0" train_pointwise.py \
+        --device gpu \
+        --save_dir ./checkpoints \
+        --batch_size 32 \
+        --learning_rate 2E-5
+```
+也可以直接执行下面的命令：
+
+```
+sh train.sh
+```
+
+可支持配置的参数：
+
+* `save_dir`：可选，保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
+* `max_seq_length`：可选，ERNIE-Gram 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
+* `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。
+* `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.0。
+* `epochs`: 训练轮次，默认为3。
+* `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
+* `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
+* `seed`：可选，随机种子，默认为1000.
+* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
+
+
+程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
+如：
+```text
+checkpoints/
+├── model_100
+│   ├── model_state.pdparams
+│   ├── tokenizer_config.json
+│   └── vocab.txt
+└── ...
+```
+
+**NOTE:**
+* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
+
+模型训练结束后，进行动态图模型预测，本案例用万方的测试集作为预测数据,  测试数据示例如下，：
+
+```text
+基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试      基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测     1
+肺炎链球菌脑膜炎        儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点     1
+小学生  学习态度        数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养 1
+乙状结肠冗长症的诊断及手术治疗  乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗    1
+电动叉车线控转向系统建模与控制策略研究  电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术     1
+基于Python的京东        一种基于Python的商品评论数据智能获取与分析技术商品评论,Python,爬虫,分词,数据分析        1
+广西横县华支睾吸虫      广西横县集贸市场淡水鱼虾华支睾吸虫囊蚴感染调查淡水鱼、虾,华支睾吸虫,囊蚴,感染   1
+. 从国家自然科学基金申请和评审程序 探讨如何提高申请书质量       从国家自然科学基金申请和评审程序探讨如何提高申请书质量国家自然科学基金,申请书,评审程序,撰写提纲,写作技巧   1
+```
+
+下面是启动预测的命令：
+
+```shell
+$ unset CUDA_VISIBLE_DEVICES
+python -u -m paddle.distributed.launch --gpus "0" \
+        predict_pointwise.py \
+        --device gpu \
+        --params_path "./checkpoints/model_4400/model_state.pdparams"\
+        --batch_size 128 \
+        --max_seq_length 64 \
+        --input_file 'test.tsv'
+```
+也可以直接执行下面的命令：
+
+```
+sh predict.sh
+```
+
+输出预测结果如下:
+```text
+{'query': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试', 'title': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测', 'label': 1, 'pred_label': 1}
+{'query': '肺炎链球菌脑膜炎', 'title': '儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点', 'label': 1, 'pred_label': 1}
+{'query': '小学生  学习态度', 'title': '数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养', 'label': 1, 'pred_label': 1}
+{'query': '乙状结肠冗长症的诊断及手术治疗', 'title': '乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗', 'label': 1, 'pred_label': 1}
+{'query': '电动叉车线控转向系统建模与控制策略研究', 'title': '电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术', 'label': 1, 'pred_label': 1}
+```
+
+对于有部署需求的，选择静态图部署预测，首先把动态图的模型导出为静态图，使用静态图导出工具 `export_model.py` 将动态图参数导出成静态图参数。 执行如下命令：
+
+`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+
+也可以直接执行命令：
+
+```
+sh export.sh
+```
+
+其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
+
+
+导出静态图模型之后，可以基于静态图模型进行预测，`deploy/python/predict.py` 文件提供了静态图预测示例。执行如下命令：
+
+`python deploy/python/predict.py --model_dir ./output`
+
+也可以直接执行命令：
+
+```
+sh deploy.sh
+```
 
 ## Reference
+
 [1] Tianyu Gao, Xingcheng Yao, Danqi Chen: SimCSE: Simple Contrastive Learning of Sentence Embeddings. EMNLP (1) 2021: 6894-6910
 
 [2] Vladimir Karpukhin, Barlas Oğuz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih, Dense Passage Retrieval for Open-Domain Question Answering, Preprint 2020.
+
+[3] Dongling Xiao, Yu-Kun Li, Han Zhang, Yu Sun, Hao Tian, Hua Wu, Haifeng Wang:
+ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding. NAACL-HLT 2021: 1702-1715
