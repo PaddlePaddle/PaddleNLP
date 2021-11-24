@@ -6,7 +6,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 
 <p align="center">
-  <img src="../../../docs/imgs/faster_generation.png" width="400" height ="500" />
+  <img src="../../../docs/imgs/faster_generation.png" width="400" height ="600" />
 </p>
 
 ## Featrues
