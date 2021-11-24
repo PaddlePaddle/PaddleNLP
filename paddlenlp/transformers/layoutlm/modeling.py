@@ -51,36 +51,37 @@ class LayoutLMPooler(Layer):
         return pooled_output
 
 
+'''
 class LayoutLMEmbeddings(Layer):
     """
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self, config):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 max_2d_position_embeddings=1024,
+                 layer_norm_eps=1e-12,
+                 type_vocab_size=16,
+                 pad_token_id=0):
         super(LayoutLMEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            config["vocab_size"], config["hidden_size"], padding_idx=0)
-        self.position_embeddings = nn.Embedding(
-            config["max_position_embeddings"], config["hidden_size"])
+        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         # gry add for layoutlm
-        self.x_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.y_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.h_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["coordinate_size"])
-        self.w_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["coordinate_size"])
+        self.x_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
+        self.y_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
+        self.h_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
+        self.w_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
         # end of gry add for layoutlm
-        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"],
-                                                  config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(
-            config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
 
         self.register_buffer(
             "position_ids",
-            paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
+            paddle.arange(max_position_embeddings).expand((1, -1)))
 
     def forward(self,
                 input_ids,
@@ -98,7 +99,7 @@ class LayoutLMEmbeddings(Layer):
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
+        words_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
         try:
@@ -121,7 +122,88 @@ class LayoutLMEmbeddings(Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = (
-            input_embedings + position_embeddings + left_position_embeddings +
+            words_embedings + position_embeddings + left_position_embeddings +
+            upper_position_embeddings + right_position_embeddings +
+            lower_position_embeddings + h_position_embeddings +
+            w_position_embeddings + token_type_embeddings)
+
+        embeddings = self.layer_norm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
+'''
+
+
+class LayoutLMEmbeddings(Layer):
+    """
+    Include embeddings from word, position and token_type embeddings
+    """
+
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 max_2d_position_embeddings=1024,
+                 type_vocab_size=16):
+        super().__init__()
+        self.word_embeddings = nn.Embedding(
+            vocab_size, hidden_size, padding_idx=0)
+        self.position_embeddings = nn.Embedding(max_position_embeddings,
+                                                hidden_size)
+        # gry add for layoutlm
+        self.x_position_embeddings = nn.Embedding(max_2d_position_embeddings,
+                                                  hidden_size)
+        self.y_position_embeddings = nn.Embedding(max_2d_position_embeddings,
+                                                  hidden_size)
+        self.h_position_embeddings = nn.Embedding(max_2d_position_embeddings,
+                                                  hidden_size)
+        self.w_position_embeddings = nn.Embedding(max_2d_position_embeddings,
+                                                  hidden_size)
+        # end of gry add for layoutlm
+        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
+
+    def forward(self,
+                input_ids,
+                bbox=None,
+                token_type_ids=None,
+                position_ids=None):
+        if position_ids is None:
+            ones = paddle.ones_like(input_ids, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=-1)
+
+            position_ids = seq_length - ones
+            position_ids.stop_gradient = True
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+
+        word_embeddings = self.word_embeddings(input_ids)
+        position_embeddings = self.position_embeddings(position_ids)
+
+        # gry add
+        try:
+            left_position_embeddings = self.x_position_embeddings(bbox[:, :, 0])
+            upper_position_embeddings = self.y_position_embeddings(bbox[:, :,
+                                                                        1])
+            right_position_embeddings = self.x_position_embeddings(bbox[:, :,
+                                                                        2])
+            lower_position_embeddings = self.y_position_embeddings(bbox[:, :,
+                                                                        3])
+        except IndexError as e:
+            raise IndexError(
+                "The :obj:`bbox`coordinate values should be within 0-1000 range."
+            ) from e
+        h_position_embeddings = self.h_position_embeddings(bbox[:, :, 3] -
+                                                           bbox[:, :, 1])
+        w_position_embeddings = self.w_position_embeddings(bbox[:, :, 2] -
+                                                           bbox[:, :, 0])
+        # end of gry add
+
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = (
+            word_embeddings + position_embeddings + left_position_embeddings +
             upper_position_embeddings + right_position_embeddings +
             lower_position_embeddings + h_position_embeddings +
             w_position_embeddings + token_type_embeddings)
@@ -135,21 +217,21 @@ class LayoutLMPretrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutlm-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
+            "vocab_size": 30522,
             "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "max_2d_position_embeddings": 1024,
+            "initializer_range": 0.02,
+            "layer_norm_eps": 1e-12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "use_cache": True,
-            "vocab_size": 30522
         },
         "layoutlm-large-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -186,14 +268,18 @@ class LayoutLMPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, (nn.Linear, nn.Embedding)):
+            # In the dygraph mode, use the `set_value` to reset the parameter directly,
+            # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.pretrained_init_configuration[
-                            "initializer_range"] if "initializer_range" in
-                        self.pretrained_init_configuration else 0.02,
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range") else
+                        self.bert.config["initializer_range"],
                         shape=layer.weight.shape))
+        elif isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-12
 
 
 @register_base_model
@@ -234,12 +320,35 @@ class LayoutLMModel(LayoutLMPretrainedModel):
 
     def __init__(
             self,
-            pool_act='tanh',
-            **kwargs, ):
+            vocab_size,
+            hidden_size=768,
+            num_hidden_layers=12,
+            num_attention_heads=12,
+            intermediate_size=3072,
+            hidden_act="gelu",
+            hidden_dropout_prob=0.1,
+            attention_probs_dropout_prob=0.1,
+            layer_norm_eps=1e-12,
+            max_position_embeddings=512,
+            max_2d_position_embeddings=1024,
+            type_vocab_size=16,
+            initializer_range=0.02,
+            pad_token_id=0,
+            pool_act="tanh", ):
         super(LayoutLMModel, self).__init__()
-        config = kwargs
-        self.config = kwargs
-        self.embeddings = LayoutLMEmbeddings(config)
+        #self.config = kwargs
+        self.num_hidden_layers = num_hidden_layers
+        self.pad_token_id = pad_token_id
+        self.initializer_range = initializer_range
+        '''
+        self.embeddings = LayoutLMEmbeddings(
+            vocab_size, hidden_size, hidden_dropout_prob,
+            max_position_embeddings, max_2d_position_embeddings,
+            layer_norm_eps, type_vocab_size, pad_token_id) '''
+        self.embeddings = LayoutLMEmbeddings(
+            vocab_size, hidden_size, hidden_dropout_prob,
+            max_position_embeddings, max_2d_position_embeddings,
+            type_vocab_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -249,18 +358,17 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = LayoutLMPooler(config["hidden_size"], pool_act)
+        self.pooler = LayoutLMPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                bbox=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                head_mask=None,
-                output_hidden_states=None,
-                output_attentions=None):
+    def forward(
+            self,
+            input_ids=None,
+            bbox=None,
+            token_type_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            output_hidden_states=False, ):
         r'''
         The LayoutLMModel forward method, overrides the `__call__()` special method.
 
@@ -315,44 +423,59 @@ class LayoutLMModel(LayoutLMPretrainedModel):
         input_shape = input_ids.shape
 
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
+            attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                axis=[1, 2])
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+        '''
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
         if position_ids is None:
             seq_length = input_shape[1]
             position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
+            position_ids = position_ids.expand_as(input_ids)'''
         if bbox is None:
-            bbox = paddle.zeros(input_shape + [4])
-
+            bbox = paddle.zeros(tuple(list(input_shape) + [4]), dtype="int64")
+        '''
         if head_mask is not None:
             if head_mask.dim() == 1:
                 head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(
                     -1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.config["num_hidden_layers"],
+                head_mask = head_mask.expand(self.num_hidden_layers,
                                              -1, -1, -1, -1)
             elif head_mask.dim() == 2:
                 head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
             head_mask = head_mask.to(dtype=next(self.parameters()).dtype)
         else:
-            head_mask = [None] * self.config["num_hidden_layers"]
+            head_mask = [None] * self.num_hidden_layers
+        '''
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             bbox=bbox,
             position_ids=position_ids,
             token_type_ids=token_type_ids, )
-        encoder_outputs = self.encoder(
-            embedding_output,
-            attention_mask=attention_mask,
-            position_ids=final_position_ids,
-            head_mask=head_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, )
-        sequence_output = encoder_outputs[0]
-        pooled_output = self.pooler(sequence_output)
 
-        return sequence_output, pooled_output
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = []
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+        else:
+            sequence_output = self.encoder(embedding_output, attention_mask)
+            pooled_output = self.pooler(sequence_output)
+        if output_hidden_states:
+            return encoder_outputs, pooled_output
+        else:
+            return sequence_output, pooled_output
 
 
 class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
