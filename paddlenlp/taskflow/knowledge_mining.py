@@ -213,7 +213,7 @@ class WordTagTask(Task):
         self._summary_num = 2
 
         if self._params_path:
-            self._task_path = os.path.abspath(self._params_path).rsplit("/", 1)[0]
+            self._task_path = os.path.dirname(os.path.realpath(self._params_path))
 
         self._load_static_model(self._params_path)
 
