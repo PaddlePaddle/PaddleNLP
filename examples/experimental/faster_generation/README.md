@@ -2,7 +2,12 @@
 
 FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
 
-功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数，关于该函数的详细介绍可以参考[generate](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html)。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为开启状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。
+功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数，关于该函数的详细介绍可以参考API文档[generate](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html)。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为开启状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。下图展示了FasterGeneration的启动流程：
+
+
+<p align="center">
+  <img src="../../../docs/imgs/faster_generation.png" width="400" height ="500" />
+</p>
 
 ## Featrues
 
@@ -12,10 +17,10 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
 
 ### Inference Model Support
-下表为PaddleNLP FasterGeneration的预训练模型和解码策略的支持情况（GPU）。
+下表为PaddleNLP FasterGeneration对预训练模型和解码策略的支持情况（GPU）。
 
 | Model Name | GPT2 |BART |mBART | UnifiedTransformer |
-|---| :----:| :-----:|:-----:| :------------------: |
+|:---:| :----:| :-----:|:-----:| :------------------: |
 | Model Structure| Decoder |Encoder-Decoder |  Encoder-Decoder | Prefix-LM  |
 |Beam Search           | ❌  | ✅  | ✅  | ✅  |
 |Top-K Sampling        | ✅  | ✅  | ✅  | ✅  |
@@ -49,7 +54,6 @@ python samples/gpt_sample.py
 
 ```sh
 ...
-Compiling user custom op, it will cost a few seconds.....
 2021-11-17 13:42:56,771 - INFO - execute command: cd /10.2/hub/PaddleNLP/paddlenlp/ops/extenstions && /usr/local/bin/python FasterTransformer_setup.py build
 INFO:utils.cpp_extension:execute command: cd /10.2/hub/PaddleNLP/paddlenlp/ops/extenstions && /usr/local/bin/python FasterTransformer_setup.py build
 grep: warning: GREP_OPTIONS is deprecated; please use an alias or script
@@ -75,11 +79,11 @@ Model input: 花间一壶酒，独酌无相亲。举杯邀明月，
 Result: 对影成三人。
 ```
 
-编译只会进行一次，之后再次使用高性能解码不需要重新编译了。`samples`文件夹中的其他示例的使用方法相同。更详细的使用教程可以参考[FasterGeneration加速生成AP](https://paddlenlp.readthedocs.io/zh/latest/advanced_guide/fastergeneration/fastergeneration.html)。
+编译只会进行一次，之后再次使用高性能解码不需要重新编译了。`samples`文件夹中的其他示例的使用方法相同。
 
 ## Generate Examples
 
-除了以上示例之外，PaddleNLP的examples中所有使用了`model.generate`的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
+除了以上示例之外，PaddleNLP的examples中大多使用了`model.generate`的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
 
 - [examples/dialogue/unified_transformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer)
 - [examples/language_model/gpt/faster_gpt](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt)

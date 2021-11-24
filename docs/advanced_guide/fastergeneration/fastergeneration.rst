@@ -9,12 +9,14 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
 - 解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 **8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/perf>`_ 。
-- 易用性强。功能的入口为 `model.generate` ，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
+- 易用性强。功能的入口为 `model.generate` ，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。下图展示了FasterGeneration的启动流程：
+
+.. image:: /imgs/faster_generation.png
 
 快速开始
 -----------
 
-为体现FasterGeneration的易用性，我们在 `samples` 文件夹中内置了几个典型任务示例，下面以基于GPT模型的中文文本续写任务为例：
+为体现FasterGeneration的易用性，我们在 `samples <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/samples>`_ 文件夹中内置了几个典型任务示例，下面以基于GPT模型的中文文本续写任务为例：
 
 .. code-block::
 
@@ -26,7 +28,6 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 .. code-block::
 
     ...
-    Compiling user custom op, it will cost a few seconds.....
     2021-11-17 13:42:56,771 - INFO - execute command: cd /10.2/hub/PaddleNLP/paddlenlp/ops/extenstions && /usr/local/bin/python FasterTransformer_setup.py build
     INFO:utils.cpp_extension:execute command: cd /10.2/hub/PaddleNLP/paddlenlp/ops/extenstions && /usr/local/bin/python FasterTransformer_setup.py build
     grep: warning: GREP_OPTIONS is deprecated; please use an alias or script
@@ -84,7 +85,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 关于该方法的更多参数可以参考API文档 `generate <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html>`_ 。
 
-`samples` 文件夹中的其他示例的使用方法相同。
+`samples <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/samples>`_ 文件夹中的其他示例的使用方法相同。
 
 其他示例
 -----------
@@ -96,9 +97,9 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - `examples/text_generation/unimo-text <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text>`_
 - `examples/text_summarization/bart <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_
 
-根据提示修改对应参数即可使用FasterGeneration加速生成。下面我们以 `Unified Transformer` 为例展示一下FasterGeneration的加速效果：
+根据提示修改对应参数即可使用FasterGeneration加速生成。下面我们以基于 `Unified Transformer` 的任务型对话为例展示一下FasterGeneration的加速效果：
 
-打开以上链接中Unified Transformer对应的example，找到README中对应预测的脚本。
+打开以上链接中Unified Transformer对应的example，找到README中对应预测的脚本。稍作修改如下：
 
 .. code-block::
 
@@ -113,7 +114,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
         --batch_size=4 \
         --min_dec_len=1 \
         --max_dec_len=64 \
-        --num_return_sequences=20 \
+        --num_return_sequences=1 \
         --decode_strategy=sampling \
         --top_k=5 \
         --device=gpu
@@ -149,13 +150,13 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 .. code-block::
 
-    step 10 - 2.979s/step
-    step 20 - 2.957s/step
-    step 30 - 2.971s/step
+    step 10 - 1.695s/step
+    step 20 - 1.432s/step
+    step 30 - 1.435s/step
 
-可以看到，非加速版 `generate()` 方法的预测速度为每个step耗时3秒左右。
+可以看到，非加速版 `generate()` 方法的预测速度为每个step耗时1.5秒左右。
 
-下面我们在启动脚本中传入 `--faster` 参数，这会让 `generate()` 方法传入 `use_faster=True` ，启动加速模式。同时我们需要将 `--min_dec_len` 设为0，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下：
+下面我们在启动脚本中传入 `--faster` 参数，这会让 `generate()` 方法传入 `use_faster=True` ，启动加速模式。同时我们需要设置 `--min_dec_len=0` ，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下：
 
 .. code-block::
 
@@ -170,7 +171,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
         --batch_size=4 \
         --min_dec_len=0 \
         --max_dec_len=64 \
-        --num_return_sequences=20 \
+        --num_return_sequences=1 \
         --decode_strategy=sampling \
         --top_k=5 \
         --device=gpu \
@@ -181,8 +182,8 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 .. code-block::
 
     [2021-11-23 13:38:09,200] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
-    step 10 - 1.691s/step
-    step 20 - 1.612s/step
-    step 30 - 1.641s/step
+    step 10 - 0.511s/step
+    step 20 - 0.343s/step
+    step 30 - 0.419s/step
 
-可以看到，FasterGeneration的预测速度为每个step耗时1.6秒左右，提速超过80%。如果减少 `num_return_sequences` ，可以得到更高的加速比。
+可以看到，FasterGeneration的预测速度为每个step耗时0.4秒左右，提速超过三倍。如果减少 `num_return_sequences` ，可以得到更高的加速比。
