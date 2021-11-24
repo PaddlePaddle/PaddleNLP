@@ -82,7 +82,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
         [2021-11-17 14:21:06,132] [ WARNING] - FasterGeneration is not available, and the original version would be used instead.
 
 
-关于该方法的详细介绍可以参考 `generate <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html>`_ 。
+关于该方法的更多参数可以参考API文档 `generate <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html>`_ 。
 
 `samples` 文件夹中的其他示例的使用方法相同。
 
@@ -96,4 +96,93 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - `examples/text_generation/unimo-text <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text>`_
 - `examples/text_summarization/bart <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_
 
-根据提示修改对应参数即可使用FasterGeneration加速生成。
+根据提示修改对应参数即可使用FasterGeneration加速生成。下面我们以 `Unified Transformer` 为例展示一下FasterGeneration的加速效果：
+
+打开以上链接中Unified Transformer对应的example，找到README中对应预测的脚本。
+
+.. code-block::
+
+    export CUDA_VISIBLE_DEVICES=0
+        python infer.py \
+        --model_name_or_path=unified_transformer-12L-cn-luge \
+        --output_path=./predict.txt \
+        --logging_steps=10 \
+        --seed=2021 \
+        --max_seq_len=512 \
+        --max_knowledge_len=256 \
+        --batch_size=4 \
+        --min_dec_len=1 \
+        --max_dec_len=64 \
+        --num_return_sequences=20 \
+        --decode_strategy=sampling \
+        --top_k=5 \
+        --device=gpu
+
+由于这里只是展示性能，我们直接在 `model_name_or_path` 填入PaddleNLP预训练模型名称 `unified_transformer-12L-cn-luge` 。
+
+可以看到，由于该任务为对话任务，我们为了防止模型生成过多安全回复（如：哈哈哈、不错等），保证生成结果具有更多的随机性，我们选择TopK-sampling作为解码策略，并让k=5。
+
+打开 `infer.py` ，可以看到我们传入的脚本参数大多都提供给了 `model.generate()` 方法：
+
+.. code-block::
+
+    output = model.generate(
+        input_ids=input_ids,
+        token_type_ids=token_type_ids,
+        position_ids=position_ids,
+        attention_mask=attention_mask,
+        seq_len=seq_len,
+        max_length=args.max_dec_len,
+        min_length=args.min_dec_len,
+        decode_strategy=args.decode_strategy,
+        temperature=args.temperature,
+        top_k=args.top_k,
+        top_p=args.top_p,
+        num_beams=args.num_beams,
+        length_penalty=args.length_penalty,
+        early_stopping=args.early_stopping,
+        num_return_sequences=args.num_return_sequences,
+        use_fp16_decoding=args.use_fp16_decoding,
+        use_faster=args.faster)
+
+运行脚本，输出结果如下：
+
+.. code-block::
+
+    step 10 - 2.979s/step
+    step 20 - 2.957s/step
+    step 30 - 2.971s/step
+
+可以看到，非加速版 `generate()` 方法的预测速度为每个step耗时3秒左右。
+
+下面我们在启动脚本中传入 `--faster` 参数，这会让 `generate()` 方法传入 `use_faster=True` ，启动加速模式。同时我们需要将 `--min_dec_len` 设为0，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下：
+
+.. code-block::
+
+    export CUDA_VISIBLE_DEVICES=0
+        python infer.py \
+        --model_name_or_path=unified_transformer-12L-cn-luge \
+        --output_path=./predict.txt \
+        --logging_steps=10 \
+        --seed=2021 \
+        --max_seq_len=512 \
+        --max_knowledge_len=256 \
+        --batch_size=4 \
+        --min_dec_len=0 \
+        --max_dec_len=64 \
+        --num_return_sequences=20 \
+        --decode_strategy=sampling \
+        --top_k=5 \
+        --device=gpu \
+        --faster
+
+再次运行脚本，输出结果如下（由于我们已经编译过高性能算子，所以这里不会从新编译）：
+
+.. code-block::
+
+    [2021-11-23 13:38:09,200] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
+    step 10 - 1.691s/step
+    step 20 - 1.612s/step
+    step 30 - 1.641s/step
+
+可以看到，FasterGeneration的预测速度为每个step耗时1.6秒左右，提速超过80%。如果减少 `num_return_sequences` ，可以得到更高的加速比。

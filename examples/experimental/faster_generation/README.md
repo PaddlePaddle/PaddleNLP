@@ -12,18 +12,21 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
 
 ### Inference Model Support
-下表为PaddleNLP FasterGeneration的预训练模型支持情况（GPU）。
+下表为PaddleNLP FasterGeneration的预训练模型和解码策略的支持情况（GPU）。
 
-|Model Structure | Decoder | Encoder-Decoder | Prefix-LM |
-|---| :----:| :-----:| :------------------: |
-|Model Name| GPT2  | BART  | UnifiedTransformer  |
-
-### Decoding Strategy Support
-下表为PaddleNLP FasterGeneration的解码策略支持情况。
-
-|  Library | Beam Search(with grown topk) | Diverse Sibling Search | Top-K Sampling | Top-P Sampling| Forced Decoding |
-|  ------  | :-----:| :------:| :-----:|:-------: | :---:|
-| PaddleNLP         | ✅  | ✅   | ✅  | ✅ | ✅ |
+| Model Name | GPT2 |BART |mBART | UnifiedTransformer |
+|---| :----:| :-----:|:-----:| :------------------: |
+| Model Structure| Decoder |Encoder-Decoder |  Encoder-Decoder | Prefix-LM  |
+|Beam Search           | ❌  | ✅  | ✅  | ✅  |
+|Top-K Sampling        | ✅  | ✅  | ✅  | ✅  |
+|Top-P Sampling        | ✅  | ✅  | ✅  | ✅  |
+|Diverse Sibling Search| ✅  | ✅  | ✅  | ✅  |
+|Diverse Beam Search   | ❌  | ❌  | ❌  | ❌  |
+|Forced Decoding       | ❌  | ❌  | ✅  | ❌  |
+|Length Penalty        | ❌  | ✅  | ✅  | ✅  |
+|Temperature           | ✅  | ✅  | ✅  | ✅  |
+|Repetition Penalty    | ✅  | ✅  | ✅  | ✅  |
+|Min Length            | ❌  | ❌  | ❌  | ❌  |
 
 ## Performence
 
@@ -72,7 +75,9 @@ Model input: 花间一壶酒，独酌无相亲。举杯邀明月，
 Result: 对影成三人。
 ```
 
-编译只会进行一次，之后再次使用高性能解码不需要重新编译了。`samples`文件夹中的其他示例的使用方法相同。
+编译只会进行一次，之后再次使用高性能解码不需要重新编译了。`samples`文件夹中的其他示例的使用方法相同。更详细的使用教程可以参考[FasterGeneration加速生成AP](https://paddlenlp.readthedocs.io/zh/latest/advanced_guide/fastergeneration/fastergeneration.html)。
+
+## Generate Examples
 
 除了以上示例之外，PaddleNLP的examples中所有使用了`model.generate`的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
 
@@ -89,3 +94,5 @@ Result: 对影成三人。
 ```
 
 根据提示修改对应参数即可使用FasterGeneration加速生成。
+
+更多有关FasterGeneration的使用教程，请参考[FasterGeneration加速生成API](https://paddlenlp.readthedocs.io/zh/latest/advanced_guide/fastergeneration/fastergeneration.html)
