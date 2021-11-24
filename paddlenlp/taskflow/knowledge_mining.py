@@ -25,6 +25,14 @@ from collections import OrderedDict
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddlenlp.layers.crf import LinearChainCrf
+from paddlenlp.utils.tools import compare_version
+if compare_version(paddle.version.full_version, "2.2.0") >= 0:
+    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+    from paddle.text import ViterbiDecoder
+else:
+    from paddlenlp.layers.crf import ViterbiDecoder
+
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
@@ -165,31 +173,49 @@ class WordTagTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
 
     """
-    def __init__(self, model, task, **kwargs):
+    def __init__(self, 
+                 model, 
+                 task,
+                 batch_size=1,
+                 params_path=None,
+                 tag_path=None,
+                 term_schema_path=None,
+                 term_data_path=None,
+                 **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._static_mode = False
+        self._tag_path = tag_path
+        self._params_path = params_path
+        self._term_schema_path = term_schema_path
+        self._term_data_path = term_data_path
         self._linking = self.kwargs[
             'linking'] if 'linking' in self.kwargs else False
-        term_schema_path = download_file(self._task_path, "termtree_type.csv",
-                                         URLS['termtree_type'][0],
-                                         URLS['termtree_type'][1])
-        term_data_path = download_file(self._task_path, "TermTree.V1.0",
-                                       URLS['TermTree.V1.0'][0],
-                                       URLS['TermTree.V1.0'][1])
-        tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
-                                 URLS['termtree_tags_pos'][0],
-                                 URLS['termtree_tags_pos'][1])
-        self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
-
+        if self._tag_path is None:
+            self._tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
+                                     URLS['termtree_tags_pos'][0],
+                                     URLS['termtree_tags_pos'][1])
+        self._tags_to_index, self._index_to_tags = self._load_labels(self._tag_path)
+            
+        self._construct_tokenizer(model)
+        if self._term_schema_path is None:
+            term_schema_path = download_file(self._task_path, "termtree_type.csv",
+                                            URLS['termtree_type'][0],
+                                            URLS['termtree_type'][1])
+        if self._term_data_path is None:
+            term_data_path = download_file(self._task_path, "TermTree.V1.0",
+                                        URLS['TermTree.V1.0'][0],
+                                        URLS['TermTree.V1.0'][1])
         self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
                                            self._linking)
-        self._construct_tokenizer(model)
+        
+        self.crf = LinearChainCrf(len(self._tags_to_index), 100, with_start_stop_tag=False)
+        self._viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
         self._usage = usage
         self._summary_num = 2
-        if self._static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+
+        if self._params_path:
+            self._task_path = os.path.abspath(self._params_path).rsplit("/", 1)[0]
+
+        self._load_static_model(self._params_path)
 
     @property
     def summary_num(self):
@@ -216,6 +242,42 @@ class WordTagTask(Task):
                 i += 1
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
         return tags_to_idx, idx_to_tags
+
+    def _load_static_model(self, params_path=None):
+        """Load static model"""
+        inference_model_path = os.path.join(self._task_path, "static",
+                                            "inference")
+        if not os.path.exists(inference_model_path + ".pdiparams"):
+            with dygraph_mode_guard():
+                self._construct_model(self.model)
+                if params_path:
+                    state_dict = paddle.load(params_path)
+                    self._model.set_dict(state_dict)
+                self._construct_input_spec()
+                self._convert_dygraph_to_static()
+
+        model_file = inference_model_path + ".pdmodel"
+        params_file = inference_model_path + ".pdiparams"
+        self._config = paddle.inference.Config(model_file, params_file)
+        place = paddle.get_device()
+        if place == 'cpu':
+            self._config.disable_gpu()
+        else:
+            self._config.enable_use_gpu(100, self.kwargs['device_id'])
+            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
+            self._config.delete_pass(
+                "embedding_eltwise_layernorm_fuse_pass")
+        self._config.switch_use_feed_fetch_ops(False)
+        self._config.disable_glog_info()
+        self.predictor = paddle.inference.create_predictor(self._config)
+        self.input_handles = [
+            self.predictor.get_input_handle(name)
+            for name in self.predictor.get_input_names()
+        ]
+        self.output_handle = [
+            self.predictor.get_output_handle(name)
+            for name in self.predictor.get_output_names()
+        ]
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -307,7 +369,6 @@ class WordTagTask(Task):
         """
         Create the dataset and dataloader for the predict.
         """
-        batch_size = 1
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
@@ -344,7 +405,7 @@ class WordTagTask(Task):
             Pad(axis=0,
                 pad_val=self._tokenizer.pad_token_type_id,
                 dtype='int64'),  # token_type_ids
-            Stack(dtype='int64'),  # seq_len
+            Stack(dtype='int64'), # seq_len
         ): fn(samples)
 
         infer_data_loader = paddle.io.DataLoader(infer_ds,
@@ -448,9 +509,8 @@ class WordTagTask(Task):
                                     name="input_ids"),  # input_ids
             paddle.static.InputSpec(shape=[None, None],
                                     dtype="int64",
-                                    name="token_type_ids"),  # segment_ids
-            paddle.static.InputSpec(shape=[None], dtype="int64", name="lengths")
-        ]  # seq_len
+                                    name="token_type_ids"),  # token_type_ids
+        ]
 
     def _construct_model(self, model):
         """
@@ -489,28 +549,16 @@ class WordTagTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         all_pred_tags = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                with paddle.no_grad():
-                    for batch in inputs['data_loader']:
-                        input_ids, token_type_ids, seq_len = batch
-                        seq_logits, cls_logits = self._model(input_ids,
-                                                             token_type_ids,
-                                                             lengths=seq_len)
-                        score, pred_tags = self._model.viterbi_decoder(
-                            seq_logits, seq_len)
-                        all_pred_tags.extend(pred_tags.numpy().tolist())
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    data_dict = dict()
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    results = self._exe.run(
-                        self._static_program,
-                        feed=data_dict,
-                        fetch_list=self._static_fetch_targets)
-                    all_pred_tags.extend(results[1].tolist())
+
+        for batch in inputs['data_loader']:
+            input_ids, token_type_ids, seq_len = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+            self.predictor.run()
+            logits = self.output_handle[0].copy_to_cpu()
+            score, pred_tags = self._viterbi_decoder(
+                paddle.to_tensor(logits), seq_len)
+            all_pred_tags.extend(pred_tags.numpy().tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs
 
@@ -546,7 +594,6 @@ class NPTagTask(Task):
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self._static_mode = True
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._linking = linking
@@ -559,31 +606,29 @@ class NPTagTask(Task):
                                        URLS["name_category_map.json"][0],
                                        URLS["name_category_map.json"][1])
         self._construct_dict_map(name_dict_path)
-        if self._static_mode:
-            self._get_inference_model()
-            # Reload Predictor
-            if paddle.get_device().startswith("gpu"):
-                inference_model_path = os.path.join(self._task_path, "static",
-                                                    "inference")
-                model_file = inference_model_path + ".pdmodel"
-                params_file = inference_model_path + ".pdiparams"
-                self._config = paddle.inference.Config(model_file, params_file)
-                self._config.enable_use_gpu(100, 0)
-                self._config.switch_use_feed_fetch_ops(False)
-                self._config.disable_glog_info()
-                self._config.delete_pass(
-                    "embedding_eltwise_layernorm_fuse_pass")
-                self.predictor = paddle.inference.create_predictor(self._config)
-                self.input_handles = [
-                    self.predictor.get_input_handle(name)
-                    for name in self.predictor.get_input_names()
-                ]
-                self.output_handle = [
-                    self.predictor.get_output_handle(name)
-                    for name in self.predictor.get_output_names()
-                ]
-        else:
-            self._construct_model(model)
+
+        self._get_inference_model()
+        if paddle.get_device().startswith("gpu"):
+            inference_model_path = os.path.join(self._task_path, "static",
+                                                "inference")
+            model_file = inference_model_path + ".pdmodel"
+            params_file = inference_model_path + ".pdiparams"
+            self._config = paddle.inference.Config(model_file, params_file)
+            self._config.enable_use_gpu(100, 0)
+            self._config.switch_use_feed_fetch_ops(False)
+            self._config.disable_glog_info()
+            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
+            self._config.delete_pass(
+                "embedding_eltwise_layernorm_fuse_pass")
+            self.predictor = paddle.inference.create_predictor(self._config)
+            self.input_handles = [
+                self.predictor.get_input_handle(name)
+                for name in self.predictor.get_input_names()
+            ]
+            self.output_handle = [
+                self.predictor.get_output_handle(name)
+                for name in self.predictor.get_output_names()
+            ]
 
     @property
     def summary_num(self):
