@@ -73,6 +73,9 @@ Post-Training的时候使用的是全量的数据，使用了文本的query,titl
 
 #### 3.2.2 评估指标
 
+在语义索引召回阶段使用的指标是Recall@K,表示的是在查询的所有实际相关结果中在所有的实际相关结果的比例,在排序阶段使用的指标为AUC，AUC反应的是分类器对样本的排序能力，如果完全随机的对样本分类，那么AUC应该接近0.5。分类器越可能把真正的正样本排在前面，auc越大，分类性能越好。
+
+
 ### 3.3 运行环境和安装说明
 
 （1）运行环境
@@ -85,11 +88,14 @@ paddlenlp                          2.1.1
 paddlepaddle-gpu                   2.1.3.post101
 CUDA Version: 10.2
 NVIDIA Driver Version: 440.64.00 
+Ubuntu 16.04.6 LTS (Docker)
 ```
+
 b. 硬件环境：
 
 ```
 NVIDIA Tesla V100 16GB x4卡
+Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 ```
 
 ## 4. 动手实践——搭建自己的检索系统
