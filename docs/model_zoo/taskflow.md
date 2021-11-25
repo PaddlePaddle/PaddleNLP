@@ -145,7 +145,7 @@ ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德�
 
 - 使用ddparser-ernie-1.0进行预测:
 
-```
+```python
 ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
