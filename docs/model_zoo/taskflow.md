@@ -122,6 +122,8 @@ corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇�
 
 ### 句法分析
 
+- 未分词输入:
+
 ```python
 from paddlenlp import Taskflow
 
@@ -131,26 +133,33 @@ ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德�
 
 ddp(["9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫", "他送了一本书"])
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+```
 
-# 输出概率值和词性标签
+- 输出概率值和词性标签:
+
+```python
 ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
 ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什', '球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 7, 7, 6, 6, 7, 0, 9, 10, 7], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ATT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB'], 'postag': ['TIME', 'TIME', 'PER', 'p', 'PER', 'n', 'v', 'LOC', 'n', 'PER'], 'prob': [0.79, 0.98, 1.0, 0.49, 0.97, 0.86, 1.0, 0.85, 0.97, 0.99]}]
+```
 
-# 使用ddparser-ernie-1.0进行预测
+- 使用ddparser-ernie-1.0进行预测:
+
+```
 ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
 
-# 已分词方式
-ddp = Taskflow("dependency_parsing", segmented=True)
-ddp([['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫']])
+- 已分词输入:
+
+```python
+ddp = Taskflow("dependency_parsing")
+ddp.from_segments([['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫']])
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
 ```
 
-#### 依存关系可视化
-
-句法树可视化示例：
+- 依存关系可视化：
 
 ```python
 from paddlenlp import Taskflow
