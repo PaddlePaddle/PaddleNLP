@@ -105,20 +105,20 @@ class TextSimilarityTask(Task):
         examples = []
 
         for data in inputs:
-            query, title = data[0], data[1]
+            text1, text2 = data[0], data[1]
             
-            query_encoded_inputs = self._tokenizer(
-                text=query, max_seq_len=self._max_seq_len)
-            query_input_ids = query_encoded_inputs["input_ids"]
-            query_token_type_ids = query_encoded_inputs["token_type_ids"]
+            text1_encoded_inputs = self._tokenizer(
+                text=text1, max_seq_len=self._max_seq_len)
+            text1_input_ids = text1_encoded_inputs["input_ids"]
+            text1_token_type_ids = text1_encoded_inputs["token_type_ids"]
 
-            title_encoded_inputs = self._tokenizer(
-                text=title, max_seq_len=self._max_seq_len)
-            title_input_ids = title_encoded_inputs["input_ids"]
-            title_token_type_ids = title_encoded_inputs["token_type_ids"]
+            text2_encoded_inputs = self._tokenizer(
+                text=text2, max_seq_len=self._max_seq_len)
+            text2_input_ids = text2_encoded_inputs["input_ids"]
+            text2_token_type_ids = text2_encoded_inputs["token_type_ids"]
             
-            examples.append((query_input_ids, query_token_type_ids, 
-                title_input_ids, title_token_type_ids))
+            examples.append((text1_input_ids, text1_token_type_ids, 
+                text2_input_ids, text2_token_type_ids))
 
         batches = [
             examples[idx:idx + self._batch_size]
@@ -126,10 +126,10 @@ class TextSimilarityTask(Task):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # query_input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # query_segment
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # title_input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input_text1
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # input_text1_segment
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input_text2
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # input_text2_segment
         ): [data for data in fn(samples)]
 
         outputs = {}
@@ -145,22 +145,22 @@ class TextSimilarityTask(Task):
         results = []
         with static_mode_guard():
             for batch in inputs['data_loader']:
-                q_ids, q_segment_ids, t_ids, t_segment_ids = self._batchify_fn(batch)
-                self.input_handles[0].copy_from_cpu(q_ids)
-                self.input_handles[1].copy_from_cpu(q_segment_ids)
+                text1_ids, text1_segment_ids, text2_ids, text2_segment_ids = self._batchify_fn(batch)
+                self.input_handles[0].copy_from_cpu(text1_ids)
+                self.input_handles[1].copy_from_cpu(text1_segment_ids)
                 self.predictor.run()
-                vecs_query = self.output_handle[1].copy_to_cpu()
+                vecs_text1 = self.output_handle[1].copy_to_cpu()
 
-                self.input_handles[0].copy_from_cpu(t_ids)
-                self.input_handles[1].copy_from_cpu(t_segment_ids)
+                self.input_handles[0].copy_from_cpu(text2_ids)
+                self.input_handles[1].copy_from_cpu(text2_segment_ids)
                 self.predictor.run()
-                vecs_title = self.output_handle[1].copy_to_cpu()
+                vecs_text2 = self.output_handle[1].copy_to_cpu()
 
-                vecs_query = vecs_query / (vecs_query**2).sum(axis=1,
+                vecs_text1 = vecs_text1 / (vecs_text1**2).sum(axis=1,
                                                             keepdims=True)**0.5
-                vecs_title = vecs_title / (vecs_title**2).sum(axis=1,
+                vecs_text2 = vecs_text2 / (vecs_text2**2).sum(axis=1,
                                                             keepdims=True)**0.5
-                similarity = (vecs_query * vecs_title).sum(axis=1)
+                similarity = (vecs_text1 * vecs_text2).sum(axis=1)
                 results.extend(similarity)
         inputs['result'] = results
         return inputs
