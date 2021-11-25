@@ -285,7 +285,7 @@ class Predictor(object):
         # Postprocess time
         if args.benchmark:
             self.autolog.times.end(stamp=True)
-        return results, preds_list
+        return results, preds_list, length_list
 
 
 if __name__ == "__main__":
@@ -301,11 +301,14 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_dir, args.device, args.max_seq_len,
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.enable_mkldnn)
-    results, preds_list = predictor.predict(infer_ds, word_vocab, label_vocab,
-                                            normlize_vocab)
+    results, preds_list, length_list = predictor.predict(
+        infer_ds, word_vocab, label_vocab, normlize_vocab)
 
-    for idx, preds in enumerate(preds_list):
-        print("{}\t{}".format(idx, preds))
+    idx = 0
+    for batch_preds, batch_length in zip(preds_list, length_list):
+        for preds, length in zip(batch_preds, batch_length):
+            print("{}\t{}".format(idx, preds[:length]))
+            idx += 1
 
     if args.benchmark:
         predictor.autolog.report()
