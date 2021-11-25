@@ -126,10 +126,10 @@ class TextSimilarityTask(Task):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input_text1
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # input_text1_segment
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input_text2
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # input_text2_segment
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # text1_input_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # text1_token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # text2_input_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # text2_token_type_ids
         ): [data for data in fn(samples)]
 
         outputs = {}
