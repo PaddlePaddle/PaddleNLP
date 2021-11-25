@@ -65,9 +65,10 @@ def from_built_in_model():
 
 def from_local_dir():
 
-    model = AutoModel.from_pretrained(('../saved_model/my_bert_model'))
-    model = AutoModelForPreTraining.from_pretrained(
-        ('../saved_model/my_bert_model_for_pretraining'))
+    model = AutoModel.from_pretrained(
+        ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
+    model = AutoModelForPretraining.from_pretrained((
+        '/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
 
 
 def from_community_model():
@@ -89,5 +90,5 @@ def from_community_model():
 
 if __name__ == '__main__':
     from_built_in_model()
-    #from_local_dir()
-    #from_community_model()
+    from_local_dir()
+    from_community_model()

@@ -15,9 +15,7 @@
 import os
 import io
 import importlib
-import paddle
 import json
-import warnings
 from collections import OrderedDict
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
@@ -57,7 +55,6 @@ class _BaseAutoModelClass:
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        auto_class = cls.__name__
         # From local dir path
         if os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
@@ -66,29 +63,41 @@ class _BaseAutoModelClass:
                 with io.open(config_file, encoding="utf-8") as f:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class")
+                init_class = init_kwargs.pop("init_class", None)
                 try:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.modeling")
                     model_name = getattr(import_class, init_class)
+                    keyerror = False
                     return model_name.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
+                        pretrained_model_name_or_path, *model_args, **kwargs,
+                        **init_kwargs)
                 except KeyError as err:
-                    # logger.error(err)
-                    for diff_model in cls._all_name_mapping:
-                        if init_class in diff_model:
-                            class_name = diff_model[init_class]
+                    keyerror = True
+                if keyerror:
+                    print(
+                        'We use pattern recoginition to recoginize the Model class.'
+                    )
+                    # 从init_class判断
+                    if init_class != None:
+                        init_class = init_class.lower()
+                        mapping_init_class = init_class
+                    else:
+                        # 无init_class,从pretrained_model_name_or_path判断
+                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        )
+                        mapping_init_class = init_class
+                    for key, pattern in cls._name_mapping.items():
+                        if pattern in mapping_init_class:
+                            init_class = key
+                            class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
                                 f"paddlenlp.transformers.{class_name}.modeling")
-                            for i, j in cls._name_mapping.items():
-                                if j == class_name:
-                                    init_class = i
-                                    model_name = getattr(import_class,
-                                                         init_class)
-                                    return model_name.from_pretrained(
-                                        pretrained_model_name_or_path,
-                                        *model_args, **kwargs)
+                            model_name = getattr(import_class, init_class)
+                            return model_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs, **init_kwargs)
 
         else:
             for names, model_class in cls._model_mapping.items():
@@ -113,42 +122,44 @@ class _BaseAutoModelClass:
                     with io.open(resolved_vocab_file, encoding="utf-8") as f:
                         init_kwargs = json.load(f)
                     # class name corresponds to this configuration
-                    init_class = init_kwargs.pop("init_class")
+                    init_class = init_kwargs.pop("init_class", None)
                     try:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
                         model_name = getattr(import_class, init_class)
+                        keyerror = False
                         return model_name.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
-                            **kwargs)
+                            **kwargs, **init_kwargs)
                     except KeyError as err:
-                        for diff_model in cls._all_name_mapping:
-                            if init_class in diff_model:
-                                class_name = diff_model[init_class]
-                                import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.modeling"
-                                )
-                                for i, j in cls._name_mapping.items():
-                                    if j == class_name:
-                                        init_class = i
-                                        model_name = getattr(import_class,
-                                                             init_class)
-                                        return model_name.from_pretrained(
-                                            pretrained_model_name_or_path,
-                                            *model_args, **kwargs)
-                        '''
-                        for diff_model in cls._all_name_mapping:
-                            if init_class in diff_model:
-                                class_name = diff_model[init_class]
+                        #logger.error(err)
+                        keyerror = True
+                    if keyerror:
+                        print(
+                            'We use pattern recoginition to recoginize the Model class.'
+                        )
+                        #从init_class判断
+                        if init_class != None:
+                            init_class = init_class.lower()
+                            mapping_init_class = init_class
+                        else:
+                            #无init_class,从pretrained_model_name_or_path判断
+                            pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                            )
+                            mapping_init_class = init_class
+                        for key, pattern in cls._name_mapping.items():
+                            if pattern in mapping_init_class:
+                                init_class = key
+                                class_name = cls._name_mapping[init_class]
                                 import_class = importlib.import_module(
                                     f"paddlenlp.transformers.{class_name}.modeling"
                                 )
                                 model_name = getattr(import_class, init_class)
                                 return model_name.from_pretrained(
                                     pretrained_model_name_or_path, *model_args,
-                                    **kwargs)
-                        '''
+                                    **kwargs, **init_kwargs)
+
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -476,15 +487,54 @@ def get_configurations(key):
 
 
 class AutoModel(_BaseAutoModelClass):
+    """
+    AutoClass can help you automatically retrieve the relevant model given the provided
+    pretrained weights/vocabulary.
+    AutoModel is a generic model class that will be instantiated as one of the base model classes
+    when created with the from_pretrained() classmethod.
+
+    Classmethod: from_pretrained():
+    Creates an instance of `AutoModel`. Model weights are loaded
+    by specifying name of a built-in pretrained model, or a community contributed model,
+    or a local file directory path.
+
+    Args:
+        pretrained_model_name_or_path (str): Name of pretrained model or dir path
+            to load from. The string can be:
+
+            - Name of a built-in pretrained model
+            - Name of a community-contributed pretrained model.
+            - Local directory path which contains model weights file("model_state.pdparams")
+              and model config file ("model_config.json").
+        *args (tuple): Position arguments for model `__init__`. If provided,
+            use these as position argument values for model initialization.
+        **kwargs (dict): Keyword arguments for model `__init__`. If provided,
+            use these to update pre-defined keyword argument values for model
+            initialization. If the keyword is in `__init__` argument names of
+            base model, update argument values of the base model; else update
+            argument values of derived model.
+
+    Returns:
+        PretrainedModel: An instance of `AutoModel`.
+
+    Example:
+        .. code-block::
+
+            from paddlenlp.transformers import AutoModel
+
+            # Name of built-in pretrained model
+            model = AutoModel.from_pretrained('bert-base-uncased')
+
+            # Name of community-contributed pretrained model
+            model = AutoModel.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+            # Load from local directory path
+            model = AutoModel.from_pretrained('./my_bert/')
+    """
     MAPPING_NAMES = get_configurations("model")
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
     _all_name_mapping = All_MAPPING_NAMES
-
-    def __init__(self, task='model'):
-        self.task = task
-        if self.task == 'model':
-            dd
 
 
 class AutoModelForPretraining(_BaseAutoModelClass):

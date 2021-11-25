@@ -4,11 +4,14 @@ from collections import OrderedDict
 
 def from_local_dir():
     # From local dir path
-    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bert'))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/notebook/saved_model/my_bert'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bart'))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/notebook/saved_model/my_bart'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer = AutoTokenizer.from_pretrained(('../saved_model/my_bigbird'))
+    tokenizer = AutoTokenizer.from_pretrained(
+        ('/Users/huhuiwen01/notebook/saved_model/my_bigbird'))
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
 
@@ -60,5 +63,5 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 
 if __name__ == '__main__':
     from_local_dir()
-    from_built_in_models()
+    #from_built_in_models()
     from_community_models()
