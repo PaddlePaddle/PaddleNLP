@@ -166,8 +166,20 @@ class AutoTokenizer():
          """
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
+        all_tokenizer_names = []
+        for names, tokenizer_class in cls._tokenizer_mapping.items():
+            for name in names:
+                all_tokenizer_names.append(name)
+
+        # From built-in pretrained models
+        if pretrained_model_name_or_path in all_tokenizer_names:
+            for names, tokenizer_class in cls._tokenizer_mapping.items():
+                for pattern in names:
+                    if pattern == pretrained_model_name_or_path:
+                        return tokenizer_class.from_pretrained(
+                            pretrained_model_name_or_path, **kwargs)
         # From local dir path
-        if os.path.isdir(pretrained_model_name_or_path):
+        elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
                                        cls.tokenizer_config_file)
             if os.path.exists(config_file):
@@ -209,14 +221,6 @@ class AutoTokenizer():
                                 **kwargs, **init_kwargs)
 
         else:
-            for tokenizer_names, tokenizer_class in cls._tokenizer_mapping.items(
-            ):
-                # From built-in pretrained models
-                for pattern in tokenizer_names:
-                    if pattern == pretrained_model_name_or_path:
-                        return tokenizer_class.from_pretrained(
-                            pretrained_model_name_or_path, **kwargs)
-
             # Assuming from community-contributed pretrained models
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
@@ -227,7 +231,6 @@ class AutoTokenizer():
             try:
                 resolved_vocab_file = get_path_from_url(community_config_path,
                                                         default_root)
-                print(resolved_vocab_file)
                 if os.path.exists(resolved_vocab_file):
                     with io.open(resolved_vocab_file, encoding="utf-8") as f:
                         init_kwargs = json.load(f)
@@ -241,7 +244,7 @@ class AutoTokenizer():
                         keyerror = False
                         return tokenizer_name.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
-                            **kwargs, **init_kwargs)
+                            **kwargs, **init_kwargs)  #
                     # If no `init_class`, we use pattern recoginition to recoginize the Tokenizerc class.
                     except KeyError as err:
                         logger.error(err)

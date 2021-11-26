@@ -5,6 +5,8 @@ import warnings
 
 
 def from_built_in_model():
+    print(
+        'From_built_in_models:-----------------------------------------------')
     '''
     # model test
     model = AutoModel.from_pretrained('bert-base-uncased')
@@ -64,7 +66,8 @@ def from_built_in_model():
 
 
 def from_local_dir():
-
+    print(
+        'From_local_dir:-----------------------------------------------------')
     model = AutoModel.from_pretrained(
         ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
     model = AutoModelForPretraining.from_pretrained((
@@ -72,6 +75,8 @@ def from_local_dir():
 
 
 def from_community_model():
+    print(
+        'From_community_models:----------------------------------------------')
 
     model = AutoModelForSequenceClassification.from_pretrained(
         'yingyibiao/bert-base-uncased-sst-2-finetuned')
@@ -90,5 +95,5 @@ def from_community_model():
 
 if __name__ == '__main__':
     from_built_in_model()
-    from_local_dir()
-    from_community_model()
+    #from_local_dir()
+    #from_community_model()

@@ -55,8 +55,21 @@ class _BaseAutoModelClass:
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        all_model_names = []
+        for names, model_class in cls._model_mapping.items():
+            for name in names:
+                all_model_names.append(name)
+        # From built-in pretrained models
+        if pretrained_model_name_or_path in all_model_names:
+            for names, model_class in cls._model_mapping.items():
+                # From built-in pretrained models
+                for pattern in names:
+                    if pattern == pretrained_model_name_or_path:
+                        # print(pattern, model_class)
+                        return model_class.from_pretrained(
+                            pretrained_model_name_or_path, **kwargs)
         # From local dir path
-        if os.path.isdir(pretrained_model_name_or_path):
+        elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
                                        cls.model_config_file)
             if os.path.exists(config_file):
@@ -100,14 +113,7 @@ class _BaseAutoModelClass:
                                 **kwargs, **init_kwargs)
 
         else:
-            for names, model_class in cls._model_mapping.items():
-                # From built-in pretrained models
-                for pattern in names:
-                    if pattern == pretrained_model_name_or_path:
-                        # print(pattern, model_class)
-                        return model_class.from_pretrained(
-                            pretrained_model_name_or_path, **kwargs)
-
+            # Assuming from community-contributed pretrained models
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
                                                  cls.model_config_file)
@@ -200,7 +206,7 @@ MODEL_MAPPING_NAMES = OrderedDict([
 MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     # Model for pre-training mapping
     ("AlbertForPretraining", "albert"),
-    ("BartForConditionalGeneration", "bart"),
+    #("BartForConditionalGeneration", "bart"),
     ("BigBirdForPretraining", "bigbird"),
     ("ErnieForPretraining", "ernie"),
     ("GPTForPretraining", "gpt"),
@@ -208,6 +214,12 @@ MODEL_FOR_PRETRAINING_MAPPING_NAMES = OrderedDict([
     ("RoFormerForPretraining", "roformer"),
     ("TinyBertForPretraining", "tinybert"),
     ("BertForPretraining", "bert"),
+])
+
+MODEL_FOR_CONDITIONAL_GENERATION = OrderedDict([
+    # Model for pre-training mapping
+    ("BartForConditionalGeneration", "bart"),
+    #("GPTForPretraining", "gpt"),
 ])
 
 MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
