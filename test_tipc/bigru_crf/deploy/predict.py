@@ -175,6 +175,23 @@ class Predictor(object):
                     max_batch_size=batch_size,
                     min_subgraph_size=30,
                     precision_mode=precision_mode)
+                min_input_shape = {
+                    "gru_0.tmp_1": [1, 32, 32],
+                    "embedding_1.tmp_0": [1, 32],
+                    "gru_0.tmp_0": [1, 32, 32]
+                }
+                max_input_shape = {
+                    "gru_0.tmp_1": [64, 256, 256],
+                    "embedding_1.tmp_0": [64, 128],
+                    "gru_0.tmp_0": [64, 256, 256]
+                }
+                opt_input_shape = {
+                    "gru_0.tmp_1": [1, 128, 128],
+                    "embedding_1.tmp_0": [1, 128],
+                    "gru_0.tmp_0": [1, 128, 128]
+                }
+                config.set_trt_dynamic_shape_info(
+                    min_input_shape, max_input_shape, opt_input_shape)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads

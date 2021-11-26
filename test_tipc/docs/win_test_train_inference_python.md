@@ -2,6 +2,7 @@
 
 Linux端基础训练预测功能测试的主程序为`test_train_inference_python.sh`，可以测试基于Python的模型训练、推理等基本功能。
 
+- Mac端基础训练预测功能测试参考[链接](./mac_test_train_inference_python.md)
 - Windows端基础训练预测功能测试参考[链接](./win_test_train_inference_python.md)
 
 ## 1. 测试结论汇总
@@ -13,7 +14,7 @@ Linux端基础训练预测功能测试的主程序为`test_train_inference_pytho
 | bigru_crf | 正常训练  | 正常训练 | - | - |
 
 
-- 预测相关：训练产出的模型可以分为`正常模型`，模型对应的预测功能汇总如下，
+- 预测相关：训练产出的模型为`正常模型`，预测功能汇总如下，
 
 | 模型类型 |device | batchsize | tensorrt | mkldnn | cpu多线程 |
 |  ----   |  ---- |   ----   |  :----:  |   :----:   |  :----:  |
@@ -24,6 +25,8 @@ Linux端基础训练预测功能测试的主程序为`test_train_inference_pytho
 ## 2. 测试流程
 
 运行环境配置请参考[文档](./install.md)的内容配置TIPC的运行环境。
+
+另外，由于Windows上和linux的路径管理方式不同，可以在win上安装gitbash终端，在gitbash中执行指令的方式和在linux端执行指令方式相同，更方便tipc测试。[gitbash下载连接](https://git-scm.com/download/win)
 
 ### 2.1 安装依赖
 - 安装PaddlePaddle >= 2.0
