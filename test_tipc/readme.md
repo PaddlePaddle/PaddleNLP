@@ -27,33 +27,23 @@
 
 ```shell
 test_tipc/
-├── configs/  # 配置文件目录
-    ├── ch_ppocr_mobile_v2.0_det    # ch_ppocr_mobile_v2.0_det模型的测试配置文件目录
-        ├── train_infer_python.txt      # 测试Linux上python训练预测（基础训练预测）的配置文件
-        ├── model_linux_gpu_normal_normal_infer_cpp_linux_gpu_cpu.txt     # 测试Linux上c++预测的配置文件
-        ├── model_linux_gpu_normal_normal_infer_python_jetson.txt         # 测试Jetson上python预测的配置文件
-        ├── train_linux_gpu_fleet_amp_infer_python_linux_gpu_cpu.txt      # 测试Linux上多机多卡、混合精度训练和python预测的配置文件
-        ├── ...  
-    ├── ch_ppocr_server_v2.0_det               # ch_ppocr_server_v2.0_det模型的测试配置文件目录
-        ├── ...  
-    ├── ch_ppocr_mobile_v2.0_rec               # ch_ppocr_mobile_v2.0_rec模型的测试配置文件目录
-        ├── ...  
-    ├── ch_ppocr_server_v2.0_det               # ch_ppocr_server_v2.0_det模型的测试配置文件目录
-        ├── ...  
-    ├── ...  
-├── results/   # 预先保存的预测结果，用于和实际预测结果进行精读比对
-    ├── python_ppocr_det_mobile_results_fp32.txt           # 预存的mobile版ppocr检测模型python预测fp32精度的结果
-    ├── python_ppocr_det_mobile_results_fp16.txt           # 预存的mobile版ppocr检测模型python预测fp16精度的结果
-    ├── cpp_ppocr_det_mobile_results_fp32.txt       # 预存的mobile版ppocr检测模型c++预测的fp32精度的结果
-    ├── cpp_ppocr_det_mobile_results_fp16.txt       # 预存的mobile版ppocr检测模型c++预测的fp16精度的结果
-    ├── ...
-├── prepare.sh                        # 完成test_*.sh运行所需要的数据和模型下载
-├── test_train_inference_python.sh    # 测试python训练预测的主程序
-├── test_inference_cpp.sh             # 测试c++预测的主程序
-├── test_serving.sh                   # 测试serving部署预测的主程序
-├── test_lite_arm_cpu_cpp.sh          # 测试lite在arm_cpu上部署的C++预测的主程序
-├── compare_results.py                # 用于对比log中的预测结果与results中的预存结果精度误差是否在限定范围内
-└── readme.md                         # 使用文档
+├── bigru_crf                      # bigru_crf模型实现
+│   ├── data.py
+│   ├── deploy
+│   │   └── predict.py             # python预测部署脚本
+│   ├── export_model.py            # 模型导出脚本
+│   ├── model.py                   # 模型实现脚本
+│   └── train.py                   # 训练脚本
+├── compare_results.py             # 用于对比log中的预测结果与results中的预存结果精度误差是否在限定范围内
+├── configs                        # 配置文件目录
+│   └── bigru_crf                  # bigru_crf模型的测试配置文件目录
+│       └── train_infer_python.txt # 测试Linux上python训练预测（基础训练预测）的配置文件
+├── prepare.sh                     # 完成test_*.sh运行所需要的数据和模型下载
+├── readme.md                      # 使用文档
+├── results                        # 预先保存的预测结果，用于和实际预测结果进行精读比对
+│   ├── python_bigru_crf_results_fp16.txt # 预存的bigru_cr模型python预测fp16精度的结果
+│   └── python_bigru_crf_results_fp32.txt # 预存的bigru_cr模型python预测fp32精度的结果
+└── test_train_inference_python.sh # 测试python训练预测的主程序
 ```
 
 ### 测试流程概述
@@ -82,21 +72,10 @@ bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt '
 # 运行测试
 bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'lite_train_lite_infer'
 ```  
-关于本示例命令的更多信息可查看[基础训练预测使用文档](https://github.com/PaddlePaddle/PaddleOCR/blob/dygraph/test_tipc/docs/test_train_inference_python.md#22-%E5%8A%9F%E8%83%BD%E6%B5%8B%E8%AF%95)。
-
-### 配置文件命名规范
-在`configs`目录下，**按模型名称划分为子目录**，子目录中存放所有该模型测试需要用到的配置文件，配置文件的命名遵循如下规范：
-
-1. 基础训练预测配置简单命名为：`train_infer_python.txt`，表示**Linux环境下单机、不使用混合精度训练+python预测**，其完整命名对应`train_linux_gpu_normal_normal_infer_python_linux_gpu_cpu.txt`，由于本配置文件使用频率较高，这里进行了名称简化。
-
-2. 其他带训练配置命名格式为：`train_训练硬件环境(linux_gpu/linux_dcu/…)_是否多机(fleet/normal)_是否混合精度(amp/normal)_预测模式(infer/lite/serving/js)_语言(cpp/python/java)_预测硬件环境(linux_gpu/mac/jetson/opencl_arm_gpu/...).txt`。如，linux gpu下多机多卡+混合精度链条测试对应配置 `train_linux_gpu_fleet_amp_infer_python_linux_gpu_cpu.txt`，linux dcu下基础训练预测对应配置 `train_linux_dcu_normal_normal_infer_python_linux_dcu.txt`。
-
-3. 仅预测的配置（如serving、lite等）命名格式：`model_训练硬件环境(linux_gpu/linux_dcu/…)_是否多机(fleet/normal)_是否混合精度(amp/normal)_(infer/lite/serving/js)_语言(cpp/python/java)_预测硬件环境(linux_gpu/mac/jetson/opencl_arm_gpu/...).txt`，即，与2相比，仅第一个字段从train换为model，测试时模型直接下载获取，这里的“训练硬件环境”表示所测试的模型是在哪种环境下训练得到的。
-
-**根据上述命名规范，可以直接从子目录名称和配置文件名找到需要测试的场景和功能对应的配置文件。**
+关于本示例命令的更多信息可查看[基础训练预测使用文档](docs/test_train_inference_python.md)。
 
 
 <a name="more"></a>
 ## 4. 开始测试
-各功能测试中涉及混合精度、裁剪、量化等训练相关，及mkldnn、Tensorrt等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：  
+各功能测试中涉及混合精度、裁剪、量化等训练相关，及MKLDNN、TensorRT等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：  
 - [test_train_inference_python 使用](docs/test_train_inference_python.md) ：测试基于Python的模型训练、评估、推理等基本功能。
