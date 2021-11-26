@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@
 
 #include <cuda_runtime.h>
 #include <vector>
-#include "fastertransformer/common.h"
-#include "fastertransformer/utils.h"
+#include "fastertransformer/utils/common.h"
+#include "fastertransformer/utils/utils.h"
 
 #ifdef PADDLE_CUDA
 #ifdef PADDLE_ON_INFERENCE
@@ -50,6 +50,7 @@ class Allocator<AllocatorType::CUDA> : public IAllocator {
 
 public:
   Allocator(int device_id) : device_id_(device_id) {}
+  ~Allocator() {}
 
   void *malloc(size_t size, const bool is_set_zero = true) const {
     void *ptr = nullptr;
