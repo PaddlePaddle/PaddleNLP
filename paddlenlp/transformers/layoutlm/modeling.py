@@ -28,7 +28,7 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     "LayoutLMModel",
     "LayoutLMPretrainedModel",
-    #"LayoutLMForMaskedLM",
+    "LayoutLMForMaskedLM",
     "LayoutLMForTokenClassification",
     "LayoutLMForSequenceClassification",
 ]
@@ -406,10 +406,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
     def __init__(self, layoutlm, num_classes=2, dropout=None):
         super(LayoutLMForTokenClassification, self).__init__()
         self.num_classes = num_classes
-        if isinstance(layoutlm, dict):
-            self.layoutlm = LayoutLMModel(**layoutxlm)
-        else:
-            self.layoutlm = layoutlm
+        self.layoutlm = layoutlm
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
@@ -419,43 +416,36 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
 
-    def forward(
-            self,
-            input_ids=None,
-            bbox=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            labels=None, ):
-
+    def forward(self,
+                input_ids=None,
+                bbox=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                labels=None,
+                output_hidden_states=False):
+        if attention_mask is not None:
+            attention_mask = attention_mask.unsqueeze(
+                axis=[1, 2]).astype("int64")
         outputs = self.layoutlm(
             input_ids=input_ids,
             bbox=bbox,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            head_mask=head_mask, )
-        seq_length = input_ids.shape[1]
-        sequence_output, pooled_output = outputs[0][:, :seq_length], outputs[
-            0][:, seq_length:]
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
-        outputs = logits
+            output_hidden_states=False)
+        sequence_output = outputs[0]
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
         return outputs
 
 
 class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
-    def __init__(self, layoutlm, num_classes=2, dropout=None):
+    def __init__(self, layoutlm, num_classes=2):
         super(LayoutLMForSequenceClassification, self).__init__()
         self.layoutlm = layoutlm
         self.num_classes = num_classes
-        #if isinstance(layoutlm, dict):
-        #   self.layoutlm = LayoutLMModel(**layoutlm)
-        #else:
-        #   self.layoutlm = layoutlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.layoutlm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
                                     num_classes)
         #self.classifier.apply(self.init_weights)
@@ -482,5 +472,126 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
         pooled_outputs = outputs[1]
         pooled_outputs = self.dropout(pooled_outputs)
         logits = self.classifier(pooled_outputs)
-        outputs = logits
-        return outputs
+        return logits
+
+
+class LayoutLMLMPredictionHead(Layer):
+    """
+    LayoutLM Model with a `language modeling` head on top for CLM fine-tuning.
+    """
+
+    def __init__(self,
+                 hidden_size,
+                 vocab_size,
+                 activation,
+                 embedding_weights=None):
+        super(LayoutLMLMPredictionHead, self).__init__()
+        self.transform = nn.Linear(hidden_size, hidden_size)
+        self.activation = getattr(nn.functional, activation)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.decoder_weight = self.create_parameter(
+            shape=[vocab_size, hidden_size],
+            dtype=self.transform.weight.dtype,
+            is_bias=False) if embedding_weights is None else embedding_weights
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+
+    def forward(self, hidden_states, masked_positions=None):
+        if masked_positions is not None:
+            hidden_states = paddle.reshape(hidden_states,
+                                           [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states,
+                                                 masked_positions)
+        # gather masked tokens might be more quick
+        hidden_states = self.transform(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight,
+            transpose_y=True) + self.decoder_bias
+        return hidden_states
+
+
+class LayoutLMOnlyMLMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+        super().__init__()
+        self.predictions = LayoutLMLMPredictionHead(
+            hidden_size=hidden_size,
+            vocab_size=vocab_size,
+            activation=activation,
+            embedding_weights=embedding_weights)
+
+    def forward(self, sequence_output, masked_positions=None):
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        return prediction_scores
+
+
+class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
+    """
+    LayoutLM Model with a `masked language modeling` head on top.
+
+    Args:
+        layoutlm (:class:`LayoutLMModel`):
+            An instance of :class:`LayoutLMModel`.
+
+    """
+
+    def __init__(self, layoutlm):
+        super(LayoutLMForMaskedLM, self).__init__()
+        self.layoutlm = layoutlm
+        self.cls = LayoutLMOnlyMLMHead(
+            self.layoutlm.config["hidden_size"],
+            self.layoutlm.config["vocab_size"],
+            self.layoutlm.config["hidden_act"],
+            embedding_weights=self.layoutlm.embeddings.word_embeddings.weight)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                bbox=None,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`LayoutLMModel`.
+            bbox (Tensor):
+                See :class:`LayoutLMModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`LayoutLMModel`.
+            position_ids (Tensor, optional):
+                See :class:`LayoutLMModel`.
+            attention_mask (Tensor, optional):
+                See :class:`LayoutLMModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import LayoutLMForMaskedLM, LayoutLMTokenizer
+
+                tokenizer = LayoutLMTokenizer.from_pretrained('layoutlm-base-uncased')
+                model = LayoutLMForMaskedLM.from_pretrained('layoutlm-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+
+        """
+
+        outputs = self.layoutlm(
+            input_ids,
+            bbox=bbox,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        sequence_output = outputs[0]
+        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        return prediction_scores
