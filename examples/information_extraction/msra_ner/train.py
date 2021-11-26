@@ -233,7 +233,6 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
     for arg in vars(args):
         logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
