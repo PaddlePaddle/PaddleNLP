@@ -29,7 +29,7 @@ option(WITH_GPT         "Compiled with GPT."                                    
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." OFF)
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
-option(WITH_ENCODER     "Compile with Transformer Encoder"                          OFF)
+option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 option(WITH_BART        "Compile with BART"                                         ON)
 
@@ -283,14 +283,11 @@ file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransforme
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_dst)
 
 # Encoder patches.
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
-
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/standard_encoder.h standard_encoder_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/standard_encoder.h standard_encoder_h_dst)
 # Encoder patches end.
-
-# TODO(ENCODER)
-# set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
@@ -305,6 +302,8 @@ set(FT_PATCH_COMMAND
   && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
   && cp ${arguments_h_src} ${arguments_h_dst}
   && cp ${open_decoder_h_src} ${open_decoder_h_dst}
+  && cp ${standard_encoder_h_src} ${standard_encoder_h_dst}
+  && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
@@ -315,14 +314,6 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
   && ${MUTE_COMMAND}
 )
-
-# TODO: Add these patch into FT_PATCH_COMMAND
-#[[
-  # TODO(ENCODER)
-  && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
-
-  && cat blank_lines ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
-]]
 
 # TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
 # re-run always use the latest patches when the developer changes FT patch codes,
