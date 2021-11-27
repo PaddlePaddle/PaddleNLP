@@ -88,7 +88,7 @@ class NERTask(WordTagTask):
             for s, t in zip(sent_out, tags_out):
                 pred_words.append({"item": s, "wordtag_label": t})
 
-            result = {"text": sent, "items":pred_words}
+            result = {"text": sent, "items": pred_words}
             batch_results.append(result)
         return batch_results
 
