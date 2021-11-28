@@ -139,7 +139,7 @@ class CSCTask(Task):
             pad_pinyin_id=self._pinyin_vocab[self._pinyin_vocab.pad_token])
         # Load the model parameter for the predict
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1], model)
+                                   URLS[model][0], URLS[model][1])
         state_dict = paddle.load(model_path)
         model_instance.set_state_dict(state_dict)
         model_instance.eval()
@@ -308,15 +308,21 @@ class CSCTask(Task):
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
         rest_words = []
-        if len(words) > self._max_seq_length - 2:
-            rest_words = words[max_seq_length - 2:]
-            words = words[:self._max_seq_length - 2]
+        max_seq_length = self._max_seq_length - 2
+        if len(words) > max_seq_length:
+            rest_words = words[max_seq_length:]
+            words = words[:max_seq_length]
 
         pred_result = ""
         for j, word in enumerate(words):
-            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[j])
-            if not is_chinese_char(ord(word)) or det_pred[
-                    j] == 0 or candidates == UNK or candidates == '[PAD]':
+            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[
+                j] if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
+            word_icc = is_chinese_char(ord(word))
+            cand_icc = is_chinese_char(ord(candidates)) if len(
+                candidates) == 1 else False
+            if not word_icc or det_pred[j] == 0\
+                or candidates in [UNK, '[PAD]']\
+                or (word_icc and not cand_icc):
                 pred_result += word
             else:
                 pred_result += candidates.lstrip("##")

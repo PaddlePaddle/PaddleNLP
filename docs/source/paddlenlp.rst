@@ -13,6 +13,7 @@ paddlenlp
    paddlenlp.data
    paddlenlp.datasets
    paddlenlp.embeddings
+   paddlenlp.experimental
    paddlenlp.layers
    paddlenlp.losses
    paddlenlp.metrics

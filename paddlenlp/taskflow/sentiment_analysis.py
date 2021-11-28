@@ -49,21 +49,21 @@ usage = r"""
            senta = Taskflow("sentiment_analysis")
            senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
            '''
-           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
+           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
            '''
 
            senta(["怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片", 
                   "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
            '''
-           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}, 
-            {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive'}
+           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}, 
+            {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive', 'score': 0.9857505559921265}
            ]
            '''
 
            senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
            senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
            '''
-           [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
+           [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive', 'score': 0.984320878982544}]
            '''
          """
 
@@ -115,7 +115,7 @@ class SentaTask(Task):
             padding_idx=pad_token_id,
             pooling_type='max')
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1], model)
+                                   URLS[model][0], URLS[model][1])
 
         # Load the model parameter for the predict
         state_dict = paddle.load(model_path)
@@ -126,7 +126,7 @@ class SentaTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        full_name = download_file(self.model, "senta_word_dict.txt",
+        full_name = download_file(self._task_path, "senta_word_dict.txt",
                                   URLS['bilstm_vocab'][0],
                                   URLS['bilstm_vocab'][1])
         vocab = Vocab.load_vocabulary(
@@ -181,6 +181,7 @@ class SentaTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
+        scores = []
         with static_mode_guard():
             for batch in inputs['data_loader']:
                 ids, lens = self.batchify_fn(batch)
@@ -188,10 +189,14 @@ class SentaTask(Task):
                 self.input_handles[1].copy_from_cpu(lens)
                 self.predictor.run()
                 idx = self.output_handle[0].copy_to_cpu().tolist()
+                probs = self.output_handle[1].copy_to_cpu().tolist()
                 labels = [self._label_map[i] for i in idx]
+                score = [max(prob) for prob in probs]
                 results.extend(labels)
+                scores.extend(score)
 
         inputs['result'] = results
+        inputs['score'] = scores
         return inputs
 
     def _postprocess(self, inputs):
@@ -199,10 +204,11 @@ class SentaTask(Task):
         This function will convert the model output to raw text.
         """
         final_results = []
-        for text, label in zip(inputs['text'], inputs['result']):
+        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label
+            result['score'] = score
             final_results.append(result)
         return final_results
 
@@ -302,6 +308,7 @@ class SkepTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
+        scores = []
         with static_mode_guard():
             for batch in inputs['data_loader']:
                 ids, segment_ids = self._batchify_fn(batch)
@@ -309,10 +316,14 @@ class SkepTask(Task):
                 self.input_handles[1].copy_from_cpu(segment_ids)
                 self.predictor.run()
                 idx = self.output_handle[0].copy_to_cpu().tolist()
+                probs = self.output_handle[1].copy_to_cpu().tolist()
                 labels = [self._label_map[i] for i in idx]
+                score = [max(prob) for prob in probs]
                 results.extend(labels)
+                scores.extend(score)
 
         inputs['result'] = results
+        inputs['score'] = scores
         return inputs
 
     def _postprocess(self, inputs):
@@ -320,9 +331,10 @@ class SkepTask(Task):
         The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
-        for text, label in zip(inputs['text'], inputs['result']):
+        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label
+            result['score'] = score
             final_results.append(result)
         return final_results
