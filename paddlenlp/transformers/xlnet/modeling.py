@@ -1854,7 +1854,7 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
             return_dict=return_dict, )
         output = transformer_outputs if not return_dict \
             else transformer_outputs["last_hidden_state"]
-        logits = self.classifier(output)
+        logits = self.qa_outputs(output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
         return start_logits, end_logits
