@@ -76,3 +76,5 @@ from .t5.modeling import *
 from .t5.tokenizer import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
+from .fnet.modeling import *
+from .fnet.tokenizer import *
