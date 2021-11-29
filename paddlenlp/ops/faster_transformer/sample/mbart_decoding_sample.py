@@ -16,7 +16,6 @@ import time
 from pprint import pprint
 
 import paddle
-from paddlenlp.ops import FasterMBART
 from paddlenlp.transformers import MBartForConditionalGeneration, MBartTokenizer
 from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
@@ -123,9 +122,6 @@ def do_predict(args):
     eos_id = model.mbart.config["eos_token_id"]
     pad_id = model.mbart.config["pad_token_id"]
     input_ids = prepare_input(tokenizer, sentences, pad_id)
-
-    # Set evaluate mode
-    model.eval()
 
     with paddle.no_grad():
         for i in range(100):
