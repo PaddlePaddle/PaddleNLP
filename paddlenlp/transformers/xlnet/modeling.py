@@ -22,10 +22,9 @@ from paddlenlp.ops.einsum import *
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "XLNetPretrainedModel",
-    "XLNetModel",
-    "XLNetForSequenceClassification",
-    "XLNetForTokenClassification",
+    "XLNetPretrainedModel", "XLNetModel", "XLNetForSequenceClassification",
+    "XLNetForTokenClassification", "XLNetLMHeadModel", "XLNetForMultipleChoice",
+    "XLNetForQuestionAnswering"
 ]
 
 dtype_float = paddle.get_default_dtype()
@@ -410,7 +409,6 @@ class XLNetLayer(Layer):
             target_mapping=None,
             head_mask=None,
             output_attentions=False, ):
-
         outputs = self.rel_attn(
             output_h,
             output_g,
@@ -1461,3 +1459,402 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 "attentions": transformer_outputs["attentions"],
             }
         return logits
+
+
+class XLNetLMHeadModel(XLNetPretrainedModel):
+    """
+    XLNet Model with a language modeling head on top (linear layer with weights tied to the input embeddings).
+
+    Args:
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+    """
+
+    def __init__(self, xlnet):
+        super(XLNetLMHeadModel, self).__init__()
+        self.transformer = xlnet
+        self.decoder_weight = self.transformer.word_embedding.weight
+        self.decoder_bias = self.create_parameter(
+            shape=[self.transformer.config['vocab_size']],
+            dtype=self.decoder_weight.dtype,
+            is_bias=True)
+        self.init_weights()
+
+    def forward(
+            self,
+            input_ids,
+            token_type_ids=None,
+            attention_mask=None,
+            mems=None,
+            perm_mask=None,
+            target_mapping=None,
+            input_mask=None,
+            head_mask=None,
+            inputs_embeds=None,
+            use_mems_train=False,
+            use_mems_eval=False,
+            return_dict=False, ):
+        r"""
+        The XLNetLMHeadModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            Tensor or dict: Returns tensor `logits` or a dict with key-value pairs:
+             {"logits": `logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}.
+
+            With the corresponding fields:
+
+            - `logits` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, num_classes].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetLMHeadModel
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetLMHeadModel.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+                logits = outputs
+        """
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            mems=mems,
+            perm_mask=perm_mask,
+            target_mapping=target_mapping,
+            input_mask=input_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_mems_train=use_mems_train,
+            use_mems_eval=use_mems_eval,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+
+        logits = paddle.matmul(
+            output, self.decoder_weight, transpose_y=True) + self.decoder_bias
+
+        if return_dict:
+            return {
+                "logits": logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return logits
+
+
+class XLNetForMultipleChoice(XLNetPretrainedModel):
+    """
+    XLNet Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RACE/SWAG tasks.
+
+    Args:
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+    """
+
+    def __init__(self, xlnet):
+        super(XLNetForMultipleChoice, self).__init__()
+        self.transformer = xlnet
+        self.classifier = XLNetClassificationHead(
+            self.transformer.d_model,
+            self.transformer.config["classifier_dropout"], 1)
+        self.init_weights()
+
+    def forward(
+            self,
+            input_ids,
+            token_type_ids=None,
+            attention_mask=None,
+            mems=None,
+            perm_mask=None,
+            target_mapping=None,
+            input_mask=None,
+            head_mask=None,
+            inputs_embeds=None,
+            use_mems_train=False,
+            use_mems_eval=False,
+            return_dict=False, ):
+        r"""
+        The XLNetForMultipleChoice forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            tensor or dict: Returns tensor `logtis` or a dict with key-value pairs:
+             {"logits": `logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}
+
+            With the corresponding fields:
+            - `logits` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, num_classes].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import XLNetForMultipleChoice, XLNetTokenizer
+                from paddlenlp.data import Pad, Dict
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForMultipleChoice.from_pretrained('xlnet-base-cased')
+                data = [
+                    {
+                        "question": "how do you turn on an ipad screen?",
+                        "answer1": "press the volume button.",
+                        "answer2": "press the lock button.",
+                        "label": 1,
+                    },
+                    {
+                        "question": "how do you indent something?",
+                        "answer1": "leave a space before starting the writing",
+                        "answer2": "press the spacebar",
+                        "label": 0,
+                    },
+                ]
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+                inputs = tokenizer(text, text_pair)
+                batchify_fn = lambda samples, fn=Dict(
+                    {
+                        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+                        "token_type_ids": Pad(
+                            axis=0, pad_val=tokenizer.pad_token_type_id
+                        ),  # token_type_ids
+                    }
+                ): fn(samples)
+                inputs = batchify_fn(inputs)
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
+                    token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+                # [2, 2]
+        """
+        num_choices = input_ids.shape[
+            1] if input_ids is not None else inputs_embeds.shape[1]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(shape=(
+                -1, attention_mask.shape[-1]))
+
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, token_type_ids.shape[-1]))
+
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(
+                inputs_embeds.shape[0], -1, inputs_embeds.shape[-1]))
+
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+        logits = self.classifier(output)
+        reshaped_logits = logits.reshape([-1, num_choices])
+        if return_dict:
+            return {
+                "logits": reshaped_logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return reshaped_logits
+
+
+class XLNetForQuestionAnswering(XLNetPretrainedModel):
+    """
+      XLNet Model with a span classification head on top for extractive question-answering tasks like SQuAD (a linear
+      layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
+
+    Args:
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+    """
+
+    def __init__(self, xlnet):
+        super(XLNetForQuestionAnswering, self).__init__()
+        self.transformer = xlnet
+        self.qa_outputs = nn.Linear(self.transformer.d_model, 2)
+
+        self.init_weights()
+
+    def forward(
+            self,
+            input_ids,
+            token_type_ids=None,
+            attention_mask=None,
+            mems=None,
+            perm_mask=None,
+            target_mapping=None,
+            input_mask=None,
+            head_mask=None,
+            inputs_embeds=None,
+            use_mems_train=False,
+            use_mems_eval=False,
+            return_dict=False, ):
+        r"""
+        The XLNetForQuestionAnswering forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            tuple or dict: Returns tensor (`start_logits`, `end_logits`) or a dict with key-value pairs:
+             {"start_logits": `start_logits`, "end_logits": `end_logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}
+
+            With the corresponding fields:
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetForQuestionAnswering
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForQuestionAnswering.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+                start_logits = outputs[0]
+                end_logits = outputs[1]
+        """
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            mems=mems,
+            perm_mask=perm_mask,
+            target_mapping=target_mapping,
+            input_mask=input_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_mems_train=use_mems_train,
+            use_mems_eval=use_mems_eval,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+        logits = self.qa_outputs(output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+        return start_logits, end_logits
