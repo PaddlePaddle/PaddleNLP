@@ -41,7 +41,9 @@ def parse_args():
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=["beam_search", "topk_sampling", "topp_sampling"],
+        choices=[
+            "beam_search", "beam_search_v2", "topk_sampling", "topp_sampling"
+        ],
         help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
     )
     parser.add_argument("--beam_size", default=4, type=int, help="Beam size. ")
@@ -168,7 +170,7 @@ def do_predict(args):
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
             if not args.profile:
-                if args.decoding_strategy == "beam_search":
+                if args.decoding_strategy == "beam_search" or args.decoding_strategy == "beam_search_v2":
                     finished_seq = finished_seq.numpy().transpose([1, 2, 0])
                 elif args.decoding_strategy == "topk_sampling" or args.decoding_strategy == "topp_sampling":
                     finished_seq = np.expand_dims(
@@ -183,7 +185,7 @@ def do_predict(args):
                         sequence = " ".join(word_list) + "\n"
                         f.write(sequence)
         if args.profile:
-            if args.decoding_strategy == "beam_search":
+            if args.decoding_strategy == "beam_search" or args.decoding_strategy == "beam_search_v2":
                 logger.info(
                     "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.beam_size,

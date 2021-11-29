@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,24 +22,19 @@
 
 #include <cuda_runtime.h>
 #include <stdlib.h>
-#include "fastertransformer/common.h"
-#include "fastertransformer/common_structure.h"
+#include "fastertransformer/utils/common.h"
+#include "fastertransformer/utils/common_structure.h"
+#include "fastertransformer/utils/nccl_utils.h"
 
 namespace fastertransformer {
 
 template <typename T>
-class DecodingInitParam {
+class DecodingInitParam : public AbstractParam {
 public:
   /* weights for masked_multi_head_attention */
   const T *embedding_table = nullptr;
   const T *embedding_kernel = nullptr;
-  // TODO we use float type bias in beam search
-  // to prevent the bad performance, but use T type in
-  // sampling because there is no cumulated log prob
-  // in sampling.
-  // Try to merge them in the future.
-  const T *embedding_bias_T = nullptr;
-  const float *embedding_bias = nullptr;
+  const T *embedding_bias = nullptr;
 
   // Used for unilm.
   const T *trans_kernel = nullptr;
@@ -61,22 +56,33 @@ public:
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
 
-  const T *logits_mask_T = nullptr;
-  const float *logits_mask = nullptr;
+  const T *logits_mask = nullptr;
 
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
   cublasHandle_t cublas_handle;
+  cublasLtHandle_t cublaslt_handle;
   cudaStream_t stream;
+
+  // For GPT model
+  int request_batch_size;
+  int request_input_len;
+  int request_output_len = 0;
+  int max_input_len;
+  int *d_start_ids;
+  const int *d_start_lengths;
+  const T *d_attn_mask;
+
+  virtual ~DecodingInitParam() {}
 };
 
 struct TransformerArguments {
-  int batch_size_;
-  int seq_len_;
-  int head_num_;
-  int size_per_head_;
-  int hidden_units_;
+  size_t batch_size_;
+  size_t seq_len_;
+  size_t head_num_;
+  size_t size_per_head_;
+  size_t hidden_units_;
 };
 
 struct DecodingArguments : public TransformerArguments {
@@ -92,8 +98,14 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float probability_threshold_;
   size_t cub_temp_storage_size_{0};
   bool normalization_before_{true};
-  int pos_offset_{0};  // for position embedding
+  int pos_offset_{0};     // For BART position embedding
+  bool pos_bias_{false};  // For Unified position embedding
   ActivationType act_{ActivationType::RELU};
+
+  int memory_max_seq_len_{0};
+  float temperature_{1.0};
+  float repeat_penalty_{1.0};
+  bool prefix_lm_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -102,17 +114,22 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   float beam_search_diversity_rate_;
   float alpha_;  // power number for length penalty in beam search v2
   bool normalization_before_{true};
-  int pos_offset_{0};  // for position embedding
+  int pos_offset_{0};     // For BART position embedding
+  bool pos_bias_{false};  // For Unified position embedding
   ActivationType act_{ActivationType::RELU};
+
+  int memory_max_seq_len_{0};
+  bool prefix_lm_{false};
 };
 
-struct Gpt2Arguments : public DecodingSamplingArguments {
+struct GptArguments : public DecodingSamplingArguments {
   int **start_ids_;
   int start_len_;
   float temperature_{2.0};
   float len_penalty{1.0};
-  float repeat_penalty{2.0};
+  float repetition_penalty_{1.0};
   int *vocab_mask{nullptr};
+  int min_gpu_num_{1};
 };
 
 struct TransformerSamplingArguments : public DecodingSamplingArguments {
@@ -120,7 +137,7 @@ struct TransformerSamplingArguments : public DecodingSamplingArguments {
   int start_len_;
   float temperature_{1.0};
   float len_penalty{1.0};
-  float repeat_penalty{1.0};
+  float repetition_penalty_{1.0};
   int *vocab_mask{nullptr};
   bool normalization_before_{true};
   bool pos_bias_{true};
@@ -133,7 +150,7 @@ struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
   int start_len_;
   float temperature_{2.0};
   float len_penalty{1.0};
-  float repeat_penalty{2.0};
+  float repetition_penalty_{2.0};
   bool normalization_before_{true};
   bool pos_bias_{true};
   int unk_id_{-1};

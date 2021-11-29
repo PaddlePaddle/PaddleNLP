@@ -6,7 +6,7 @@
 
 [UnifiedTransformer](https://arxiv.org/abs/2006.16779)以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，采用灵活的注意力机制，十分适合对话生成任务。
 
-本项目是UnifiedTransformer在 Paddle 2.0上的开源实现，包含了在[DuConv](https://www.aclweb.org/anthology/P19-1369/)数据集上微调和预测的代码。
+本项目是UnifiedTransformer在 Paddle 2.0上的开源实现，介绍了如何使用UnifiedTransformer在DuConv任务型对话数据集上进行微调，并给出了一个搭建简单中文聊天机器人的例子。
 
 ## 快速开始
 
@@ -42,9 +42,13 @@ train_ds, dev_ds, test1_ds, test2_ds = load_dataset('duconv', splits=('train', '
 
 ### 预训练模型
 
-* unified_transformer-12L-cn: 12-layers, 12-heads, 768-hidden, 在千万级别的中文会话数据上进行预训练。
-* unified_transformer-12L-cn-luge: 12-layers, 12-heads, 768-hidden, 由unified_transformer-12L-cn预训练模型在千言对话数据集上进行微调。并且模型输入中加入了标识不同对话技能的special token，使得模型能同时支持闲聊对话、推荐对话和知识对话。
-* plato-mini: 6-layers, 12-heads, 768-hidden, 在十亿级别的中文对话数据上进行预训练。参数量更小，但效果更好。
+以下是PaddleNLP支持的对话类预训练模型：
+
+|模型名称| 模型参数 | 模型特点 |
+|:-----:|:------:|:-------:|
+|unified_transformer-12L-cn| 12-layers, 12-heads, 768-hidden| 在千万级别的中文会话数据上进行预训练。|
+|unified_transformer-12L-cn-luge| 12-layers, 12-heads, 768-hidden|由unified_transformer-12L-cn预训练模型在千言对话数据集上进行微调。并且模型输入中加入了标识不同对话技能的special token，使得模型能同时支持闲聊对话、推荐对话和知识对话。|
+|plato-mini| 6-layers, 12-heads, 768-hidden|在十亿级别的中文对话数据上进行预训练。参数量更小，但效果更好。只支持闲聊型对话。|
 
 ### 模型训练
 
@@ -114,7 +118,7 @@ python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
 
 ### 模型预测
 
-运行如下命令即可在测试集上进行测试
+运行如下命令即可在测试集上进行测试。
 
 ```shell
 # GPU启动，预测仅支持单卡
@@ -173,7 +177,7 @@ python infer.py \
 
 ### 人机交互
 
-运行如下命令即可开始与聊天机器人用中文进行简单的对话
+运行如下命令即可开始与聊天机器人用中文进行简单的对话。
 
 ```shell
 # GPU启动，仅支持单卡
