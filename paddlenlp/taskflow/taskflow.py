@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask
+from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
@@ -36,9 +36,13 @@ TASKS = {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,
-                "log_name": 'knowledge_mining_wordtag',
+                "task_flag": 'knowledge_mining-wordtag',
                 "linking": True,
-            }
+            },
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'knowledge_mining-nptag',
+            },
         },
         "default": {
             "model": "wordtag"
@@ -48,7 +52,7 @@ TASKS = {
         "models": {
             "wordtag": {
                 "task_class": NERTask,
-                "log_name": 'ner_wordtag',
+                "task_flag": 'ner-wordtag',
                 "linking": False,
             }
         },
@@ -60,6 +64,7 @@ TASKS = {
         "models": {
             "gpt-cpm-large-cn": {
                 "task_class": PoetryGenerationTask,
+                "task_flag": 'poetry_generation-gpt-cpm-large-cn',
             },
         },
         "default": {
@@ -70,6 +75,7 @@ TASKS = {
         "models": {
             "gpt-cpm-large-cn": {
                 "task_class": QuestionAnsweringTask,
+                "task_flag": 'question_answering-gpt-cpm-large-cn',
             },
         },
         "default": {
@@ -81,7 +87,8 @@ TASKS = {
             "lac": {
                 "task_class": LacTask,
                 "hidden_size": 128,
-                "emb_dim": 128
+                "emb_dim": 128,
+                "task_flag": 'lexical_analysis-gru_crf',
             }
         },
         "default": {
@@ -93,7 +100,8 @@ TASKS = {
             "lac": {
                 "task_class": WordSegmentationTask,
                 "hidden_size": 128,
-                "emb_dim": 128
+                "emb_dim": 128,
+                "task_flag": 'word_segmentation-gru_crf',
             }
         },
         "default": {
@@ -105,7 +113,8 @@ TASKS = {
             "lac": {
                 "task_class": POSTaggingTask,
                 "hidden_size": 128,
-                "emb_dim": 128
+                "emb_dim": 128,
+                "task_flag": 'pos_tagging-gru_crf',
             }
         },
         "default": {
@@ -115,10 +124,12 @@ TASKS = {
     'sentiment_analysis': {
         "models": {
             "bilstm": {
-                "task_class": SentaTask
+                "task_class": SentaTask,
+                "task_flag": 'sentiment_analysis-bilstm',
             },
             "skep_ernie_1.0_large_ch": {
-                "task_class": SkepTask
+                "task_class": SkepTask,
+                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
             }
         },
         "default": {
@@ -128,13 +139,16 @@ TASKS = {
     'dependency_parsing': {
         "models": {
             "ddparser": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-biaffine',
             },
             "ddparser-ernie-1.0": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-1.0',
             },
             "ddparser-ernie-gram-zh": {
-                "task_class": DDParserTask
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-gram-zh',
             },
         },
         "default": {
@@ -144,13 +158,14 @@ TASKS = {
     'text_correction': {
         "models": {
             "csc-ernie-1.0": {
-                "task_class": CSCTask
+                "task_class": CSCTask,
+                "task_flag": "text_correction-csc-ernie-1.0"
             },
         },
         "default": {
             "model": "csc-ernie-1.0"
         }
-    }
+    },
 }
 
 

@@ -80,8 +80,12 @@ std::vector<paddle::Tensor> DecodingForward(
     // Use separated alive and finish beam queues to avoid the decrease of alive
     // beams. The outputs must include both the finish and alive to trace full
     // path.
-    sequence_length_dims = {batch_size * 2};
-    batch_size /= beam_size;
+    if (batch_size != -1) {
+      sequence_length_dims = {batch_size * 2};
+      batch_size /= beam_size;
+    } else {
+      sequence_length_dims = {batch_size};
+    }
     output_dims = {max_out_len, batch_size, beam_size * 2};
     parent_ids_dims = output_dims;
   } else if (decoding_strategy == "topk_sampling" ||
@@ -222,9 +226,11 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
     // Use separated alive and finish beam queues to avoid the decrease of alive
     // beams. The outputs must include both the finish and alive to trace full
     // path.
-    sequence_length_dims = {batch_size * 2};
     if (batch_size != -1) {
+      sequence_length_dims = {batch_size * 2};
       batch_size /= beam_size;
+    } else {
+      sequence_length_dims = {batch_size};
     }
     output_dims = {max_len, batch_size, beam_size * 2};
     return {output_dims, output_dims, sequence_length_dims};
