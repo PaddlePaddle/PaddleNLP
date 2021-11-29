@@ -193,6 +193,10 @@ def do_train(args):
     get_rng_state_tracker().add('global_seed', args.seed)
     get_rng_state_tracker().add('local_seed',
                                 args.seed + fleet.worker_index() + 2021)
+    
+    if args.use_amp and args.amp_level=="O2":
+        assert (args.mp_degree == 1 and args.pp_degree == 1), "When amp level is O2, mp_degree and pp_degree should be 1."
+        assert (args.use_sharding == False), "When amp level is O2, use_sharding should be False."
 
     assert args.device in [
         "cpu", "gpu", "xpu"
