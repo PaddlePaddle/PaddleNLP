@@ -16,10 +16,10 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
-#include "fastertransformer/common.h"
+#include "fastertransformer/decoding_beamsearch.h"
+#include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/open_decoder.h"
-#include "fastertransformer/transformer_beamsearch.h"
-#include "fastertransformer/transformer_sampling.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"

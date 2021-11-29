@@ -5,5 +5,4 @@
 .. toctree::
    :maxdepth: 1
 
-   fastergeneration.rst
    fastertransformer.rst
