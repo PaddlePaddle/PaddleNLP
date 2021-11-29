@@ -15,8 +15,7 @@ import paddle.distributed as dist
 
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+sys.path.append("../")
 import reader
 from util.record import AverageStatistical
 
@@ -46,42 +45,6 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
-    parser.add_argument(
-        "--train_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
-    )
-    parser.add_argument(
-        "--dev_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
-    )
-    parser.add_argument(
-        "--vocab_file",
-        default=None,
-        type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
-    )
-    parser.add_argument(
-        "--unk_token",
-        default=None,
-        type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -114,19 +77,18 @@ def do_train(args):
     startup_program = paddle.static.Program()
     with paddle.static.program_guard(train_program, startup_program):
         src_word = paddle.static.data(
-            name="src_word", shape=[None, None], dtype=args.input_dtype)
+            name="src_word", shape=[None, None], dtype="int64")
         trg_word = paddle.static.data(
-            name="trg_word", shape=[None, None], dtype=args.input_dtype)
+            name="trg_word", shape=[None, None], dtype="int64")
         lbl_word = paddle.static.data(
-            name="lbl_word", shape=[None, None, 1], dtype=args.input_dtype)
+            name="lbl_word", shape=[None, None, 1], dtype="int64")
 
         # Define model
         transformer = TransformerModel(
             src_vocab_size=args.src_vocab_size,
             trg_vocab_size=args.trg_vocab_size,
             max_length=args.max_length + 1,
-            num_encoder_layers=args.n_layer,
-            num_decoder_layers=args.n_layer,
+            n_layer=args.n_layer,
             n_head=args.n_head,
             d_model=args.d_model,
             d_inner_hid=args.d_inner_hid,
@@ -214,14 +176,48 @@ def do_train(args):
     batch_cost_avg = AverageStatistical()
     batch_ips_avg = AverageStatistical()
 
+    """
+    np_src_word = np.random.randint(0, 10000, [408, 20])
+    np_temp_word = np.random.randint(0, 10000, [408, 19])
+    np_zero_word = np.zeros([408, 1]).astype(np.int64)
+    np_one_word = np.ones([408, 1]).astype(np.int64)
+    np_trg_word = np.append(np_zero_word, np_temp_word, axis=-1)
+    np_lbl_word = np.append(np_temp_word, np_one_word, axis=-1).reshape([408, 20, 1])
+    data = [[np_src_word, np_trg_word, np_lbl_word]]
+    """
+    # for input_data in train_loader:
+    #     break
+    
+    # data = input_data
+    # if trainer_count == 1:
+    #     data = [data]
+
     for pass_id in range(args.epoch):
         batch_id = 0
         batch_start = time.time()
         pass_start_time = batch_start
+        # while True:
         for data in train_loader:
             # NOTE: used for benchmark and use None as default.
             if args.max_iter and step_idx == args.max_iter:
-                break
+                return
+            # if step_idx == 4:
+            #     break
+            
+            from paddle.fluid import core
+            import sys
+            if step_idx == 400:
+                core.nvprof_start()
+                core.nvprof_enable_record_event()
+                core.nvprof_nvtx_push(str(step_idx))
+            if step_idx == 405:
+                core.nvprof_nvtx_pop()
+                core.nvprof_stop()
+                sys.exit()
+            if step_idx >= 400 and step_idx < 405:
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push(str(step_idx))
+            
             if trainer_count == 1:
                 data = [data]
             train_reader_cost = time.time() - batch_start
@@ -239,6 +235,7 @@ def do_train(args):
                                      np.asarray(outs[1]).sum())
             else:
                 outs = exe.run(compiled_train_program,
+                # outs = exe.run(train_program,
                                feed=[{
                                    'src_word': data[i][0],
                                    'trg_word': data[i][1],
@@ -299,10 +296,6 @@ def do_train(args):
             step_idx += 1
             batch_start = time.time()
 
-        # NOTE: used for benchmark and use None as default.
-        if args.max_iter and step_idx == args.max_iter:
-            break
-
     if args.save_model and dist.get_rank() == 0:
         model_path = os.path.join(args.save_model, "step_final", "transformer")
         paddle.static.save(train_program, model_path)
@@ -315,16 +308,10 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
+        pprint(args)
     args.benchmark = ARGS.benchmark
     args.is_distributed = ARGS.distributed
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
-    args.train_file = ARGS.train_file
-    args.dev_file = ARGS.dev_file
-    args.vocab_file = ARGS.vocab_file
-    args.unk_token = ARGS.unk_token
-    args.bos_token = ARGS.bos_token
-    args.eos_token = ARGS.eos_token
-    pprint(args)
 
     do_train(args)

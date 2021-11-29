@@ -15,7 +15,6 @@ from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
 
 from util.record import AverageStatistical
-from util.to_static import apply_to_static
 
 
 def parse_args():
@@ -35,42 +34,6 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
-    parser.add_argument(
-        "--train_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
-    )
-    parser.add_argument(
-        "--dev_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
-    )
-    parser.add_argument(
-        "--vocab_file",
-        default=None,
-        type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
-    )
-    parser.add_argument(
-        "--unk_token",
-        default=None,
-        type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -100,8 +63,7 @@ def do_train(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        num_encoder_layers=args.n_layer,
-        num_decoder_layers=args.n_layer,
+        n_layer=args.n_layer,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -109,8 +71,6 @@ def do_train(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx)
-
-    transformer = apply_to_static(args, transformer)
 
     # Define loss
     criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
@@ -159,15 +119,48 @@ def do_train(args):
     batch_ips_avg = AverageStatistical()
 
     # Train loop
+
+    # for input_data in train_loader:
+    #     break
+
+    # (src_word, trg_word, lbl_word) = input_data
+    # print("yoki: ", src_word)
+    # print("yoki: ", trg_word)
+    # print("yoki: ", lbl_word)
+
+    
     for pass_id in range(args.epoch):
         epoch_start = time.time()
 
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
+        # while True:
+            #NOTE: Used for benchmark and use None as default. 
+            if args.max_iter and step_idx == args.max_iter:
+                return
+            # if step_idx == 4:
+            #     break
+            
+            
+            from paddle.fluid import core
+            import sys
+            if step_idx == 400:
+                core.nvprof_start()
+                core.nvprof_enable_record_event()
+                core.nvprof_nvtx_push(str(step_idx))
+            if step_idx == 405:
+                core.nvprof_nvtx_pop()
+                core.nvprof_stop()
+                sys.exit()
+            if step_idx >= 400 and step_idx < 405:
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push(str(step_idx))
+            
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
-
+            # print("yoki: shape: ", src_word.shape, trg_word.shape, lbl_word.shape)
+            
             if args.use_amp:
                 scaler = paddle.amp.GradScaler(
                     init_loss_scaling=args.scale_loss)
@@ -184,12 +177,17 @@ def do_train(args):
                 logits = transformer(src_word=src_word, trg_word=trg_word)
                 sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
+                tokens_per_cards = token_num.numpy()
+                if step_idx % args.print_step == 0 and (args.benchmark or
+                                                    rank == 0):
+                    total_avg_cost = avg_cost.numpy()
+
                 avg_cost.backward()
 
                 optimizer.step()
                 optimizer.clear_grad()
 
-            tokens_per_cards = token_num.numpy()
+            # tokens_per_cards = token_num.numpy()
 
             train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
@@ -199,7 +197,7 @@ def do_train(args):
             # NOTE: For benchmark, loss infomation on all cards will be printed.
             if step_idx % args.print_step == 0 and (args.benchmark or
                                                     rank == 0):
-                total_avg_cost = avg_cost.numpy()
+                # total_avg_cost = avg_cost.numpy()
 
                 if step_idx == 0:
                     logger.info(
@@ -259,17 +257,11 @@ def do_train(args):
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(model_dir, "transformer.pdopt"))
 
-            #NOTE: Used for benchmark and use None as default. 
-            if args.max_iter and step_idx == args.max_iter:
-                break
             batch_id += 1
             step_idx += 1
             scheduler.step()
             batch_start = time.time()
 
-        #NOTE: Used for benchmark and use None as default. 
-        if args.max_iter and step_idx == args.max_iter:
-            break
 
         train_epoch_cost = time.time() - epoch_start
         logger.info("train epoch: %d, epoch_cost: %.5f s" %
@@ -290,15 +282,9 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
+        pprint(args)
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
-    args.train_file = ARGS.train_file
-    args.dev_file = ARGS.dev_file
-    args.vocab_file = ARGS.vocab_file
-    args.unk_token = ARGS.unk_token
-    args.bos_token = ARGS.bos_token
-    args.eos_token = ARGS.eos_token
-    pprint(args)
 
     do_train(args)
