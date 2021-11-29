@@ -290,7 +290,8 @@ class ErnieModel(ErniePretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0,
-            weight_attr=weight_attr, )
+            weight_attr=weight_attr,
+            normalize_before=False)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
@@ -372,6 +373,7 @@ class ErnieModel(ErniePretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
+
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)

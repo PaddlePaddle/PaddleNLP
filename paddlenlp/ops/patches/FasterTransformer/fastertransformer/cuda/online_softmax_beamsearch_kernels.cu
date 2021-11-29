@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -121,7 +121,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     void batch_topk_kernel(const int* __restrict x,
                            const T* __restrict y,
                            int* __restrict z,
-                           T* __restrict v,
+                           float* __restrict v,
                            int V,
                            int K,
                            T diversity_rate) {
@@ -158,7 +158,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     for (int i = 0; i < MAX_K; ++i) {
       if (i < K) {
         z[i] = x[total.p[i]];
-        v[i] = y[total.p[i]];
+        v[i] = (float)y[total.p[i]];
       }
     }
   }
@@ -201,8 +201,8 @@ template <typename T,
           bool ALIVE = false>
 __launch_bounds__(THREADBLOCK_SIZE) __global__
     void beam_online_softmax_topk_kernel(const T* __restrict x,
-                                         const float* __restrict b,
-                                         const T* __restrict c,
+                                         const T* __restrict b,
+                                         const float* __restrict c,
                                          const bool* __restrict finished,
                                          int* __restrict z,
                                          T* __restrict v,
@@ -281,7 +281,7 @@ template <typename T,
           bool ALIVE = false>
 __launch_bounds__(THREADBLOCK_SIZE, 1) __global__
     void beam_online_softmax_topk_stage1_kernel(const T* __restrict x,
-                                                const float* __restrict b,
+                                                const T* __restrict b,
                                                 const bool* __restrict finished,
                                                 float* __restrict t,
                                                 int V,
@@ -338,8 +338,7 @@ __launch_bounds__(THREADBLOCK_SIZE, 1) __global__
 #pragma unroll 1
     for (int elem_id = section_start + thread_id; elem_id < section_end;
          elem_id += THREADBLOCK_SIZE) {
-      T bias =
-          (T)(b == nullptr ? 0.0f : b[elem_id]);  // gpt-2 does not use bias
+      T bias = b == nullptr ? (T)0.0f : b[elem_id];  // gpt-2 does not use bias
       T elem = x[elem_id] + bias;
       MD new_elem{elem, 1.0F};
       partial.md = reduce_md_op(partial.md, new_elem);
@@ -376,7 +375,7 @@ __launch_bounds__(THREADBLOCK_SIZE, 1) __global__
 template <typename T, int MAX_K, int THREADBLOCK_SIZE, bool ALIVE = false>
 __launch_bounds__(THREADBLOCK_SIZE) __global__
     void beam_online_softmax_topk_stage2_kernel(const float* __restrict x,
-                                                const T* __restrict c,
+                                                const float* __restrict c,
                                                 int* __restrict z,
                                                 T* __restrict v,
                                                 int K,
@@ -457,7 +456,7 @@ void topK_kernelLauncher(T* log_probs,
                          cudaStream_t stream) {
   const int batch_size = args.batch_size_;
   const int beam_width = args.beam_width_;
-  const int vocab_size = args.vocab_size_;
+  const int vocab_size = args.vocab_size_padded_;
   const int diversity_rate = args.beam_search_diversity_rate_;
   const int block_size = SMALL_TOP_K_SOFTMAX_THREADBLOCK_SIZE;
 
@@ -577,7 +576,7 @@ void topK_kernelLauncher(T* log_probs,
 
 template <typename T, int MAX_K, bool ALIVE = false>
 void beam_online_softmax_topk_stage2_kernelLauncher(const float* temp_storage,
-                                                    const T* cum_log_probs,
+                                                    const float* cum_log_probs,
                                                     int* ids,
                                                     T* vals,
                                                     int batch_size,
@@ -636,9 +635,9 @@ void beam_online_softmax_topk_stage2_kernelLauncher(const float* temp_storage,
 
 template <typename T, int MAX_K>
 void topK_softMax_kernelLauncher(const T* log_probs,
-                                 const float* bias,
+                                 const T* bias,
                                  const bool* finished,
-                                 T* cum_log_probs,
+                                 float* cum_log_probs,
                                  int* ids,
                                  void* temp_storage,
                                  const int temp_storage_size,
@@ -657,11 +656,12 @@ void topK_softMax_kernelLauncher(const T* log_probs,
   assert(temp_storage_size % 2 == 0);
   assert(temp_storage_size >= 2 * batch_size * beam_width * beam_width);
 
+  const int topk_buf_offset =
+      ceil(batch_size * beam_width * beam_width / 4.) * 4;
   int* topk_tmp_id_buf = reinterpret_cast<int*>(temp_storage);
-  T* topk_tmp_val_buf = reinterpret_cast<T*>(
-      topk_tmp_id_buf + batch_size * beam_width * beam_width);
-  float* tmp_buffer = reinterpret_cast<float*>(
-      topk_tmp_val_buf + batch_size * beam_width * beam_width);
+  T* topk_tmp_val_buf = reinterpret_cast<T*>(topk_tmp_id_buf + topk_buf_offset);
+  float* tmp_buffer =
+      reinterpret_cast<float*>(topk_tmp_val_buf + topk_buf_offset);
 
 #ifdef DO_SPLIT_SMALL_TOP_K_SOFTMAX
   int voc_parts = 4;
@@ -726,14 +726,14 @@ void topK_softMax_kernelLauncher(const T* log_probs,
 #endif
   } else {
 #ifdef DO_SPLIT_SMALL_TOP_K_SOFTMAX
-    beam_online_softmax_topk_stage2_kernelLauncher<T, MAX_K>(tmp_buffer,
-                                                             cum_log_probs,
-                                                             ids,
-                                                             cum_log_probs,
-                                                             batch_size,
-                                                             beam_width,
-                                                             voc_parts,
-                                                             stream);
+    beam_online_softmax_topk_stage2_kernelLauncher<float, MAX_K>(tmp_buffer,
+                                                                 cum_log_probs,
+                                                                 ids,
+                                                                 cum_log_probs,
+                                                                 batch_size,
+                                                                 beam_width,
+                                                                 voc_parts,
+                                                                 stream);
 #else
     beam_online_softmax_topk_kernel<
         T,
@@ -755,9 +755,9 @@ void topK_softMax_kernelLauncher(const T* log_probs,
 
 template <typename T>
 void topK_softMax(const T* log_probs,
-                  const float* bias,
+                  const T* bias,
                   const bool* finished,
-                  T* cum_log_probs,
+                  float* cum_log_probs,
                   int* ids,
                   void* temp_storage,
                   DecodingBeamsearchArguments args,
@@ -765,7 +765,7 @@ void topK_softMax(const T* log_probs,
   const int temp_storage_size = args.temp_storage_size_;
   const int batch_size = args.batch_size_;
   const int beam_width = args.beam_width_;
-  const int vocab_size = args.vocab_size_;
+  const int vocab_size = args.vocab_size_padded_;
   const int end_id = args.end_id_;
   const T diversity_rate = args.beam_search_diversity_rate_;
 
@@ -860,6 +860,21 @@ void topK_softMax(const T* log_probs,
                                          diversity_rate,
                                          stream);
       break;
+    case 32:
+      topK_softMax_kernelLauncher<T, 32>(log_probs,
+                                         bias,
+                                         finished,
+                                         cum_log_probs,
+                                         ids,
+                                         temp_storage,
+                                         temp_storage_size,
+                                         batch_size,
+                                         beam_width,
+                                         vocab_size,
+                                         end_id,
+                                         diversity_rate,
+                                         stream);
+      break;
     default:
       printf("[ERROR] Topk kernel does not support beamwidth = %d \n",
              beam_width);
@@ -892,9 +907,9 @@ template void topK_softMax<float>(const float* log_probs,
                                   cudaStream_t stream);
 
 template void topK_softMax<half>(const half* log_probs,
-                                 const float* bias,
+                                 const half* bias,
                                  const bool* finished,
-                                 half* cum_log_probs,
+                                 float* cum_log_probs,
                                  int* ids,
                                  void* tmp_storage,
                                  DecodingBeamsearchArguments args,
@@ -934,12 +949,13 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     void batch_topk_update_kernel(const int* __restrict x,
                                   const T* __restrict y,
                                   bool* finished,
+                                  bool* alive_finished,
                                   int* sequence_length,
                                   int* word_ids,
                                   int* parent_ids,
                                   int* output_word_ids,
                                   int* output_parent_ids,
-                                  T* output_cum_log_probs,
+                                  float* output_cum_log_probs,
                                   const int batch_size,
                                   const int beam_width,
                                   const int vocab_size,
@@ -991,6 +1007,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     output_cum_log_probs += vector_id * K;
     sequence_length += vector_id * K;
     finished += vector_id * K;
+    alive_finished += vector_id * beam_width;
     // load the finish queue to grow
     // TODO(guosheng): Use vectorized load or do this BlockReduce to use
     // multi-threads without extra sync
@@ -1040,6 +1057,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
           output_cum_log_probs[MAX_K / 2 + alive_num] = cum_log_prob;
           sequence_length[MAX_K / 2 + alive_num] = step;
           finished[MAX_K / 2 + alive_num] = 0;
+          alive_finished[alive_num] = 0;
           alive_num += 1;
         }
       }
@@ -1056,7 +1074,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
 
     // early finish
     float lowest_finish =
-        finish_num == 0 ? -MAX_T_VAL : output_cum_log_probs[finish_num - 1];
+        finish_num == 0 ? -1e20f : output_cum_log_probs[finish_num - 1];
     // The best possible score of the most likely alive sequence
     float lower_bound =
         (float)output_cum_log_probs[MAX_K / 2] / max_length_penalty;
@@ -1072,21 +1090,25 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
         finished[finish_num] = 1;
       }
       // If early stop, also mark the alive beams finished.
-      for (int i = MAX_K / 2; i < MAX_K; ++i) finished[i] = 1;
+      for (int i = MAX_K / 2; i < MAX_K; ++i) {
+        finished[i] = 1;
+        alive_finished[i - MAX_K / 2] = 1;
+      }
     }
   }
 }
 
 template <typename T, int MAX_K>
 void topK_softMax_update_kernelLauncher(const T* log_probs,
-                                        const float* bias,
+                                        const T* bias,
                                         bool* finished,
+                                        bool* alive_finished,
                                         int* sequence_length,
                                         int* word_ids,
                                         int* parent_ids,
                                         int* output_word_ids,
                                         int* output_parent_ids,
-                                        T* cum_log_probs,
+                                        float* cum_log_probs,
                                         void* temp_storage,
                                         const int temp_storage_size,
                                         const int batch_size,
@@ -1172,6 +1194,7 @@ void topK_softMax_update_kernelLauncher(const T* log_probs,
       topk_tmp_id_buf,
       topk_tmp_val_buf,
       finished,
+      alive_finished,
       sequence_length,
       word_ids,
       parent_ids,
@@ -1194,15 +1217,16 @@ void topK_softMax_update_kernelLauncher(const T* log_probs,
 template <typename T>
 void topK_softMax_update(
     const T* log_probs,
-    const float* bias,  // NOTE: bias is float in V3.1
+    const T* bias,  // NOTE: bias is float in V3.1
     bool* finished,
+    bool* alive_finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
     int* output_word_ids,
-    int* output_parent_ids,   // for gather tree, include both alive and finish
-                              // beams
-    T* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    int* output_parent_ids,  // for gather tree, include both alive and finish
+                             // beams
+    float* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
     void* temp_storage,
     const int step,
     DecodingBeamsearchArguments args,
@@ -1210,8 +1234,7 @@ void topK_softMax_update(
   const int temp_storage_size = args.temp_storage_size_;
   const int batch_size = args.batch_size_;
   const int beam_width = args.beam_width_;
-  // const int vocab_size = args.vocab_size_padded_;
-  const int vocab_size = args.vocab_size_;
+  const int vocab_size = args.vocab_size_padded_;
   const int end_id = args.end_id_;
   const T diversity_rate = args.beam_search_diversity_rate_;
   const int max_out_len = args.seq_len_;
@@ -1222,6 +1245,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 2>(log_probs,
                                                bias,
                                                finished,
+                                               alive_finished,
                                                sequence_length,
                                                word_ids,
                                                parent_ids,
@@ -1244,6 +1268,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 4>(log_probs,
                                                bias,
                                                finished,
+                                               alive_finished,
                                                sequence_length,
                                                word_ids,
                                                parent_ids,
@@ -1266,6 +1291,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 6>(log_probs,
                                                bias,
                                                finished,
+                                               alive_finished,
                                                sequence_length,
                                                word_ids,
                                                parent_ids,
@@ -1288,6 +1314,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 8>(log_probs,
                                                bias,
                                                finished,
+                                               alive_finished,
                                                sequence_length,
                                                word_ids,
                                                parent_ids,
@@ -1310,6 +1337,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 16>(log_probs,
                                                 bias,
                                                 finished,
+                                                alive_finished,
                                                 sequence_length,
                                                 word_ids,
                                                 parent_ids,
@@ -1332,6 +1360,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 32>(log_probs,
                                                 bias,
                                                 finished,
+                                                alive_finished,
                                                 sequence_length,
                                                 word_ids,
                                                 parent_ids,
@@ -1354,6 +1383,7 @@ void topK_softMax_update(
       topK_softMax_update_kernelLauncher<T, 64>(log_probs,
                                                 bias,
                                                 finished,
+                                                alive_finished,
                                                 sequence_length,
                                                 word_ids,
                                                 parent_ids,
@@ -1384,6 +1414,7 @@ template void topK_softMax_update<float>(
     const float* log_probs,
     const float* bias,
     bool* finished,
+    bool* alive_finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
@@ -1398,15 +1429,16 @@ template void topK_softMax_update<float>(
 
 template void topK_softMax_update<half>(
     const half* log_probs,
-    const float* bias,
+    const half* bias,
     bool* finished,
+    bool* alive_finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
     int* output_word_ids,
     int* output_parent_ids,  // for gather tree, include both alive and finish
                              // beams
-    half* output_cum_log_probs,
+    float* output_cum_log_probs,
     void* temp_storage,
     const int step,
     DecodingBeamsearchArguments args,
