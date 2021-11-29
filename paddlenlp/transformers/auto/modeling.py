@@ -46,9 +46,9 @@ MAPPING_NAMES = OrderedDict([
     ("DistilBert", "distilbert"),
     ("Electra", "electra"),
     ("Skep", "skep"),
-    ("ErnieCtm", "ernie-ctm"),
-    ("ErnieDoc", "ernie-doc"),
-    ("ErnieGram", "ernie-gram"),
+    ("ErnieCtm", "ernie_ctm"),
+    ("ErnieDoc", "ernie_doc"),
+    ("ErnieGram", "ernie_gram"),
     ("Ernie", "ernie"),
     ("GPT", "gpt"),
     ("MPNet", "mpnet"),
@@ -58,7 +58,7 @@ MAPPING_NAMES = OrderedDict([
     ("TinyBert", "tinybert"),
     ("Bert", "bert"),
     ("UNIMO", "unimo"),
-    ("UnifiedTransformer", "unifiedtransformer"),
+    ("UnifiedTransformer", "unified_transformer"),
     ("XLNet", "xlnet"),
 ])
 
@@ -184,60 +184,15 @@ for key, value in MAPPING_NAMES.items():
 
 
 def get_configurations():
-    albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
-    bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
-    bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
-    convbert = tuple(ConvBertPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    distilbert = tuple(
-        DistilBertPretrainedModel.pretrained_init_configuration.keys())
-    electra = tuple(ElectraPretrainedModel.pretrained_init_configuration.keys())
-    skep = tuple(SkepPretrainedModel.pretrained_init_configuration.keys())
-    erniectm = tuple(ErnieCtmPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    erniedoc = tuple(ErnieDocPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    erniegen = tuple(ErnieForGeneration.pretrained_init_configuration.keys())
-    erniegram = tuple(ErnieGramModel.pretrained_init_configuration.keys())
-    ernie = tuple(ErniePretrainedModel.pretrained_init_configuration.keys())
-    gpt = tuple(GPTPretrainedModel.pretrained_init_configuration.keys())
-    mpnet = tuple(MPNetPretrainedModel.pretrained_init_configuration.keys())
-    nezha = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
-    roberta = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys())
-    roformer = tuple(RoFormerPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    tinybert = tuple(TinyBertPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    bert = tuple(BertPretrainedModel.pretrained_init_configuration.keys())
-    unifiedtransformer = tuple(
-        UnifiedTransformerModel.pretrained_init_configuration.keys())
-    unimo = tuple(UNIMOPretrainedModel.pretrained_init_configuration.keys())
-    xlnet = tuple(XLNetPretrainedModel.pretrained_init_configuration.keys())
+    MODEL_MAPPING_NAMES = OrderedDict()
+    for key, class_name in MAPPING_NAMES.items():
+        import_class = importlib.import_module(
+            f"paddlenlp.transformers.{class_name}.modeling")
+        model_name = getattr(import_class, key + 'Model')
+        name = tuple(model_name.pretrained_init_configuration.keys())
+        MODEL_MAPPING_NAMES[name] = key + 'Model'
 
-    MAPPING_NAMES = OrderedDict([
-        (albert, 'AlbertModel'),
-        (bart, 'BartModel'),
-        (bigbird, 'BigBirdModel'),
-        (convbert, 'ConvBertModel'),
-        (distilbert, 'DistilBertModel'),
-        (electra, 'ElectraModel'),
-        (skep, 'SkepModel'),
-        (erniectm, 'ErnieCtmModel'),
-        (erniedoc, 'ErnieDocModel'),
-        (erniegram, 'ErnieGramModel'),
-        (ernie, 'ErnieModel'),
-        (gpt, 'GPTModel'),
-        (mpnet, 'MPNetModel'),
-        (nezha, 'NeZhaModel'),
-        (roberta, 'RobertaModel'),
-        (roformer, 'RoFormerModel'),
-        (tinybert, 'TinyBertModel'),
-        (bert, 'BertModel'),
-        (unifiedtransformer, 'UnifiedTransformerModel'),
-        (unimo, 'UNIMOModel'),
-        (xlnet, 'XLNetModel'),
-    ])
-    return MAPPING_NAMES
+    return MODEL_MAPPING_NAMES
 
 
 class _BaseAutoModelClass:
@@ -314,22 +269,19 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
-                try:
-                    class_name = cls._name_mapping[init_class]
+                class_name = cls._name_mapping.get(init_class, None)
+                if class_name:
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.modeling")
                     model_name = getattr(import_class, init_class)
-                    keyerror = False
                     return model_name.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
-                except KeyError as err:
-                    keyerror = True
-                if keyerror:
+                else:
                     print(
-                        'We use pattern recoginition to recoginize the Model class.'
+                        'We use pattern recognition to recognize the Model class.'
                     )
                     # From init_class
-                    if init_class != None:
+                    if init_class:
                         init_class = init_class.lower()
                         mapping_init_class = init_class
                     else:
@@ -364,24 +316,20 @@ class _BaseAutoModelClass:
                         init_kwargs = json.load(f)
                     # class name corresponds to this configuration
                     init_class = init_kwargs.pop("init_class", None)
-                    try:
-                        class_name = cls._name_mapping[init_class]
+                    class_name = cls._name_mapping.get(init_class, None)
+                    if class_name:
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
                         model_name = getattr(import_class, init_class)
-                        keyerror = False
                         return model_name.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
-                    except KeyError as err:
-                        #logger.error(err)
-                        keyerror = True
-                    if keyerror:
+                    else:
                         print(
-                            'We use pattern recoginition to recoginize the Model class.'
+                            'We use pattern recognition to recognize the Model class.'
                         )
                         # From init_class
-                        if init_class != None:
+                        if init_class:
                             init_class = init_class.lower()
                             mapping_init_class = init_class
                         else:

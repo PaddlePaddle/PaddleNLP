@@ -12,6 +12,9 @@ def from_built_in_models():
     tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
+    tokenizer = AutoTokenizer.from_pretrained('ernie-ctm')
+    print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
+
     tokenizer = AutoTokenizer.from_pretrained('plato-mini')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
 
@@ -69,5 +72,6 @@ def from_community_models():
 if __name__ == '__main__':
 
     from_built_in_models()
-    from_local_dir()
+    #from_local_dir()
     from_community_models()
+    print(tuple(AlbertTokenizer.pretrained_init_configuration.keys()))

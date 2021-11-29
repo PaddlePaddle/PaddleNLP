@@ -5,8 +5,7 @@ import warnings
 
 
 def from_built_in_model():
-    print(
-        'From_built_in_models:-----------------------------------------------')
+    print('From_built_in_models:-------------------------------')
 
     # model test
     model = AutoModel.from_pretrained('bert-base-uncased')
@@ -16,7 +15,6 @@ def from_built_in_model():
     #model = AutoModel.from_pretrained('unified_transformer-12L-cn')
 
     # pretraining test
-    '''
     #model = AutoModelForPretraining.from_pretrained('roformer-chinese-small')
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='pretraining')
@@ -26,7 +24,8 @@ def from_built_in_model():
     print(type(model))
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='token_classification')
-    print(type(model))'''
+    print(type(model))
+
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='question_answering')
     print(type(model))
@@ -36,7 +35,7 @@ def from_built_in_model():
     print(type(model))
 
     #model = AutoModelForPretraining.from_pretrained('tinybert-4l-312d')
-    '''
+
     # lm_head test
     model = AutoModelWithLMHead.from_pretrained('gpt-cpm-large-cn')
     print(type(model))
@@ -91,23 +90,19 @@ def from_built_in_model():
     #model = AutoGenerator.from_pretrained("electra-small")
     #model = AutoDiscriminator.from_pretrained("convbert-base")
     #model = AutoDiscriminator.from_pretrained("electra-small")
-    '''
 
 
 def from_local_dir():
-    print(
-        'From_local_dir:-----------------------------------------------------')
-    model = AutoModel.from_pretrained(
-        ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
+    print('From_local_dir:-----------------------------------------')
+    model = AutoModel.from_pretrained(('saved_model/my_bert_model'))
     print(type(model))
-    model = AutoModelForSequenceClassification.from_pretrained((
-        '/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
+    model = AutoModelForSequenceClassification.from_pretrained(
+        ('saved_model/my_bert_model_for_pretraining'))
     print(type(model))
 
 
 def from_community_model():
-    print(
-        'From_community_models:----------------------------------------------')
+    print('From_community_models:---------------------------------')
     #model = AutoModelForSequenceClassification.from_pretrained(
     #   'yingyibiao/bert-base-uncased-sst-2-finetuned')
     #print(type(model))
@@ -116,17 +111,8 @@ def from_community_model():
     print(type(model))
 
 
-'''
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-    inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
-    outputs = model(**inputs)
-    print(outputs)
-    logits = outputs[0]
-'''
-
 if __name__ == '__main__':
 
     #from_built_in_model()
-    from_local_dir()
-    #from_community_model()
+    #from_local_dir()
+    from_community_model()

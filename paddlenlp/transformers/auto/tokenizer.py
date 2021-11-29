@@ -33,9 +33,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("DistilBertTokenizer", "distilbert"),
     ("ElectraTokenizer", "electra"),
     ("SkepTokenizer", "skep"),
-    ("ErnieCtmTokenizer", "ernie-ctm"),
-    ("ErnieDocTokenizer", "ernie-doc"),
-    ("ErnieGramTokenizer", "ernie-gram"),
+    ("ErnieCtmTokenizer", "ernie_ctm"),
+    ("ErnieDocTokenizer", "ernie_doc"),
+    ("ErnieGramTokenizer", "ernie_gram"),
     ("ErnieTokenizer", "ernie"),
     ("GPTTokenizer", "gpt"),
     ("MPNetTokenizer", "mpnet"),
@@ -51,60 +51,17 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 
 
 def get_configurations():
-    albert = tuple(AlbertPretrainedModel.pretrained_init_configuration.keys())
-    bart = tuple(BartPretrainedModel.pretrained_init_configuration.keys())
-    bigbird = tuple(BigBirdPretrainedModel.pretrained_init_configuration.keys())
-    convbert = tuple(ConvBertPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    distilbert = tuple(
-        DistilBertPretrainedModel.pretrained_init_configuration.keys())
-    electra = tuple(ElectraPretrainedModel.pretrained_init_configuration.keys())
-    skep = tuple(SkepPretrainedModel.pretrained_init_configuration.keys())
-    erniectm = tuple(ErnieCtmPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    erniedoc = tuple(ErnieDocPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    erniegram = tuple(ErnieGramModel.pretrained_init_configuration.keys())
-    ernie = tuple(ErniePretrainedModel.pretrained_init_configuration.keys())
-    gpt = tuple(GPTPretrainedModel.pretrained_init_configuration.keys())
-    mpnet = tuple(MPNetPretrainedModel.pretrained_init_configuration.keys())
-    nezha = tuple(NeZhaPretrainedModel.pretrained_init_configuration.keys())
-    roberta = tuple(RobertaPretrainedModel.pretrained_init_configuration.keys())
-    roformer = tuple(RoFormerPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    tinybert = tuple(TinyBertPretrainedModel.pretrained_init_configuration.keys(
-    ))
-    bert = tuple(BertPretrainedModel.pretrained_init_configuration.keys())
-    unifiedtransformer = tuple(
-        UnifiedTransformerModel.pretrained_init_configuration.keys())
-    unimo = tuple(UNIMOPretrainedModel.pretrained_init_configuration.keys())
-    xlnet = tuple(XLNetPretrainedModel.pretrained_init_configuration.keys())
-
-    MAPPING_NAMES = OrderedDict([
-        # Base model mapping
-        (albert, AlbertTokenizer),
-        (bart, BartTokenizer),
-        (bigbird, BigBirdTokenizer),
-        (convbert, ConvBertTokenizer),
-        (distilbert, DistilBertTokenizer),
-        (electra, ElectraTokenizer),
-        (skep, SkepTokenizer),
-        (erniectm, ErnieCtmTokenizer),
-        (erniedoc, ErnieDocTokenizer),
-        (erniegram, ErnieGramTokenizer),
-        (ernie, ErnieTokenizer),
-        (gpt, GPTTokenizer),
-        (mpnet, MPNetTokenizer),
-        (nezha, NeZhaTokenizer),
-        (roberta, RobertaTokenizer),
-        (roformer, RoFormerTokenizer),
-        (tinybert, TinyBertTokenizer),
-        (bert, BertTokenizer),
-        (unifiedtransformer, UnifiedTransformerTokenizer),
-        (unimo, UNIMOTokenizer),
-        (xlnet, XLNetTokenizer),
-    ])
+    MAPPING_NAMES = OrderedDict()
+    for key, class_name in TOKENIZER_MAPPING_NAMES.items():
+        import_class = importlib.import_module(
+            f"paddlenlp.transformers.{class_name}.tokenizer")
+        tokenizer_name = getattr(import_class, key)
+        name = tuple(tokenizer_name.pretrained_init_configuration.keys())
+        MAPPING_NAMES[name] = tokenizer_name
     return MAPPING_NAMES
+
+
+#get_configurations()
 
 
 class AutoTokenizer():
@@ -177,7 +134,8 @@ class AutoTokenizer():
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
                         return tokenizer_class.from_pretrained(
-                            pretrained_model_name_or_path, **kwargs)
+                            pretrained_model_name_or_path, *model_args,
+                            **kwargs)
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path,
@@ -192,13 +150,12 @@ class AutoTokenizer():
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_name = getattr(import_class, init_class)
-                    keyerror = False
                     return tokenizer_name.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
-                # If no `init_class`, we use pattern recoginition to recoginize the Tokenizer class.
+                # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
                 else:
                     print(
-                        'We use pattern recoginition to recoginize the Tokenizer class.'
+                        'We use pattern recognition to recognize the Tokenizer class.'
                     )
                     for key, pattern in cls._name_mapping.items():
                         pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
@@ -237,14 +194,13 @@ class AutoTokenizer():
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.tokenizer")
                         tokenizer_name = getattr(import_class, init_class)
-                        keyerror = False
                         return tokenizer_name.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
-                    # If no `init_class`, we use pattern recoginition to recoginize the Tokenizer class.
+                    # If no `init_class`, we use pattern recognition to recognize the Tokenizer class.
                     else:
                         print(
-                            'We use pattern recoginition to recoginize the Tokenizer class.'
+                            'We use pattern recognition to recognize the Tokenizer class.'
                         )
                         for key, pattern in cls._name_mapping.items():
                             pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
