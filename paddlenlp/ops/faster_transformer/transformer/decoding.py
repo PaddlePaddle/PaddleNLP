@@ -268,7 +268,8 @@ def infer_unified_decoding(
         linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
         _max_out_len, _diversity_rate, _unk_id, _mask_id, _temperature,
-        _len_penalty, _normalize_before, _pos_bias, _hidden_act, _rel_len):
+        _len_penalty, _normalize_before, _pos_bias, _hidden_act, _rel_len,
+        _early_stopping):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -325,7 +326,8 @@ def infer_unified_decoding(
         "normalize_before": _normalize_before,
         "pos_bias": _pos_bias,
         "hidden_act": _hidden_act,
-        "rel_len": _rel_len
+        "rel_len": _rel_len,
+        "early_stopping": _early_stopping
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -358,7 +360,7 @@ def infer_bart_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
-        _alpha):
+        _alpha, _early_stopping):
 
     helper = LayerHelper('fusion_bart_decoding', **locals())
 
@@ -412,7 +414,8 @@ def infer_bart_decoding(
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
-        "alpha": _alpha
+        "alpha": _alpha,
+        "early_stopping": _early_stopping
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -446,7 +449,8 @@ def finalize(beam_size,
 
     if decoding_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
-            beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
+            beam_size * 2 if decoding_strategy.endswith("_v2") or
+            decoding_strategy.endswith("_v3") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -1245,7 +1249,8 @@ class InferUnifiedDecoding(nn.Layer):
                 length_penalty=1.0,
                 diversity_rate=0.0,
                 pos_bias=True,
-                rel_len=True):
+                rel_len=False,
+                early_stopping=False):
         decoding_strategy = self._decoding_strategy
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
@@ -1263,6 +1268,9 @@ class InferUnifiedDecoding(nn.Layer):
                 raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        elif decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v3"
+
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -1314,14 +1322,15 @@ class InferUnifiedDecoding(nn.Layer):
             _normalize_before=self._normalize_before,
             _pos_bias=pos_bias,
             _hidden_act=self._hidden_act,
-            _rel_len=rel_len)
+            _rel_len=rel_len,
+            _early_stopping=early_stopping)
 
         ids = finalize(
             beam_size,
             output_ids,
             parent_ids,
             sequence_length,
-            decoding_strategy=self._decoding_strategy)
+            decoding_strategy=decoding_strategy)
 
         return ids
 
@@ -1330,7 +1339,7 @@ class InferBartDecoding(nn.Layer):
     def __init__(
             self,
             model,
-            decoding_strategy="beam_search_v2",
+            decoding_strategy="beam_search_v3",
             decoding_lib=None,
             use_fp16_decoding=False, ):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
@@ -1517,11 +1526,12 @@ class InferBartDecoding(nn.Layer):
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
-                alpha=0.6):
-        # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
+                alpha=0.6,
+                early_stopping=False):
+        # beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
         decoding_strategy = self._decoding_strategy
         if decoding_strategy.startswith("beam_search"):
-            decoding_strategy = "beam_search_v2"
+            decoding_strategy = "beam_search_v3"
         elif decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
             top_k = 1
@@ -1554,7 +1564,7 @@ class InferBartDecoding(nn.Layer):
             decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
-            alpha)
+            alpha, early_stopping)
 
         ids = finalize(
             beam_size,

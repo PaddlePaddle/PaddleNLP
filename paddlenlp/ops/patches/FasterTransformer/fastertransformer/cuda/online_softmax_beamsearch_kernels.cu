@@ -966,7 +966,9 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
                                   int K,
                                   T diversity_rate,
                                   float length_penalty,
-                                  float max_length_penalty) {
+                                  float max_length_penalty,
+                                  const int finished_candidate_num,
+                                  const bool early_stopping = false) {
   int thread_id = threadIdx.x;
   int vector_id = blockIdx.x;
 
@@ -1040,14 +1042,14 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
         int beam_id_in_output =
             vector_id * K + (beam_id % beam_width) + beam_width;
         int word_id = abs_id % vocab_size;
-        if (word_id == end_id) {  // grow finish
+        if (i < finished_candidate_num && word_id == end_id) {  // grow finish
           // The alive candidates are put after finish candidates in the
           // finish queue, thus parent index should plus with the
           // offset(beam_width).
           finish_candidate.insert(
               cum_log_prob / length_penalty, beam_id_in_output, step);
           if (finish_num != MAX_K / 2) finish_num += 1;
-        } else if (alive_num < beam_width) {  // grow alive
+        } else if (alive_num < beam_width && word_id != end_id) {  // grow alive
           parent_ids[alive_num] = beam_id;
           word_ids[alive_num] = word_id;
           // Also put alive candidates after finish candidates, since output
@@ -1065,7 +1067,8 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
 
     for (int i = 0; i < MAX_K / 2; ++i) {
       output_word_ids[i] = end_id;
-      output_cum_log_probs[i] = finish_candidate.u[i];
+      output_cum_log_probs[i] =
+          static_cast<float>(finish_candidate.u[i]) / length_penalty;
       output_parent_ids[i] = finish_candidate.idx[i];
       sequence_length[i] = finish_candidate.len[i];
       // finished[i] = 1;
@@ -1080,7 +1083,9 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
         (float)output_cum_log_probs[MAX_K / 2] / max_length_penalty;
 
     // output must include both the finish and alive to trace full path
-    if (step == max_out_len || lowest_finish > lower_bound) {  // when finishing
+    if (step == max_out_len || lowest_finish > lower_bound ||
+        (early_stopping &&
+         finished_candidate_num == finish_num)) {  // when finishing
       for (int i = 0; finish_num < MAX_K / 2; ++finish_num, ++i) {
         output_word_ids[finish_num] = word_ids[i];
         output_cum_log_probs[finish_num] =
@@ -1119,6 +1124,8 @@ void topK_softMax_update_kernelLauncher(const T* log_probs,
                                         const int max_out_len,
                                         T diversity_rate,
                                         const float alpha,
+                                        const int finished_candidate_num,
+                                        const bool early_stopping,
                                         cudaStream_t stream) {
   const int items_per_thread = 1;
   const int block_sz =
@@ -1188,8 +1195,12 @@ void topK_softMax_update_kernelLauncher(const T* log_probs,
                                                               beam_width * 2,
                                                               end_id);
 #endif
-  float length_penalty = std::pow((5. + step + 1) / 6., alpha);
-  float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., alpha);
+  float length_penalty = (finished_candidate_num == beam_width)
+                             ? std::pow((5. + step - 1) / 6., alpha)
+                             : std::pow((5. + step + 1) / 6., alpha);
+  float max_length_penalty = (finished_candidate_num == beam_width)
+                                 ? length_penalty
+                                 : std::pow((5. + max_out_len + 1) / 6., alpha);
   batch_topk_update_kernel<T, MAX_K, 32><<<batch_size, 32, 0, stream>>>(
       topk_tmp_id_buf,
       topk_tmp_val_buf,
@@ -1211,7 +1222,9 @@ void topK_softMax_update_kernelLauncher(const T* log_probs,
       beam_width * 2,
       diversity_rate,
       length_penalty,
-      max_length_penalty);
+      max_length_penalty,
+      finished_candidate_num,
+      early_stopping);
 }
 
 template <typename T>
@@ -1239,6 +1252,8 @@ void topK_softMax_update(
   const T diversity_rate = args.beam_search_diversity_rate_;
   const int max_out_len = args.seq_len_;
   const float alpha = args.alpha_;
+  const int finished_candidate_num = args.finished_candidate_num_;
+  const bool early_stopping = args.early_stopping_;
 
   switch (beam_width) {
     case 1:
@@ -1262,6 +1277,8 @@ void topK_softMax_update(
                                                max_out_len,
                                                diversity_rate,
                                                alpha,
+                                               finished_candidate_num,
+                                               early_stopping,
                                                stream);
       break;
     case 2:
@@ -1285,6 +1302,8 @@ void topK_softMax_update(
                                                max_out_len,
                                                diversity_rate,
                                                alpha,
+                                               finished_candidate_num,
+                                               early_stopping,
                                                stream);
       break;
     case 3:
@@ -1308,6 +1327,8 @@ void topK_softMax_update(
                                                max_out_len,
                                                diversity_rate,
                                                alpha,
+                                               finished_candidate_num,
+                                               early_stopping,
                                                stream);
       break;
     case 4:
@@ -1331,6 +1352,8 @@ void topK_softMax_update(
                                                max_out_len,
                                                diversity_rate,
                                                alpha,
+                                               finished_candidate_num,
+                                               early_stopping,
                                                stream);
       break;
     case 8:
@@ -1354,6 +1377,8 @@ void topK_softMax_update(
                                                 max_out_len,
                                                 diversity_rate,
                                                 alpha,
+                                                finished_candidate_num,
+                                                early_stopping,
                                                 stream);
       break;
     case 16:
@@ -1377,6 +1402,8 @@ void topK_softMax_update(
                                                 max_out_len,
                                                 diversity_rate,
                                                 alpha,
+                                                finished_candidate_num,
+                                                early_stopping,
                                                 stream);
       break;
     case 32:
@@ -1400,6 +1427,8 @@ void topK_softMax_update(
                                                 max_out_len,
                                                 diversity_rate,
                                                 alpha,
+                                                finished_candidate_num,
+                                                early_stopping,
                                                 stream);
       break;
     default:

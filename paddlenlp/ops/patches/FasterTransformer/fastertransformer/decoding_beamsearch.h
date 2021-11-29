@@ -104,7 +104,9 @@ public:
                      const int pos_offset = 0,
                      const ActivationType act = ActivationType::RELU,
                      const bool pos_bias = false,
-                     const bool prefix_lm = false)
+                     const bool prefix_lm = false,
+                     const int finished_candidate_num = -1,
+                     const bool early_stopping = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -136,6 +138,11 @@ public:
     args_.act_ = act;
 
     args_.prefix_lm_ = prefix_lm;
+
+    args_.finished_candidate_num_ = (finished_candidate_num == -1)
+                                        ? beam_width * 2
+                                        : finished_candidate_num;
+    args_.early_stopping_ = early_stopping;
 
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
