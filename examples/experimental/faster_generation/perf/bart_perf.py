@@ -114,7 +114,7 @@ def do_predict(args):
         paddle.device.cuda.synchronize()
         logger.info("Average test time for fast decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
-
+        print(output)
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
@@ -134,7 +134,7 @@ def do_predict(args):
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
-
+        print(output)
     device = torch.device("cuda:0")
     hf_model = hf_bart_model.from_pretrained("facebook/" +
                                              args.model_name_or_path)
@@ -163,6 +163,7 @@ def do_predict(args):
                 length_penalty=0.0)
         logger.info("Average test time for hf decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
+        print(output[:, 1:])
 
 
 if __name__ == "__main__":
