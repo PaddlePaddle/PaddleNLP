@@ -68,8 +68,10 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const float& len_penalty,
     const bool& normalize_before,
     const bool& pos_bias,
-    const std::string& hidden_act) {
+    const std::string& hidden_act,
+    const bool& rel_len) {
   int batch_size = cache_k[0].shape()[0];
+  int max_out_len = rel_len ? max_len + cache_k[0].shape()[2] : max_len;
 
   std::vector<int64_t> output_dims;
   std::vector<int64_t> parent_ids_dims;
@@ -78,12 +80,24 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     if (batch_size != -1) {
       batch_size /= beam_size;
     }
-    output_dims = {max_len, batch_size, beam_size};
+    output_dims = {max_out_len, batch_size, beam_size};
+    parent_ids_dims = output_dims;
+  } else if (decoding_strategy == "beam_search_v2") {
+    // Use separated alive and finish beam queues to avoid the decrease of alive
+    // beams. The outputs must include both the finish and alive to trace full
+    // path.
+    if (batch_size != -1) {
+      sequence_length_dims = {batch_size * 2};
+      batch_size /= beam_size;
+    } else {
+      sequence_length_dims = {batch_size};
+    }
+    output_dims = {max_out_len, batch_size, beam_size * 2};
     parent_ids_dims = output_dims;
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling" ||
              decoding_strategy == "sampling") {
-    output_dims = {max_len, batch_size};
+    output_dims = {max_out_len, batch_size};
     parent_ids_dims = {1};
   } else {
     PD_THROW("Not supported decoding strategy. ");
@@ -146,7 +160,7 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       num_layer,
                                       bos_id,
                                       eos_id,
-                                      max_len,
+                                      max_out_len,
                                       beam_search_diversity_rate,
                                       unk_id,
                                       mask_id,
@@ -209,7 +223,8 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const float& len_penalty,
     const bool& normalize_before,
     const bool& pos_bias,
-    const std::string& hidden_act) {
+    const std::string& hidden_act,
+    const bool& rel_len) {
   int batch_size = cache_k_shapes[0][0];
 
   std::vector<int64_t> output_dims;
@@ -318,7 +333,8 @@ PD_BUILD_OP(fusion_unified_decoding)
             "len_penalty: float",
             "normalize_before: bool",
             "pos_bias: bool",
-            "hidden_act: std::string"})
+            "hidden_act: std::string",
+            "rel_len: bool"})
     .SetKernelFn(PD_KERNEL(UnifiedDecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(UnifiedDecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(UnifiedDecodingInferDtype));
