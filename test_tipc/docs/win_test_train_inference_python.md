@@ -60,14 +60,14 @@ bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/trai
 - 模式2：lite_train_whole_infer，使用少量数据训练，一定量数据预测，用于验证训练后的模型执行预测，预测速度是否合理；
 ```shell
 bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt  'lite_train_whole_infer'
-bash test_tipc/test_train_inference_python.sh ../test_tipc/configs/bigru_crf/train_infer_python.txt 'lite_train_whole_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'lite_train_whole_infer'
 ```  
 
 - 模式3：whole_infer，不训练，全量数据预测，走通开源模型评估、动转静，检查inference model预测时间和精度;
 ```shell
 bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'whole_infer'
 # 用法1:
-bash test_tipc/test_train_inference_python.sh ../test_tipc/configs/bigru_crf/train_infer_python.txt 'whole_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'whole_infer'
 # 用法2: 指定GPU卡预测，第三个传入参数为GPU卡号
 bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'whole_infer' '1'
 ```  
