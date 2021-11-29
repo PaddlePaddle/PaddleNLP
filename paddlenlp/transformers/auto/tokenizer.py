@@ -61,9 +61,6 @@ def get_configurations():
     return MAPPING_NAMES
 
 
-#get_configurations()
-
-
 class AutoTokenizer():
     """
     AutoClass can help you automatically retrieve the relevant model given the provided
