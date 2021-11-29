@@ -20,6 +20,7 @@ from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
 
 
 def infer_transformer_encoder(
@@ -33,10 +34,10 @@ def infer_transformer_encoder(
         attn_out_weight,
         attn_out_bias,
         attn_mask,
-        attn_ln_weight,
-        attn_ln_bias,
-        out_ln_weight,
-        out_ln_bias,
+        norm1_weight,
+        norm1_bias,
+        norm2_weight,
+        norm2_bias,
         ffn_inter_weight,
         ffn_inter_bias,
         ffn_out_weight,
@@ -47,7 +48,7 @@ def infer_transformer_encoder(
         n_head,
         size_per_head,
         n_layer=12,
-        is_gelu=True,
+        use_gelu=True,
         remove_padding=False,
         int8_mode=0,
         layer_idx=0,
@@ -71,10 +72,10 @@ def infer_transformer_encoder(
         'SelfAttnOutputWeight': attn_out_weight,
         'SelfAttnOutputBias': attn_out_bias,
         "SelfAttnMask": attn_mask,
-        'SelfAttnOutputLayernormWeight': attn_ln_weight,
-        'SelfAttnOutputLayernormBias': attn_ln_bias,
-        'OutputLayernormWeight': out_ln_weight,
-        'OutputLayernormBias': out_ln_bias,
+        'SelfAttnOutputLayernormWeight': norm1_weight,
+        'SelfAttnOutputLayernormBias': norm1_bias,
+        'OutputLayernormWeight': norm2_weight,
+        'OutputLayernormBias': norm2_bias,
         'FFNInterWeight': ffn_inter_weight,
         'FFNInterBias': ffn_inter_bias,
         'FFNOutputWeight': ffn_out_weight,
@@ -86,7 +87,7 @@ def infer_transformer_encoder(
     attrs = {
         'head_num': n_head,
         'size_per_head': size_per_head,
-        'is_gelu': is_gelu,
+        'use_gelu': use_gelu,
         "remove_padding": remove_padding,
         'int8_mode': int8_mode,
         'num_layer': n_layer,
@@ -150,6 +151,7 @@ def encoder_layer_forward(self,
     """
     if cache is not None:
         raise NotImplementedError("cache in encoder is not supported now")
+
     src = infer_transformer_encoder(
         input=src,
         q_weight=self.self_attn.q_proj.weight,
@@ -161,10 +163,10 @@ def encoder_layer_forward(self,
         attn_out_weight=self.self_attn.out_proj.weight,
         attn_out_bias=self.self_attn.out_proj.bias,
         attn_mask=src_mask,
-        attn_ln_weight=self.norm1.weight,
-        attn_ln_bias=self.norm1.bias,
-        out_ln_weight=self.norm2.weight,
-        out_ln_bias=self.norm2.bias,
+        norm1_weight=self.norm1.weight,
+        norm1_bias=self.norm1.bias,
+        norm2_weight=self.norm2.weight,
+        norm2_bias=self.norm2.bias,
         ffn_inter_weight=self.linear1.weight,
         ffn_inter_bias=self.linear1.bias,
         ffn_out_weight=self.linear2.weight,
@@ -174,8 +176,9 @@ def encoder_layer_forward(self,
         # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
         n_head=self._config['nhead'],
         size_per_head=self._config['d_model'] // self._config['nhead'],
-        is_gelu=self._config['activation'] == 'gelu',
+        use_gelu=self._config['activation'] == 'gelu',
         normalize_before=self._config['normalize_before'] == True)
+
     return src
 
 
@@ -232,7 +235,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self, need_build=True):
+def enable_faster_encoder(self, need_build=True, use_fp16=False):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -268,6 +271,8 @@ def enable_faster_encoder(self, need_build=True):
                 layer.forward = layer._ft_forward
         elif isinstance(layer, TransformerEncoder):
             layer.forward = layer._ft_forward
+            if use_fp16:
+                convert_to_fp16(layer)
 
     if not self.training:
         if need_build:
@@ -307,3 +312,60 @@ def disable_faster_encoder(self):
     for layer in self.children():
         layer.apply(init_func)
     return self
+
+
+def convert_to_fp16(transformer_encoder):
+    """ Convert paddle.nn.TransformerEncoder's parameter from float32 to float16
+
+    Args:
+        transformer_encoder (obeject, paddle.nn.TransformerEncoder):
+            The object to be converted to float16 inplaced, it must be an isinstance
+            of paddle.nn.TransformerEncoder.
+    """
+    if not isinstance(transformer_encoder, paddle.nn.TransformerEncoder):
+        logger.warning(
+            "transformer_encoder is not isinstance of paddle.nn.TransformerEncoder, return itself with no parameters convertion.".
+            format)
+        return transformer_encoder
+    else:
+        encoder_layers = transformer_encoder.layers
+
+        for mod in encoder_layers:
+            mod.norm1.weight = transfer_param(
+                mod.norm1.weight, restore_data=True)
+            mod.norm1.bias = transfer_param(
+                mod.norm1.bias, is_bias=True, restore_data=True)
+            mod.norm2.weight = transfer_param(
+                mod.norm2.weight, restore_data=True)
+            mod.norm2.bias = transfer_param(
+                mod.norm2.bias, is_bias=True, restore_data=True)
+
+            mod.linear1.weight = transfer_param(
+                mod.linear1.weight, restore_data=True)
+            mod.linear1.bias = transfer_param(
+                mod.linear1.bias, is_bias=True, restore_data=True)
+
+            mod.self_attn.q_proj.weight = transfer_param(
+                mod.self_attn.q_proj.weight, restore_data=True)
+            mod.self_attn.q_proj.bias = transfer_param(
+                mod.self_attn.q_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.k_proj.weight = transfer_param(
+                mod.self_attn.k_proj.weight, restore_data=True)
+            mod.self_attn.k_proj.bias = transfer_param(
+                mod.self_attn.k_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.v_proj.weight = transfer_param(
+                mod.self_attn.v_proj.weight, restore_data=True)
+            mod.self_attn.v_proj.bias = transfer_param(
+                mod.self_attn.v_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.out_proj.weight = transfer_param(
+                mod.self_attn.out_proj.weight, restore_data=True)
+            mod.self_attn.out_proj.bias = transfer_param(
+                mod.self_attn.out_proj.bias, is_bias=True, restore_data=True)
+
+            mod.linear2.weight = transfer_param(
+                mod.linear2.weight, restore_data=True)
+            mod.linear2.bias = transfer_param(
+                mod.linear2.bias, is_bias=True, restore_data=True)
+        logger.info(
+            "Convert transformer_encoder's parameters from float32 to float16 succeessfully."
+        )

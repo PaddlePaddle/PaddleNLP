@@ -107,8 +107,10 @@ def do_predict(args):
         for i in range(100):
             # For warmup. 
             if 50 == i:
+                paddle.device.cuda.synchronize()
                 start = time.time()
             transformer(src_word=src_word)
+        paddle.device.cuda.synchronize()
         logger.info("Average test time for encoder-decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
 

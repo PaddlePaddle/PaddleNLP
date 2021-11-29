@@ -238,17 +238,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # FasterTransformer when using float16.
-        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
-        # after update to FT-4.0.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
-                "beam_search"):
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -267,6 +256,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         self.load_dict(model_dict)
 
@@ -352,17 +343,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # FasterTransformer when using float16.
-        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
-        # after update to FT-4.0.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
-                "beam_search"):
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -381,6 +361,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         for item in self.state_dict():
             param = self
@@ -663,6 +645,8 @@ class FasterGPT(GPTPretrainedModel):
 
     def forward(self,
                 input_ids,
+                mem_seq_len=None,
+                attention_mask=None,
                 top_k=4,
                 top_p=0.0,
                 max_length=256,
@@ -691,8 +675,20 @@ class FasterGPT(GPTPretrainedModel):
         if num_return_sequences > 1:
             input_ids, _ = self.expand_inputs_for_generation(
                 input_ids, expand_size=num_return_sequences)
+
+        if mem_seq_len is None:
+            mem_seq_len = paddle.sum(paddle.cast(
+                input_ids != pad_token_id, dtype="int32"),
+                                     axis=-1,
+                                     dtype="int32")
+
+            if bos_token_id == pad_token_id:
+                mem_seq_len = mem_seq_len + 1
+
         return self.decoding(
             input_ids,
+            mem_seq_len=mem_seq_len,
+            attention_mask=attention_mask,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
@@ -816,7 +812,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                **model_kwargs):
+                length_penalty=0.6):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -832,7 +828,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-
         if self._decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
@@ -849,13 +844,16 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        else:
+        elif self._decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
                 "attention_mask": attention_mask,
                 "seq_len": seq_len
             }
+        else:
+            raise ValueError(
+                "Only greedy search, beam search and sampling are supported. ")
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -885,6 +883,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
             pos_bias=True)
 
@@ -978,7 +977,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                **model_kwargs):
+                length_penalty=0.6):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -994,7 +993,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-
         if self._decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
@@ -1011,13 +1009,16 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        else:
+        elif self._decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
                 "attention_mask": attention_mask,
                 "seq_len": seq_len
             }
+        else:
+            raise ValueError(
+                "Only greedy search, beam search and sampling are supported. ")
 
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -1046,6 +1047,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
             pos_bias=False)
 

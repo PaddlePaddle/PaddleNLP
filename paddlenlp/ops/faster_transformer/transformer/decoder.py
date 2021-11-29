@@ -25,15 +25,43 @@ from paddlenlp.ops.ext_utils import load
 from paddlenlp.ops import transfer_param
 
 
-def infer_transformer_decoder(
-        from_tensor, memory_tensor, mem_seq_len, self_ln_weight, self_ln_bias,
-        self_q_weight, self_q_bias, self_k_weight, self_k_bias, self_v_weight,
-        self_v_bias, self_out_weight, self_out_bias, cross_ln_weight,
-        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
-        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
-        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
-        ffn_inter_bias, ffn_out_weight, ffn_out_bias, old_self_cache,
-        old_mem_cache, n_head, size_per_head):
+def infer_transformer_decoder(from_tensor,
+                              memory_tensor,
+                              mem_seq_len,
+                              self_ln_weight,
+                              self_ln_bias,
+                              self_q_weight,
+                              self_q_bias,
+                              self_k_weight,
+                              self_k_bias,
+                              self_v_weight,
+                              self_v_bias,
+                              self_out_weight,
+                              self_out_bias,
+                              cross_ln_weight,
+                              cross_ln_bias,
+                              cross_q_weight,
+                              cross_q_bias,
+                              cross_k_weight,
+                              cross_k_bias,
+                              cross_v_weight,
+                              cross_v_bias,
+                              cross_out_weight,
+                              cross_out_bias,
+                              ffn_ln_weight,
+                              ffn_ln_bias,
+                              ffn_inter_weight,
+                              ffn_inter_bias,
+                              ffn_out_weight,
+                              ffn_out_bias,
+                              old_self_cache_key,
+                              old_self_cache_value,
+                              old_mem_cache,
+                              step,
+                              n_head,
+                              size_per_head,
+                              memory_hidden_dim,
+                              is_fuse_qkv=False):
     helper = LayerHelper('fusion_decoder', **locals())
 
     inputs = {
@@ -66,26 +94,43 @@ def infer_transformer_decoder(
         "FFNInterBias": ffn_inter_bias,
         "FFNOutWeight": ffn_out_weight,
         "FFNOutBias": ffn_out_bias,
-        "OldSelfCache": old_self_cache,
+        "OldSelfCacheKey": old_self_cache_key,
+        "OldSelfCacheValue": old_self_cache_value,
         "OldMemCache": old_mem_cache
     }
-
-    attrs = {'n_head': n_head, 'size_per_head': size_per_head}
+    attrs = {
+        'step': step,
+        'n_head': n_head,
+        'size_per_head': size_per_head,
+        'memory_hidden_dim': memory_hidden_dim,
+        'is_fuse_qkv': is_fuse_qkv
+    }
 
     decoder_output = helper.create_variable(dtype=memory_tensor.dtype)
-    new_self_cache = helper.create_variable(dtype=memory_tensor.dtype)
+    new_self_cache_key = helper.create_variable(dtype=memory_tensor.dtype)
+    new_self_cache_value = helper.create_variable(dtype=memory_tensor.dtype)
     new_mem_cache = helper.create_variable(dtype=memory_tensor.dtype)
 
     outputs = {
         'DecoderOutput': decoder_output,
-        'NewSelfCache': new_self_cache,
+        'NewSelfCacheKey': new_self_cache_key,
+        'NewSelfCacheValue': new_self_cache_value,
         'NewMemCache': new_mem_cache
     }
 
     helper.append_op(
         type='fusion_decoder', inputs=inputs, outputs=outputs, attrs=attrs)
 
-    return decoder_output, new_self_cache, new_mem_cache
+    return decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache
+
+
+def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):
+    x = 8 if is_fp16 else 4
+    use_batch_major_op_cache = True if use_batch_major_op_cache == True and \
+                                       size_per_head % x == 0 \
+                                    else False
+    x = x if use_batch_major_op_cache else 1
+    return use_batch_major_op_cache, x
 
 
 class InferTransformerDecoder(nn.Layer):
@@ -110,7 +155,8 @@ class InferTransformerDecoder(nn.Layer):
                  n_head,
                  size_per_head,
                  decoder_lib=None,
-                 use_fp16_decoder=False):
+                 use_fp16_decoder=False,
+                 use_batch_major_op_cache=False):
 
         if decoder_lib is not None and os.path.isfile(decoder_lib):
             # Maybe it has been loadad by `ext_utils.load`
@@ -126,6 +172,7 @@ class InferTransformerDecoder(nn.Layer):
         super(InferTransformerDecoder, self).__init__()
         self.n_head = n_head
         self.size_per_head = size_per_head
+        self.use_batch_major_op_cache = use_batch_major_op_cache
 
         if use_fp16_decoder:
             for idx, mod in enumerate(decoder.layers):
@@ -207,24 +254,39 @@ class InferTransformerDecoder(nn.Layer):
             layer_weight.append(mod.linear2.bias)
             self.weights.append(layer_weight)
 
-    def forward(self, from_tensor, memory_tensor, mem_seq_len, self_cache,
-                mem_cache):
+    def forward(self, from_tensor, memory_tensor, mem_seq_len, self_cache_key,
+                self_cache_value, mem_cache, step, memory_hidden_dim,
+                is_fuse_qkv):
         decoder_output = from_tensor
-        self_caches = []
+        self_caches_key = []
+        self_caches_value = []
         mem_caches = []
-        self_cache = paddle.concat(
-            [
-                self_cache, paddle.zeros(
-                    shape=[
-                        len(self.weights), 2, 1, paddle.shape(memory_tensor)[0],
-                        self.n_head * self.size_per_head
-                    ],
-                    dtype=self_cache.dtype)
-            ],
-            axis=2)
+        if not self.use_batch_major_op_cache:
+            self_cache_key = paddle.concat(
+                [
+                    self_cache_key, paddle.zeros(
+                        shape=[
+                            len(self.weights), 1,
+                            paddle.shape(memory_tensor)[0],
+                            self.n_head * self.size_per_head
+                        ],
+                        dtype=self_cache_key.dtype)
+                ],
+                axis=1)
+            self_cache_value = paddle.concat(
+                [
+                    self_cache_value, paddle.zeros(
+                        shape=[
+                            len(self.weights), 1,
+                            paddle.shape(memory_tensor)[0],
+                            self.n_head * self.size_per_head
+                        ],
+                        dtype=self_cache_value.dtype)
+                ],
+                axis=1)
         for idx in range(len(self.weights)):
             weight = self.weights[idx]
-            decoder_output, new_self_cache, new_mem_cache = infer_transformer_decoder(
+            decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache = infer_transformer_decoder(
                 from_tensor=decoder_output,
                 memory_tensor=memory_tensor,
                 mem_seq_len=mem_seq_len,
@@ -254,16 +316,22 @@ class InferTransformerDecoder(nn.Layer):
                 ffn_inter_bias=weight[23],
                 ffn_out_weight=weight[24],
                 ffn_out_bias=weight[25],
-                old_self_cache=self_cache[idx],
+                old_self_cache_key=self_cache_key[idx],
+                old_self_cache_value=self_cache_value[idx],
                 old_mem_cache=mem_cache[idx],
+                step=step,
                 n_head=self.n_head,
-                size_per_head=self.size_per_head)
-            self_caches.append(new_self_cache)
+                size_per_head=self.size_per_head,
+                memory_hidden_dim=memory_hidden_dim,
+                is_fuse_qkv=is_fuse_qkv)
+            self_caches_key.append(new_self_cache_key)
+            self_caches_value.append(new_self_cache_value)
             mem_caches.append(new_mem_cache)
 
-        self_cache = paddle.stack(self_caches, axis=0)
+        self_cache_key = paddle.stack(self_caches_key, axis=0)
+        self_cache_value = paddle.stack(self_caches_value, axis=0)
         mem_cache = paddle.stack(mem_caches, axis=0)
-        return decoder_output, self_cache, mem_cache
+        return decoder_output, self_cache_key, self_cache_value, mem_cache
 
 
 class FasterDecoder(nn.Layer):
@@ -320,9 +388,11 @@ class FasterDecoder(nn.Layer):
                  eos_id=1,
                  max_out_len=256,
                  decoder_lib=None,
-                 use_fp16_decoder=False):
+                 use_fp16_decoder=False,
+                 use_batch_major_op_cache=False):
         super().__init__()
         self.trg_vocab_size = trg_vocab_size
+        self.n_head = n_head
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
@@ -332,6 +402,9 @@ class FasterDecoder(nn.Layer):
         self.use_fp16_decoder = use_fp16_decoder
         self.num_decoder_layers = num_decoder_layers
         self.d_model = d_model
+        self.size_per_head = d_model // n_head
+        self.use_batch_major_op_cache, self.x = get_op_cache_config(
+            use_batch_major_op_cache, self.size_per_head, use_fp16_decoder)
 
         self.src_word_embedding = WordEmbedding(
             vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
@@ -363,9 +436,10 @@ class FasterDecoder(nn.Layer):
         self.decoder = InferTransformerDecoder(
             decoder=self.transformer.decoder,
             n_head=n_head,
-            size_per_head=d_model // n_head,
+            size_per_head=self.size_per_head,
             decoder_lib=decoder_lib,
-            use_fp16_decoder=use_fp16_decoder)
+            use_fp16_decoder=use_fp16_decoder,
+            use_batch_major_op_cache=self.use_batch_major_op_cache)
 
         if weight_sharing:
             self.linear = lambda x: paddle.matmul(x=x,
@@ -405,7 +479,7 @@ class FasterDecoder(nn.Layer):
         enc_output = self.transformer.encoder(
             enc_input, src_mask=src_slf_attn_bias)
 
-        batch_size = enc_output.shape[0]
+        batch_size, _, memory_hidden_dim = enc_output.shape
         end_token_tensor = paddle.full(
             shape=[batch_size, 1], fill_value=self.eos_id, dtype="int64")
 
@@ -419,16 +493,32 @@ class FasterDecoder(nn.Layer):
             enc_output = paddle.cast(enc_output, "float16")
 
         # Init cache
-        self_cache = paddle.zeros(
-            shape=[self.num_decoder_layers, 2, 0, batch_size, self.d_model],
-            dtype=enc_output.dtype)
+        if not self.use_batch_major_op_cache:
+            self_cache_key = paddle.zeros(
+                shape=[self.num_decoder_layers, 0, batch_size, self.d_model],
+                dtype=enc_output.dtype)
+            self_cache_value = paddle.zeros(
+                shape=[self.num_decoder_layers, 0, batch_size, self.d_model],
+                dtype=enc_output.dtype)
+        else:
+            self_cache_key = paddle.zeros(
+                shape=[
+                    self.num_decoder_layers, batch_size, self.n_head,
+                    self.size_per_head // self.x, self.max_out_len, self.x
+                ],
+                dtype=enc_output.dtype)
+            self_cache_value = paddle.zeros(
+                shape=[
+                    self.num_decoder_layers, batch_size, self.n_head,
+                    self.max_out_len, self.size_per_head
+                ],
+                dtype=enc_output.dtype)
         mem_cache = paddle.zeros(
             shape=[
                 self.num_decoder_layers, 2, batch_size, src_max_len,
                 self.d_model
             ],
             dtype=enc_output.dtype)
-
         for i in range(self.max_out_len):
             trg_pos = paddle.full(
                 shape=trg_word.shape, fill_value=i, dtype="int64")
@@ -442,13 +532,16 @@ class FasterDecoder(nn.Layer):
             # TODO(gongenlei): do cast in op
             if self.use_fp16_decoder:
                 dec_input = paddle.cast(dec_input, "float16")
-
-            dec_output, self_cache, mem_cache = self.decoder(
+            dec_output, self_cache_key, self_cache_value, mem_cache = self.decoder(
                 from_tensor=dec_input,
                 memory_tensor=enc_output,
                 mem_seq_len=mem_seq_lens,
-                self_cache=self_cache,
-                mem_cache=mem_cache)
+                self_cache_key=self_cache_key,
+                self_cache_value=self_cache_value,
+                mem_cache=mem_cache,
+                step=i,
+                memory_hidden_dim=memory_hidden_dim,
+                is_fuse_qkv=False)
 
             if self.use_fp16_decoder:
                 dec_output = paddle.cast(dec_output, "float32")

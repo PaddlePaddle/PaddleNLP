@@ -82,8 +82,12 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const bool& pos_bias,
     const std::string& hidden_act,
     cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
-  int beam_width_ = (decoding_strategy == "beam_search") ? beam_size : 1;
+  int beam_width_ = (decoding_strategy == "beam_search" ||
+                     decoding_strategy == "beam_search_v2")
+                        ? beam_size
+                        : 1;
   int candidate_num_ =
       ("topk_sampling" == decoding_strategy ||
        "topp_sampling" == decoding_strategy || "sampling" == decoding_strategy)
@@ -96,7 +100,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
           : 0.0;
 
   auto cache_k0_dims = cache_k[0].shape();
-  int batch_size_ = (decoding_strategy == "beam_search")
+  int batch_size_ = (decoding_strategy == "beam_search" ||
+                     decoding_strategy == "beam_search_v2")
                         ? cache_k0_dims[0] / beam_width_
                         : cache_k0_dims[0];
   const int memory_max_seq_len = cache_k0_dims[2];
@@ -109,6 +114,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
 
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = cublas_handle_;
+  decoding_params.cublaslt_handle = cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(cache_k[0].place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(cache_k[0].place());
@@ -122,12 +128,24 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
   decoding_params.type_id = type_id.data<int>();
 
-  TransformerDecoderInitParam<DataType_>* params =
-      new TransformerDecoderInitParam<DataType_>[num_layer_];
+  DecoderInitParam<DataType_>* params =
+      new DecoderInitParam<DataType_>[num_layer_];
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
+    params[i].cublaslt_handle = cublaslt_handle_;
+
+    if (decoding_strategy == "beam_search" ||
+        decoding_strategy == "beam_search_v2") {
+      params[i].request_batch_size = batch_size_ * beam_width_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    } else if (decoding_strategy == "sampling" ||
+               decoding_strategy == "topk_sampling" ||
+               decoding_strategy == "topp_sampling") {
+      params[i].request_batch_size = batch_size_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    }
 
     // cache
     params[i].k_cache =
@@ -202,29 +220,21 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.lm_layernorm.beta =
       reinterpret_cast<const DataType_*>(lm_layernorm_bias.data<data_t_>());
 
-  // for embedding
+  // For embedding
   decoding_params.embedding_table =
       reinterpret_cast<const DataType_*>(word_emb.data<data_t_>());
-  // for weight sharing matmul
+  // For weight sharing matmul
   decoding_params.embedding_kernel =
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
-  // NOTE: the data type of the embedding bias for logits is different
-  // between decoding with beam search and top-k/top-p sampling in
-  // FasterTransformer when using float16.
-  if ("beam_search" == decoding_strategy) {
-    // for matmul bias
-    decoding_params.embedding_bias = embedding_bias.data<float>();
-    decoding_params.logits_mask = logits_mask.data<float>();
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy ||
-             "sampling" == decoding_strategy) {
-    decoding_params.embedding_bias_T =
-        reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
-    decoding_params.logits_mask_T =
-        reinterpret_cast<const DataType_*>(logits_mask.data<data_t_>());
-  }
+  // For matmul bias
+  decoding_params.embedding_bias =
+      reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
+
+  // For masking some id during gen.
+  decoding_params.logits_mask =
+      reinterpret_cast<const DataType_*>(logits_mask.data<data_t_>());
 
   decoding_params.type_table =
       reinterpret_cast<const DataType_*>(type_embedding_weight.data<data_t_>());
@@ -233,11 +243,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       (hidden_act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
 
   if ("beam_search" == decoding_strategy) {
-    TransformerBeamsearch<DecodingTraits_::OpType>*
-        unified_decoding_beam_search_;
+    DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
 
     unified_decoding_beam_search_ =
-        new TransformerBeamsearch<DecodingTraits_::OpType>(
+        new DecodingBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
             beam_width_,
@@ -251,47 +260,83 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             start_id_,
             end_id_,
             beam_search_diversity_rate_,
-            false, /*is_fuse_topk_softMax set false cause topk reason*/
+            true,        /*is_fuse_topk_softMax*/
+            true,        /*is_fuse_qkv*/
+            false,       /*keep_alive_beam*/
+            len_penalty, /*alpha not used for this case*/
             normalize_before,
-            pos_bias,
+            0, /*pos_offset BART only for now*/
             activate,
-            unk_id,
-            mask_id,
-            temperature,
-            len_penalty);
+            pos_bias,
+            true /*prefix_lm*/);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
     delete unified_decoding_beam_search_;
+  } else if ("beam_search_v2" == decoding_strategy) {
+    DecodingBeamsearch<DecodingTraits_::OpType>*
+        unified_decoding_beam_search_v2_;
+
+    unified_decoding_beam_search_v2_ =
+        new DecodingBeamsearch<DecodingTraits_::OpType>(
+            allocator_,
+            batch_size_,
+            beam_width_,
+            max_seq_len_,
+            head_num_,
+            size_per_head_,
+            vocab_size,
+            num_layer_,
+            memory_hidden_dim,
+            memory_max_seq_len,
+            start_id_,
+            end_id_,
+            beam_search_diversity_rate_,
+            true, /*is_fuse_topk_softMax*/
+            true, /*is_fuse_qkv*/
+            true, /*keep_alive_beam*/
+            len_penalty,
+            normalize_before,
+            0, /*pos_offset BART only for now*/
+            activate,
+            pos_bias,
+            true /*prefix_lm*/);
+    unified_decoding_beam_search_v2_->forward(params, decoding_params);
+
+    delete unified_decoding_beam_search_v2_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
-    TransformerSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
-    unified_decoding_sampling_ =
-        new TransformerSampling<DecodingTraits_::OpType>(allocator_,
-                                                         batch_size_,
-                                                         max_seq_len_,
-                                                         head_num_,
-                                                         size_per_head_,
-                                                         vocab_size,
-                                                         num_layer_,
-                                                         memory_hidden_dim,
-                                                         memory_max_seq_len,
-                                                         start_id_,
-                                                         end_id_,
-                                                         candidate_num_,
-                                                         probability_threshold_,
-                                                         normalize_before,
-                                                         pos_bias,
-                                                         activate,
-                                                         unk_id,
-                                                         mask_id,
-                                                         temperature);
+    DecodingSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
+
+    unified_decoding_sampling_ = new DecodingSampling<DecodingTraits_::OpType>(
+        allocator_,
+        batch_size_,
+        max_seq_len_,
+        head_num_,
+        size_per_head_,
+        vocab_size,
+        num_layer_,
+        memory_hidden_dim,
+        memory_max_seq_len,
+        start_id_,
+        end_id_,
+        candidate_num_,
+        probability_threshold_,
+        true, /*is_fuse_qkv*/
+        normalize_before,
+        0, /*pos_offset BART only for now*/
+        activate,
+        pos_bias,
+        temperature,
+        1.0,
+        true);
     unified_decoding_sampling_->forward(params, decoding_params);
 
     delete unified_decoding_sampling_;
   } else {
     PD_THROW(
-        "Only beam_search, topk_sampling and topp_sampling are supported for "
+        "Only beam_search, beam_search_v2, topk_sampling and topp_sampling are "
+        "supported for "
         "FasterTransformer. ");
   }
   delete[] params;
@@ -357,6 +402,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
+  cublasLtHandle_t cublaslt_handle_;
+  cublasLtCreate(&cublaslt_handle_);
 
   std::vector<paddle::Tensor> ret;
 
@@ -417,6 +464,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           pos_bias,
           hidden_act,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -476,6 +524,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           pos_bias,
           hidden_act,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -488,5 +537,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
   }
 
   cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

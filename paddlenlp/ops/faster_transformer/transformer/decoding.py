@@ -200,17 +200,19 @@ def infer_force_decoding(
 
 
 def infer_gpt_decoding(
-        input, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight, slf_q_bias,
-        slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight,
-        slf_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
-        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-        decoder_ln_bias, pos_emb, linear_weight, topk, topp, max_out_len,
-        head_num, size_per_head, num_layer, bos_id, eos_id, temperature,
-        use_fp16_decoding):
+        input, attn_mask, mem_seq_len, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+        ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
+        decoder_ln_weight, decoder_ln_bias, pos_emb, linear_weight, topk, topp,
+        max_out_len, head_num, size_per_head, num_layer, bos_id, eos_id,
+        temperature, use_fp16_decoding):
     helper = LayerHelper('fusion_gpt', **locals())
 
     inputs = {
         "Input": input,
+        "AttentionMask": attn_mask,
+        "StartLength": mem_seq_len,
         "WordEmbedding": word_emb,
         "SelfLayernormWeight@VECTOR": slf_ln_weight,
         "SelfLayernormBias@VECTOR": slf_ln_bias,
@@ -266,7 +268,7 @@ def infer_unified_decoding(
         linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
         _max_out_len, _diversity_rate, _unk_id, _mask_id, _temperature,
-        _len_penalty, _normalize_before, _pos_bias, _hidden_act):
+        _len_penalty, _normalize_before, _pos_bias, _hidden_act, _rel_len):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -322,7 +324,8 @@ def infer_unified_decoding(
         "len_penalty": _len_penalty,
         "normalize_before": _normalize_before,
         "pos_bias": _pos_bias,
-        "hidden_act": _hidden_act
+        "hidden_act": _hidden_act,
+        "rel_len": _rel_len
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -564,8 +567,7 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
-            if not decoding_strategy.startswith("beam_search"):
-                linear.bias = transfer_param(linear.bias)
+            linear.bias = transfer_param(linear.bias, is_bias=True)
 
             positional_embedding.weight = transfer_param(
                 positional_embedding.weight)
@@ -735,9 +737,8 @@ class InferGptDecoding(nn.Layer):
         self.size_per_head = int(self.model.gpt.config['hidden_size'] /
                                  self.head_num)
         self.num_layer = self.model.gpt.config['num_hidden_layers']
-        data_type = "float32"
+
         if self.use_fp16_decoding:
-            data_type = "float16"
             for mod in self.model.gpt.decoder.layers:
                 mod.norm1.weight = transfer_param(
                     mod.norm1.weight, restore_data=True)
@@ -809,8 +810,22 @@ class InferGptDecoding(nn.Layer):
         for mod in self.model.gpt.decoder.layers:
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
-            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
-            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
+            self.slf_q_weight.append(
+                paddle.concat(
+                    [
+                        mod.self_attn.q_proj.weight,
+                        mod.self_attn.k_proj.weight, mod.self_attn.v_proj.weight
+                    ],
+                    axis=-1))
+            self.slf_q_bias.append(
+                paddle.concat(
+                    [
+                        mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
+                        mod.self_attn.v_proj.bias
+                    ],
+                    axis=-1))
+
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_weight.append(mod.self_attn.v_proj.weight)
@@ -833,6 +848,8 @@ class InferGptDecoding(nn.Layer):
 
     def forward(self,
                 input_ids,
+                mem_seq_len,
+                attention_mask=None,
                 topk=4,
                 topp=0.0,
                 bos_token_id=None,
@@ -840,9 +857,23 @@ class InferGptDecoding(nn.Layer):
                 pad_token_id=None,
                 max_out_len=256,
                 temperature=1):
+        if attention_mask is None:
+            if in_dygraph_mode():
+                attention_mask = paddle.zeros(
+                    [],
+                    dtype="float16" if self.use_fp16_decoding else
+                    "float32") if attention_mask is None else attention_mask
+            else:
+                # A better way? 
+                attention_mask = paddle.static.data(
+                    name="attention_mask",
+                    shape=[],
+                    dtype="float16" if self.use_fp16_decoding else "float32")
 
         output_ids = infer_gpt_decoding(
             input=[input_ids],
+            attn_mask=[attention_mask],
+            mem_seq_len=[mem_seq_len],
             word_emb=self.word_emb,
             slf_ln_weight=self.slf_ln_weight,
             slf_ln_bias=self.slf_ln_bias,
@@ -942,16 +973,38 @@ class InferUnifiedDecoding(nn.Layer):
         if self._use_fp16_decoding:
             for mod in self._model.encoder.layers:
                 self.sub_modules["slf_q_weight"].append(
-                    transfer_param(
-                        mod.self_attn.q_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                    paddle.concat(
+                        [
+                            transfer_param(
+                                mod.self_attn.q_proj.weight,
+                                restore_data=True,
+                                reserve_var=True), transfer_param(
+                                    mod.self_attn.k_proj.weight,
+                                    restore_data=True,
+                                    reserve_var=True), transfer_param(
+                                        mod.self_attn.v_proj.weight,
+                                        restore_data=True,
+                                        reserve_var=True)
+                        ],
+                        axis=-1))
                 self.sub_modules["slf_q_bias"].append(
-                    transfer_param(
-                        mod.self_attn.q_proj.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                    paddle.concat(
+                        [
+                            transfer_param(
+                                mod.self_attn.q_proj.bias,
+                                is_bias=True,
+                                restore_data=True,
+                                reserve_var=True), transfer_param(
+                                    mod.self_attn.k_proj.bias,
+                                    is_bias=True,
+                                    restore_data=True,
+                                    reserve_var=True), transfer_param(
+                                        mod.self_attn.v_proj.bias,
+                                        is_bias=True,
+                                        restore_data=True,
+                                        reserve_var=True)
+                        ],
+                        axis=-1))
                 self.sub_modules["slf_k_weight"].append(
                     transfer_param(
                         mod.self_attn.k_proj.weight,
@@ -1103,22 +1156,29 @@ class InferUnifiedDecoding(nn.Layer):
                         restore_data=True,
                         reserve_var=True), [1, 0])
             ]
-            if self._decoding_strategy != "beam_search":
-                self.sub_modules["linear_bias"] = [
-                    transfer_param(
-                        self._model.lm_head.decoder_bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
-                ]
-            else:
-                self.sub_modules[
-                    "linear_bias"] = [self._model.lm_head.decoder_bias]
+            self.sub_modules["linear_bias"] = [
+                transfer_param(
+                    self._model.lm_head.decoder_bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
         else:
             for mod in self._model.encoder.layers:
                 self.sub_modules["slf_q_weight"].append(
-                    mod.self_attn.q_proj.weight)
-                self.sub_modules["slf_q_bias"].append(mod.self_attn.q_proj.bias)
+                    paddle.concat(
+                        [
+                            mod.self_attn.q_proj.weight, mod.self_attn.k_proj.
+                            weight, mod.self_attn.v_proj.weight
+                        ],
+                        axis=-1))
+                self.sub_modules["slf_q_bias"].append(
+                    paddle.concat(
+                        [
+                            mod.self_attn.q_proj.bias,
+                            mod.self_attn.k_proj.bias, mod.self_attn.v_proj.bias
+                        ],
+                        axis=-1))
                 self.sub_modules["slf_k_weight"].append(
                     mod.self_attn.k_proj.weight)
                 self.sub_modules["slf_k_bias"].append(mod.self_attn.k_proj.bias)
@@ -1184,7 +1244,8 @@ class InferUnifiedDecoding(nn.Layer):
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
-                pos_bias=True):
+                pos_bias=True,
+                rel_len=True):
         decoding_strategy = self._decoding_strategy
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
@@ -1252,7 +1313,8 @@ class InferUnifiedDecoding(nn.Layer):
             _len_penalty=length_penalty,
             _normalize_before=self._normalize_before,
             _pos_bias=pos_bias,
-            _hidden_act=self._hidden_act)
+            _hidden_act=self._hidden_act,
+            _rel_len=rel_len)
 
         ids = finalize(
             beam_size,
@@ -1365,9 +1427,8 @@ class InferBartDecoding(nn.Layer):
 
             model.lm_head_weight = transfer_param(
                 model.lm_head_weight, restore_data=True)
-            if not decoding_strategy.startswith("beam_search"):
-                model.final_logits_bias = transfer_param(
-                    model.final_logits_bias, is_bias=True, restore_data=True)
+            model.final_logits_bias = transfer_param(
+                model.final_logits_bias, is_bias=True, restore_data=True)
 
             model.decoder.decoder_embed_positions.weight = transfer_param(
                 model.decoder.decoder_embed_positions.weight, restore_data=True)

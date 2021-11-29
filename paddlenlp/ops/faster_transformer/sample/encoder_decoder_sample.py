@@ -43,9 +43,23 @@ def parse_args():
     return args
 
 
+def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):
+    x = 8 if is_fp16 else 4
+    use_batch_major_op_cache = True if use_batch_major_op_cache == True and \
+                                       size_per_head % x == 0 \
+                                    else False
+    x = x if use_batch_major_op_cache else 1
+    return use_batch_major_op_cache, x
+
+
 def do_predict(args):
     place = "gpu"
     paddle.set_device(place)
+
+    use_batch_major_op_cache = True
+    size_per_head = args.d_model // args.n_head
+    use_batch_major_op_cache, x = get_op_cache_config(
+        use_batch_major_op_cache, size_per_head, args.use_fp16_decoder)
 
     # Define model
     transformer = FasterDecoder(
@@ -63,7 +77,8 @@ def do_predict(args):
         eos_id=args.eos_idx,
         max_out_len=args.max_out_len,
         decoder_lib=args.decoder_lib,
-        use_fp16_decoder=args.use_fp16_decoder)
+        use_fp16_decoder=args.use_fp16_decoder,
+        use_batch_major_op_cache=use_batch_major_op_cache)
 
     # Load checkpoint.
     transformer.load(
@@ -83,7 +98,9 @@ def do_predict(args):
             # For warmup. 
             if 50 == i:
                 start = time.time()
+            paddle.device.cuda.synchronize()
             finished_seq, finished_scores = transformer(src_word=src_word)
+        paddle.device.cuda.synchronize()
         logger.info("Average test time for decoder is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
