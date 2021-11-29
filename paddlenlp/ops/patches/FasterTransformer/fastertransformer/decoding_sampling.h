@@ -782,15 +782,14 @@ public:
         }
 
         if (decoding_params.logits_mask) {
-          apply_logits_mask_kernelLauncher(
-              logits_buf_,
-              keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
-              args_.batch_size_,
-              1,
-              args_.vocab_size_padded_,
-              args_.vocab_size_,
-              decoding_params.stream,
-              decoding_params.logits_mask);
+          apply_logits_mask_kernelLauncher(logits_buf_,
+                                           finished_buf_,
+                                           args_.batch_size_,
+                                           1,
+                                           args_.vocab_size_padded_,
+                                           args_.vocab_size_,
+                                           decoding_params.stream,
+                                           decoding_params.logits_mask);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
