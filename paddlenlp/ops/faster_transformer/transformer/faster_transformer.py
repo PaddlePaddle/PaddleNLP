@@ -23,14 +23,16 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
-                           InferUnifiedDecoding, InferBartDecoding)
+                           InferUnifiedDecoding, InferBartDecoding,
+                           InferMBartDecoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import (
-    GPTChineseTokenizer, GPTTokenizer, UnifiedTransformerPretrainedModel,
-    UNIMOPretrainedModel, BartPretrainedModel, GPTPretrainedModel)
+from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
+                                    UnifiedTransformerPretrainedModel,
+                                    UNIMOPretrainedModel, BartPretrainedModel,
+                                    GPTPretrainedModel, MBartPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -1141,6 +1143,119 @@ class FasterBART(BartPretrainedModel):
             enc_output=encoder_output,
             memory_seq_lens=seq_len,
             beam_size=num_beams,
+            top_k=top_k,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            top_p=top_p,
+            max_out_len=max_length,
+            diversity_rate=diversity_rate,
+            alpha=length_penalty)
+
+    generate = forward
+
+
+class FasterMBART(MBartPretrainedModel):
+    def __init__(self,
+                 model,
+                 decode_strategy="sampling",
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterMBART, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
+                model.mbart.encoder.embed_tokens.weight))
+            model.mbart.encoder.embed_tokens = nn.Embedding(
+                *model.mbart.encoder.embed_tokens.weight.shape,
+                weight_attr=weight_attr)
+        self.encoder = model.mbart.get_encoder()
+        self.decoder = model.mbart.get_decoder()
+        self.pad_token_id = model.mbart.config['pad_token_id']
+        self._decode_strategy = decode_strategy
+
+        self.decoding = InferMBartDecoding(
+            model=self._model,
+            decoding_strategy=decode_strategy,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            hidden_act=model.mbart.config['activation_function'])
+
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
+
+    def forward(self,
+                input_ids=None,
+                encoder_output=None,
+                seq_len=None,
+                forced_bos_token_id=None,
+                num_beams=4,
+                top_k=1,
+                top_p=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                max_length=256,
+                diversity_rate=0.0,
+                length_penalty=0.6,
+                num_return_sequences=1,
+                **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self._model, 'decoder_start_token_id', None)
+
+        #(gongenlei) Not enable_faster_encoder temporarily
+        # self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+        if encoder_output is None:
+            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+            encoder_output = self.encoder(input_ids)
+        # self.encoder = disable_faster_encoder(self.encoder)
+        batch_size = paddle.shape(encoder_output)[0]
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        if self._decode_strategy.startswith("beam_search") and num_beams > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        elif self._decode_strategy == "sampling" and num_return_sequences > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output,
+                expand_size=num_return_sequences,
+                seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        if decoder_start_token_id is not None:
+            bos_token_id = decoder_start_token_id
+
+        # TODO(gongenlei) Need to expand
+        if forced_bos_token_id is not None:
+            trg_word = paddle.full(
+                [batch_size, 1], forced_bos_token_id, dtype="int32")
+        else:
+            trg_word = paddle.zeros([0])
+
+        return self.decoding(
+            enc_output=encoder_output,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            trg_word=trg_word,
             top_k=top_k,
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,

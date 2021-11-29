@@ -104,7 +104,8 @@ public:
                      const int pos_offset = 0,
                      const ActivationType act = ActivationType::RELU,
                      const bool pos_bias = false,
-                     const bool prefix_lm = false)
+                     const bool prefix_lm = false,
+                     const bool is_mbart = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -136,6 +137,7 @@ public:
     args_.act_ = act;
 
     args_.prefix_lm_ = prefix_lm;
+    args_.is_mbart_ = is_mbart;
 
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
@@ -544,15 +546,36 @@ public:
                                      args_.pos_bias_,
                                      decoding_params.stream);
         } else {
-          embedding_lookup_sine_position_encoding_kernel_launcher(
-              from_tensor_[0],
-              decoding_params.embedding_table,
-              decoding_params.position_encoding_table +
-                  (step - 1) * args_.hidden_units_,
-              word_ids_buf_,
-              m,
-              args_.hidden_units_,
-              decoding_params.stream);
+          if (args_.is_mbart_) {
+            embedding_lookup_sine_position_encoding_kernel_launcher(
+                embedding_buf_,
+                decoding_params.embedding_table,
+                decoding_params.position_encoding_table +
+                    (step - 1 + args_.pos_offset_) * args_.hidden_units_,
+                word_ids_buf_,
+                m,
+                args_.hidden_units_,
+                decoding_params.stream);
+
+            layer_norm(embedding_buf_,
+                       decoding_params.mbart_layernorm.gamma,
+                       decoding_params.mbart_layernorm.beta,
+                       from_tensor_[0],
+                       m,
+                       k,
+                       decoding_params.stream);
+
+          } else {
+            embedding_lookup_sine_position_encoding_kernel_launcher(
+                from_tensor_[0],
+                decoding_params.embedding_table,
+                decoding_params.position_encoding_table +
+                    (step - 1 + args_.pos_offset_) * args_.hidden_units_,
+                word_ids_buf_,
+                m,
+                args_.hidden_units_,
+                decoding_params.stream);
+          }
         }
       } else {
         if (args_.prefix_lm_) {
