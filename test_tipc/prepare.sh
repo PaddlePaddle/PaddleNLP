@@ -45,5 +45,7 @@ elif [ ${MODE} = "whole_infer" ];then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
         wget -nc -P ./data/ https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
+        # Download static model
+        
     fi
 fi

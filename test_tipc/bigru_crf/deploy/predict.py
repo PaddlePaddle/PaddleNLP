@@ -33,7 +33,7 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] 
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
+parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16"], help='The tensorrt precision.')
 parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
 args = parser.parse_args()
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     idx = 0
     for batch_preds, batch_length in zip(preds_list, length_list):
         for preds, length in zip(batch_preds, batch_length):
-            print("{} {}".format(idx, preds[:length]))
+            print("{}\t{}".format(idx, preds[:length]))
             idx += 1
 
     if args.benchmark:
