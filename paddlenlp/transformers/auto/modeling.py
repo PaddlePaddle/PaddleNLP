@@ -42,7 +42,6 @@ class _BaseAutoModelClass:
     # Base class for auto models.
     _model_mapping = None
     _name_mapping = None
-    #_all_name_mapping = None
     model_config_file = "model_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -52,9 +51,28 @@ class _BaseAutoModelClass:
         )
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        task='model',
+                        *model_args,
                         **kwargs):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        key_dict = {
+            'model': MODEL_MAPPING_NAMES,
+            'pretraining': PRETRAINING_MAPPING_NAMES,
+            'sequence_classification': SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
+            'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
+            'question_answering': QUESTION_ANSWERING_MAPPING_NAMES,
+            'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
+            'lm_head': LM_HEAD_MAPPING_NAMES,
+            'masked_lm': MASKED_LM_MAPPING_NAMES,
+            'encoder': ENCODER_MAPPING_NAMES,
+            'decoder': DECODER_MAPPING_NAMES,
+            'generator': GENERATOR_MAPPING_NAMES,
+            'discriminator': DISCRIMINATOR_MAPPING_NAMES,
+        }
+        cls._name_mapping = key_dict[task]
+
         all_model_names = []
         for names, model_class in cls._model_mapping.items():
             for name in names:
@@ -73,7 +91,6 @@ class _BaseAutoModelClass:
                         init_class = cls._name_mapping[model_name +
                                                        '_Import_Class']
                         model_class = getattr(import_class, init_class)
-                        print('built-in', model_class)
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -92,7 +109,6 @@ class _BaseAutoModelClass:
                         f"paddlenlp.transformers.{class_name}.modeling")
                     model_name = getattr(import_class, init_class)
                     keyerror = False
-                    print('local', model_name)
                     return model_name.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 except KeyError as err:
@@ -117,7 +133,6 @@ class _BaseAutoModelClass:
                             import_class = importlib.import_module(
                                 f"paddlenlp.transformers.{class_name}.modeling")
                             model_name = getattr(import_class, init_class)
-                            print('local', model_name)
                             return model_name.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs, **init_kwargs)
@@ -143,7 +158,6 @@ class _BaseAutoModelClass:
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
                         model_name = getattr(import_class, init_class)
-                        print('community', model_name)
                         keyerror = False
                         return model_name.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
@@ -172,7 +186,6 @@ class _BaseAutoModelClass:
                                     f"paddlenlp.transformers.{class_name}.modeling"
                                 )
                                 model_name = getattr(import_class, init_class)
-                                print('community', model_name)
                                 return model_name.from_pretrained(
                                     pretrained_model_name_or_path, *model_args,
                                     **kwargs)
@@ -199,7 +212,6 @@ MAPPING_NAMES = OrderedDict([
     ("Skep", "skep"),
     ("ErnieCtm", "ernie-ctm"),
     ("ErnieDoc", "ernie-doc"),
-    #("ErnieForGeneration", "ernie-gen"),
     ("ErnieGram", "ernie-gram"),
     ("Ernie", "ernie"),
     ("GPT", "gpt"),
@@ -259,6 +271,7 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'ForQuestionAnswering'
     QUESTION_ANSWERING_MAPPING_NAMES[key2] = import_class
 
+# Model for Multiple Choice mapping
 MULTIPLE_CHOICE_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -267,6 +280,7 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'ForMultipleChoice'
     MULTIPLE_CHOICE_MAPPING_NAMES[key2] = import_class
 
+# Model for MaskedLM mapping
 MASKED_LM_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -275,14 +289,16 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'ForMaskedLM'
     MASKED_LM_MAPPING_NAMES[key2] = import_class
 
+# Model with LH mapping
 LM_HEAD_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
     LM_HEAD_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
-    import_class = key + 'ForMultipleChoice'
+    import_class = key + 'LMHeadModel'
     LM_HEAD_MAPPING_NAMES[key2] = import_class
 
+# Encoder mapping
 ENCODER_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -291,6 +307,7 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'LMHeadModel'
     ENCODER_MAPPING_NAMES[key2] = import_class
 
+# Decoder mapping
 DECODER_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -299,6 +316,7 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'Decoder'
     DECODER_MAPPING_NAMES[key2] = import_class
 
+# Generator mapping
 GENERATOR_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -307,6 +325,7 @@ for key, value in MAPPING_NAMES.items():
     import_class = key + 'Generator'
     GENERATOR_MAPPING_NAMES[key2] = import_class
 
+# Discriminator mapping
 DISCRIMINATOR_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
@@ -314,23 +333,6 @@ for key, value in MAPPING_NAMES.items():
     key2 = key + 'Model_Import_Class'
     import_class = key + 'Discriminator'
     DISCRIMINATOR_MAPPING_NAMES[key2] = import_class
-'''
-MODEL_FOR_CONDITIONAL_GENERATION = OrderedDict([
-    # Model for pre-training mapping
-    ("BartForConditionalGeneration", "bart"),
-    #("GPTForPretraining", "gpt"),
-])
-
-MODEL_WITH_LM_HEAD_MAPPING_NAMES = OrderedDict([
-    # Model with LM heads mapping
-    #("AlbertForMaskedLM", "albert"),
-    #("DistilBertForMaskedLM", "distilbert"),
-    ("GPTLMHeadModel", "gpt"),
-    #("MPNetForMaskedLM", "mpnet"),
-    ("UnifiedTransformerLMHeadModel", "unifiedtransformer"),
-    ("UNIMOLMHeadModel", "unimo"),
-])
-'''
 
 
 def get_configurations():
@@ -439,7 +441,6 @@ class AutoModel(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
-    #_all_name_mapping = All_MAPPING_NAMES
 
 
 class AutoModelForPretraining(_BaseAutoModelClass):
