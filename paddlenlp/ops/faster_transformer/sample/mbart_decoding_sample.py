@@ -128,9 +128,9 @@ def do_predict(args):
     model.eval()
 
     with paddle.no_grad():
-        for i in range(1):
+        for i in range(100):
             # For warmup.
-            if 0 == i:
+            if 50 == i:
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize()
                 start = time.perf_counter()
