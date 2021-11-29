@@ -37,170 +37,6 @@ __all__ = [
     "AutoDiscriminator",
 ]
 
-
-class _BaseAutoModelClass:
-    # Base class for auto models.
-    _model_mapping = None
-    _name_mapping = None
-    model_config_file = "model_config.json"
-
-    def __init__(self, *args, **kwargs):
-        raise EnvironmentError(
-            f"{self.__class__.__name__} is designed to be instantiated "
-            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
-        )
-
-    @classmethod
-    def from_pretrained(cls,
-                        pretrained_model_name_or_path,
-                        task='model',
-                        *model_args,
-                        **kwargs):
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        key_dict = {
-            'model': MODEL_MAPPING_NAMES,
-            'pretraining': PRETRAINING_MAPPING_NAMES,
-            'sequence_classification': SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
-            'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
-            'question_answering': QUESTION_ANSWERING_MAPPING_NAMES,
-            'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
-            'lm_head': LM_HEAD_MAPPING_NAMES,
-            'masked_lm': MASKED_LM_MAPPING_NAMES,
-            'encoder': ENCODER_MAPPING_NAMES,
-            'decoder': DECODER_MAPPING_NAMES,
-            'generator': GENERATOR_MAPPING_NAMES,
-            'discriminator': DISCRIMINATOR_MAPPING_NAMES,
-        }
-        cls._name_mapping = key_dict[task]
-
-        all_model_names = []
-        for names, model_class in cls._model_mapping.items():
-            for name in names:
-                all_model_names.append(name)
-
-        # From built-in pretrained models
-        if pretrained_model_name_or_path in all_model_names:
-            for names, model_name in cls._model_mapping.items():
-                # From built-in pretrained models
-                for pattern in names:
-                    if pattern == pretrained_model_name_or_path:
-                        # print(pattern, model_class)
-                        class_name = cls._name_mapping[model_name]
-                        import_class = importlib.import_module(
-                            f"paddlenlp.transformers.{class_name}.modeling")
-                        init_class = cls._name_mapping[model_name +
-                                                       '_Import_Class']
-                        model_class = getattr(import_class, init_class)
-                        return model_class.from_pretrained(
-                            pretrained_model_name_or_path, *model_args,
-                            **kwargs)
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path,
-                                       cls.model_config_file)
-            if os.path.exists(config_file):
-                with io.open(config_file, encoding="utf-8") as f:
-                    init_kwargs = json.load(f)
-                # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class", None)
-                try:
-                    class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.modeling")
-                    model_name = getattr(import_class, init_class)
-                    keyerror = False
-                    return model_name.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
-                except KeyError as err:
-                    keyerror = True
-                if keyerror:
-                    print(
-                        'We use pattern recoginition to recoginize the Model class.'
-                    )
-                    # 从init_class判断
-                    if init_class != None:
-                        init_class = init_class.lower()
-                        mapping_init_class = init_class
-                    else:
-                        # 无init_class,从pretrained_model_name_or_path判断
-                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
-                        )
-                        mapping_init_class = init_class
-                    for key, pattern in cls._name_mapping.items():
-                        if pattern in mapping_init_class:
-                            init_class = key
-                            class_name = cls._name_mapping[init_class]
-                            import_class = importlib.import_module(
-                                f"paddlenlp.transformers.{class_name}.modeling")
-                            model_name = getattr(import_class, init_class)
-                            return model_name.from_pretrained(
-                                pretrained_model_name_or_path, *model_args,
-                                **kwargs, **init_kwargs)
-        # Assuming from community-contributed pretrained models
-        else:
-            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                                 pretrained_model_name_or_path,
-                                                 cls.model_config_file)
-
-            default_root = os.path.join(MODEL_HOME,
-                                        pretrained_model_name_or_path)
-
-            try:
-                resolved_vocab_file = get_path_from_url(community_config_path,
-                                                        default_root)
-                if os.path.exists(resolved_vocab_file):
-                    with io.open(resolved_vocab_file, encoding="utf-8") as f:
-                        init_kwargs = json.load(f)
-                    # class name corresponds to this configuration
-                    init_class = init_kwargs.pop("init_class", None)
-                    try:
-                        class_name = cls._name_mapping[init_class]
-                        import_class = importlib.import_module(
-                            f"paddlenlp.transformers.{class_name}.modeling")
-                        model_name = getattr(import_class, init_class)
-                        keyerror = False
-                        return model_name.from_pretrained(
-                            pretrained_model_name_or_path, *model_args,
-                            **kwargs, **init_kwargs)
-                    except KeyError as err:
-                        #logger.error(err)
-                        keyerror = True
-                    if keyerror:
-                        print(
-                            'We use pattern recoginition to recoginize the Model class.'
-                        )
-                        # From init_class
-                        if init_class != None:
-                            init_class = init_class.lower()
-                            mapping_init_class = init_class
-                        else:
-                            # From pretrained_model_name_or_path
-                            pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
-                            )
-                            mapping_init_class = init_class
-                        for key, pattern in cls._name_mapping.items():
-                            if pattern in mapping_init_class:
-                                init_class = key
-                                class_name = cls._name_mapping[init_class]
-                                import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.modeling"
-                                )
-                                model_name = getattr(import_class, init_class)
-                                return model_name.from_pretrained(
-                                    pretrained_model_name_or_path, *model_args,
-                                    **kwargs)
-
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "- a correct model-identifier of built-in pretrained models,\n"
-                    "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-                )
-
-
 MAPPING_NAMES = OrderedDict([
     # Base model mapping
     ("Albert", "albert"),
@@ -230,28 +66,30 @@ MAPPING_NAMES = OrderedDict([
 MODEL_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    MODEL_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'Model'
     MODEL_MAPPING_NAMES[key2] = import_class
+    MODEL_MAPPING_NAMES[key1] = value
 
 # Model for Pre-training mapping
 PRETRAINING_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    PRETRAINING_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForPretraining'
     PRETRAINING_MAPPING_NAMES[key2] = import_class
+    PRETRAINING_MAPPING_NAMES[import_class] = value
+    PRETRAINING_MAPPING_NAMES[key1] = value
 
 # Model for Sequence Classification mapping
 SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForSequenceClassification'
     SEQUENCE_CLASSIFICATION_MAPPING_NAMES[key2] = import_class
+    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[import_class] = value
+    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[key1] = value
 
 # Model for Token Classification mapping
 TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict()
@@ -261,78 +99,88 @@ for key, value in MAPPING_NAMES.items():
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForTokenClassification'
     TOKEN_CLASSIFICATION_MAPPING_NAMES[key2] = import_class
+    TOKEN_CLASSIFICATION_MAPPING_NAMES[import_class] = value
+    TOKEN_CLASSIFICATION_MAPPING_NAMES[key1] = value
 
 # Model for Question Answering mapping
 QUESTION_ANSWERING_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    QUESTION_ANSWERING_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForQuestionAnswering'
     QUESTION_ANSWERING_MAPPING_NAMES[key2] = import_class
+    QUESTION_ANSWERING_MAPPING_NAMES[import_class] = value
+    QUESTION_ANSWERING_MAPPING_NAMES[key1] = value
 
 # Model for Multiple Choice mapping
 MULTIPLE_CHOICE_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    MULTIPLE_CHOICE_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForMultipleChoice'
     MULTIPLE_CHOICE_MAPPING_NAMES[key2] = import_class
+    MULTIPLE_CHOICE_MAPPING_NAMES[import_class] = value
+    MULTIPLE_CHOICE_MAPPING_NAMES[key1] = value
 
 # Model for MaskedLM mapping
 MASKED_LM_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    MASKED_LM_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'ForMaskedLM'
     MASKED_LM_MAPPING_NAMES[key2] = import_class
+    MASKED_LM_MAPPING_NAMES[import_class] = value
+    MASKED_LM_MAPPING_NAMES[key1] = value
 
 # Model with LH mapping
 LM_HEAD_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    LM_HEAD_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'LMHeadModel'
     LM_HEAD_MAPPING_NAMES[key2] = import_class
+    LM_HEAD_MAPPING_NAMES[import_class] = value
+    LM_HEAD_MAPPING_NAMES[key1] = value
 
 # Encoder mapping
 ENCODER_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    ENCODER_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'LMHeadModel'
     ENCODER_MAPPING_NAMES[key2] = import_class
+    ENCODER_MAPPING_NAMES[import_class] = value
+    ENCODER_MAPPING_NAMES[key1] = value
 
 # Decoder mapping
 DECODER_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    DECODER_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'Decoder'
     DECODER_MAPPING_NAMES[key2] = import_class
+    DECODER_MAPPING_NAMES[import_class] = value
+    DECODER_MAPPING_NAMES[key1] = value
 
 # Generator mapping
 GENERATOR_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    GENERATOR_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'Generator'
     GENERATOR_MAPPING_NAMES[key2] = import_class
+    GENERATOR_MAPPING_NAMES[import_class] = value
+    GENERATOR_MAPPING_NAMES[key1] = value
 
 # Discriminator mapping
 DISCRIMINATOR_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
     key1 = key + 'Model'
-    DISCRIMINATOR_MAPPING_NAMES[key1] = value
     key2 = key + 'Model_Import_Class'
     import_class = key + 'Discriminator'
     DISCRIMINATOR_MAPPING_NAMES[key2] = import_class
+    DISCRIMINATOR_MAPPING_NAMES[import_class] = value
+    DISCRIMINATOR_MAPPING_NAMES[key1] = value
 
 
 def get_configurations():
@@ -376,7 +224,6 @@ def get_configurations():
         (skep, 'SkepModel'),
         (erniectm, 'ErnieCtmModel'),
         (erniedoc, 'ErnieDocModel'),
-        #(erniegen, ErnieForGeneration),
         (erniegram, 'ErnieGramModel'),
         (ernie, 'ErnieModel'),
         (gpt, 'GPTModel'),
@@ -391,6 +238,178 @@ def get_configurations():
         (xlnet, 'XLNetModel'),
     ])
     return MAPPING_NAMES
+
+
+class _BaseAutoModelClass:
+    # Base class for auto models.
+    _model_mapping = None
+    _name_mapping = None
+    _task_choice = False
+    model_config_file = "model_config.json"
+
+    def __init__(self, *args, **kwargs):
+        raise EnvironmentError(
+            f"{self.__class__.__name__} is designed to be instantiated "
+            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
+        )
+
+    @classmethod
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        task=None,
+                        *model_args,
+                        **kwargs):
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        if task:
+            if cls._task_choice == True:
+                key_dict = {
+                    'model': MODEL_MAPPING_NAMES,
+                    'pretraining': PRETRAINING_MAPPING_NAMES,
+                    'sequence_classification':
+                    SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
+                    'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
+                    'question_answering': QUESTION_ANSWERING_MAPPING_NAMES,
+                    'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
+                    'lm_head': LM_HEAD_MAPPING_NAMES,
+                    'masked_lm': MASKED_LM_MAPPING_NAMES,
+                    'encoder': ENCODER_MAPPING_NAMES,
+                    'decoder': DECODER_MAPPING_NAMES,
+                    'generator': GENERATOR_MAPPING_NAMES,
+                    'discriminator': DISCRIMINATOR_MAPPING_NAMES,
+                }
+                try:
+                    cls._name_mapping = key_dict[task]
+                except KeyError as err:
+                    logger.error(err)
+                    raise KeyError(f'We only support {key_dict.keys()}.')
+            else:
+                print('We only support task choice for AutoModel.')
+
+        all_model_names = []
+        for names, model_class in cls._model_mapping.items():
+            for name in names:
+                all_model_names.append(name)
+
+        # From built-in pretrained models
+        if pretrained_model_name_or_path in all_model_names:
+            for names, model_name in cls._model_mapping.items():
+                # From built-in pretrained models
+                for pattern in names:
+                    if pattern == pretrained_model_name_or_path:
+                        class_name = cls._name_mapping[model_name]
+                        import_class = importlib.import_module(
+                            f"paddlenlp.transformers.{class_name}.modeling")
+                        init_class = cls._name_mapping[model_name +
+                                                       '_Import_Class']
+                        model_class = getattr(import_class, init_class)
+                        return model_class.from_pretrained(
+                            pretrained_model_name_or_path, *model_args,
+                            **kwargs)
+        # From local dir path
+        elif os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path,
+                                       cls.model_config_file)
+            if os.path.exists(config_file):
+                with io.open(config_file, encoding="utf-8") as f:
+                    init_kwargs = json.load(f)
+                # class name corresponds to this configuration
+                init_class = init_kwargs.pop("init_class", None)
+                try:
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.modeling")
+                    model_name = getattr(import_class, init_class)
+                    keyerror = False
+                    return model_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                except KeyError as err:
+                    keyerror = True
+                if keyerror:
+                    print(
+                        'We use pattern recoginition to recoginize the Model class.'
+                    )
+                    # From init_class
+                    if init_class != None:
+                        init_class = init_class.lower()
+                        mapping_init_class = init_class
+                    else:
+                        # From pretrained_model_name_or_path
+                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        )
+                        mapping_init_class = pretrained_model_name_or_path
+                    for key, pattern in cls._name_mapping.items():
+                        if pattern in mapping_init_class:
+                            init_class = key
+                            class_name = cls._name_mapping[init_class]
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.modeling")
+                            model_name = getattr(import_class, init_class)
+                            return model_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs)
+        # Assuming from community-contributed pretrained models
+        else:
+            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                                 pretrained_model_name_or_path,
+                                                 cls.model_config_file)
+
+            default_root = os.path.join(MODEL_HOME,
+                                        pretrained_model_name_or_path)
+
+            try:
+                resolved_vocab_file = get_path_from_url(community_config_path,
+                                                        default_root)
+                if os.path.exists(resolved_vocab_file):
+                    with io.open(resolved_vocab_file, encoding="utf-8") as f:
+                        init_kwargs = json.load(f)
+                    # class name corresponds to this configuration
+                    init_class = init_kwargs.pop("init_class", None)
+                    try:
+                        class_name = cls._name_mapping[init_class]
+                        import_class = importlib.import_module(
+                            f"paddlenlp.transformers.{class_name}.modeling")
+                        model_name = getattr(import_class, init_class)
+                        keyerror = False
+                        return model_name.from_pretrained(
+                            pretrained_model_name_or_path, *model_args,
+                            **kwargs)
+                    except KeyError as err:
+                        #logger.error(err)
+                        keyerror = True
+                    if keyerror:
+                        print(
+                            'We use pattern recoginition to recoginize the Model class.'
+                        )
+                        # From init_class
+                        if init_class != None:
+                            init_class = init_class.lower()
+                            mapping_init_class = init_class
+                        else:
+                            # From pretrained_model_name_or_path
+                            pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                            )
+                            mapping_init_class = pretrained_model_name_or_path
+                        for key, pattern in cls._name_mapping.items():
+                            if pattern in mapping_init_class:
+                                init_class = key
+                                class_name = cls._name_mapping[init_class]
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.modeling"
+                                )
+                                model_name = getattr(import_class, init_class)
+                                return model_name.from_pretrained(
+                                    pretrained_model_name_or_path, *model_args,
+                                    **kwargs)
+
+            except RuntimeError as err:
+                logger.error(err)
+                raise RuntimeError(
+                    f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
+                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                    "- a correct model-identifier of built-in pretrained models,\n"
+                    "- or a correct model-identifier of community-contributed pretrained models,\n"
+                    "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
+                )
 
 
 class AutoModel(_BaseAutoModelClass):
@@ -441,6 +460,7 @@ class AutoModel(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
     _name_mapping = MODEL_MAPPING_NAMES
+    _task_choice = True
 
 
 class AutoModelForPretraining(_BaseAutoModelClass):

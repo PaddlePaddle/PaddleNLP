@@ -16,7 +16,7 @@ def from_built_in_model():
     #model = AutoModel.from_pretrained('unified_transformer-12L-cn')
 
     # pretraining test
-
+    '''
     #model = AutoModelForPretraining.from_pretrained('roformer-chinese-small')
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='pretraining')
@@ -26,8 +26,12 @@ def from_built_in_model():
     print(type(model))
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='token_classification')
-    print(type(model))
+    print(type(model))'''
     model = AutoModel.from_pretrained(
+        'roformer-chinese-small', task='question_answering')
+    print(type(model))
+
+    model = AutoModelForPretraining.from_pretrained(
         'roformer-chinese-small', task='question_answering')
     print(type(model))
 
@@ -95,18 +99,21 @@ def from_local_dir():
         'From_local_dir:-----------------------------------------------------')
     model = AutoModel.from_pretrained(
         ('/Users/huhuiwen01/notebook/saved_model/my_bert_model'))
-    model = AutoModelForPretraining.from_pretrained((
+    print(type(model))
+    model = AutoModelForSequenceClassification.from_pretrained((
         '/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining'))
+    print(type(model))
 
 
 def from_community_model():
     print(
         'From_community_models:----------------------------------------------')
-
-    model = AutoModelForSequenceClassification.from_pretrained(
-        'yingyibiao/bert-base-uncased-sst-2-finetuned')
+    #model = AutoModelForSequenceClassification.from_pretrained(
+    #   'yingyibiao/bert-base-uncased-sst-2-finetuned')
+    #print(type(model))
     model = AutoModelForSequenceClassification.from_pretrained(
         'junnyu/ckiplab-bert-base-chinese-ner')
+    print(type(model))
 
 
 '''
@@ -120,6 +127,6 @@ def from_community_model():
 
 if __name__ == '__main__':
 
-    from_built_in_model()
-    #from_local_dir()
+    #from_built_in_model()
+    from_local_dir()
     #from_community_model()
