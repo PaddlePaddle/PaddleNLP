@@ -77,10 +77,9 @@ bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/trai
 
 运行相应指令后，在`test_tipc/output`文件夹下自动会保存运行日志。如'lite_train_lite_infer'模式下，会运行训练+inference的链条，因此，在`test_tipc/output`文件夹有以下文件：
 ```
-test_tipc/output/
+test_tipc/bigru_crf/output/
 |- results_python.log    # 运行指令状态的日志
 |- norm_train_gpus_0_autocast_null/  # GPU 0号卡上正常训练的训练日志和模型保存文件夹
-|- pact_train_gpus_0_autocast_null/  # GPU 0号卡上量化训练的训练日志和模型保存文件夹
 ......
 |- python_infer_cpu_usemkldnn_True_threads_1_batchsize_1.log  # CPU上开启Mkldnn线程数设置为1，测试batch_size=1条件下的预测运行日志
 |- python_infer_gpu_usetrt_True_precision_fp16_batchsize_1.log # GPU上开启TensorRT，测试batch_size=1的半精度预测日志
@@ -105,20 +104,21 @@ Run failed with command ......
 - 从本地文件中提取保存好的结果；
 - 比较上述两个结果是否符合精度预期，误差大于设置阈值时会报错。
 
+* 注意：仅验证whole_infer模式即可。
+
 #### 使用方式
 运行命令：
 ```shell
-python3.7 test_tipc/compare_results.py --gt_file=./test_tipc/results/python_*.txt  --log_file=./test_tipc/output/python_*.log --atol=1e-3 --rtol=1e-3
+python3.7 test_tipc/compare_results.py --gt_file=./test_tipc/bigru_crf/results/python_*.txt  --log_file=./test_tipc/bigru_crf/output/python_bigru_crf_*.log
 ```
 
 参数介绍：  
 - gt_file： 指向事先保存好的预测结果路径，支持*.txt 结尾，会自动索引*.txt格式的文件，文件默认保存在test_tipc/result/ 文件夹下
 - log_file: 指向运行test_tipc/test_train_inference_python.sh 脚本的infer模式保存的预测日志，预测日志中打印的有预测结果，同样支持python_infer_*.log格式传入
-- atol: 设置的绝对误差
-- rtol: 设置的相对误差
 
 #### 运行结果
-
 正常运行效果如下图：
+![image](https://user-images.githubusercontent.com/10826371/143834455-d0bb1597-dbea-47ee-949d-29885cf49085.png)
 
 出现不一致结果时的运行输出：
+![image](https://user-images.githubusercontent.com/10826371/143834641-f3d55202-8205-465c-906c-818a80b976fd.png)

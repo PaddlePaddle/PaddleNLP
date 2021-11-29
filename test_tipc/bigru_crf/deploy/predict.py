@@ -324,7 +324,7 @@ if __name__ == "__main__":
     idx = 0
     for batch_preds, batch_length in zip(preds_list, length_list):
         for preds, length in zip(batch_preds, batch_length):
-            print("{}\t{}".format(idx, preds[:length]))
+            print("{}\t{}".format(idx, preds[:length].tolist()), flush=True)
             idx += 1
 
     if args.benchmark:
