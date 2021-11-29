@@ -89,7 +89,7 @@ wget  https://paddle-wheel.bj.bcebos.com/with-trt/2.1.1-gpu-cuda10.2-cudnn8.1-mk
 pip3.7 install -U paddlepaddle_gpu-2.1.1-cp37-cp37m-linux_x86_64.whl
 ```
 
-## 4. 安装PaddleOCR依赖
+## 4. 安装PaddleNLP依赖
 ```
 # 安装AutoLog
 git clone https://github.com/LDOUBLEV/AutoLog

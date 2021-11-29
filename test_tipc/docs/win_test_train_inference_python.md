@@ -32,6 +32,7 @@ Linux端基础训练预测功能测试的主程序为`test_train_inference_pytho
 - 安装PaddlePaddle >= 2.0
 - 安装PaddleNLP
     ```
+    pip3 install ../requirements.txt
     pip3 install  ..
     ```
 - 安装autolog（规范化日志输出工具）
