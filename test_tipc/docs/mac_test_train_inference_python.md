@@ -47,7 +47,6 @@ Mac端基础训练预测功能测试的主程序为`test_train_inference_python.
 
 - 模式1：lite_train_lite_infer，使用少量数据训练，用于快速验证训练到预测的走通流程，不验证精度和速度；
 ```shell
-
 # 同linux端运行不同的是，Mac端测试使用新的配置文件train_mac_cpu_normal_normal_infer_python_mac_cpu.txt，
 # 配置文件中默认去掉了GPU和mkldnn相关的测试链条
 bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'lite_train_lite_infer'
@@ -81,8 +80,7 @@ test_tipc/bigru_crf/output/
 |- results_python.log    # 运行指令状态的日志
 |- norm_train_gpus_-1_autocast_null/  # GPU 0号卡上正常训练的训练日志和模型保存文件夹
 ......
-|- python_infer_cpu_usemkldnn_True_threads_1_batchsize_1.log  # CPU上开启Mkldnn线程数设置为1，测试batch_size=1条件下的预测运行日志
-|- python_infer_gpu_usetrt_True_precision_fp16_batchsize_1.log # GPU上开启TensorRT，测试batch_size=1的半精度预测日志
+|- python_infer_cpu_usemkldnn_False_threads_1_batchsize_1.log  # CPU上关闭Mkldnn线程数设置为1，测试batch_size=1条件下的预测运行日志
 ......
 ```
 
