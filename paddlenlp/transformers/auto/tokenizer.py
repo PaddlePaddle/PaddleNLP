@@ -124,8 +124,6 @@ class AutoTokenizer():
                  # Load from local directory path
                  tokenizer = AutoTokenizer.from_pretrained('./my_bert/')
          """
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:

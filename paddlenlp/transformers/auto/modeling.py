@@ -236,8 +236,6 @@ class _BaseAutoModelClass:
                         task=None,
                         *model_args,
                         **kwargs):
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-
         if task:
             if cls._task_choice == True:
                 key_dict = {
@@ -404,6 +402,8 @@ class AutoModel(_BaseAutoModelClass):
             - Name of a community-contributed pretrained model.
             - Local directory path which contains model weights file("model_state.pdparams")
               and model config file ("model_config.json").
+        task (str): Specify a downstream task.
+            We only support specify downstream tasks in AutoModel. Defaults to `None`.
         *args (tuple): Position arguments for model `__init__`. If provided,
             use these as position argument values for model initialization.
         **kwargs (dict): Keyword arguments for model `__init__`. If provided,
