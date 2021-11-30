@@ -535,13 +535,10 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids, )
         sequence_output, pooled_output = outputs[0], outputs[1]
-        sequence_output = sequence_output
-        pooled_output = pooled_output
 
         cls_logits = self.sent_classifier(pooled_output)
 
         seq_logits = self.tag_classifier(sequence_output)
-        seq_logits = seq_logits
 
         total_loss = None
         if tag_labels is not None and cls_label is not None:

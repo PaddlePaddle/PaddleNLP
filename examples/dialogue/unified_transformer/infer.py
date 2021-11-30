@@ -103,7 +103,7 @@ def infer(args):
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_return_sequences,
             use_fp16_decoding=args.use_fp16_decoding,
-            use_fast=args.faster)
+            use_faster=args.faster)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
