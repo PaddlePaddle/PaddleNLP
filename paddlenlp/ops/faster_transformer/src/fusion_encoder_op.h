@@ -59,3 +59,44 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     bool allow_gemm_test,
     bool use_trt_kernel_,
     bool normalize_before);
+
+/**
+ * The CublasHandle class defines the `GetInstance` method that serves as an
+ * alternative to constructor and lets clients access the same instance of this
+ * class over and over.
+ */
+class CublasHandle {
+  /**
+   * The CublasHandle's constructor should always be private to prevent direct
+   * construction calls with the `new` operator.
+   */
+private:
+  CublasHandle() {
+    cublasCreate(&cublas_handle_);
+    cublasLtCreate(&cublaslt_handle_);
+  }
+
+public:
+  /**
+   * CublasHandle should not be cloneable.
+   */
+  CublasHandle(CublasHandle& other) = delete;
+
+  /**
+   * CublasHandle should not be assignable.
+   */
+  void operator=(const CublasHandle&) = delete;
+
+  /**
+   * This is the static method that controls the access to the singleton
+   * instance. On the first run, it creates a singleton object and places it
+   * into the static field. On subsequent runs, it returns the client existing
+   * object stored in the static field.
+   */
+  static CublasHandle* GetInstance();
+
+  cublasHandle_t cublas_handle_;
+  cublasLtHandle_t cublaslt_handle_;
+
+  ~CublasHandle();
+};

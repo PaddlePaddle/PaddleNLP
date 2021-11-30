@@ -187,3 +187,13 @@ PD_BUILD_OP(fusion_encoder)
     .SetKernelFn(PD_KERNEL(EncoderForward))
     .SetInferShapeFn(PD_INFER_SHAPE(EncoderInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(EncoderInferDtype));
+
+CublasHandle* CublasHandle::GetInstance() {
+  static CublasHandle* p_handle = nullptr;
+  if (p_handle == nullptr) {
+    p_handle = new CublasHandle();
+  }
+  return p_handle;
+}
+
+CublasHandle::~CublasHandle() { cublasDestroy(cublas_handle_); }
