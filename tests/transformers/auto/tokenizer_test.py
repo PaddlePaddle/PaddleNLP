@@ -45,33 +45,25 @@ def from_community_models():
     tokenizer = AutoTokenizer.from_pretrained(
         'yingyibiao/bert-base-uncased-sst-2-finetuned')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer.save_pretrained(
-        '/Users/huhuiwen01/Downloads/huhuiwen/saved_tokenizer/community_bert_auto'
-    )
+    tokenizer.save_pretrained('saved_tokenizer/community_bert_auto')
+
     tokenizer = BertTokenizer.from_pretrained(
         'yingyibiao/bert-base-uncased-sst-2-finetuned')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer.save_pretrained(
-        '/Users/huhuiwen01/Downloads/huhuiwen/saved_tokenizer/community_bert')
+    tokenizer.save_pretrained('saved_tokenizer/community_bert')
 
     # community without init_class
     tokenizer = AutoTokenizer.from_pretrained(
         'junnyu/ckiplab-bert-base-chinese-ner')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer.save_pretrained(
-        '/Users/huhuiwen01/Downloads/huhuiwen/saved_tokenizer/community_junnyu_bert_auto'
-    )
+
     tokenizer = BertTokenizer.from_pretrained(
         'junnyu/ckiplab-bert-base-chinese-ner')
     print(tokenizer("Welcome to use PaddlePaddle and PaddleNLP!"))
-    tokenizer.save_pretrained(
-        '/Users/huhuiwen01/Downloads/huhuiwen/saved_tokenizer/community_junnyu_bert'
-    )
 
 
 if __name__ == '__main__':
 
     from_built_in_models()
-    #from_local_dir()
+    from_local_dir()
     from_community_models()
-    print(tuple(AlbertTokenizer.pretrained_init_configuration.keys()))
