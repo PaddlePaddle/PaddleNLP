@@ -1,7 +1,8 @@
-# Windows端基础训练预测功能测试
+# Linux端基础训练预测功能测试
 
-Windows端基础训练预测功能测试的主程序为`test_train_inference_python.sh`，可以测试基于Python的模型训练、推理等基本功能。
+Linux端基础训练预测功能测试的主程序为`test_train_inference_python.sh`，可以测试基于Python的模型训练、推理等基本功能。
 
+- Windows端基础训练预测功能测试参考[链接](./win_test_train_inference_python.md)
 
 ## 1. 测试结论汇总
 
@@ -12,19 +13,16 @@ Windows端基础训练预测功能测试的主程序为`test_train_inference_pyt
 | bigru_crf | 正常训练  | - | - | - |
 
 
-- 预测相关：训练产出的模型为`正常模型`，预测功能汇总如下，
+- 预测相关：训练产出的模型为`正常模型`，模型对应的预测功能汇总如下，
 
 | 模型类型 |device | batchsize | tensorrt | mkldnn | cpu多线程 |
 |  ----   |  ---- |   ----   |  :----:  |   :----:   |  :----:  |
-| 正常模型 | GPU | 1/8 | fp32/fp16 | - | - |
-| 正常模型 | CPU | 1/8 | - | fp32/fp16 | 支持 |
+| 正常模型 | CPU | 1/8 | - | fp32 | 支持 |
 
 
 ## 2. 测试流程
 
 运行环境配置请参考[文档](./install.md)的内容配置TIPC的运行环境。
-
-另外，由于Windows上和linux的路径管理方式不同，可以在win上安装gitbash终端，在gitbash中执行指令的方式和在linux端执行指令方式相同，更方便tipc测试。[gitbash下载连接](https://git-scm.com/download/win)
 
 ### 2.1 安装依赖
 - 安装PaddlePaddle >= 2.0
@@ -51,36 +49,39 @@ Windows端基础训练预测功能测试的主程序为`test_train_inference_pyt
 
 - 模式1：lite_train_lite_infer，使用少量数据训练，用于快速验证训练到预测的走通流程，不验证精度和速度；
 ```shell
-bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'lite_train_lite_infer'
-bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'lite_train_lite_infer'
+
+# 同linux端运行不同的是，Mac端测试使用新的配置文件train_mac_cpu_normal_normal_infer_python_mac_cpu.txt，
+# 配置文件中默认去掉了GPU和mkldnn相关的测试链条
+bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'lite_train_lite_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'lite_train_lite_infer'
 ```  
 
 - 模式2：lite_train_whole_infer，使用少量数据训练，一定量数据预测，用于验证训练后的模型执行预测，预测速度是否合理；
 ```shell
-bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt  'lite_train_whole_infer'
-bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'lite_train_whole_infer'
+bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt  'lite_train_whole_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'lite_train_whole_infer'
 ```  
 
 - 模式3：whole_infer，不训练，全量数据预测，走通开源模型评估、动转静，检查inference model预测时间和精度;
 ```shell
-bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'whole_infer'
+bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'whole_infer'
 # 用法1:
-bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'whole_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'whole_infer'
 # 用法2: 指定GPU卡预测，第三个传入参数为GPU卡号
-bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'whole_infer' '1'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'whole_infer' '1'
 ```  
 
 - 模式4：whole_train_whole_infer，CE： 全量数据训练，全量数据预测，验证模型训练精度，预测精度，预测速度；
 ```shell
-bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'whole_train_whole_infer'
-bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_windows_gpu_normal_normal_infer_python_windows_cpu_gpu.txt 'whole_train_whole_infer'
+bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'whole_train_whole_infer'
+bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_mac_cpu_normal_normal_infer_python_mac_cpu.txt 'whole_train_whole_infer'
 ```  
 
 运行相应指令后，在`test_tipc/output`文件夹下自动会保存运行日志。如'lite_train_lite_infer'模式下，会运行训练+inference的链条，因此，在`test_tipc/output`文件夹有以下文件：
 ```
 test_tipc/bigru_crf/output/
 |- results_python.log    # 运行指令状态的日志
-|- norm_train_gpus_0_autocast_null/  # GPU 0号卡上正常训练的训练日志和模型保存文件夹
+|- norm_train_gpus_-1_autocast_null/  # GPU 0号卡上正常训练的训练日志和模型保存文件夹
 ......
 |- python_infer_cpu_usemkldnn_True_threads_1_batchsize_1.log  # CPU上开启Mkldnn线程数设置为1，测试batch_size=1条件下的预测运行日志
 |- python_infer_gpu_usetrt_True_precision_fp16_batchsize_1.log # GPU上开启TensorRT，测试batch_size=1的半精度预测日志
@@ -105,6 +106,8 @@ Run failed with command ......
 - 从本地文件中提取保存好的结果；
 - 比较上述两个结果是否符合精度预期，误差大于设置阈值时会报错。
 
+* 注意：仅验证whole_infer模式即可。
+
 #### 使用方式
 运行命令：
 ```shell
@@ -116,7 +119,6 @@ python3.7 test_tipc/compare_results.py --gt_file=./test_tipc/bigru_crf/results/p
 - log_file: 指向运行test_tipc/test_train_inference_python.sh 脚本的infer模式保存的预测日志，预测日志中打印的有预测结果，同样支持python_infer_*.log格式传入
 
 #### 运行结果
-
 正常运行效果如下图：
 ![image](https://user-images.githubusercontent.com/10826371/143834455-d0bb1597-dbea-47ee-949d-29885cf49085.png)
 
