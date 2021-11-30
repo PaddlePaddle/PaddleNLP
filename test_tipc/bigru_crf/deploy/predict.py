@@ -33,7 +33,7 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] 
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
+parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16"], help='The tensorrt precision.')
 parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
 args = parser.parse_args()
@@ -165,16 +165,33 @@ class Predictor(object):
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
             precision_map = {
-                "fp16": inference.PrecisionType.Half,
-                "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "fp16": (inference.PrecisionType.Half, False),
+                "fp32": (inference.PrecisionType.Float32, False),
+                "int8": (inference.PrecisionType.Int8, True)
             }
-            precision_mode = precision_map[precision]
+            precision_mode, use_calib_mode = precision_map[precision]
             if use_tensorrt:
                 config.enable_tensorrt_engine(
                     max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                    min_subgraph_size=0,
+                    precision_mode=precision_mode,
+                    use_calib_mode=use_calib_mode)
+                min_input_shape = {
+                    # shape: [B, T, H]
+                    "embedding_1.tmp_0": [batch_size, 1, 128],
+                    # shape: [T, B, H]
+                    "gru_0.tmp_0": [1, batch_size, 256],
+                }
+                max_input_shape = {
+                    "embedding_1.tmp_0": [batch_size, 256, 128],
+                    "gru_0.tmp_0": [256, batch_size, 256],
+                }
+                opt_input_shape = {
+                    "embedding_1.tmp_0": [batch_size, 128, 128],
+                    "gru_0.tmp_0": [128, batch_size, 256],
+                }
+                config.set_trt_dynamic_shape_info(
+                    min_input_shape, max_input_shape, opt_input_shape)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -307,7 +324,7 @@ if __name__ == "__main__":
     idx = 0
     for batch_preds, batch_length in zip(preds_list, length_list):
         for preds, length in zip(batch_preds, batch_length):
-            print("{}\t{}".format(idx, preds[:length]))
+            print("{}\t{}".format(idx, preds[:length].tolist()), flush=True)
             idx += 1
 
     if args.benchmark:

@@ -45,5 +45,9 @@ elif [ ${MODE} = "whole_infer" ];then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
         wget -nc -P ./data/ https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
+        # Download static model
+        rm -rf ./test_tipc/bigru_crf/infer_model
+        wget -nc -P ./test_tipc/bigru_crf/ https://paddlenlp.bj.bcebos.com/models/bigru_crf_infer_model.tgz  --no-check-certificate
+        cd ./test_tipc/bigru_crf && tar xfz bigru_crf_infer_model.tgz && cd ../..
     fi
 fi

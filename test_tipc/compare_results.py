@@ -4,13 +4,12 @@ import subprocess
 import json
 import argparse
 import glob
+import ast
 
 
 def init_args():
     parser = argparse.ArgumentParser()
     # params for testing assert allclose
-    parser.add_argument("--atol", type=float, default=1e-3)
-    parser.add_argument("--rtol", type=float, default=1e-3)
     parser.add_argument("--gt_file", type=str, default="")
     parser.add_argument("--log_file", type=str, default="")
     parser.add_argument("--precision", type=str, default="fp32")
@@ -39,18 +38,14 @@ def parser_results_from_log_by_name(log_path, names_list):
 
     if names_list is None or len(names_list) < 1:
         return []
-
     parser_results = {}
-    for name in names_list:
-        cmd = "grep {} {}".format(name, log_path)
-        outs = run_shell_command(cmd)
-        outs = outs.split("\n")[0]
-        result = outs.split("{}".format(name))[-1]
-        try:
-            result = json.loads(result)
-        except:
-            result = np.array([int(r) for r in result.split()]).reshape(-1, 4)
-        parser_results[name] = result
+    cmd = "grep -P '\t' {}".format(log_path)
+    outs = run_shell_command(cmd).split("\n")
+    for item in outs:
+        item = item.split("\t")
+        if len(item) != 2:
+            continue
+        parser_results[item[0]] = ast.literal_eval(item[1])
     return parser_results
 
 
@@ -63,12 +58,7 @@ def load_gt_from_file(gt_file):
     parser_gt = {}
     for line in data:
         image_name, result = line.strip("\n").split("\t")
-        image_name = image_name.split('/')[-1]
-        try:
-            result = json.loads(result)
-        except:
-            result = np.array([int(r) for r in result.split()]).reshape(-1, 4)
-        parser_gt[image_name] = result
+        parser_gt[image_name] = ast.literal_eval(result)
     return parser_gt
 
 
@@ -102,8 +92,7 @@ def collect_predict_from_logs(log_path, key_list):
 
 def testing_assert_allclose(dict_x, dict_y, atol=1e-7, rtol=1e-7):
     for k in dict_x:
-        np.testing.assert_allclose(
-            np.array(dict_x[k]), np.array(dict_y[k]), atol=atol, rtol=rtol)
+        np.testing.assert_equal(np.array(dict_x[k]), np.array(dict_y[k]))
 
 
 if __name__ == "__main__":
@@ -113,7 +102,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     gt_collection = load_gt_from_txts(args.gt_file)
-    key_list = gt_collection["fp32"][0].keys()
+    key_list = gt_collection[args.precision][0].keys()
 
     pred_collection = collect_predict_from_logs(args.log_file, key_list)
     for filename in pred_collection.keys():
@@ -128,8 +117,7 @@ if __name__ == "__main__":
         pred_dict = pred_collection[filename]
 
         try:
-            testing_assert_allclose(
-                gt_dict, pred_dict, atol=args.atol, rtol=args.rtol)
+            testing_assert_allclose(gt_dict, pred_dict)
             print(
                 "Assert allclose passed! The results of {} and {} are consistent!".
                 format(filename, gt_filename))

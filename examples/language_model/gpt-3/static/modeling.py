@@ -23,6 +23,7 @@ import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddle.distributed.fleet import fleet
+import paddle.incubate as incubate
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
@@ -227,11 +228,9 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        
+        weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
-        if attn_mask is not None:
-            product = product + attn_mask
-
-        weights = F.softmax(product)
         if self.dropout:
             weights = F.dropout(
                 weights,
@@ -741,16 +740,15 @@ class GPTModel(GPTPretrainedModel):
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
-                                                         input_ids)
+                                                        input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        attention_mask.stop_gradient = True
 
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=attention_mask,
+            tgt_mask=None,
             use_cache=use_cache,
             cache=cache)
         self.checkpoints.extend(self.decoder.checkpoints)
@@ -793,10 +791,10 @@ class GPTForPretraining(GPTPretrainedModel):
                 use_cache=False,
                 cache=None):
         outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
+                        position_ids=position_ids,
+                        attention_mask=attention_mask,
+                        use_cache=use_cache,
+                        cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
