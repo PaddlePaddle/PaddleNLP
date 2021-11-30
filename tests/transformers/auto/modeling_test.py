@@ -124,8 +124,6 @@ def from_community_model():
 
 if __name__ == '__main__':
 
-    #from_built_in_model()
-    #from_local_dir()
-    #from_community_model()
-    model = Auto.from_pretrained('ernie-gen-base-en')
-    print(type(model))
+    from_built_in_model()
+    from_local_dir()
+    from_community_model()

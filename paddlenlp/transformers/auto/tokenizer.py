@@ -25,7 +25,6 @@ from paddlenlp.utils.log import logger
 __all__ = ["AutoTokenizer", ]
 
 TOKENIZER_MAPPING_NAMES = OrderedDict([
-    # Base model mapping
     ("AlbertTokenizer", "albert"),
     ("BartTokenizer", "bart"),
     ("BigBirdTokenizer", "bigbird"),

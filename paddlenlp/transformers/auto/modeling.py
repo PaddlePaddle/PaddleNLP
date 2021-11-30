@@ -28,7 +28,7 @@ __all__ = [
     "AutoModelForQuestionAnswering", "AutoModelForMultipleChoice",
     "AutoModelWithLMHead", "AutoModelForMaskedLM", "AutoModelForCausalLM",
     "AutoEncoder", "AutoDecoder", "AutoGenerator", "AutoDiscriminator",
-    "AutoModelForConditionalGeneration", "Auto"
+    "AutoModelForConditionalGeneration"
 ]
 
 MAPPING_NAMES = OrderedDict([
