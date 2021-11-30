@@ -1,1 +1,0 @@
-{"do_lower_case": true, "vocab_file": "/Users/huhuiwen01/.paddlenlp/models/yingyibiao/bert-base-uncased-sst-2-finetuned/vocab.txt", "init_class": "BertTokenizer"}
