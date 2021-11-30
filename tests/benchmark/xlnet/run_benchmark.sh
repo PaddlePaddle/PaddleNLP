@@ -7,8 +7,9 @@ function _set_params(){
     run_mode=${1:-"sp"}          # 单卡sp|多卡mp
     batch_size=${2:-"64"}
     fp_item=${3:-"fp32"}        # fp32|fp16
-    max_iter=${4:-"1500"}       # 可选，如果需要修改代码提前中断
+    max_iter=${4:-"1000"}       # 可选，如果需要修改代码提前中断
     model_name=${5:-"xlnet-base-cased"}
+    need_profile=${6:-"off"}
     run_log_path=${TRAIN_LOG_DIR:-$(pwd)}  # TRAIN_LOG_DIR 后续QA设置该参数
 
 #   以下不用修改
@@ -23,10 +24,18 @@ function _train(){
     echo "Train on ${num_gpu_devices} GPUs"
     echo "current CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES, gpus=$num_gpu_devices, batch_size=$batch_size"
 
-    train_cmd="--model_name_or_path=${model_name}
+    profiler_cmd=""
+    profiler_options="batch_range=[100,110];profile_path=${log_profile}"
+    if [ $need_profile = "on" ]; then
+        profiler_cmd="--profiler_options=${profiler_options}"
+    fi
+
+    train_cmd="${profiler_cmd}
+               --model_name_or_path=${model_name}
                --task_name=SST-2
                --max_seq_length=128
-               --logging_steps=500
+               --pad_to_max_seq_len=True
+               --logging_steps=1
                --save_steps=2000
                --batch_size=${batch_size}
                --learning_rate=2e-5
@@ -37,10 +46,10 @@ function _train(){
     case ${run_mode} in
     sp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
+        examples/language_model/xlnet/run_glue.py ${train_cmd}" ;;
     mp)
         train_cmd="python -m paddle.distributed.launch --gpus=$CUDA_VISIBLE_DEVICES \
-        ../../../examples/language_model/xlnet/run_glue.py ${train_cmd}"
+        examples/language_model/xlnet/run_glue.py ${train_cmd}"
         log_parse_file="mylog/workerlog.0" ;;
     *) echo "choose run_mode(sp or mp)"; exit 1;
     esac
