@@ -48,8 +48,8 @@ link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}cryptopp/lib")
 link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}utf8proc/lib")
 link_directories("${PADDLE_LIB}/paddle/lib")
 
-# include_directories("${PROJECT_SOURCE_DIR}/tokenizer")
-# add_subdirectory("tokenizer")
+include_directories("${PROJECT_SOURCE_DIR}/tokenizer")
+add_subdirectory("tokenizer")
 
 if (WIN32)
   add_definitions("/DGOOGLE_GLOG_DLL_DECL=")
@@ -139,10 +139,6 @@ else()
   endif()
 endif()
 
-
-# message(status "PROJECT_BINARY_DIR PROJECT_BINARY_DIR PROJECT_BINARY_DIR PROJECT_BINARY_DIR PROJECT_BINARY_DIR PROJECT_BINARY_DIR , ${PROJECT_BINARY_DIR}") 
-# set(DEPS ${PROJECT_BINARY_DIR}/tokenizer/libTokenizer${CMAKE_STATIC_LIBRARY_SUFFIX})
-
 if(WITH_STATIC_LIB)
   set(DEPS ${PADDLE_LIB}/paddle/lib/libpaddle_inference${CMAKE_STATIC_LIBRARY_SUFFIX})
 else()
@@ -193,7 +189,7 @@ if(WITH_ROCM)
   endif()
 endif()
 
-# set(DEPS ${DEPS} Tokenizer)
+set(DEPS ${DEPS} Tokenizer)
 
 add_executable(${PROJECT_NAME} ${PROJECT_NAME}.cc)
 

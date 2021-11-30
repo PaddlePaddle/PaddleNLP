@@ -213,10 +213,10 @@ class ErnieEncoderStack(nn.Layer):
 class ErnieGenPretrainedModel(object):
     r"""
     An abstract class for pretrained ErnieGen models. It provides ErnieGen related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
     model_config_file = "model_config.json"

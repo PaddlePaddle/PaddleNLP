@@ -1,4 +1,5 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2019 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
@@ -133,8 +134,9 @@ class ElectraPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained Electra models. It provides Electra related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
-    `pretrained_resource_files_map`, `base_model_prefix` for downloading and loading pretrained models.
-    See `PretrainedModel` for more details.
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     base_model_prefix = "electra"
     model_config_file = "model_config.json"
@@ -616,7 +618,7 @@ class ElectraGenerator(ElectraPretrainedModel):
 # class ElectraClassificationHead and ElectraForSequenceClassification for fine-tuning
 class ElectraClassificationHead(nn.Layer):
     """
-    Head for sentence-level classification tasks.
+    Perform sentence-level classification tasks.
 
     Args:
         hidden_size (int):
@@ -1064,8 +1066,8 @@ class ElectraPooler(nn.Layer):
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
     """
-    Electra Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
-    softmax) e.g. for RocStories/SWAG tasks.
+    Electra Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
         electra (:class:`ElectraModel`):
@@ -1276,9 +1278,8 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
 
 class ElectraForQuestionAnswering(ElectraPretrainedModel):
     """
-    Electra Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    Electra Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         electra (:class:`ElectraModel`):

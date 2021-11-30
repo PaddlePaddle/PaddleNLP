@@ -54,6 +54,7 @@ def parse_args():
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(XLNetPretrainedModel.pretrained_init_configuration.keys()),)
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.",)
     parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",)
+    parser.add_argument("--pad_to_max_seq_len", default=False, type=bool, help="Whether to pad all sequences to max length for sequences shorter than max length.",)
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size per device for training.",)
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.",)
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.",)
@@ -120,6 +121,7 @@ def convert_example(example,
                     tokenizer,
                     label_list,
                     max_seq_length=512,
+                    pad_to_max_seq_len=False,
                     is_test=False):
     """convert a glue example into necessary features"""
     if not is_test:
@@ -133,12 +135,14 @@ def convert_example(example,
         example = tokenizer(
             example['sentence'],
             max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
             return_attention_mask=True)
     else:
         example = tokenizer(
             example['sentence1'],
             text_pair=example['sentence2'],
             max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
             return_attention_mask=True)
 
     if not is_test:
@@ -168,7 +172,8 @@ def do_train(args):
         convert_example,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_seq_length,
+        pad_to_max_seq_len=args.pad_to_max_seq_len, )
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)

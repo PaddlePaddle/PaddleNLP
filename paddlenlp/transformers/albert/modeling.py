@@ -1067,7 +1067,7 @@ class AlbertModel(AlbertPretrainedModel):
 class AlbertForPretraining(AlbertPretrainedModel):
     """
     Albert Model with a `masked language modeling` head and a `sentence order prediction` head
-    on top during the pretraining.
+    on top.
 
     Args:
         albert (:class:`AlbertModel`):
@@ -1240,7 +1240,7 @@ class AlbertSOPHead(Layer):
 
 class AlbertForMaskedLM(AlbertPretrainedModel):
     """
-    Albert Model with a `masked language modeling` head on top during the pretraining.
+    Albert Model with a `masked language modeling` head on top.
 
     Args:
         albert (:class:`AlbertModel`):
@@ -1565,8 +1565,8 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
 class AlbertForQuestionAnswering(AlbertPretrainedModel):
     """
-    Albert Model  with a linear layer on top of the hidden-states output to compute `span_start_logits` and `span_end_logits`,
-    designed for question-answering tasks like SQuAD.
+    Albert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         albert (:class:`AlbertModel`):
