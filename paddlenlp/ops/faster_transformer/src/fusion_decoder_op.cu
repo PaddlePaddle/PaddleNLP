@@ -100,12 +100,12 @@ std::vector<paddle::Tensor> decoder_kernel(
 
   DataType_* decoder_output = reinterpret_cast<DataType_*>(
       decoder_output_tensor.mutable_data<data_t_>());
-  DataType_* self_cache_key_tensor =
-      reinterpret_cast<DataType_*>(old_self_cache_key.data<data_t_>());
-  DataType_* self_cache_value_tensor =
-      reinterpret_cast<DataType_*>(old_self_cache_value.data<data_t_>());
-  DataType_* memory_cache =
-      reinterpret_cast<DataType_*>(old_mem_cache.data<data_t_>());
+  DataType_* self_cache_key_tensor = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_self_cache_key.data<data_t_>()));
+  DataType_* self_cache_value_tensor = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_self_cache_value.data<data_t_>()));
+  DataType_* memory_cache = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_mem_cache.data<data_t_>()));
   const DataType_* from_tensor =
       reinterpret_cast<const DataType_*>(from_tensor_input.data<data_t_>());
   const DataType_* memory_tensor =
