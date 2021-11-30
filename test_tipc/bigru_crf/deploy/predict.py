@@ -218,21 +218,23 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(
-                model_name="bigru_crf",
-                model_precision=precision,
-                batch_size=self.batch_size,
-                data_shape="dynamic",
-                save_path=save_log_path,
-                inference_config=config,
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
+            kwargs = {
+                "model_name": "bigru_crf",
+                "model_precision": precision,
+                "batch_size": self.batch_size,
+                "data_shape": "dynamic",
+                "save_path": save_log_path,
+                "inference_config": config,
+                "pids": pid,
+                "process_name": None,
+                "time_keys":
+                ['preprocess_time', 'inference_time', 'postprocess_time'],
+                "warmup": 0,
+                "logger": logger
+            }
+            if device == "gpu":
+                kwargs["gpu_ids"] = 0
+            self.autolog = auto_log.AutoLogger(**kwargs)
 
     def predict(self, data, word_vocab, label_vocab, normlize_vocab):
         """
