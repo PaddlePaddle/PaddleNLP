@@ -283,7 +283,6 @@ class _BaseAutoModelClass:
                         init_class = cls._name_mapping[model_name +
                                                        '_Import_Class']
                         model_class = getattr(import_class, init_class)
-                        print(model_class)
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -512,6 +511,3 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
     _name_mapping = CONDITIONAL_GENERATION_MAPPING_NAMES
-
-
-Auto = AutoModel
