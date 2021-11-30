@@ -91,6 +91,17 @@ def from_built_in_model():
     #model = AutoDiscriminator.from_pretrained("convbert-base")
     #model = AutoDiscriminator.from_pretrained("electra-small")
 
+    # CausalLM test
+    model = AutoModelForCausalLM.from_pretrained('blenderbot-3B')
+    print(type(model))
+
+    model = AutoModelForConditionalGeneration.from_pretrained(
+        'blenderbot_small-90M')
+    print(type(model))
+
+    model = AutoModelForCausalLM.from_pretrained('blenderbot_small-90M')
+    print(type(model))
+
 
 def from_local_dir():
     print('From_local_dir:-----------------------------------------')
@@ -113,6 +124,6 @@ def from_community_model():
 
 if __name__ == '__main__':
 
-    #from_built_in_model()
+    from_built_in_model()
     #from_local_dir()
-    from_community_model()
+    #from_community_model()

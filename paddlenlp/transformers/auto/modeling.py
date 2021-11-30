@@ -31,10 +31,12 @@ __all__ = [
     "AutoModelForMultipleChoice",
     "AutoModelWithLMHead",
     "AutoModelForMaskedLM",
+    "AutoModelForCausalLM",
     "AutoEncoder",
     "AutoDecoder",
     "AutoGenerator",
     "AutoDiscriminator",
+    "AutoModelForConditionalGeneration",
 ]
 
 MAPPING_NAMES = OrderedDict([
@@ -42,6 +44,8 @@ MAPPING_NAMES = OrderedDict([
     ("Albert", "albert"),
     ("Bart", "bart"),
     ("BigBird", "bigbird"),
+    ("BlenderbotSmall", "blenderbot_small"),
+    ("Blenderbot", "blenderbot"),
     ("ConvBert", "convbert"),
     ("DistilBert", "distilbert"),
     ("Electra", "electra"),
@@ -55,6 +59,7 @@ MAPPING_NAMES = OrderedDict([
     ("NeZha", "nezha"),
     ("Roberta", "roberta"),
     ("RoFormer", "roformer"),
+    ("SqueezeBert", "squeezebert"),
     ("TinyBert", "tinybert"),
     ("Bert", "bert"),
     ("UNIMO", "unimo"),
@@ -132,6 +137,16 @@ for key, value in MAPPING_NAMES.items():
     MASKED_LM_MAPPING_NAMES[import_class] = value
     MASKED_LM_MAPPING_NAMES[key1] = value
 
+# Model for CausalLM mapping
+CAUSAL_LM_MAPPING_NAMES = OrderedDict()
+for key, value in MAPPING_NAMES.items():
+    key1 = key + 'Model'
+    key2 = key + 'Model_Import_Class'
+    import_class = key + 'ForCausalLM'
+    CAUSAL_LM_MAPPING_NAMES[key2] = import_class
+    CAUSAL_LM_MAPPING_NAMES[import_class] = value
+    CAUSAL_LM_MAPPING_NAMES[key1] = value
+
 # Model with LH mapping
 LM_HEAD_MAPPING_NAMES = OrderedDict()
 for key, value in MAPPING_NAMES.items():
@@ -182,17 +197,27 @@ for key, value in MAPPING_NAMES.items():
     DISCRIMINATOR_MAPPING_NAMES[import_class] = value
     DISCRIMINATOR_MAPPING_NAMES[key1] = value
 
+# Conditional generation mapping
+CONDITIONAL_GENERATION_MAPPING_NAMES = OrderedDict()
+for key, value in MAPPING_NAMES.items():
+    key1 = key + 'Model'
+    key2 = key + 'Model_Import_Class'
+    import_class = key + 'ForConditionalGeneration'
+    CONDITIONAL_GENERATION_MAPPING_NAMES[key2] = import_class
+    CONDITIONAL_GENERATION_MAPPING_NAMES[import_class] = value
+    CONDITIONAL_GENERATION_MAPPING_NAMES[key1] = value
+
 
 def get_configurations():
-    MODEL_MAPPING_NAMES = OrderedDict()
+    CONFIGURATION_MODEL_MAPPING = OrderedDict()
     for key, class_name in MAPPING_NAMES.items():
         import_class = importlib.import_module(
             f"paddlenlp.transformers.{class_name}.modeling")
         model_name = getattr(import_class, key + 'Model')
         name = tuple(model_name.pretrained_init_configuration.keys())
-        MODEL_MAPPING_NAMES[name] = key + 'Model'
+        CONFIGURATION_MODEL_MAPPING[name] = key + 'Model'
 
-    return MODEL_MAPPING_NAMES
+    return CONFIGURATION_MODEL_MAPPING
 
 
 class _BaseAutoModelClass:
@@ -215,11 +240,13 @@ class _BaseAutoModelClass:
                         *model_args,
                         **kwargs):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+
         if task:
             if cls._task_choice == True:
                 key_dict = {
                     'model': MODEL_MAPPING_NAMES,
                     'pretraining': PRETRAINING_MAPPING_NAMES,
+                    'total_pretraining': TOTAL_PRETRAINING_MAPPING_NAMES,
                     'sequence_classification':
                     SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
                     'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
@@ -227,6 +254,7 @@ class _BaseAutoModelClass:
                     'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
                     'lm_head': LM_HEAD_MAPPING_NAMES,
                     'masked_lm': MASKED_LM_MAPPING_NAMES,
+                    'causal_lm': Causal_LM_MAPPING_NAMES,
                     'encoder': ENCODER_MAPPING_NAMES,
                     'decoder': DECODER_MAPPING_NAMES,
                     'generator': GENERATOR_MAPPING_NAMES,
@@ -257,6 +285,7 @@ class _BaseAutoModelClass:
                         init_class = cls._name_mapping[model_name +
                                                        '_Import_Class']
                         model_class = getattr(import_class, init_class)
+                        print(model_class)
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -453,6 +482,12 @@ class AutoModelForMaskedLM(_BaseAutoModelClass):
     _name_mapping = MASKED_LM_MAPPING_NAMES
 
 
+class AutoModelForCausalLM(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations()
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = CAUSAL_LM_MAPPING_NAMES
+
+
 class AutoEncoder(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
@@ -475,3 +510,9 @@ class AutoDiscriminator(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
     _name_mapping = DISCRIMINATOR_MAPPING_NAMES
+
+
+class AutoModelForConditionalGeneration(_BaseAutoModelClass):
+    MAPPING_NAMES = get_configurations()
+    _model_mapping = MAPPING_NAMES
+    _name_mapping = CONDITIONAL_GENERATION_MAPPING_NAMES
