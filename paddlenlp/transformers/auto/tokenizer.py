@@ -169,9 +169,8 @@ class AutoTokenizer():
                             return tokenizer_name.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs)
-
+        # Assuming from community-contributed pretrained models
         else:
-            # Assuming from community-contributed pretrained models
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
                                                  cls.tokenizer_config_file)
@@ -181,41 +180,6 @@ class AutoTokenizer():
             try:
                 resolved_vocab_file = get_path_from_url(community_config_path,
                                                         default_root)
-                if os.path.exists(resolved_vocab_file):
-                    with io.open(resolved_vocab_file, encoding="utf-8") as f:
-                        init_kwargs = json.load(f)
-                    # class name corresponds to this configuration
-                    init_class = init_kwargs.pop("init_class", None)
-                    if init_class:
-                        class_name = cls._name_mapping[init_class]
-                        import_class = importlib.import_module(
-                            f"paddlenlp.transformers.{class_name}.tokenizer")
-                        tokenizer_name = getattr(import_class, init_class)
-                        return tokenizer_name.from_pretrained(
-                            pretrained_model_name_or_path, *model_args,
-                            **kwargs)
-                    # If no `init_class`, we use pattern recognition to recognize the Tokenizer class.
-                    else:
-                        print(
-                            'We use pattern recognition to recognize the Tokenizer class.'
-                        )
-                        for key, pattern in cls._name_mapping.items():
-                            pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
-                            )
-                            if pattern in pretrained_model_name_or_path:
-                                init_class = key
-                                class_name = cls._name_mapping[init_class]
-                                import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.tokenizer"
-                                )
-                                tokenizer_name = getattr(import_class,
-                                                         init_class)
-                                print(
-                                    f"The 'pretrained_model_name_or_path' is {pretrained_model_name_or_path}, we import {tokenizer_name}."
-                                )
-                                return tokenizer_name.from_pretrained(
-                                    pretrained_model_name_or_path, *model_args,
-                                    **kwargs)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -225,3 +189,36 @@ class AutoTokenizer():
                     "- or a correct model-identifier of community-contributed pretrained models,\n"
                     "- or the correct path to a directory containing relevant tokenizer files.\n"
                 )
+
+            if os.path.exists(resolved_vocab_file):
+                with io.open(resolved_vocab_file, encoding="utf-8") as f:
+                    init_kwargs = json.load(f)
+                # class name corresponds to this configuration
+                init_class = init_kwargs.pop("init_class", None)
+                if init_class:
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.tokenizer")
+                    tokenizer_name = getattr(import_class, init_class)
+                    return tokenizer_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                # If no `init_class`, we use pattern recognition to recognize the Tokenizer class.
+                else:
+                    print(
+                        'We use pattern recognition to recognize the Tokenizer class.'
+                    )
+                    for key, pattern in cls._name_mapping.items():
+                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        )
+                        if pattern in pretrained_model_name_or_path:
+                            init_class = key
+                            class_name = cls._name_mapping[init_class]
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.tokenizer")
+                            tokenizer_name = getattr(import_class, init_class)
+                            print(
+                                f"The 'pretrained_model_name_or_path' is {pretrained_model_name_or_path}, we import {tokenizer_name}."
+                            )
+                            return tokenizer_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs)

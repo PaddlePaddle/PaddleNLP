@@ -65,5 +65,5 @@ def from_community_models():
 if __name__ == '__main__':
 
     from_built_in_models()
-    from_local_dir()
+    #from_local_dir()
     from_community_models()

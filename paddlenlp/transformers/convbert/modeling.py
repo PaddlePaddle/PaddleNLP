@@ -24,7 +24,7 @@ __all__ = [
     "ConvBertDiscriminator", "ConvBertGenerator", "ConvBertClassificationHead",
     "ConvBertForSequenceClassification", "ConvBertForTokenClassification",
     "ConvBertPretrainingCriterion", "ConvBertForQuestionAnswering",
-    "ConvBertForMultipleChoice"
+    "ConvBertForMultipleChoice", "ConvBertForPretraining"
 ]
 dtype_float = paddle.get_default_dtype()
 
@@ -1552,3 +1552,6 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
         return start_logits, end_logits
+
+
+ConvBertForPretraining = ConvBertForTotalPretraining

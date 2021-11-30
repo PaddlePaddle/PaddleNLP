@@ -19,18 +19,11 @@ import paddle.nn.functional as F
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ElectraModel',
-    'ElectraPretrainedModel',
-    'ElectraForTotalPretraining',
-    'ElectraDiscriminator',
-    'ElectraGenerator',
-    'ElectraClassificationHead',
-    'ElectraForSequenceClassification',
-    'ElectraForTokenClassification',
-    'ElectraPretrainingCriterion',
-    'ElectraForMultipleChoice',
-    'ElectraForQuestionAnswering',
-    'ElectraForMaskedLM',
+    'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
+    'ElectraDiscriminator', 'ElectraGenerator', 'ElectraClassificationHead',
+    'ElectraForSequenceClassification', 'ElectraForTokenClassification',
+    'ElectraPretrainingCriterion', 'ElectraForMultipleChoice',
+    'ElectraForQuestionAnswering', 'ElectraForMaskedLM', 'ElectraForPretraining'
 ]
 
 
@@ -1360,3 +1353,4 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
 
 # ElectraForMaskedLM is the same as ElectraGenerator
 ElectraForMaskedLM = ElectraGenerator
+ElectraForPretraining = ElectraForTotalPretraining

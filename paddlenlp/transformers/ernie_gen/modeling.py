@@ -28,7 +28,7 @@ from paddlenlp.transformers import BertPretrainedModel, ElectraPretrainedModel, 
 
 from ..utils import InitTrackerMeta, fn_args_to_dict
 
-__all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration"]
+__all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration", "ErnieGenModel"]
 
 
 def _build_linear(n_in, n_out, name, init):
@@ -674,3 +674,6 @@ class ErnieForGeneration(ErnieModel):
                 soft_label=(tgt_labels.shape[-1] != 1))
 
             return loss, logits_2d, info
+
+
+ErnieGenModel = ErnieForGeneration

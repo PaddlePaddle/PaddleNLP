@@ -23,20 +23,12 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = [
-    "AutoModel",
-    "AutoModelForPretraining",
-    "AutoModelForSequenceClassification",
-    "AutoModelForTokenClassification",
-    "AutoModelForQuestionAnswering",
-    "AutoModelForMultipleChoice",
-    "AutoModelWithLMHead",
-    "AutoModelForMaskedLM",
-    "AutoModelForCausalLM",
-    "AutoEncoder",
-    "AutoDecoder",
-    "AutoGenerator",
-    "AutoDiscriminator",
-    "AutoModelForConditionalGeneration",
+    "AutoModel", "AutoModelForPretraining",
+    "AutoModelForSequenceClassification", "AutoModelForTokenClassification",
+    "AutoModelForQuestionAnswering", "AutoModelForMultipleChoice",
+    "AutoModelWithLMHead", "AutoModelForMaskedLM", "AutoModelForCausalLM",
+    "AutoEncoder", "AutoDecoder", "AutoGenerator", "AutoDiscriminator",
+    "AutoModelForConditionalGeneration", "Auto"
 ]
 
 MAPPING_NAMES = OrderedDict([
@@ -53,6 +45,7 @@ MAPPING_NAMES = OrderedDict([
     ("ErnieCtm", "ernie_ctm"),
     ("ErnieDoc", "ernie_doc"),
     ("ErnieGram", "ernie_gram"),
+    ("ErnieGen", "ernie_gen"),
     ("Ernie", "ernie"),
     ("GPT", "gpt"),
     ("MPNet", "mpnet"),
@@ -246,7 +239,6 @@ class _BaseAutoModelClass:
                 key_dict = {
                     'model': MODEL_MAPPING_NAMES,
                     'pretraining': PRETRAINING_MAPPING_NAMES,
-                    'total_pretraining': TOTAL_PRETRAINING_MAPPING_NAMES,
                     'sequence_classification':
                     SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
                     'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
@@ -254,11 +246,13 @@ class _BaseAutoModelClass:
                     'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
                     'lm_head': LM_HEAD_MAPPING_NAMES,
                     'masked_lm': MASKED_LM_MAPPING_NAMES,
-                    'causal_lm': Causal_LM_MAPPING_NAMES,
+                    'causal_lm': CAUSAL_LM_MAPPING_NAMES,
                     'encoder': ENCODER_MAPPING_NAMES,
                     'decoder': DECODER_MAPPING_NAMES,
                     'generator': GENERATOR_MAPPING_NAMES,
                     'discriminator': DISCRIMINATOR_MAPPING_NAMES,
+                    'conditional_generation':
+                    CONDITIONAL_GENERATION_MAPPING_NAMES,
                 }
                 try:
                     cls._name_mapping = key_dict[task]
@@ -340,44 +334,6 @@ class _BaseAutoModelClass:
             try:
                 resolved_vocab_file = get_path_from_url(community_config_path,
                                                         default_root)
-                if os.path.exists(resolved_vocab_file):
-                    with io.open(resolved_vocab_file, encoding="utf-8") as f:
-                        init_kwargs = json.load(f)
-                    # class name corresponds to this configuration
-                    init_class = init_kwargs.pop("init_class", None)
-                    class_name = cls._name_mapping.get(init_class, None)
-                    if class_name:
-                        import_class = importlib.import_module(
-                            f"paddlenlp.transformers.{class_name}.modeling")
-                        model_name = getattr(import_class, init_class)
-                        return model_name.from_pretrained(
-                            pretrained_model_name_or_path, *model_args,
-                            **kwargs)
-                    else:
-                        print(
-                            'We use pattern recognition to recognize the Model class.'
-                        )
-                        # From init_class
-                        if init_class:
-                            init_class = init_class.lower()
-                            mapping_init_class = init_class
-                        else:
-                            # From pretrained_model_name_or_path
-                            pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
-                            )
-                            mapping_init_class = pretrained_model_name_or_path
-                        for key, pattern in cls._name_mapping.items():
-                            if pattern in mapping_init_class:
-                                init_class = key
-                                class_name = cls._name_mapping[init_class]
-                                import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.modeling"
-                                )
-                                model_name = getattr(import_class, init_class)
-                                return model_name.from_pretrained(
-                                    pretrained_model_name_or_path, *model_args,
-                                    **kwargs)
-
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -387,6 +343,42 @@ class _BaseAutoModelClass:
                     "- or a correct model-identifier of community-contributed pretrained models,\n"
                     "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
                 )
+
+            if os.path.exists(resolved_vocab_file):
+                with io.open(resolved_vocab_file, encoding="utf-8") as f:
+                    init_kwargs = json.load(f)
+                # class name corresponds to this configuration
+                init_class = init_kwargs.pop("init_class", None)
+                class_name = cls._name_mapping.get(init_class, None)
+                if class_name:
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.modeling")
+                    model_name = getattr(import_class, init_class)
+                    return model_name.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                else:
+                    print(
+                        'We use pattern recognition to recognize the Model class.'
+                    )
+                    # From init_class
+                    if init_class:
+                        init_class = init_class.lower()
+                        mapping_init_class = init_class
+                    else:
+                        # From pretrained_model_name_or_path
+                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        )
+                        mapping_init_class = pretrained_model_name_or_path
+                    for key, pattern in cls._name_mapping.items():
+                        if pattern in mapping_init_class:
+                            init_class = key
+                            class_name = cls._name_mapping[init_class]
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.modeling")
+                            model_name = getattr(import_class, init_class)
+                            return model_name.from_pretrained(
+                                pretrained_model_name_or_path, *model_args,
+                                **kwargs)
 
 
 class AutoModel(_BaseAutoModelClass):
@@ -516,3 +508,6 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
     MAPPING_NAMES = get_configurations()
     _model_mapping = MAPPING_NAMES
     _name_mapping = CONDITIONAL_GENERATION_MAPPING_NAMES
+
+
+Auto = AutoModel
