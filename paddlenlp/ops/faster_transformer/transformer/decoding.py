@@ -1802,9 +1802,6 @@ class InferMBartDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        # import pdb
-        # pdb.set_trace()
-
         for mod in model.mbart.decoder.decoder.layers:
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
@@ -1814,8 +1811,6 @@ class InferMBartDecoding(nn.Layer):
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_weight.append(mod.self_attn.v_proj.weight)
             self.slf_v_bias.append(mod.self_attn.v_proj.bias)
-            # import pdb
-            # pdb.set_trace()
             self.slf_out_weight.append(mod.self_attn.out_proj.weight)
             self.slf_out_bias.append(mod.self_attn.out_proj.bias)
 
