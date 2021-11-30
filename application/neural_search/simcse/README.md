@@ -74,6 +74,48 @@ checkpoints/
 **NOTE:**
 * 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
 
+### 构建索引
+
+```
+root_dir="checkpoints" 
+
+python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
+        recall.py \
+        --device gpu \
+        --recall_result_dir "recall_result_dir" \
+        --recall_result_file "recall_result.txt" \
+        --params_path "${root_dir}/model_10000/model_state.pdparams" \
+        --hnsw_m 100 \
+        --hnsw_ef 100 \
+        --batch_size 64 \
+        --output_emb_size 256\
+        --max_seq_length 60 \
+        --recall_num 50 \
+        --similar_text_pair "data/test.csv" \
+        --corpus_file "data/corpus.csv" 
+
+
+```
+也可以使用bash脚本：
+
+```
+sh run_build_index.sh
+```
+
+### 召回评估
+
+```
+python -u evaluate.py \
+    --similar_text_pair "data/test.csv" \
+    --recall_result_file "./recall_result_dir/recall_result.txt" \
+    --recall_num 50
+```
+可以使用bash脚本：
+
+```
+sh evaluate.sh
+```
+
 ### 基于动态图模型预测
  
 测试数据示例如下，：
@@ -96,6 +138,8 @@ python -u -m paddle.distributed.launch --gpus "0" \
         --max_seq_length 64 \
         --text_pair_file 'test.tsv'
 ```
+
+
 
 
 ## Reference
