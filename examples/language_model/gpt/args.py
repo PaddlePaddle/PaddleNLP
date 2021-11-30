@@ -202,6 +202,12 @@ def parse_args(MODEL_CLASSES):
         const=False,
         help="Enable mixed precision training.")
     parser.add_argument(
+        "--amp_level",
+        type=str,
+        default="O1",
+        choices=["O1", "O2"],
+        help="select O1 or O2 of amp level.")
+    parser.add_argument(
         "--enable_addto",
         type=str2bool,
         nargs='?',
