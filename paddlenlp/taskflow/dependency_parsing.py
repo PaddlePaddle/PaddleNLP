@@ -113,7 +113,7 @@ class DDParserTask(Task):
                 ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh")
         word_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "word_vocab.json",
-            URLS[self.model][0], URLS[self.model][1], self.model)
+            URLS[self.model][0], URLS[self.model][1])
         rel_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "rel_vocab.json",
             URLS[self.model][0], URLS[self.model][1])
@@ -149,8 +149,8 @@ class DDParserTask(Task):
 
     def _construct_input_spec(self):
         """
-       Construct the input spec for the convert dygraph model to static model.
-       """
+        Construct the input spec for the convert dygraph model to static model.
+        """
         self._input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),

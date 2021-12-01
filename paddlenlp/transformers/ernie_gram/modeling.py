@@ -20,6 +20,7 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ErnieGramModel',
+    'ErnieGramPretrainedModel',
     'ErnieGramForSequenceClassification',
     'ErnieGramForTokenClassification',
     'ErnieGramForQuestionAnswering',
@@ -78,9 +79,8 @@ class ErnieGramPretrainedModel(PretrainedModel):
     An abstract class for pretrained ERNIE-Gram models. It provides ERNIE-Gram related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. 
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
-
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"

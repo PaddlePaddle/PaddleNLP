@@ -57,34 +57,55 @@ std::vector<paddle::Tensor> decoder_kernel(
     const paddle::Tensor& ffn_inter_bias,
     const paddle::Tensor& ffn_out_weight,
     const paddle::Tensor& ffn_out_bias,
-    const paddle::Tensor& old_self_cache,
+    const paddle::Tensor& old_self_cache_key,
+    const paddle::Tensor& old_self_cache_value,
     const paddle::Tensor& old_mem_cache,
+    const int step,
     paddle::Tensor& decoder_output_tensor,
-    paddle::Tensor& new_self_cache,
+    paddle::Tensor& new_self_cache_key,
+    paddle::Tensor& new_self_cache_value,
     paddle::Tensor& new_mem_cache,
     int n_head,
     int size_per_head,
+    int memory_hidden_dim,
+    bool is_fuse_qkv,
     cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   auto input_dims = memory_tensor_input.shape();
   const int batch_size_ = static_cast<int>(input_dims[0]);
   const int max_seq_len_ = static_cast<int>(input_dims[1]);
-  const int memory_hidden_dim_ = static_cast<int>(input_dims[2]);
+  const int memory_hidden_dim_ = static_cast<int>(memory_hidden_dim);
+  const bool is_fuse_qkv_ = static_cast<bool>(is_fuse_qkv);
+
+  // Detect we use batch major
+  bool use_batch_major =
+      (old_self_cache_key.shape().size() == 5) ? true : false;
+  // we use decoder_max_seq_len == -1 to tell the decoder we use seq major cache
+  // format
+  int decoder_max_seq_len =
+      (use_batch_major) ? (int)old_self_cache_value.shape()[2] : -1;
 
   typedef PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
   typedef DecoderTransformerTraits<traits_::OpType> DecoderTraits_;
   OpenDecoder<DecoderTraits_::OpType>* decoder_;
-  decoder_ = new OpenDecoder<DecoderTraits_::OpType>(
-      batch_size_, max_seq_len_, n_head, size_per_head, memory_hidden_dim_);
+  decoder_ = new OpenDecoder<DecoderTraits_::OpType>(n_head,
+                                                     size_per_head,
+                                                     memory_hidden_dim_,
+                                                     is_fuse_qkv_,
+                                                     true,
+                                                     ActivationType::RELU);
 
   DataType_* decoder_output = reinterpret_cast<DataType_*>(
       decoder_output_tensor.mutable_data<data_t_>());
-  DataType_* self_cache =
-      reinterpret_cast<DataType_*>(old_self_cache.data<data_t_>());
-  DataType_* memory_cache =
-      reinterpret_cast<DataType_*>(old_mem_cache.data<data_t_>());
+  DataType_* self_cache_key_tensor = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_self_cache_key.data<data_t_>()));
+  DataType_* self_cache_value_tensor = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_self_cache_value.data<data_t_>()));
+  DataType_* memory_cache = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(old_mem_cache.data<data_t_>()));
   const DataType_* from_tensor =
       reinterpret_cast<const DataType_*>(from_tensor_input.data<data_t_>());
   const DataType_* memory_tensor =
@@ -93,7 +114,10 @@ std::vector<paddle::Tensor> decoder_kernel(
 
   DecoderInitParam<DataType_> params;
   params.cublas_handle = cublas_handle_;
+  params.cublaslt_handle = cublaslt_handle_;
   params.stream = stream;
+  params.request_max_mem_seq_len = max_seq_len_;
+  params.request_batch_size = batch_size_;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
   params.self_layernorm.gamma =
@@ -149,20 +173,29 @@ std::vector<paddle::Tensor> decoder_kernel(
   params.ffn.output_weight.bias =
       reinterpret_cast<const DataType_*>(ffn_out_bias.data<data_t_>());
 
-  const int step = static_cast<int>(old_self_cache.shape()[1]);
+  const int local_step = static_cast<int>(step) + 1;
   const int hidden_units = n_head * size_per_head;
-  DataType_* K_cache = self_cache;
-  DataType_* V_cache = self_cache + batch_size_ * step * hidden_units;
+  DataType_* K_cache = self_cache_key_tensor;
+  DataType_* V_cache = self_cache_value_tensor;
   DataType_* K_mem_cache = memory_cache;
   DataType_* V_mem_cache =
       memory_cache + batch_size_ * max_seq_len_ * hidden_units;
+  decoder_->set_max_batch_size(batch_size_);
 
   const int decoder_buffer_size =
       decoder_->getWorkspaceSize() * sizeof(DataType_);
-  DataType_* decoder_buffer =
-      (DataType_*)allocator_.malloc(decoder_buffer_size);
-
-  decoder_->initialize(params, decoder_buffer);
+  void* buf =
+      allocator_.malloc(((sizeof(DataType_) == 2) ? CUBLAS_WORKSPACE_SIZE : 0) +
+                        decoder_buffer_size);
+  void* cublas_workspace = nullptr;
+  DataType_* decoder_buffer = (DataType_*)buf;
+  if (sizeof(DataType_) == 2)  // half
+  {
+    cublas_workspace = buf;
+    decoder_buffer =
+        (DataType_*)((char*)cublas_workspace + CUBLAS_WORKSPACE_SIZE);
+  }
+  decoder_->initialize(params, decoder_buffer, cublas_workspace);
   decoder_->forward(from_tensor,
                     memory_tensor,
                     K_cache,
@@ -171,11 +204,15 @@ std::vector<paddle::Tensor> decoder_kernel(
                     V_mem_cache,
                     memory_sequence_length,
                     decoder_output,
-                    step,
+                    local_step,
+                    decoder_max_seq_len,
                     true);
   allocator_.free(decoder_buffer);
   delete decoder_;
-  return {decoder_output_tensor, new_self_cache, new_mem_cache};
+  return {decoder_output_tensor,
+          new_self_cache_key,
+          new_self_cache_value,
+          new_mem_cache};
 }
 
 std::vector<paddle::Tensor> DecoderCUDAForward(
@@ -208,16 +245,23 @@ std::vector<paddle::Tensor> DecoderCUDAForward(
     const paddle::Tensor& ffn_inter_bias,
     const paddle::Tensor& ffn_out_weight,
     const paddle::Tensor& ffn_out_bias,
-    const paddle::Tensor& old_self_cache,
+    const paddle::Tensor& old_self_cache_key,
+    const paddle::Tensor& old_self_cache_value,
     const paddle::Tensor& old_mem_cache,
+    const int step,
     paddle::Tensor& decoder_output,
-    paddle::Tensor& new_self_cache,
+    paddle::Tensor& new_self_cache_key,
+    paddle::Tensor& new_self_cache_value,
     paddle::Tensor& new_mem_cache,
     int n_head,
-    int size_per_head) {
+    int size_per_head,
+    int memory_hidden_dim,
+    bool is_fuse_qkv) {
   auto stream = memory_tensor.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
+  cublasLtHandle_t cublaslt_handle_;
+  cublasLtCreate(&cublaslt_handle_);
   cublasSetStream(cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
@@ -253,14 +297,20 @@ std::vector<paddle::Tensor> DecoderCUDAForward(
                                                       ffn_inter_bias,
                                                       ffn_out_weight,
                                                       ffn_out_bias,
-                                                      old_self_cache,
+                                                      old_self_cache_key,
+                                                      old_self_cache_value,
                                                       old_mem_cache,
+                                                      step,
                                                       decoder_output,
-                                                      new_self_cache,
+                                                      new_self_cache_key,
+                                                      new_self_cache_value,
                                                       new_mem_cache,
                                                       n_head,
                                                       size_per_head,
+                                                      memory_hidden_dim,
+                                                      is_fuse_qkv,
                                                       cublas_handle_,
+                                                      cublaslt_handle_,
                                                       stream);
       break;
     }
@@ -294,14 +344,20 @@ std::vector<paddle::Tensor> DecoderCUDAForward(
                                                       ffn_inter_bias,
                                                       ffn_out_weight,
                                                       ffn_out_bias,
-                                                      old_self_cache,
+                                                      old_self_cache_key,
+                                                      old_self_cache_value,
                                                       old_mem_cache,
+                                                      step,
                                                       decoder_output,
-                                                      new_self_cache,
+                                                      new_self_cache_key,
+                                                      new_self_cache_value,
                                                       new_mem_cache,
                                                       n_head,
                                                       size_per_head,
+                                                      memory_hidden_dim,
+                                                      is_fuse_qkv,
                                                       cublas_handle_,
+                                                      cublaslt_handle_,
                                                       stream);
       break;
     }
@@ -313,5 +369,6 @@ std::vector<paddle::Tensor> DecoderCUDAForward(
     }
   }
   cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

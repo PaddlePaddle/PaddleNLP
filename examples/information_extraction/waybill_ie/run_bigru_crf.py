@@ -21,7 +21,6 @@ import paddle.nn as nn
 
 from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.embeddings import TokenEmbedding
 

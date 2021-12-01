@@ -1,5 +1,5 @@
-# Copyright (c) 2021, PadddlePaddle authors.  All rights reserved.
-# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021, PadddlePaddle authors. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

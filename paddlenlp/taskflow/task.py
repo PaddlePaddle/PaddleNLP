@@ -19,7 +19,7 @@ from abc import abstractmethod
 import paddle
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from .utils import static_mode_guard, dygraph_mode_guard
+from .utils import download_check, static_mode_guard, dygraph_mode_guard
 
 
 class Task(metaclass=abc.ABCMeta):
@@ -42,8 +42,14 @@ class Task(metaclass=abc.ABCMeta):
         # The static model instantce
         self._input_spec = None
         self._config = None
-        self._task_path = os.path.join(PPNLP_HOME, "taskflow", self.task,
+        # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
+        self._home_path = self.kwargs[
+            'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
+        self._task_path = os.path.join(self._home_path, "taskflow", self.task,
                                        self.model)
+        self._task_flag = self.kwargs[
+            'task_flag'] if 'task_flag' in self.kwargs else self.model
+        download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
@@ -85,7 +91,7 @@ class Task(metaclass=abc.ABCMeta):
 
     def _prepare_static_mode(self):
         """
-        Construct the input data and executor in the PaddlePaddele static mode. 
+        Construct the input data and predictor in the PaddlePaddele static mode. 
         """
         place = paddle.get_device()
         if place == 'cpu':

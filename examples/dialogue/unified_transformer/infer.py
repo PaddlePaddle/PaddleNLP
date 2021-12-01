@@ -5,7 +5,6 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
-from paddlenlp.ops import FasterUnifiedTransformer
 
 from utils import print_args, set_seed, create_data_loader, select_response
 
@@ -34,7 +33,6 @@ def parse_args():
     parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
     parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
     parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
-    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -82,13 +80,6 @@ def infer(args):
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
-    if args.faster:
-        model = FasterUnifiedTransformer(
-            model,
-            decoding_strategy=args.decode_strategy,
-            decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
-
     model.eval()
     total_time = 0.0
     start_time = time.time()
@@ -110,7 +101,9 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences)
+            num_return_sequences=args.num_return_sequences,
+            use_fp16_decoding=args.use_fp16_decoding,
+            use_faster=args.faster)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
@@ -118,17 +111,9 @@ def infer(args):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        if args.faster:
-            ids = output
-            results = select_response(
-                ids,
-                None,
-                tokenizer,
-                num_return_sequences=args.num_return_sequences)
-        else:
-            ids, scores = output
-            results = select_response(ids, scores, tokenizer, args.max_dec_len,
-                                      args.num_return_sequences)
+        ids, scores = output
+        results = select_response(ids, scores, tokenizer, args.max_dec_len,
+                                  args.num_return_sequences)
         pred_responses.extend(results)
 
         start_time = time.time()

@@ -15,6 +15,7 @@ from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
 
 from util.record import AverageStatistical
+from util.to_static import apply_to_static
 
 
 def parse_args():
@@ -108,6 +109,8 @@ def do_train(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx)
+
+    transformer = apply_to_static(args, transformer)
 
     # Define loss
     criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)

@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/model_config.json",
+  "model_state": "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/model_state.pdparams",
+  "tokenizer_config_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/tokenizer_config.json",
+  "vocab_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/vocab.txt"
+}

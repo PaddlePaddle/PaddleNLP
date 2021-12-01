@@ -15,13 +15,20 @@ import os
 from attrdict import AttrDict
 import argparse
 import time
-
 import yaml
 from pprint import pprint
 import paddle
-
 from paddlenlp.ops import FasterDecoder
 from paddlenlp.utils.log import logger
+
+
+def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):
+    x = 8 if is_fp16 else 4
+    use_batch_major_op_cache = True if use_batch_major_op_cache == True and \
+                                       size_per_head % x == 0 \
+                                    else False
+    x = x if use_batch_major_op_cache else 1
+    return use_batch_major_op_cache, x
 
 
 def parse_args():
@@ -33,9 +40,9 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoder_lib",
-        default="../../build/lib/libdecoder_op.so",
+        default="../../build/lib/libdecoding_op.so",
         type=str,
-        help="Path of libdecoder_op.so. ")
+        help="Path of libdecoding_op.so. ")
     parser.add_argument(
         "--use_fp16_decoder",
         action="store_true",
@@ -48,6 +55,11 @@ def do_predict(args):
     place = "gpu"
     paddle.set_device(place)
 
+    use_batch_major_op_cache = True
+    size_per_head = args.d_model // args.n_head
+    use_batch_major_op_cache, x = get_op_cache_config(
+        use_batch_major_op_cache, size_per_head, args.use_fp16_decoder)
+    print(f'use_batch_major_op_cache={use_batch_major_op_cache}, x={x}')
     # Define model
     transformer = FasterDecoder(
         src_vocab_size=args.src_vocab_size,
@@ -64,7 +76,8 @@ def do_predict(args):
         eos_id=args.eos_idx,
         max_out_len=args.max_out_len,
         decoder_lib=args.decoder_lib,
-        use_fp16_decoder=args.use_fp16_decoder)
+        use_fp16_decoder=args.use_fp16_decoder,
+        use_batch_major_op_cache=use_batch_major_op_cache)
 
     # Load checkpoint.
     transformer.load(
@@ -87,11 +100,30 @@ def do_predict(args):
         dtype = 'float16'
         dec_input = paddle.cast(dec_input, dtype=dtype)
         enc_output = paddle.cast(enc_output, dtype=dtype)
-    self_cache = paddle.zeros(
-        shape=[
-            args.num_decoder_layers, 2, 0, args.infer_batch_size, args.d_model
-        ],
-        dtype=dtype)
+    if not use_batch_major_op_cache:
+        self_cache_key = paddle.zeros(
+            shape=[
+                args.num_decoder_layers, 0, args.infer_batch_size, args.d_model
+            ],
+            dtype=dtype)
+        self_cache_value = paddle.zeros(
+            shape=[
+                args.num_decoder_layers, 0, args.infer_batch_size, args.d_model
+            ],
+            dtype=dtype)
+    else:
+        self_cache_key = paddle.zeros(
+            shape=[
+                args.num_decoder_layers, args.infer_batch_size, args.n_head,
+                size_per_head // x, args.max_out_len, x
+            ],
+            dtype=dtype)
+        self_cache_value = paddle.zeros(
+            shape=[
+                args.num_decoder_layers, args.infer_batch_size, args.n_head,
+                args.max_out_len, size_per_head
+            ],
+            dtype=dtype)
     mem_cache = paddle.zeros(
         shape=[
             args.num_decoder_layers, 2, args.infer_batch_size, args.max_length,
@@ -104,12 +136,18 @@ def do_predict(args):
             # For warmup. 
             if 50 == i:
                 start = time.time()
-            dec_output, self_cache, mem_cache = transformer.decoder(
+            paddle.device.cuda.synchronize()
+            dec_output, self_cache_key, self_cache_value, mem_cache = transformer.decoder(
                 from_tensor=dec_input,
                 memory_tensor=enc_output,
                 mem_seq_len=mem_seq_lens,
-                self_cache=self_cache,
-                mem_cache=mem_cache)
+                self_cache_key=self_cache_key,
+                self_cache_value=self_cache_value,
+                mem_cache=mem_cache,
+                step=0,
+                memory_hidden_dim=args.d_model,
+                is_fuse_qkv=False)
+        paddle.device.cuda.synchronize()
         logger.info("Average test time for decoder is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
