@@ -28,7 +28,7 @@ __inline__ __device__ T gelu(T x) {
 
   // NOTE: The precision of gelu with or without approximate formulation
   // may cause serious problem in some cases. If necessary, the following
-  // comments can be open to use the non-approximate formulation.
+  // comments can be opened to use the non-approximate formulation.
   // float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
   return x * cdf;
 }
