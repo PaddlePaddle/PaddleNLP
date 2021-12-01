@@ -55,15 +55,11 @@ def create_data_holder(args):
         name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
         name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
-    attention_mask = paddle.static.data(
-        name="attention_mask",
-        shape=[-1, 1, args.max_seq_len, args.max_seq_len],
-        dtype="float32")
     position_ids = paddle.static.data(
         name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
     labels = paddle.static.data(
         name="labels", shape=[-1, args.max_seq_len], dtype="int64")
-    return [tokens, loss_mask, attention_mask, position_ids, labels]
+    return [tokens, loss_mask, position_ids, labels]
 
 
 def dist_optimizer(args, topo):
@@ -91,14 +87,12 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": [
-                'softmax',
-                'layer_norm',
-                'gelu',
-            ],
-            "custom_black_list": ['c_softmax_with_cross_entropy'],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
+            "use_pure_fp16": args.amp_level=="O2",
+            "use_fp16_guard": False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -199,6 +193,10 @@ def do_train(args):
     get_rng_state_tracker().add('global_seed', args.seed)
     get_rng_state_tracker().add('local_seed',
                                 args.seed + fleet.worker_index() + 2021)
+    
+    if args.use_amp and args.amp_level=="O2":
+        assert (args.mp_degree == 1 and args.pp_degree == 1), "When amp level is O2, mp_degree and pp_degree should be 1."
+        assert (args.use_sharding == False), "When amp level is O2, use_sharding should be False."
 
     assert args.device in [
         "cpu", "gpu", "xpu"
@@ -246,7 +244,7 @@ def do_train(args):
         with paddle.utils.unique_name.guard():
             with paddle.static.device_guard('gpu:0'):
                 data_holders = create_data_holder(args)
-                [tokens, loss_mask, attention_mask, position_ids,
+                [tokens, loss_mask, position_ids,
                  labels] = data_holders
 
                 tokenizer = tokenizer_class.from_pretrained(
@@ -285,9 +283,8 @@ def do_train(args):
                         attention_probs_dropout_prob=args.
                         attention_probs_dropout_prob,
                         topo=topo)
-
                 # Create the model for the gpt pretrain
-                preds = model(tokens, position_ids, attention_mask)
+                preds = model(tokens, position_ids)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
                     GPTPretrainingCriterion)(topo)
@@ -309,12 +306,12 @@ def do_train(args):
             if args.grad_clip > 0:
                 clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
+                
 
             decay_param = [
                 p.name for n, p in model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
-
             optimizer = paddle.optimizer.AdamW(
                 learning_rate=lr_scheduler,
                 beta1=args.adam_beta1,
@@ -357,6 +354,11 @@ def do_train(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
+    
+    
+    if args.use_amp and args.amp_level=="O2":
+        optimizer.amp_init(place)
+    
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -411,6 +413,7 @@ def do_train(args):
             train_start = time.time()
 
             global_step += 1
+
             ret = exe.run(main_program,
                           feed=batch,
                           fetch_list=fetchs,
