@@ -196,4 +196,7 @@ CublasHandle* CublasHandle::GetInstance() {
   return p_handle;
 }
 
-CublasHandle::~CublasHandle() { cublasDestroy(cublas_handle_); }
+CublasHandle::~CublasHandle() {
+  cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
+}

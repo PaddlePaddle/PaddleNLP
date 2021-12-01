@@ -29,7 +29,7 @@ limitations under the License. */
 #include "pd_traits.h"
 
 // Get global CublasHandle singleton instance
-CublasHandle* kHandle = CublasHandle::GetInstance();
+// CublasHandle* kHandle = CublasHandle::GetInstance();
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> encoder_kernel(
@@ -97,8 +97,9 @@ std::vector<paddle::Tensor> encoder_kernel(
     BertInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
-    encoder_param.cublas_handle = kHandle->cublas_handle_;
-    encoder_param.cublaslt_handle = kHandle->cublaslt_handle_;
+    encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+    encoder_param.cublaslt_handle =
+        CublasHandle::GetInstance()->cublaslt_handle_;
     encoder_param.from_tensor =
         reinterpret_cast<const DataType_*>(input.data<data_t_>());
 
@@ -186,8 +187,9 @@ std::vector<paddle::Tensor> encoder_kernel(
     EncoderInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
-    encoder_param.cublas_handle = kHandle->cublas_handle_;
-    encoder_param.cublaslt_handle = kHandle->cublaslt_handle_;
+    encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+    encoder_param.cublaslt_handle =
+        CublasHandle::GetInstance()->cublaslt_handle_;
     encoder_param.from_tensor =
         reinterpret_cast<const DataType_*>(input.data<data_t_>());
 
@@ -315,7 +317,7 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     bool normalize_before) {
   auto stream = input.stream();
 
-  cublasSetStream(kHandle->cublas_handle_, stream);
+  cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
 
