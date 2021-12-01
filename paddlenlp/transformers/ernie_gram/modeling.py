@@ -20,6 +20,7 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ErnieGramModel',
+    'ErnieGramPretrainedModel',
     'ErnieGramForSequenceClassification',
     'ErnieGramForTokenClassification',
     'ErnieGramForQuestionAnswering',
