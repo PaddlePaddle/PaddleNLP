@@ -1,4 +1,5 @@
 /*
+* Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,9 +22,14 @@ namespace fastertransformer {
 
 template <typename T>
 __inline__ __device__ T gelu(T x) {
-  // float cdf = 0.5f * (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x
-  // * x * x))));
-  float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
+  float cdf =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
+
+  // NOTE: The precision of gelu with or without approximate formulation
+  // may cause serious problem in some cases. If necessary, the following
+  // comments can be open to use the non-approximate formulation.
+  // float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
   return x * cdf;
 }
 
