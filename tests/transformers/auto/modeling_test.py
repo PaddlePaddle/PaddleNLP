@@ -16,6 +16,7 @@ def from_built_in_model():
 
     # pretraining test
     #model = AutoModelForPretraining.from_pretrained('roformer-chinese-small')
+
     model = AutoModel.from_pretrained(
         'roformer-chinese-small', task='pretraining')
     print(type(model))
@@ -37,14 +38,15 @@ def from_built_in_model():
     #model = AutoModelForPretraining.from_pretrained('tinybert-4l-312d')
 
     # lm_head test
-    model = AutoModelWithLMHead.from_pretrained('gpt-cpm-large-cn')
-    print(type(model))
+    #model = AutoModelWithLMHead.from_pretrained('gpt-cpm-large-cn')
+    #print(type(model))
     #model = AutoModelWithLMHead.from_pretrained('unified_transformer-12L-cn')
     #model = AutoModelWithLMHead.from_pretrained('unimo-text-1.0')
 
     # masked lm test
 
     model = AutoModelForMaskedLM.from_pretrained('albert-base-v1')
+    print(type(model))
     #model = AutoModelForMaskedLM.from_pretrained('bart-base')
     #model = AutoModelForMaskedLM.from_pretrained('distilbert-base-uncased')
     #model = AutoModelForMaskedLM.from_pretrained('mpnet-base')
@@ -125,5 +127,5 @@ def from_community_model():
 if __name__ == '__main__':
 
     from_built_in_model()
-    from_local_dir()
-    from_community_model()
+    #from_local_dir()
+    #from_community_model()
