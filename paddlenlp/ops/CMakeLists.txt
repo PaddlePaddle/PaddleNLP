@@ -37,6 +37,8 @@ if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
+list(APPEND decoding_op_files cublas_handle.cc)
+
 if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
 endif()
@@ -260,6 +262,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/cuda_kernels.cu cuda_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_kernels.cu cuda_kernels_cu_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/open_attention.h open_attention_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/decoding_kernels.cu decoding_kernels_cu_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_decoding_kernels.cu trans_decoding_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/decoding_kernels.cu decoding_kernels_cu_dst)
@@ -291,6 +296,7 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
+
 set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
   && cp ${allocator_src} ${allocator_dst}
@@ -302,6 +308,7 @@ set(FT_PATCH_COMMAND
   && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
   && cp ${arguments_h_src} ${arguments_h_dst}
   && cp ${open_decoder_h_src} ${open_decoder_h_dst}
+  && cp ${open_attention_h_src} ${open_attention_h_dst}
   && cp ${standard_encoder_h_src} ${standard_encoder_h_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}

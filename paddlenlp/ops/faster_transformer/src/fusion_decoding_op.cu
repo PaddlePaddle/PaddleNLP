@@ -21,13 +21,10 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
+#include "cublas_handle.h"
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fusion_decoding_op.h"
-#include "fusion_encoder_op.h"
 #include "pd_traits.h"
-
-// Get global CublasHandle singleton instance
-// CublasHandle* CublasHandle::GetInstance() = CublasHandle::GetInstance();
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> decoding_kernel(
@@ -377,11 +374,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const float& alpha) {
   auto stream = input.stream();
 
-  //   cublasHandle_t cublas_handle_;
-  //   cublasCreate(&cublas_handle_);
-  //   cublasLtHandle_t cublaslt_handle_;
-  //   cublasLtCreate(&cublaslt_handle_);
-
   cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
@@ -438,8 +430,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          //   cublas_handle_,
-          //   cublaslt_handle_,
           stream);
       break;
     }
@@ -494,8 +484,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          //   cublas_handle_,
-          //   cublaslt_handle_,
           stream);
       break;
     }
@@ -506,8 +494,5 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
       break;
     }
   }
-
-  //   cublasDestroy(cublas_handle_);
-  //   cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

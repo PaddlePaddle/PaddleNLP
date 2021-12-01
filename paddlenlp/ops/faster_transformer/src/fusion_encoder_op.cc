@@ -11,6 +11,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+
 #include <string>
 #include <vector>
 
@@ -187,16 +188,3 @@ PD_BUILD_OP(fusion_encoder)
     .SetKernelFn(PD_KERNEL(EncoderForward))
     .SetInferShapeFn(PD_INFER_SHAPE(EncoderInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(EncoderInferDtype));
-
-CublasHandle* CublasHandle::GetInstance() {
-  static CublasHandle* p_handle = nullptr;
-  if (p_handle == nullptr) {
-    p_handle = new CublasHandle();
-  }
-  return p_handle;
-}
-
-CublasHandle::~CublasHandle() {
-  cublasDestroy(cublas_handle_);
-  cublasLtDestroy(cublaslt_handle_);
-}

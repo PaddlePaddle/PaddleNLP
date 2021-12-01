@@ -21,6 +21,7 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
+#include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fastertransformer/cuda/cuda_kernels.h"
@@ -28,8 +29,6 @@ limitations under the License. */
 #include "fusion_encoder_op.h"
 #include "pd_traits.h"
 
-// Get global CublasHandle singleton instance
-// CublasHandle* kHandle = CublasHandle::GetInstance();
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> encoder_kernel(
