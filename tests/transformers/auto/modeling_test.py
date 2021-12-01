@@ -18,21 +18,7 @@ def from_built_in_model():
     #model = AutoModelForPretraining.from_pretrained('roformer-chinese-small')
 
     model = AutoModel.from_pretrained(
-        'roformer-chinese-small', task='pretraining')
-    print(type(model))
-    model = AutoModel.from_pretrained(
-        'roformer-chinese-small', task='sequence_classification')
-    print(type(model))
-    model = AutoModel.from_pretrained(
-        'roformer-chinese-small', task='token_classification')
-    print(type(model))
-
-    model = AutoModel.from_pretrained(
-        'roformer-chinese-small', task='question_answering')
-    print(type(model))
-
-    model = AutoModelForPretraining.from_pretrained(
-        'roformer-chinese-small', task='question_answering')
+        'roformer-chinese-small', task='ForPretraining')
     print(type(model))
 
     #model = AutoModelForPretraining.from_pretrained('tinybert-4l-312d')
@@ -127,5 +113,5 @@ def from_community_model():
 if __name__ == '__main__':
 
     from_built_in_model()
-    #from_local_dir()
-    #from_community_model()
+    from_local_dir()
+    from_community_model()

@@ -64,92 +64,26 @@ MAPPING_NAMES = OrderedDict([
     ("XLNet", "xlnet"),
 ])
 
-# Base model mapping
-MODEL_MAPPING_NAMES = OrderedDict()
-# Model for Pre-training mapping
-PRETRAINING_MAPPING_NAMES = OrderedDict()
-# Model for Sequence Classification mapping
-SEQUENCE_CLASSIFICATION_MAPPING_NAMES = OrderedDict()
-# Model for Token Classification mapping
-TOKEN_CLASSIFICATION_MAPPING_NAMES = OrderedDict()
-# Model for Question Answering mapping
-QUESTION_ANSWERING_MAPPING_NAMES = OrderedDict()
-# Model for Multiple Choice mapping
-MULTIPLE_CHOICE_MAPPING_NAMES = OrderedDict()
-# Model for MaskedLM mapping
-MASKED_LM_MAPPING_NAMES = OrderedDict()
-# Model for CausalLM mapping
-CAUSAL_LM_MAPPING_NAMES = OrderedDict()
-# Encoder mapping
-ENCODER_MAPPING_NAMES = OrderedDict()
-# Decoder mapping
-DECODER_MAPPING_NAMES = OrderedDict()
-# Generator mapping
-GENERATOR_MAPPING_NAMES = OrderedDict()
-# Discriminator mapping
-DISCRIMINATOR_MAPPING_NAMES = OrderedDict()
-# Conditional generation mapping
-CONDITIONAL_GENERATION_MAPPING_NAMES = OrderedDict()
-for key, value in MAPPING_NAMES.items():
-    key1 = key + 'Model'
-    key2 = key + 'Model_Import_Class'
-    model_import_class = key + 'Model'
-    pretraining_import_class = key + 'ForPretraining'
-    sequence_import_class = key + 'ForSequenceClassification'
-    token_import_class = key + 'ForTokenClassification'
-    question_import_class = key + 'ForQuestionAnswering'
-    multiple_import_class = key + 'ForMultipleChoice'
-    masked_lm_import_class = key + 'ForMaskedLM'
-    causal_lm_import_class = key + 'ForCausalLM'
-    encoder_import_class = key + 'Encoder'
-    decoder_import_class = key + 'Decoder'
-    generator_import_class = key + 'Generator'
-    discriminator_import_class = key + 'Discriminator'
-    conditional_generation_import_class = key + 'ForConditionalGeneration'
 
-    MODEL_MAPPING_NAMES[key2] = model_import_class
-    MODEL_MAPPING_NAMES[key1] = value
-    PRETRAINING_MAPPING_NAMES[key2] = pretraining_import_class
-    PRETRAINING_MAPPING_NAMES[pretraining_import_class] = value
-    PRETRAINING_MAPPING_NAMES[key1] = value
-    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[key2] = sequence_import_class
-    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[sequence_import_class] = value
-    SEQUENCE_CLASSIFICATION_MAPPING_NAMES[key1] = value
-    TOKEN_CLASSIFICATION_MAPPING_NAMES[key2] = token_import_class
-    TOKEN_CLASSIFICATION_MAPPING_NAMES[token_import_class] = value
-    TOKEN_CLASSIFICATION_MAPPING_NAMES[key1] = value
-    QUESTION_ANSWERING_MAPPING_NAMES[key2] = question_import_class
-    QUESTION_ANSWERING_MAPPING_NAMES[question_import_class] = value
-    QUESTION_ANSWERING_MAPPING_NAMES[key1] = value
-    MULTIPLE_CHOICE_MAPPING_NAMES[key2] = multiple_import_class
-    MULTIPLE_CHOICE_MAPPING_NAMES[multiple_import_class] = value
-    MULTIPLE_CHOICE_MAPPING_NAMES[key1] = value
-    MASKED_LM_MAPPING_NAMES[key2] = masked_lm_import_class
-    MASKED_LM_MAPPING_NAMES[masked_lm_import_class] = value
-    MASKED_LM_MAPPING_NAMES[key1] = value
-    CAUSAL_LM_MAPPING_NAMES[key2] = causal_lm_import_class
-    CAUSAL_LM_MAPPING_NAMES[causal_lm_import_class] = value
-    CAUSAL_LM_MAPPING_NAMES[key1] = value
-    ENCODER_MAPPING_NAMES[key2] = encoder_import_class
-    ENCODER_MAPPING_NAMES[encoder_import_class] = value
-    ENCODER_MAPPING_NAMES[key1] = value
-    DECODER_MAPPING_NAMES[key2] = decoder_import_class
-    DECODER_MAPPING_NAMES[decoder_import_class] = value
-    DECODER_MAPPING_NAMES[key1] = value
-    GENERATOR_MAPPING_NAMES[key2] = generator_import_class
-    GENERATOR_MAPPING_NAMES[generator_import_class] = value
-    GENERATOR_MAPPING_NAMES[key1] = value
-    DISCRIMINATOR_MAPPING_NAMES[key2] = discriminator_import_class
-    DISCRIMINATOR_MAPPING_NAMES[discriminator_import_class] = value
-    DISCRIMINATOR_MAPPING_NAMES[key1] = value
-    CONDITIONAL_GENERATION_MAPPING_NAMES[
-        key2] = conditional_generation_import_class
-    CONDITIONAL_GENERATION_MAPPING_NAMES[
-        conditional_generation_import_class] = value
-    CONDITIONAL_GENERATION_MAPPING_NAMES[key1] = value
+def get_name_mapping(task='Model'):
+    '''
+    Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
+    'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
+    'Generator', 'Discriminator', 'ForConditionalGeneration'.
+    '''
+    NAME_MAPPING = OrderedDict()
+    for key, value in MAPPING_NAMES.items():
+        key1 = key + 'Model'
+        key2 = key + 'Model_Import_Class'
+        import_class = key + task
+        NAME_MAPPING[key2] = import_class
+        NAME_MAPPING[import_class] = value
+        NAME_MAPPING[key1] = value
+
+    return NAME_MAPPING
 
 
-def get_configurations():
+def get_init_configurations():
     CONFIGURATION_MODEL_MAPPING = OrderedDict()
     for key, class_name in MAPPING_NAMES.items():
         import_class = importlib.import_module(
@@ -186,26 +120,8 @@ class _BaseAutoModelClass:
                         **kwargs):
         if task:
             if cls._task_choice == True:
-                key_dict = {
-                    'model': MODEL_MAPPING_NAMES,
-                    'pretraining': PRETRAINING_MAPPING_NAMES,
-                    'sequence_classification':
-                    SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
-                    'token_classification': TOKEN_CLASSIFICATION_MAPPING_NAMES,
-                    'question_answering': QUESTION_ANSWERING_MAPPING_NAMES,
-                    'multiple_choice': MULTIPLE_CHOICE_MAPPING_NAMES,
-                    'lm_head': LM_HEAD_MAPPING_NAMES,
-                    'masked_lm': MASKED_LM_MAPPING_NAMES,
-                    'causal_lm': CAUSAL_LM_MAPPING_NAMES,
-                    'encoder': ENCODER_MAPPING_NAMES,
-                    'decoder': DECODER_MAPPING_NAMES,
-                    'generator': GENERATOR_MAPPING_NAMES,
-                    'discriminator': DISCRIMINATOR_MAPPING_NAMES,
-                    'conditional_generation':
-                    CONDITIONAL_GENERATION_MAPPING_NAMES,
-                }
                 try:
-                    cls._name_mapping = key_dict[task]
+                    cls._name_mapping = get_name_mapping(task)
                 except KeyError as err:
                     logger.error(err)
                     raise KeyError(f'We only support {key_dict.keys()}.')
@@ -258,9 +174,8 @@ class _BaseAutoModelClass:
                         mapping_init_class = init_class
                     else:
                         # From pretrained_model_name_or_path
-                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
+                        mapping_init_class = pretrained_model_name_or_path.lower(
                         )
-                        mapping_init_class = pretrained_model_name_or_path_lower
                     for key, pattern in cls._name_mapping.items():
                         if pattern in mapping_init_class:
                             init_class = key
@@ -315,9 +230,8 @@ class _BaseAutoModelClass:
                         mapping_init_class = init_class
                     else:
                         # From pretrained_model_name_or_path
-                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
+                        mapping_init_class = pretrained_model_name_or_path.lower(
                         )
-                        mapping_init_class = pretrained_model_name_or_path_lower
                     for key, pattern in cls._name_mapping.items():
                         if pattern in mapping_init_class:
                             init_class = key
@@ -379,79 +293,79 @@ class AutoModel(_BaseAutoModelClass):
             # Load from local directory path
             model = AutoModel.from_pretrained('./my_bert/')
     """
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = MODEL_MAPPING_NAMES
+    _name_mapping = get_name_mapping('Model')
     _task_choice = True
 
 
 class AutoModelForPretraining(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = PRETRAINING_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForPretraining')
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = SEQUENCE_CLASSIFICATION_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForSequenceClassification')
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = TOKEN_CLASSIFICATION_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForTokenClassification')
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = QUESTION_ANSWERING_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForQuestionAnswering')
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = MULTIPLE_CHOICE_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForMultipleChoice')
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = MASKED_LM_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForMaskedLM')
 
 
 class AutoModelForCausalLM(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = CAUSAL_LM_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForCausalLM')
 
 
 class AutoEncoder(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = ENCODER_MAPPING_NAMES
+    _name_mapping = get_name_mapping('Encoder')
 
 
 class AutoDecoder(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = DECODER_MAPPING_NAMES
+    _name_mapping = get_name_mapping('Decoder')
 
 
 class AutoGenerator(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = GENERATOR_MAPPING_NAMES
+    _name_mapping = get_name_mapping('Generator')
 
 
 class AutoDiscriminator(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = DISCRIMINATOR_MAPPING_NAMES
+    _name_mapping = get_name_mapping('Discriminator')
 
 
 class AutoModelForConditionalGeneration(_BaseAutoModelClass):
-    MAPPING_NAMES = get_configurations()
+    MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
-    _name_mapping = CONDITIONAL_GENERATION_MAPPING_NAMES
+    _name_mapping = get_name_mapping('ForConditionalGeneration')

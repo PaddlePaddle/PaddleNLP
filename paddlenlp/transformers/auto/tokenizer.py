@@ -159,9 +159,7 @@ class AutoTokenizer():
                         'We use pattern recognition to recognize the Tokenizer class.'
                     )
                     for key, pattern in cls._name_mapping.items():
-                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
-                        )
-                        if pattern in pretrained_model_name_or_path_lower:
+                        if pattern in pretrained_model_name_or_path.lower():
                             init_class = key
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
@@ -212,9 +210,7 @@ class AutoTokenizer():
                         'We use pattern recognition to recognize the Tokenizer class.'
                     )
                     for key, pattern in cls._name_mapping.items():
-                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
-                        )
-                        if pattern in pretrained_model_name_or_path_lower:
+                        if pattern in pretrained_model_name_or_path.lower():
                             init_class = key
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
