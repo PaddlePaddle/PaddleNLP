@@ -402,8 +402,10 @@ class AutoModel(_BaseAutoModelClass):
             - Name of a community-contributed pretrained model.
             - Local directory path which contains model weights file("model_state.pdparams")
               and model config file ("model_config.json").
-        task (str): Specify a downstream task.
-            We only support specify downstream tasks in AutoModel. Defaults to `None`.
+        task (str): Specify a downstream task. `task` can be 'model', 'pretraining', 'sequence_classification',
+            'token_classification', 'question_answering', 'multiple_choice', 'lm_head',
+            'masked_lm', 'causal_lm', 'encoder', 'decoder', 'generator', 'discriminator',
+            'conditional_generation'. We only support specify downstream tasks in AutoModel. Defaults to `None`.
         *args (tuple): Position arguments for model `__init__`. If provided,
             use these as position argument values for model initialization.
         **kwargs (dict): Keyword arguments for model `__init__`. If provided,
