@@ -15,7 +15,7 @@ class MobileBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mobilebert-uncased":
-            "https://huggingface.co/google/mobilebert-uncased/resolve/main/vocab.txt"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/mobilebert/mobilebert-uncased/vocab.txt"
         }
     }
     pretrained_init_configuration = {
