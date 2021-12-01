@@ -175,8 +175,11 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
 |  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
-|  Inbatch-negative+simcse |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
-|  post+Inbatch-negative+simcse |  58.248 | 75.099| 79.813| 83.801|87.733| Ernie预训练，simcse无监督训训练，Inbatch-negative有监督训练|
+|  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
+|  SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
+|  Post Training+SimCSE |  - | -| - | - |-| Ernie预训练，SimCSE无监督训练|
+|  Post Training+SimCSE+Inbatch-negative|  58.248 | 75.099| 79.813| 83.801|87.733| Ernie预训练，simcse无监督训训练，Inbatch-negative有监督训练|
+
 
 **召回系统搭建**
 
