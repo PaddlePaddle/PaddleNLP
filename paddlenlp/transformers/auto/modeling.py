@@ -120,11 +120,7 @@ class _BaseAutoModelClass:
                         **kwargs):
         if task:
             if cls._task_choice == True:
-                try:
-                    cls._name_mapping = get_name_mapping(task)
-                except KeyError as err:
-                    logger.error(err)
-                    raise KeyError(f'We only support {key_dict.keys()}.')
+                cls._name_mapping = get_name_mapping(task)
             else:
                 print('We only support task choice for AutoModel.')
 
