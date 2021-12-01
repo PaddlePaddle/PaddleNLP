@@ -310,9 +310,9 @@ class _BaseAutoModelClass:
                         mapping_init_class = init_class
                     else:
                         # From pretrained_model_name_or_path
-                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
                         )
-                        mapping_init_class = pretrained_model_name_or_path
+                        mapping_init_class = pretrained_model_name_or_path_lower
                     for key, pattern in cls._name_mapping.items():
                         if pattern in mapping_init_class:
                             init_class = key
@@ -367,9 +367,9 @@ class _BaseAutoModelClass:
                         mapping_init_class = init_class
                     else:
                         # From pretrained_model_name_or_path
-                        pretrained_model_name_or_path = pretrained_model_name_or_path.lower(
+                        pretrained_model_name_or_path_lower = pretrained_model_name_or_path.lower(
                         )
-                        mapping_init_class = pretrained_model_name_or_path
+                        mapping_init_class = pretrained_model_name_or_path_lower
                     for key, pattern in cls._name_mapping.items():
                         if pattern in mapping_init_class:
                             init_class = key
