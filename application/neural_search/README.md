@@ -168,16 +168,16 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 [in_batch_negative](./in_batch_negative/)
 
 
-
 召回阶段的效果评估：
 
 
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
+|  Baseline |  - | -| - | - |-| 标准 pair-wise 训练范式，通过随机采样产生负样本|
 |  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
 |  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
 |  SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
-|  Post Training+SimCSE |  - | -| - | - |-| Ernie预训练，SimCSE无监督训练|
+|  Post Training+SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie预训练，SimCSE无监督训练|
 |  Post Training+SimCSE+Inbatch-negative|  58.248 | 75.099| 79.813| 83.801|87.733| Ernie预训练，simcse无监督训训练，Inbatch-negative有监督训练|
 
 
@@ -313,6 +313,11 @@ python3 inference.py
  |  59849| 29924 |
 
 
+排序阶段的效果评估：
+
+|  模型 |  AUC |
+| ------------ | ------------ |
+|  ERNIE-Gram |  0.637 | 
 
 ## Reference
 
