@@ -8,7 +8,7 @@ class MobileBertTokenizer(BertTokenizer):
     Construct a MobileBERT tokenizer.
     :class:`~paddlenlp.transformers.MobileBertTokenizer is identical to :class:`~paddlenlp.transformers.BertTokenizer` and runs end-to-end
     tokenization: punctuation splitting and wordpiece.
-    Refer to superclass :class:`~transformers.BertTokenizer` for usage examples and documentation concerning
+    Refer to superclass :class:`~~paddlenlp.transformers.BertTokenizer` for usage examples and documentation concerning
     parameters.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}
