@@ -150,7 +150,7 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 训练教程请参考：
 
-https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie-1.0
+[ernie-1.0](./ernie-1.0/)
 
 ```
 task_name="ernie-1.0-dp8-gb1024"
@@ -206,7 +206,7 @@ python3 ernie_static_to_dynamic.py
 
 无监督预训练的教程请参考SimCSE的文档：
 
-https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/simcse
+[simcse](./simcse/)
 
 ```
 python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
@@ -230,7 +230,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 
 有监督训练的教程请参考InbatchNegative的文档：
 
-https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/semantic_indexing
+[in_batch_negative](./in_batch_negative/)
 
 ```
 root_path=train_0.001
@@ -383,8 +383,7 @@ python3 inference.py
 
 排序阶段使用的模型是ERNIE-Gram，ERNIE-Gram的详细运行步骤请参考下面的链接：
 
-
-https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/ernie_matching
+[ernie_matching](./ernie_matching/)
 
 |  训练集 | 测试集 | 
 | ------------ | ------------ | 
@@ -505,3 +504,9 @@ sh deploy.sh
 
 [3] Dongling Xiao, Yu-Kun Li, Han Zhang, Yu Sun, Hao Tian, Hua Wu, Haifeng Wang:
 ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding. NAACL-HLT 2021: 1702-1715
+
+[4] Yu Sun, Shuohuan Wang, Yu-Kun Li, Shikun Feng, Xuyi Chen, Han Zhang, Xin Tian, Danxiang Zhu, Hao Tian, Hua Wu:
+ERNIE: Enhanced Representation through Knowledge Integration. CoRR abs/1904.09223 (2019)
+
+[5] Xiao, Dongling, Yu-Kun Li, Han Zhang, Yu Sun, Hao Tian, Hua Wu, and Haifeng Wang. “ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding.” ArXiv:2010.12148 [Cs].
+
