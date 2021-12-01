@@ -45,6 +45,7 @@ MAPPING_NAMES = OrderedDict([
     ("ErnieCtm", "ernie_ctm"),
     ("ErnieDoc", "ernie_doc"),
     ("ErnieGram", "ernie_gram"),
+    ("ErnieGen", "ernie_gen"),
     ("Ernie", "ernie"),
     ("GPT", "gpt"),
     ("LayoutXLM", "layoutxlm"),
@@ -61,7 +62,6 @@ MAPPING_NAMES = OrderedDict([
     ("UNIMO", "unimo"),
     ("UnifiedTransformer", "unified_transformer"),
     ("XLNet", "xlnet"),
-    ("ErnieGen", "ernie_gen"),
 ])
 
 # Base model mapping
@@ -155,7 +155,11 @@ def get_configurations():
         import_class = importlib.import_module(
             f"paddlenlp.transformers.{class_name}.modeling")
         model_name = getattr(import_class, key + 'Model')
-        name = tuple(model_name.pretrained_init_configuration.keys())
+        if key == 'ErnieGen':
+            name = tuple(
+                model_name.ernie_gen_pretrained_init_configuration.keys())
+        else:
+            name = tuple(model_name.pretrained_init_configuration.keys())
         CONFIGURATION_MODEL_MAPPING[name] = key + 'Model'
 
     return CONFIGURATION_MODEL_MAPPING
