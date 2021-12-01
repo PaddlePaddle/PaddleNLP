@@ -1,7 +1,7 @@
 # In-batch negatives
 
-
 ## 数据准备
+
 ### 数据生成
 我们基于万方的语义匹配数据集构造生成了面向语义索引的训练集、评估集、召回库。
 
@@ -35,11 +35,8 @@ python generate_recall.py
 ## 代码结构及说明
 ```
 |—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
-|—— train_hardest_neg.py # HardestNeg 策略的训练主脚本
 |—— batch_negative
     |—— model.py # In-batch negatives 策略核心网络结构
-|——hardest_negative
-    |—— model.py # HardestNeg 策略核心网络结构
 |—— ann_util.py # Ann 建索引库相关函数
 |—— base_model.py # 语义索引模型基类
 |—— data.py # 数据读取、数据转换等预处理逻辑
@@ -93,7 +90,7 @@ sh train_batch_neg.sh
 2. 召回
 基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 1 步中建立的索引库中进行 ANN 查询召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
-3. 评估： 基于评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv) 和召回结果 `recall_result` 计算评估指标 Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50
+3. 评估： 基于评估集和召回结果 `recall_result` 计算评估指标 Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
@@ -151,10 +148,7 @@ bash evaluate.sh
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 
-成功运行结束后，会输出如下评估指标, 分别为 R@10 和 R@50
-```
-51.2    67.242
-```
+
 
 ## 开始预测
 我们可以基于语义索引模型抽取文本的语义向量或者计算文本 Pair 的语义相似度，我们以计算文本 Pair 的语义相似度为例:
@@ -187,10 +181,28 @@ python -u -m paddle.distributed.launch --gpus "0" \
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `text_pair_file`: 由文本 Pair 构成的待预测数据集
 
+## PaddleInference
 
+首先把动态图模型转换为静态图：
 
+```
+python export_model.py --params_path checkpoints/train_0.001/model_40/model_state.pdparams --output_path=./output
+```
+也可以运行下面的bash脚本：
 
+```
+sh export.sh
+```
+然后使用PaddleInference
 
+```
+python deploy/python/predict.py --model_dir=./output
+```
+也可以运行下面的bash脚本：
+
+```
+sh deploy.sh
+```
 
 ## Reference
 
