@@ -29,6 +29,7 @@ from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
+from .dialogue import DialogueTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -176,6 +177,17 @@ TASKS = {
         },
         "default": {
             "model": "simbert-base-chinese"
+        }
+    },
+    'dialogue': {
+        "models": {
+            "plato-mini": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-plato-mini"
+            },
+        },
+        "default": {
+            "model": "plato-mini"
         }
     },
 }
