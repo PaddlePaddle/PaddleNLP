@@ -118,6 +118,6 @@ if __name__ == "__main__":
     text_embedding=all_embeddings[0]
     print(text_embedding.shape)
     print(text_embedding)
-    search_in_milvus(text_embedding)
+    # search_in_milvus(text_embedding)
     
 

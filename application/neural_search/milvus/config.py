@@ -15,7 +15,6 @@
 import os
 from milvus import MetricType, IndexType
 
-# MILVUS_HOST = '10.21.226.177'
 MILVUS_HOST='10.21.226.173'
 MILVUS_PORT = 8530
 

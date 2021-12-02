@@ -13,7 +13,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase,SemanticIndexBaseStatic
+from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index

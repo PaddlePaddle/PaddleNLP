@@ -226,9 +226,12 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 ....
 ```
 
-数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索：
+数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索，milvus的详细代码请参考：
+
+[milvus](./milvus/)
 
 我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1版本，搭建完以后启动milvus
+
 
 ```
 cd [Milvus root path]/core/milvus
@@ -258,7 +261,13 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --corpus_file "data/milvus_data.csv" 
 ```
 
-然后把向量插入到Milvus库中：
+修改config.py的配置ip：
+
+```
+MILVUS_HOST='your milvus ip'
+```
+
+然后运行下面的命令把向量插入到Milvus库中：
 
 ```
 python3 embedding_insert.py
@@ -310,14 +319,14 @@ python3 inference.py
 
 |  训练集 | 测试集 | 
 | ------------ | ------------ | 
- |  59849| 29924 |
+ |  1874103| 56793 |
 
 
 排序阶段的效果评估：
 
 |  模型 |  AUC |
 | ------------ | ------------ |
-|  ERNIE-Gram |  0.637 | 
+|  ERNIE-Gram |  0.801 | 
 
 ## Reference
 
@@ -332,4 +341,3 @@ ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Nat
 ERNIE: Enhanced Representation through Knowledge Integration. CoRR abs/1904.09223 (2019)
 
 [5] Xiao, Dongling, Yu-Kun Li, Han Zhang, Yu Sun, Hao Tian, Hua Wu, and Haifeng Wang. “ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding.” ArXiv:2010.12148 [Cs].
-
