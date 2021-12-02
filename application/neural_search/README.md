@@ -142,8 +142,8 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 | ------------ | ------------ |
 |召回方案一|SimCSE|
 |召回方案二|In-batch Negative|
-|召回方案三（优化）|Post-Training+SimCSE|
-|召回方案四|SimCSE|Post-Training+SimCSE+In-batch Negative|
+|召回方案三|SimCSE+In-batch Negative|
+|召回方案四|Post-Training+SimCSE+In-batch Negative|
 
 
 第一步：Post-Training
