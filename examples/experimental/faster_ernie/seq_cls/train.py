@@ -136,6 +136,7 @@ def do_train():
 
     global_step = 0
     tic_train = time.time()
+    total_train_time = 0
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
@@ -150,13 +151,6 @@ def do_train():
             metric.update(correct)
             acc = metric.accumulate()
 
-            global_step += 1
-            if global_step % 10 == 0:
-                print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc,
-                       10 / (time.time() - tic_train)))
-                tic_train = time.time()
             if args.use_amp:
                 scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
@@ -165,12 +159,24 @@ def do_train():
                 optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
+
+            global_step += 1
+            if global_step % 10 == 0:
+                time_diff = time.time() - tic_train
+                total_train_time += time_diff
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, acc, 10 / (time_diff)))
+                tic_train = time.time()
             if global_step % 100 == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
                 model.save_pretrained(save_dir)
+                tic_train = time.time()
+
+    print("Speed: %.2f steps/s" % (global_step / (total_train_time)))
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ seq_cls/
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python train.py --device gpu --save_dir checkpoints/ --batch_size 32 --max_seq_length 128
+python train.py --device gpu --save_dir checkpoints/ --batch_size 32 --max_seq_length 128 --use_amp False
 ```
 
 可支持配置的参数：
@@ -60,6 +60,7 @@ python train.py --device gpu --save_dir checkpoints/ --batch_size 32 --max_seq_l
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。
+* `use_amp`: 是否使用混合精度训练，默认为False。
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
