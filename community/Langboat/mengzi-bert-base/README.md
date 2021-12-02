@@ -12,8 +12,8 @@
 #使用示例：
 ```python
 from paddlenlp import BertForMaskedLM, BertTokenizer
-tokenizer = BertTokenizer.from_pretrained('huhuiwen/mengzi-bert-base')
-model = BertForMaskedLM.from_pretrained('huhuiwen/mengzi-bert-base')
+tokenizer = BertTokenizer.from_pretrained('Langboat/mengzi-bert-base')
+model = BertForMaskedLM.from_pretrained('Langboat/mengzi-bert-base')
 
 
 tokens = ['[CLS]', '我', '的', '[MASK]','很', '可', '爱','。', '[SEP]']
