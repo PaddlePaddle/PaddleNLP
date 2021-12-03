@@ -786,12 +786,18 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decode_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -812,7 +818,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6):
+                length_penalty=0.6,
+                early_stopping=False,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -885,7 +893,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             temperature=temperature,
             length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=True)
+            pos_bias=True,
+            early_stopping=early_stopping)
 
     generate = forward
 
@@ -951,12 +960,18 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decode_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -977,7 +992,9 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6):
+                length_penalty=0.6,
+                early_stopping=False,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -1049,7 +1066,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature,
             length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=False)
+            pos_bias=False,
+            early_stopping=early_stopping)
 
     generate = forward
 
@@ -1101,6 +1119,7 @@ class FasterBART(BartPretrainedModel):
                 diversity_rate=0.0,
                 length_penalty=0.6,
                 num_return_sequences=1,
+                early_stopping=False,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -1148,6 +1167,7 @@ class FasterBART(BartPretrainedModel):
             top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,
-            alpha=length_penalty)
+            alpha=length_penalty,
+            early_stopping=early_stopping)
 
     generate = forward
