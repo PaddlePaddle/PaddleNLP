@@ -22,9 +22,14 @@ from paddlenlp.ops.einsum import *
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "XLNetPretrainedModel", "XLNetModel", "XLNetForSequenceClassification",
-    "XLNetForTokenClassification", "XLNetLMHeadModel", "XLNetForMultipleChoice",
-    "XLNetForQuestionAnswering"
+    "XLNetPretrainedModel",
+    "XLNetModel",
+    "XLNetForSequenceClassification",
+    "XLNetForTokenClassification",
+    "XLNetLMHeadModel",
+    "XLNetForMultipleChoice",
+    "XLNetForQuestionAnswering",
+    "XLNetForCausalLM",
 ]
 
 dtype_float = paddle.get_default_dtype()
@@ -1858,3 +1863,6 @@ class XLNetForQuestionAnswering(XLNetPretrainedModel):
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
         return start_logits, end_logits
+
+
+XLNetForCausalLM = XLNetLMHeadModel

@@ -59,29 +59,36 @@ class NERTask(WordTagTask):
 
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
-        for i, pred_tags in enumerate(batch_pred_tags):
-            pred_words, pred_word = [], []
-            text = batch_texts[i]
-            for j, tag in enumerate(pred_tags[self.summary_num:-1]):
-                if j >= len(text):
-                    break
-                pred_label = self._index_to_tags[tag]
-                if pred_label.find("-") != -1:
-                    _, label = pred_label.split("-")
-                else:
-                    label = pred_label
-                if pred_label.startswith("S") or pred_label.startswith("O"):
-                    pred_words.append({"item": text[j], "wordtag_label": label})
-                else:
-                    pred_word.append(text[j])
-                    if pred_label.startswith("E"):
-                        pred_words.append({
-                            "item": "".join(pred_word),
-                            "wordtag_label": label
-                        })
-                        del pred_word[:]
+        for sent_index in range(len(batch_texts)):
+            tags = [
+                self._index_to_tags[index]
+                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+            ]
+            sent = batch_texts[sent_index]
+            
+            sent_out = []
+            tags_out = []
+            partial_word = ""
+            for ind, tag in enumerate(tags):
+                if partial_word == "":
+                    partial_word = sent[ind]
+                    tags_out.append(tag.split('-')[1])
+                    continue
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                    sent_out.append(partial_word)
+                    tags_out.append(tag.split('-')[1])
+                    partial_word = sent[ind]
+                    continue
+                partial_word += sent[ind]
 
-            result = {"text": text, "items": pred_words}
+            if len(sent_out) < len(tags_out):
+                sent_out.append(partial_word)
+
+            pred_words = []
+            for s, t in zip(sent_out, tags_out):
+                pred_words.append({"item": s, "wordtag_label": t})
+
+            result = {"text": sent, "items": pred_words}
             batch_results.append(result)
         return batch_results
 
