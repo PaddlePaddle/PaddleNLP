@@ -24,6 +24,7 @@ __all__ = [
     "UnifiedTransformerPretrainedModel",
     'UnifiedTransformerModel',
     'UnifiedTransformerLMHeadModel',
+    'UnifiedTransformerForMaskedLM',
 ]
 
 
@@ -530,3 +531,6 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+UnifiedTransformerForMaskedLM = UnifiedTransformerLMHeadModel

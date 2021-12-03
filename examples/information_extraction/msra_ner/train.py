@@ -28,13 +28,23 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
+from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.utils.log import logger
+
+MODEL_CLASSES = {
+    "bert": (BertForTokenClassification, BertTokenizer),
+    "ernie": (ErnieForTokenClassification, ErnieTokenizer),
+    "ernie-ctm": (ErnieCtmForTokenClassification, ErnieCtmTokenizer)
+}
 
 parser = argparse.ArgumentParser()
 
 # yapf: disable
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument("--model_type", default="bert", type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()), )
+parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join( sum([ list(classes[-1].pretrained_init_configuration.keys())  for classes in MODEL_CLASSES.values() ], [])), )
+parser.add_argument("--dataset", default="msra_ner", type=str, choices=["msra_ner", "peoples_daily_ner"] ,help="The named entity recognition datasets.")
 parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
@@ -53,7 +63,7 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", 
 
 
 @paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader, label_num):
+def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
     model.eval()
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
@@ -68,8 +78,8 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
-          (avg_loss, precision, recall, f1_score))
+    print("%s: eval loss: %f, precision: %f, recall: %f, f1: %f" %
+          (mode, avg_loss, precision, recall, f1_score))
     model.train()
 
 
@@ -98,11 +108,15 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, test_ds = load_dataset(
-        'msra_ner', splits=('train', 'test'), lazy=False)
+    if args.dataset == "peoples_daily_ner":
+        train_ds, dev_ds, test_ds = load_dataset(
+            args.dataset, splits=('train', 'dev', 'test'), lazy=False)
+    else:
+        train_ds, test_ds = load_dataset(
+            args.dataset, splits=('train', 'test'), lazy=False)
 
-    tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
-    #tokenizer = ErnieCtmTokenizer.from_pretrained("ernie-ctm")
+    AutoForTokenClassification, AutoTokenizer = MODEL_CLASSES[args.model_type]
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     label_list = train_ds.label_list
     label_num = len(label_list)
@@ -144,11 +158,20 @@ def do_train(args):
         batch_size=args.batch_size,
         return_list=True)
 
+    if args.dataset == "peoples_daily_ner":
+        dev_ds = dev_ds.map(trans_func)
+
+        dev_data_loader = DataLoader(
+            dataset=dev_ds,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            batch_size=args.batch_size,
+            return_list=True)
+
     # Define the model netword and its loss
-    model = BertForTokenClassification.from_pretrained(
+    model = AutoForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
-    #model = ErnieCtmForTokenClassification.from_pretrained(
-    #    args.model_name_or_path, num_classes=label_num)
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -197,8 +220,12 @@ def do_train(args):
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if paddle.distributed.get_rank() == 0:
+                    if args.dataset == "peoples_daily_ner":
+                        evaluate(model, loss_fct, metric, dev_data_loader,
+                                 label_num, "valid")
                     evaluate(model, loss_fct, metric, test_data_loader,
-                             label_num)
+                             label_num, "test")
+
                     paddle.save(model.state_dict(),
                                 os.path.join(args.output_dir,
                                              "model_%d.pdparams" % global_step))
@@ -206,4 +233,7 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
     do_train(args)
