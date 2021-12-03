@@ -81,4 +81,5 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const float& len_penalty,
     const bool& normalize_before,
     const bool& pos_bias,
-    const std::string& hidden_act);
+    const std::string& hidden_act,
+    const bool& early_stopping);
