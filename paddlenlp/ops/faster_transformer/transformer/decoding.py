@@ -862,17 +862,9 @@ class InferGptDecoding(nn.Layer):
                 max_out_len=256,
                 temperature=1):
         if attention_mask is None:
-            if in_dygraph_mode():
-                attention_mask = paddle.zeros(
-                    [],
-                    dtype="float16" if self.use_fp16_decoding else
-                    "float32") if attention_mask is None else attention_mask
-            else:
-                # A better way? 
-                attention_mask = paddle.static.data(
-                    name="attention_mask",
-                    shape=[],
-                    dtype="float16" if self.use_fp16_decoding else "float32")
+            batch_size = paddle.shape(input_ids)[0]
+            attention_mask = paddle.tril(
+                paddle.ones([batch_size, mem_seq_len, mem_seq_len]))
 
         output_ids = infer_gpt_decoding(
             input=[input_ids],
