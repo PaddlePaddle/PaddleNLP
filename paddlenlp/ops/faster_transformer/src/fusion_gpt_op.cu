@@ -97,7 +97,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
   decoding_params.request_batch_size = batch_size_;
   decoding_params.max_input_len = start_len;
   decoding_params.request_input_len = start_len;
-  decoding_params.request_output_len = max_len;
+  decoding_params.request_output_len = max_len - start_len;
 
   decoding_params.d_start_ids = input.data<int>();
   decoding_params.d_attn_mask =
@@ -107,7 +107,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
   gpt_decoding =
       new DecodingGpt<DecodingTraits_::OpType>(allocator_,
                                                batch_size_,
-                                               max_len + start_len,
+                                               max_len,
                                                n_head,
                                                size_per_head,
                                                vocab_size,
