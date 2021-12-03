@@ -23,7 +23,11 @@ import paddle.nn.functional as F
 
 
 class SemanticIndexBase(nn.Layer):
-    def __init__(self, pretrained_model, dropout=None, output_emb_size=None):
+    def __init__(self,
+                 pretrained_model,
+                 dropout=None,
+                 output_emb_size=None,
+                 use_fp16=False):
         super().__init__()
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
@@ -39,13 +43,37 @@ class SemanticIndexBase(nn.Layer):
             self.emb_reduce_linear = paddle.nn.Linear(
                 768, output_emb_size, weight_attr=weight_attr)
 
+        self.use_fp16 = use_fp16
+
     def get_pooled_embedding(self,
                              input_ids,
                              token_type_ids=None,
                              position_ids=None,
                              attention_mask=None):
-        _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
-                                    attention_mask)
+
+        if self.use_fp16:
+            if attention_mask is None:
+                attention_mask = paddle.unsqueeze(
+                    (input_ids == self.ptm.pad_token_id
+                     ).astype(self.ptm.pooler.dense.weight.dtype) * -1e4,
+                    axis=[1, 2])
+
+            embedding_output = self.ptm.embeddings(
+                input_ids=input_ids,
+                position_ids=position_ids,
+                token_type_ids=token_type_ids)
+
+            embedding_output = paddle.cast(embedding_output, 'float16')
+            attention_mask = paddle.cast(attention_mask, 'float16')
+
+            encoder_outputs = self.ptm.encoder(embedding_output, attention_mask)
+
+            if self.use_fp16:
+                encoder_outputs = paddle.cast(encoder_outputs, 'float32')
+            cls_embedding = self.ptm.pooler(encoder_outputs)
+        else:
+            _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
+                                        attention_mask)
 
         if self.output_emb_size > 0:
             cls_embedding = self.emb_reduce_linear(cls_embedding)

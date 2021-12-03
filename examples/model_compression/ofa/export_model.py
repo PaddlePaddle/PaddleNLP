@@ -35,6 +35,47 @@ from paddleslim.nas.ofa.layers import BaseBlock
 MODEL_CLASSES = {"bert": (BertForSequenceClassification, BertTokenizer), }
 
 
+def bert_forward(self,
+                 input_ids,
+                 token_type_ids=None,
+                 position_ids=None,
+                 attention_mask=None,
+                 output_hidden_states=False):
+    wtype = self.pooler.dense.fn.weight.dtype if hasattr(
+        self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
+    if attention_mask is None:
+        attention_mask = paddle.unsqueeze(
+            (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
+    else:
+        if attention_mask.ndim == 2:
+            # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+
+    embedding_output = self.embeddings(
+        input_ids=input_ids,
+        position_ids=position_ids,
+        token_type_ids=token_type_ids)
+    if output_hidden_states:
+        output = embedding_output
+        encoder_outputs = []
+        for mod in self.encoder.layers:
+            output = mod(output, src_mask=attention_mask)
+            encoder_outputs.append(output)
+        if self.encoder.norm is not None:
+            encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+        pooled_output = self.pooler(encoder_outputs[-1])
+    else:
+        sequence_output = self.encoder(embedding_output, attention_mask)
+        pooled_output = self.pooler(sequence_output)
+    if output_hidden_states:
+        return encoder_outputs, pooled_output
+    else:
+        return sequence_output, pooled_output
+
+
+BertModel.forward = bert_forward
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -113,14 +154,15 @@ def do_train(args):
     config_path = os.path.join(args.model_name_or_path, 'model_config.json')
     cfg_dict = dict(json.loads(open(config_path).read()))
 
+    kept_layers_index = {}
     if args.depth_mult < 1.0:
-        depth = round(cfg_dict["init_args"][0]['num_hidden_layers'] * args.depth_mult)
-        cfg_dict["init_args"][0]['num_hidden_layers'] = depth 
-        kept_layers_index = {}
-        for idx, i in enumerate(range(1, depth+1)):
+        depth = round(cfg_dict["init_args"][0]['num_hidden_layers'] *
+                      args.depth_mult)
+        cfg_dict["init_args"][0]['num_hidden_layers'] = depth
+        for idx, i in enumerate(range(1, depth + 1)):
             kept_layers_index[idx] = math.floor(i / args.depth_mult) - 1
 
-    os.rename(config_path, config_path+'_bak')
+    os.rename(config_path, config_path + '_bak')
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(cfg_dict, ensure_ascii=False))
 
@@ -132,7 +174,7 @@ def do_train(args):
     origin_model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
 
-    os.rename(config_path+'_bak', config_path)
+    os.rename(config_path + '_bak', config_path)
 
     sp_config = supernet(expand_ratio=[1.0, args.width_mult])
     model = Convert(sp_config).convert(model)
@@ -142,15 +184,24 @@ def do_train(args):
     sd = paddle.load(
         os.path.join(args.model_name_or_path, 'model_state.pdparams'))
 
-    for name, params in ofa_model.model.named_parameters():
-        if 'encoder' not in name:
-            params.set_value(sd[name])
-        else:
-            idx = int(name.strip().split('.')[3])
-            mapping_name = name.replace('.'+str(idx)+'.', '.'+str(kept_layers_index[idx])+'.')
-            params.set_value(sd[mapping_name])
+    if len(kept_layers_index) == 0:
+        ofa_model.model.set_state_dict(sd)
+    else:
+        for name, params in ofa_model.model.named_parameters():
+            if 'encoder' not in name:
+                params.set_value(sd[name])
+            else:
+                idx = int(name.strip().split('.')[3])
+                mapping_name = name.replace(
+                    '.' + str(idx) + '.',
+                    '.' + str(kept_layers_index[idx]) + '.')
+                params.set_value(sd[mapping_name])
 
     best_config = utils.dynabert_config(ofa_model, args.width_mult)
+    for name, sublayer in ofa_model.model.named_sublayers():
+        if isinstance(sublayer, paddle.nn.MultiHeadAttention):
+            sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
+
     ofa_model.export(
         best_config,
         input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],

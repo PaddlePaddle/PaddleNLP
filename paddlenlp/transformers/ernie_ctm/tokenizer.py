@@ -28,7 +28,11 @@ __all__ = ['ErnieCtmTokenizer']
 
 class ErnieCtmTokenizer(PretrainedTokenizer):
     r"""
-    Construct a ERNIE-CTM tokenizer.
+    Construct an ERNIE-CTM tokenizer.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
     
     Args:
         vocab_file (str):
@@ -78,7 +82,9 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             "ernie-ctm":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
             "wordtag":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "nptag":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -89,7 +95,11 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         "wordtag": {
             "do_lower_case": True,
             "cls_num": 2
-        }
+        },
+        "nptag": {
+            "do_lower_case": True,
+            "cls_num": 2
+        },
     }
 
     def __init__(self,

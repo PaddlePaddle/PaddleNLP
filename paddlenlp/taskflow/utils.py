@@ -19,6 +19,8 @@ import json
 import warnings
 import contextlib
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import paddle
 from paddle.dataset.common import md5file
 from ..utils.log import logger
@@ -43,12 +45,14 @@ def download_file(save_dir, filename, url, md5=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
-    logger.disable()
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
+            logger.disable()
             get_path_from_url(url, save_dir, md5)
     else:
+        logger.info("Downloading {} from {}".format(filename, url))
+        logger.disable()
         get_path_from_url(url, save_dir, md5)
     logger.enable()
     return fullname
@@ -499,3 +503,219 @@ class TermTree(object):
                 node = self[nid]
                 if node.node_type == "term":
                     print(node, file=fp)
+
+
+def levenstein_distance(s1: str, s2: str) -> int:
+    """Calculate minimal Levenstein distance between s1 and s2.
+
+    Args:
+        s1 (str): string
+        s2 (str): string
+
+    Returns:
+        int: the minimal distance.
+    """
+    m, n = len(s1) + 1, len(s2) + 1
+    
+    # Initialize
+    dp = [[0] * n for i in range(m)]
+    dp[0][0] = 0
+    for i in range(1, m):
+        dp[i][0] = dp[i - 1][0] + 1
+    for j in range(1, n):
+        dp[0][j] = dp[0][j - 1] + 1
+
+    for i in range(1, m):
+        for j in range(1, n):
+            if s1[i - 1] != s2[j - 1]:
+                dp[i][j] = min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1
+            else:
+                dp[i][j] = dp[i - 1][j - 1]
+    return dp[m - 1][n - 1]
+
+
+class BurkhardKellerNode(object):
+    """Node implementatation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
+
+    Args:
+        word (str): word of current node.
+    """
+
+    def __init__(self, word: str):
+        self.word = word
+        self.next = {}
+
+
+class BurkhardKellerTree(object):
+    """Implementataion of BK-Tree
+    """
+
+    def __init__(self):
+        self.root = None
+        self.nodes = {}
+
+    def __add(self, cur_node: BurkhardKellerNode, word: str):
+        """Insert a word into current tree. If tree is empty, set this word to root.
+
+        Args:
+            word (str): word to be inserted.
+        """
+        if self.root is None:
+            self.root = BurkhardKellerNode(word)
+            return
+        if word in self.nodes:
+            return
+        dist = levenstein_distance(word, cur_node.word)
+        if dist not in cur_node.next:
+            self.nodes[word] = cur_node.next[dist] = BurkhardKellerNode(word)
+        else:
+            self.__add(cur_node.next[dist], word)
+
+    def add(self, word: str):
+        """Insert a word into current tree. If tree is empty, set this word to root.
+
+        Args:
+            word (str): word to be inserted.
+        """
+        return self.__add(self.root, word)
+
+    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
+        res = []
+        if cur_node is None:
+            return res
+        dist = levenstein_distance(cur_node.word, s)
+        if dist <= threshold:
+            res.append((cur_node.word, dist))
+        start = max(dist - threshold, 1)
+        while start < dist + threshold:
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
+            res.extend(tmp_res)
+            start += 1
+        return res
+
+    def search_similar_word(self, word: str) -> List[str]:
+        """Search the most similar (minimal levenstain distance) word between `s`.
+
+        Args:
+            s (str): target word
+
+        Returns:
+            List[str]: similar words.
+        """
+        res = self.__search_similar_word(self.root, word)
+
+        def max_prefix(s1: str, s2: str) -> int:
+            res = 0
+            length = min(len(s1), len(s2))
+            for i in range(length):
+                if s1[i] == s2[i]:
+                    res += 1
+                else:
+                    break
+            return res
+
+        res.sort(key=lambda d: (d[1], -max_prefix(d[0], word)))
+        return res
+
+
+class TriedTree(object):
+    """Implementataion of TriedTree
+    """
+
+    def __init__(self):
+        self.tree = {}
+        
+    def add_word(self, word):
+        """add single word into TriedTree"""
+        self.tree[word] = len(word)
+        for i in range(1,len(word)):
+            wfrag = word[:i]
+            self.tree[wfrag] = self.tree.get(wfrag, None)
+
+    def search(self, content):
+        """Backward maximum matching
+
+        Args:
+            content (str): string to be searched
+        Returns:
+            List[Tuple]: list of maximum matching words, each element represents 
+                the starting and ending position of the matching string.
+        """
+        result = []
+        length = len(content)
+        for start in range(length):
+            for end in range(start+1, length+1):
+                pos = self.tree.get(content[start:end], -1)
+                if pos == -1:
+                    break
+                if pos and (len(result)==0 or end > result[-1][1]):
+                    result.append((start, end))
+        return result
+
+
+class Customization(object):
+    """
+    User intervention based on Aho-Corasick automaton
+    """
+
+    def __init__(self):
+        self.dictitem = {}
+        self.ac = None
+
+    def load_customization(self, filename, sep=None):
+        """Load the custom vocab"""
+        self.ac = TriedTree()
+        with open(filename, 'r', encoding='utf8') as f:
+            for line in f:
+                if sep == None:
+                    words = line.strip().split()
+                else:
+                    sep = strdecode(sep)
+                    words = line.strip().split(sep)
+
+                if len(words) == 0:
+                    continue
+
+                phrase = ""
+                tags = []
+                offset = []
+                for word in words:
+                    if word.rfind('/') < 1:
+                        phrase += word
+                        tags.append('')
+                    else:
+                        phrase += word[:word.rfind('/')]
+                        tags.append(word[word.rfind('/') + 1:])
+                    offset.append(len(phrase))
+
+                if len(phrase) < 2 and tags[0] == '':
+                    continue
+
+                self.dictitem[phrase] = (tags, offset)
+                self.ac.add_word(phrase)
+
+    def parse_customization(self, query, lac_tags):
+        """Use custom vocab to modify the lac results"""
+        if not self.ac:
+            logging.warning("customization dict is not load")
+            return
+        ac_res = self.ac.search(query)
+
+        for begin, end in ac_res:
+            phrase = query[begin:end]
+            index = begin
+
+            tags, offsets = self.dictitem[phrase]
+            for tag, offset in zip(tags, offsets):
+                while index < begin + offset:
+                    if len(tag) == 0:
+                        lac_tags[index] = lac_tags[index][:-1] + 'I'
+                    else:
+                        lac_tags[index] = tag + "-I"
+                    index += 1
+
+            lac_tags[begin] = lac_tags[begin][:-1] + 'B'
+            for offset in offsets:
+                index = begin + offset
+                if index < len(lac_tags):
+                    lac_tags[index] = lac_tags[index][:-1] + 'B'

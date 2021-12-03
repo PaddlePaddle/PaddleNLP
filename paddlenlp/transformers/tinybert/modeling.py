@@ -29,11 +29,11 @@ __all__ = [
 
 class TinyBertPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained TinyBERT models. It provides TinyBERT
-    related `model_config_file`, `resource_files_names`,
-    `pretrained_resource_files_map`, `pretrained_init_configuration`,
-    `base_model_prefix` for downloading and loading pretrained models. See
-    `PretrainedModel` for more details.
+    An abstract class for pretrained TinyBERT models. It provides TinyBERT related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -162,7 +162,7 @@ class TinyBertPretrainedModel(PretrainedModel):
 @register_base_model
 class TinyBertModel(TinyBertPretrainedModel):
     """
-    The bare TinyBert Model transformer outputting raw hidden-states without any specific head on top.
+    The bare TinyBert Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -396,8 +396,8 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
     """
-    TinyBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    TinyBert Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         tinybert (:class:`TinyBertModel`):

@@ -20,6 +20,7 @@ import os
 import random
 import time
 import h5py
+import yaml
 import distutils.util
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
@@ -475,4 +476,5 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
+    print (args)
     do_train(args)

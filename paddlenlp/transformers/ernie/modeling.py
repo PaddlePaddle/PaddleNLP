@@ -92,8 +92,8 @@ class ErniePooler(nn.Layer):
 class ErniePretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained ERNIE models. It provides ERNIE related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. 
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
@@ -290,7 +290,8 @@ class ErnieModel(ErniePretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0,
-            weight_attr=weight_attr, )
+            weight_attr=weight_attr,
+            normalize_before=False)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
@@ -372,6 +373,7 @@ class ErnieModel(ErniePretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
+
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
@@ -657,8 +659,8 @@ class ErniePretrainingHeads(nn.Layer):
 
 class ErnieForPretraining(ErniePretrainedModel):
     r"""
-    Ernie Model with two heads on top as done during the pretraining:
-    a `masked language modeling` head and a `next sentence prediction (classification)` head.
+    Ernie Model with a `masked language modeling` head and a `sentence order prediction` head
+    on top.
 
     """
 

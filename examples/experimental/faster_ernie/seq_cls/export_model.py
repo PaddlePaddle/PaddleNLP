@@ -21,7 +21,7 @@ from paddlenlp.experimental import FasterErnieForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_path", type=str, default="checkpoint/model_900", help="The path to model parameters to be loaded.")
+parser.add_argument("--save_dir", type=str, default="ckpt/model_900", help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -31,6 +31,6 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = FasterErnieForSequenceClassification.from_pretrained(args.save_path)
+    model = FasterErnieForSequenceClassification.from_pretrained(args.save_dir)
     save_path = os.path.join(args.output_path, "inference")
     model.to_static(save_path)
