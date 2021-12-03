@@ -217,6 +217,7 @@ class BeamSearchScorer(object):
                  final_beam_scores,
                  final_beam_tokens,
                  final_beam_indices,
+                 origin_len=0,
                  pad_token_id=None,
                  eos_token_id=None):
         batch_size = len(self._beam_hyps)
@@ -232,7 +233,7 @@ class BeamSearchScorer(object):
                 batch_beam_idx = batch_idx * self.num_beams + beam_id
                 final_score = final_beam_scores[batch_beam_idx].numpy().item()
                 final_tokens = input_ids[batch_beam_idx]
-                beam_hyp.add(final_tokens, final_score)
+                beam_hyp.add(final_tokens, final_score, origin_len=origin_len)
 
         # select the best hypotheses
         sent_lengths = paddle.zeros(
@@ -362,34 +363,36 @@ class GenerationMixin(object):
                                      expand_size,
                                      attention_mask=None,
                                      **model_kwargs):
-        index = paddle.tile(
-            paddle.arange(input_ids.shape[0]).unsqueeze(-1),
-            [1, expand_size]).reshape([-1])
+        index = []
+        for i in range(input_ids.shape[0]):
+            index += [i] * expand_size
 
-        input_ids = paddle.index_select(input_ids, index)
+        #TODO Change back to index_select
+        input_ids = paddle.stack([input_ids[i] for i in index], axis=0)
 
         if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.index_select(attention_mask,
-                                                                 index)
+            model_kwargs["attention_mask"] = paddle.stack(
+                [attention_mask[i] for i in index], axis=0)
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.index_select(token_type_ids,
-                                                                 index)
+            model_kwargs["token_type_ids"] = paddle.stack(
+                [token_type_ids[i] for i in index], axis=0)
 
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.index_select(position_ids,
-                                                               index)
+            model_kwargs["position_ids"] = paddle.stack(
+                [position_ids[i] for i in index], axis=0)
 
         if "seq_len" in model_kwargs:
             seq_len = model_kwargs["seq_len"]
-            model_kwargs["seq_len"] = paddle.index_select(seq_len, index)
+            model_kwargs["seq_len"] = paddle.stack(
+                [seq_len[i] for i in index], axis=0)
 
         if "encoder_output" in model_kwargs:
             encoder_output = model_kwargs["encoder_output"]
-            model_kwargs["encoder_output"] = paddle.index_select(encoder_output,
-                                                                 index)
+            model_kwargs["encoder_output"] = paddle.stack(
+                [encoder_output[i] for i in index], axis=0)
 
         return input_ids, model_kwargs
 
@@ -464,6 +467,9 @@ class GenerationMixin(object):
 
             model_kwargs["encoder_output"] = encoder(input_ids,
                                                      **encoder_kwargs)
+            #print(input_ids)
+            #print(encoder_kwargs)
+            #print(model_kwargs["encoder_output"])                                         
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self,
@@ -513,11 +519,6 @@ class GenerationMixin(object):
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
-            )
-        if kwargs['early_stopping'] != False:
-            # not support for early_stopping yet in the faster version
-            raise AttributeError(
-                "'early_stopping != False' is not supported yet in the faster version"
             )
         if kwargs['forced_eos_token_id'] is not None:
             # not support for forced_eos_token_id yet in the faster version
@@ -979,7 +980,8 @@ class GenerationMixin(object):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-
+            #print("logits",logits)
+            #print(logits[0][464],logits[0][912])
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
@@ -995,6 +997,8 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
             next_tokens = paddle.multinomial(probs)
+            #print("next_tokens",next_tokens)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1042,6 +1046,7 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                               **model_kwargs)
+
             outputs = self(**model_inputs)
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
@@ -1071,22 +1076,22 @@ class GenerationMixin(object):
             else:
                 next_scores, next_tokens = paddle.topk(
                     next_scores, 2 * num_beams, axis=1)
-
+                #print(next_scores)
                 sibling_score = paddle.arange(
                     1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
-
+                #print(sibling_score)
                 diversed_score = next_scores - sibling_score
-
+                #print(diversed_score)
                 next_scores = next_scores.reshape(
                     [batch_size, 2 * num_beams * num_beams])
                 next_tokens = next_tokens.reshape(
                     [batch_size, 2 * num_beams * num_beams])
-
+                print("next_tokens before", next_tokens)
                 diversed_score = diversed_score.reshape(
                     [batch_size, 2 * num_beams * num_beams])
                 diversed_score, diversed_tokens = paddle.topk(
                     diversed_score, 2 * num_beams, axis=1)
-
+                print("diversed_tokens", diversed_tokens)
                 # TODO
                 # Use gather_nd() to select origan token and score
                 next_scores = paddle.stack([
@@ -1097,7 +1102,7 @@ class GenerationMixin(object):
                     paddle.index_select(next_tokens[i], diversed_tokens[i])
                     for i in range(next_tokens.shape[0])
                 ])
-
+                print("next_tokens after", next_tokens)
                 next_indices = diversed_tokens // (2 * num_beams)
 
             # stateless
@@ -1138,6 +1143,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
@@ -1274,6 +1280,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores

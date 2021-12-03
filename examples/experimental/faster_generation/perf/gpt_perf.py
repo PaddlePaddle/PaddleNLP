@@ -21,17 +21,8 @@ import paddle
 import torch
 from paddlenlp.transformers import GPTLMHeadModel, GPTTokenizer
 from transformers import GPT2LMHeadModel as hf_gpt_model
-from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
 import numpy as np
-
-
-def prepare_input(tokenizer, sentences):
-    word_pad = Pad(tokenizer.pad_token_id, dtype="int64")
-    tokenized = tokenizer(sentences)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
-    input_ids = paddle.to_tensor(inputs)
-    return input_ids
 
 
 def parse_args():
@@ -83,15 +74,14 @@ def do_predict(args):
         [[bos_id] for i in range(4 * 1)]).astype("int64").reshape([4, 1])
     input_ids = paddle.to_tensor(input_ids_np)
     # Define model
-    print(input_ids)
-    num_loop = 100
+    num_loop = 1
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize(place)
-                start = time.perf_counter()
+            start = time.perf_counter()
             output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
@@ -104,14 +94,14 @@ def do_predict(args):
         paddle.device.cuda.synchronize(place)
         logger.info("Average test time for fast decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
-        print(output)
+    print(output)
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize(place)
-                start = time.perf_counter()
+            start = time.perf_counter()
             output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
@@ -124,7 +114,7 @@ def do_predict(args):
         paddle.device.cuda.synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
-        print(output)
+    print(output)
     device = torch.device("cuda:0")
     hf_model = hf_gpt_model.from_pretrained(args.model_name_or_path[:-3])
     hf_model.to(device)
@@ -132,7 +122,7 @@ def do_predict(args):
 
     hf_input_ids = torch.tensor(input_ids_np)
     hf_input_ids = hf_input_ids.to(device)
-    print(hf_input_ids)
+
     if args.decode_strategy == 'sampling':
         do_sample = True
     else:
@@ -141,7 +131,8 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                pass
+            start = time.time()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
@@ -152,7 +143,7 @@ def do_predict(args):
                 top_p=args.top_p)
         logger.info("Average test time for hf decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
-        print(output[:, 1:])
+    print(output)
 
 
 if __name__ == "__main__":

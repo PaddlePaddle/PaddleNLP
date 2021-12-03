@@ -75,7 +75,7 @@ def parse_args():
 
 def do_predict(args):
     place = "gpu"
-    paddle.set_device(place)
+    place = paddle.set_device(place)
 
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     model = BartForConditionalGeneration.from_pretrained(
@@ -92,37 +92,17 @@ def do_predict(args):
     input_ids = prepare_input(tokenizer, sentences)
 
     # Define model
-    faster_bart = model
-    faster_bart.eval()
+    model.eval()
 
-    num_loop = 100
+    num_loop = 1
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
-                start = time.perf_counter()
-            output, _ = faster_bart.generate(
-                input_ids=input_ids,
-                max_length=args.max_length,
-                decode_strategy=args.decode_strategy,
-                top_k=args.top_k,
-                top_p=args.top_p,
-                num_beams=args.num_beams,
-                use_fp16_decoding=args.use_fp16_decoding)
-        paddle.device.cuda.synchronize()
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
-        print(output)
-    with paddle.no_grad():
-        for i in range(num_loop):
-            # For warmup.
-            if 50 == i:
-                # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
-                start = time.perf_counter()
-            output, _ = faster_bart.generate(
+                paddle.device.cuda.synchronize(place)
+            start = time.perf_counter()
+            output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
@@ -130,11 +110,34 @@ def do_predict(args):
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 early_stopping=True,
+                diversity_rate=0.4,
+                use_fp16_decoding=args.use_fp16_decoding)
+        paddle.device.cuda.synchronize(place)
+        logger.info("Average test time for fast decoding is %f ms" % (
+            (time.perf_counter() - start) / 50 * 1000))
+    print(output)
+
+    with paddle.no_grad():
+        for i in range(num_loop):
+            # For warmup.
+            if 50 == i:
+                # PaddlePaddle >= 2.2
+                paddle.device.cuda.synchronize(place)
+            start = time.perf_counter()
+            output, _ = model.generate(
+                input_ids=input_ids,
+                max_length=args.max_length,
+                decode_strategy=args.decode_strategy,
+                top_k=args.top_k,
+                top_p=args.top_p,
+                num_beams=args.num_beams,
+                early_stopping=True,
+                diversity_rate=0.4,
                 use_faster=False)
-        paddle.device.cuda.synchronize()
+        paddle.device.cuda.synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
-        print(output)
+    print(output)
     device = torch.device("cuda:0")
     hf_model = hf_bart_model.from_pretrained("facebook/" +
                                              args.model_name_or_path)
@@ -152,7 +155,8 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                pass
+            start = time.time()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
@@ -160,10 +164,11 @@ def do_predict(args):
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
+                no_repeat_ngram_size=0,
                 length_penalty=0.0)
         logger.info("Average test time for hf decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
-        print(output[:, 1:])
+    print(output[:, 1:])
 
 
 if __name__ == "__main__":
