@@ -118,6 +118,60 @@ class _BaseAutoModelClass:
                         task=None,
                         *model_args,
                         **kwargs):
+        '''
+        Creates an instance of `AutoModel`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
+
+                - Name of a built-in pretrained model
+                - Name of a community-contributed pretrained model.
+                - Local directory path which contains model weights file("model_state.pdparams")
+              and model config file ("model_config.json").
+            task (str): Specify a downstream task. Task can be 'Model', 'ForPretraining',
+                'ForSequenceClassification', 'ForTokenClassification', 'ForQuestionAnswering',
+                'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
+                'Generator', 'Discriminator', 'ForConditionalGeneration'.
+                We only support specify downstream tasks in AutoModel. Defaults to `None`.
+            *args (tuple): Position arguments for model `__init__`. If provided,
+                use these as position argument values for model initialization.
+            **kwargs (dict): Keyword arguments for model `__init__`. If provided,
+                use these to update pre-defined keyword argument values for model
+                initialization. If the keyword is in `__init__` argument names of
+                base model, update argument values of the base model; else update
+                argument values of derived model.
+
+        Returns:
+            PretrainedModel: An instance of `AutoModel`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import AutoModel
+
+                # Name of built-in pretrained model
+                model = AutoModel.from_pretrained('bert-base-uncased')
+                print(type(model))
+                # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
+
+                # Name of community-contributed pretrained model
+                model = AutoModel.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+                print(type(model))
+                # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
+
+                # Load from local directory path
+                model = AutoModel.from_pretrained('./my_bert/')
+                print(type(model))
+                # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
+
+                # choose task
+                model = AutoModel.from_pretrained('bert-base-uncased', task='ForPretraining')
+                print(type(model))
+                # <class 'paddlenlp.transformers.bert.modeling.BertForPretraining'>
+        '''
         if task:
             if cls._task_choice == True:
                 cls._name_mapping = get_name_mapping(task)
@@ -260,10 +314,11 @@ class AutoModel(_BaseAutoModelClass):
             - Name of a community-contributed pretrained model.
             - Local directory path which contains model weights file("model_state.pdparams")
               and model config file ("model_config.json").
-        task (str): Specify a downstream task. `task` can be 'model', 'pretraining', 'sequence_classification',
-            'token_classification', 'question_answering', 'multiple_choice', 'lm_head',
-            'masked_lm', 'causal_lm', 'encoder', 'decoder', 'generator', 'discriminator',
-            'conditional_generation'. We only support specify downstream tasks in AutoModel. Defaults to `None`.
+        task (str): Specify a downstream task. Task can be 'Model', 'ForPretraining',
+            'ForSequenceClassification', 'ForTokenClassification', 'ForQuestionAnswering',
+            'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
+            'Generator', 'Discriminator', 'ForConditionalGeneration'.
+            We only support specify downstream tasks in AutoModel. Defaults to `None`.
         *args (tuple): Position arguments for model `__init__`. If provided,
             use these as position argument values for model initialization.
         **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -282,12 +337,25 @@ class AutoModel(_BaseAutoModelClass):
 
             # Name of built-in pretrained model
             model = AutoModel.from_pretrained('bert-base-uncased')
+            print(type(model))
+            # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
 
             # Name of community-contributed pretrained model
             model = AutoModel.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+            print(type(model))
+            # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
 
             # Load from local directory path
             model = AutoModel.from_pretrained('./my_bert/')
+            print(type(model))
+            # <class 'paddlenlp.transformers.bert.modeling.BertModel'>
+
+            # choose task
+            model = AutoModel.from_pretrained('bert-base-uncased', task='ForPretraining')
+            print(type(model))
+            # <class 'paddlenlp.transformers.bert.modeling.BertForPretraining'>
+
+
     """
     MAPPING_NAMES = get_init_configurations()
     _model_mapping = MAPPING_NAMES
