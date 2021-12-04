@@ -24,17 +24,30 @@ from .task import Task
 usage = r"""
            from paddlenlp import Taskflow 
 
-           dialogue = Taskflow("diglogue")
+           dialogue = Taskflow("dialogue")
            dialogue("吃饭了吗")
-           #每次执行结果可能不同
+           # 每次执行结果可能不同
            '''
            [{'text': '吃饭了吗', 'response': ['刚吃完饭,你在干什么呢?']}]
            '''
 
-           dialogue(["我在科技园上班", "晚上一起吃烧烤"])
+           # 多轮对话示例
+           dialogue("我们来聊天吧！")
            '''
-           [{'text': '我在科技园上班', 'response': '科技园是在哪个地方啊?'}, {'text': '晚上一起吃烧烤', 'response': '可以呀,我也喜欢吃烧烤呢'}]
+           [{'text': '我们来聊天吧!', 'response': '好呀!那你想聊些什么?'}]
            '''
+           dialogue("都可以呀,你最喜欢什么体育运动？")
+           '''
+           [{'text': '都可以呀,你最喜欢什么体育运动？', 'response': '我最喜欢的运动就是篮球了,你呢?'}]
+           '''
+           dialogue("我也是!你最喜欢哪个篮球明星?")
+           '''
+           [{'text': '我也是!你最喜欢哪个篮球明星', 'response': '我最喜欢的是姚明,你呢?最喜欢谁?'}]
+           '''
+           dialogue("我最喜欢的是易建联,他带领广东队拿了很多次总冠军呢!")
+           '''
+           [{'text': '我最喜欢的是易建联,他带领广东队拿了很多次总冠军呢!', 'response': '我也很喜欢易建联,我最喜欢的是他的扣篮,他的扣篮是很厉害的。'}]
+           '''           
          """
 
 class DialogueTask(Task):
@@ -49,7 +62,7 @@ class DialogueTask(Task):
                  task, 
                  model, 
                  batch_size=1,
-                 max_seq_len=128,
+                 max_seq_len=512,
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
