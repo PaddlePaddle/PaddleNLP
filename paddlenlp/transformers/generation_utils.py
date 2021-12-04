@@ -217,6 +217,7 @@ class BeamSearchScorer(object):
                  final_beam_scores,
                  final_beam_tokens,
                  final_beam_indices,
+                 origin_len=0,
                  pad_token_id=None,
                  eos_token_id=None):
         batch_size = len(self._beam_hyps)
@@ -232,7 +233,7 @@ class BeamSearchScorer(object):
                 batch_beam_idx = batch_idx * self.num_beams + beam_id
                 final_score = final_beam_scores[batch_beam_idx].numpy().item()
                 final_tokens = input_ids[batch_beam_idx]
-                beam_hyp.add(final_tokens, final_score)
+                beam_hyp.add(final_tokens, final_score, origin_len=origin_len)
 
         # select the best hypotheses
         sent_lengths = paddle.zeros(
@@ -514,11 +515,11 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
             )
-        if kwargs['early_stopping'] != False:
-            # not support for early_stopping yet in the faster version
-            raise AttributeError(
-                "'early_stopping != False' is not supported yet in the faster version"
-            )
+        # if kwargs['early_stopping'] != False:
+        #     # not support for early_stopping yet in the faster version
+        #     raise AttributeError(
+        #         "'early_stopping != False' is not supported yet in the faster version"
+        #     )
         if kwargs['forced_eos_token_id'] is not None:
             # not support for forced_eos_token_id yet in the faster version
             raise AttributeError(
@@ -1138,6 +1139,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
@@ -1274,6 +1276,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
