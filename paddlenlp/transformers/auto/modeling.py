@@ -343,6 +343,9 @@ class AutoModelForPretraining(_BaseAutoModelClass):
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
+    '''
+    AutoModelForSequenceClassification.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForSequenceClassification')
@@ -388,6 +391,9 @@ class AutoModelForSequenceClassification(_BaseAutoModelClass):
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
+    '''
+    AutoModelForTokenClassification.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForTokenClassification')
@@ -433,6 +439,9 @@ class AutoModelForTokenClassification(_BaseAutoModelClass):
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
+    '''
+    AutoModelForQuestionAnswering.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForQuestionAnswering')
@@ -478,6 +487,9 @@ class AutoModelForQuestionAnswering(_BaseAutoModelClass):
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
+    '''
+    AutoModelForMultipleChoice.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForMultipleChoice')
@@ -523,6 +535,9 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
+    '''
+    AutoModelForMaskedLM.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForMaskedLM')
@@ -568,6 +583,9 @@ class AutoModelForMaskedLM(_BaseAutoModelClass):
 
 
 class AutoModelForCausalLM(_BaseAutoModelClass):
+    '''
+    AutoModelForCausalLM.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForCausalLM')
@@ -613,6 +631,9 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
 
 
 class AutoEncoder(_BaseAutoModelClass):
+    '''
+    AutoEncoder.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Encoder')
@@ -653,6 +674,9 @@ class AutoEncoder(_BaseAutoModelClass):
 
 
 class AutoDecoder(_BaseAutoModelClass):
+    '''
+    AutoDecoder.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Decoder')
@@ -693,6 +717,9 @@ class AutoDecoder(_BaseAutoModelClass):
 
 
 class AutoGenerator(_BaseAutoModelClass):
+    '''
+    AutoGenerator.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Generator')
@@ -738,6 +765,9 @@ class AutoGenerator(_BaseAutoModelClass):
 
 
 class AutoDiscriminator(_BaseAutoModelClass):
+    '''
+    AutoDiscriminator.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Discriminator')
@@ -783,6 +813,9 @@ class AutoDiscriminator(_BaseAutoModelClass):
 
 
 class AutoModelForConditionalGeneration(_BaseAutoModelClass):
+    '''
+    AutoModelForConditionalGeneration.
+    '''
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForConditionalGeneration')
