@@ -112,6 +112,8 @@ def from_community_model():
 
 if __name__ == '__main__':
 
-    from_built_in_model()
-    from_local_dir()
-    from_community_model()
+    # from_built_in_model()
+    # from_local_dir()
+    # from_community_model()
+    model = AutoModel.from_pretrained(
+        '/Users/huhuiwen01/notebook/saved_model/my_bert_model_for_pretraining')
