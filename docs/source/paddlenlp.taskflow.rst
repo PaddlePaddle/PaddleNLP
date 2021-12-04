@@ -28,5 +28,6 @@ paddlenlp.taskflow
    paddlenlp.taskflow.taskflow
    paddlenlp.taskflow.text_correction
    paddlenlp.taskflow.text_generation
+   paddlenlp.taskflow.text_similarity
    paddlenlp.taskflow.utils
    paddlenlp.taskflow.word_segmentation
