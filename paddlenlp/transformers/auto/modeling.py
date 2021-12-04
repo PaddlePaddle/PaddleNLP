@@ -703,7 +703,7 @@ class AutoDecoder(_BaseAutoModelClass):
                 from paddlenlp.transformers import AutoDecoder
 
                 # Name of built-in pretrained model
-                model = AutoDecoder.from_pretrained('bert-base-uncased')
+                model = AutoDecoder.from_pretrained('bart-base', vocab_size=20000)
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartEncoder'>
 
@@ -842,19 +842,15 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
                 from paddlenlp.transformers import AutoModelForConditionalGeneration
 
                 # Name of built-in pretrained model
-                model = AutoModelForConditionalGeneration.from_pretrained('bart')
+                model = AutoModelForConditionalGeneration.from_pretrained('bart-base')
                 print(type(model))
-                # <class 'paddlenlp.transformers.bert.modeling.BertModelForMultipleChoice'>
+                # <class 'paddlenlp.transformers.bart.modeling.BartForConditionalGeneration'>
 
-                # Name of community-contributed pretrained model
-                model = AutoModelForConditionalGeneration.from_pretrained('iverxin/bert-base-japanese')
-                print(type(model))
-                # <class 'paddlenlp.transformers.bert.modeling.BertModelForMultipleChoice'>
 
                 # Load from local directory path
-                model = AutoModelForConditionalGeneration.from_pretrained('./my_bert/')
+                model = AutoModelForConditionalGeneration.from_pretrained('./my_bart/')
                 print(type(model))
-                # <class 'paddlenlp.transformers.bert.modeling.BertModelForMultipleChoice'>
+                # <class 'paddlenlp.transformers.bart.modeling.BartForConditionalGeneration'>
         '''
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
