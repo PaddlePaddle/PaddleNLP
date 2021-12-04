@@ -103,7 +103,7 @@ def create_data_loader(args, places=None):
                 pad_idx=args.bos_idx,
                 pad_seq=args.pad_seq,
                 dtype=args.input_dtype),
-            num_workers=0)
+            num_workers=1)
         data_loaders[i] = (data_loader)
     return data_loaders
 

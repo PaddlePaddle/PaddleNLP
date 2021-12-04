@@ -20,6 +20,9 @@ sys.path.append(
 import reader
 from util.record import AverageStatistical
 
+from paddle.fluid import core
+import sys
+
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
@@ -225,6 +228,20 @@ def do_train(args):
             if trainer_count == 1:
                 data = [data]
             train_reader_cost = time.time() - batch_start
+
+
+            if step_idx == 150:
+                core.nvprof_start()
+                core.nvprof_enable_record_event()
+                core.nvprof_nvtx_push(str(step_idx))
+            if step_idx == 155:
+                core.nvprof_nvtx_pop()
+                core.nvprof_stop()
+                sys.exit()
+            if step_idx >= 150 and step_idx < 155:
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push(str(step_idx))
+                
 
             if args.is_distributed:
                 outs = exe.run(train_program,

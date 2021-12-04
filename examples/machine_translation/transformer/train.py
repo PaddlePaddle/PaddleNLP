@@ -16,6 +16,8 @@ from paddlenlp.utils.log import logger
 
 from util.record import AverageStatistical
 from util.to_static import apply_to_static
+from paddle.fluid import core
+import sys
 
 
 def parse_args():
@@ -158,6 +160,14 @@ def do_train(args):
     batch_cost_avg = AverageStatistical()
     batch_ips_avg = AverageStatistical()
 
+    amp_level='O1'
+    if args.use_amp and args.use_pure_fp16:
+        amp_level='O2'
+        
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(enable=True, init_loss_scaling=args.scale_loss)
+        transformer = paddle.amp.decorate(models=transformer, level=amp_level)
+
     # Train loop
     for pass_id in range(args.epoch):
         epoch_start = time.time()
@@ -168,13 +178,26 @@ def do_train(args):
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
+            
+            # if step_idx == 150:
+            #     core.nvprof_start()
+            #     core.nvprof_enable_record_event()
+            #     core.nvprof_nvtx_push(str(step_idx))
+            # if step_idx == 155:
+            #     core.nvprof_nvtx_pop()
+            #     core.nvprof_stop()
+            #     sys.exit()
+            # if step_idx >= 150 and step_idx < 155:
+            #     core.nvprof_nvtx_pop()
+            #     core.nvprof_nvtx_push(str(step_idx))
+            
+            
             if args.use_amp:
-                scaler = paddle.amp.GradScaler(
-                    init_loss_scaling=args.scale_loss)
-                with paddle.amp.auto_cast():
+                with paddle.amp.auto_cast(custom_black_list={'scale', 'reduce_sum', 'elementwise_div'} if amp_level=='O2' else {}, level=amp_level):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
+                tokens_per_cards = token_num.numpy()
                 scaled = scaler.scale(avg_cost)  # scale the loss
                 scaled.backward()  # do backward
 
@@ -184,12 +207,13 @@ def do_train(args):
                 logits = transformer(src_word=src_word, trg_word=trg_word)
                 sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
+                tokens_per_cards = token_num.numpy()
                 avg_cost.backward()
 
                 optimizer.step()
                 optimizer.clear_grad()
 
-            tokens_per_cards = token_num.numpy()
+            # tokens_per_cards = token_num.numpy()
 
             train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
