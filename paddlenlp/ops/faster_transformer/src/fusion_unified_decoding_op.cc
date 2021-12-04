@@ -69,7 +69,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const bool& normalize_before,
     const bool& pos_bias,
     const std::string& hidden_act,
-    const bool& rel_len) {
+    const bool& rel_len,
+    const bool& early_stopping) {
   int batch_size = cache_k[0].shape()[0];
   int max_out_len = rel_len ? max_len + cache_k[0].shape()[2] : max_len;
 
@@ -82,7 +83,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     }
     output_dims = {max_out_len, batch_size, beam_size};
     parent_ids_dims = output_dims;
-  } else if (decoding_strategy == "beam_search_v2") {
+  } else if (decoding_strategy == "beam_search_v2" ||
+             decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
     // beams. The outputs must include both the finish and alive to trace full
     // path.
@@ -168,7 +170,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       len_penalty,
                                       normalize_before,
                                       pos_bias,
-                                      hidden_act);
+                                      hidden_act,
+                                      early_stopping);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -224,7 +227,8 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const bool& normalize_before,
     const bool& pos_bias,
     const std::string& hidden_act,
-    const bool& rel_len) {
+    const bool& rel_len,
+    const bool& early_stopping) {
   int batch_size = cache_k_shapes[0][0];
 
   std::vector<int64_t> output_dims;
@@ -234,6 +238,19 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
       batch_size /= beam_size;
     }
     output_dims = {max_len, batch_size, beam_size};
+    return {output_dims, output_dims, sequence_length_dims};
+  } else if (decoding_strategy == "beam_search_v2" ||
+             decoding_strategy == "beam_search_v3") {
+    // Use separated alive and finish beam queues to avoid the decrease of alive
+    // beams. The outputs must include both the finish and alive to trace full
+    // path.
+    if (batch_size != -1) {
+      sequence_length_dims = {batch_size * 2};
+      batch_size /= beam_size;
+    } else {
+      sequence_length_dims = {batch_size};
+    }
+    output_dims = {max_len, batch_size, beam_size * 2};
     return {output_dims, output_dims, sequence_length_dims};
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling" ||
@@ -334,7 +351,8 @@ PD_BUILD_OP(fusion_unified_decoding)
             "normalize_before: bool",
             "pos_bias: bool",
             "hidden_act: std::string",
-            "rel_len: bool"})
+            "rel_len: bool",
+            "early_stopping: bool"})
     .SetKernelFn(PD_KERNEL(UnifiedDecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(UnifiedDecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(UnifiedDecodingInferDtype));
