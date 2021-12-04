@@ -128,10 +128,9 @@ std::vector<paddle::Tensor> gpt2_kernel(
       new DecoderInitParam<DataType_>[num_layer];
 
   for (int i = 0; i < num_layer; ++i) {
-    // TODO: multi-cards supports.
-    // if(layer_parallel_param.is_valid(i) == false) {
-    //     continue;
-    // }
+    if (layer_parallel_param.is_valid(i) == false) {
+      continue;
+    }
 
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
