@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "fastertransformer/common.h"
-#include "fastertransformer/gpt2.h"
+#include "fastertransformer/gpt.h"
 #include "fastertransformer/open_decoder.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
@@ -16,6 +16,8 @@
 
 std::vector<paddle::Tensor> GPT2CUDAForward(
     const paddle::Tensor& input,
+    const paddle::Tensor& attn_mask,
+    const paddle::Tensor& start_length,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,

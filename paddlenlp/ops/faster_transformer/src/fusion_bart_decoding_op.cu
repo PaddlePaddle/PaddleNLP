@@ -65,22 +65,25 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
-    std::string decoding_strategy,
-    int beam_size,
-    int topk,
-    float topp,
-    int head_num_,
-    int size_per_head_,
-    int num_layer_,
-    int start_id_,
-    int end_id_,
-    int64_t max_seq_len_,
-    float beam_search_diversity_rate_,
-    float alpha,
+    const std::string& decoding_strategy,
+    const int& beam_size,
+    const int& topk,
+    const float& topp,
+    const int& head_num_,
+    const int& size_per_head_,
+    const int& num_layer_,
+    const int& start_id_,
+    const int& end_id_,
+    const int64_t& max_seq_len_,
+    const float& beam_search_diversity_rate_,
+    const float& alpha,
+    const bool& early_stopping,
     cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
-                     decoding_strategy == "beam_search_v2")
+                     decoding_strategy == "beam_search_v2" ||
+                     decoding_strategy == "beam_search_v3")
                         ? beam_size
                         : 1;
   int candidate_num_ = (decoding_strategy == "topk_sampling" ||
@@ -94,7 +97,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
 
   auto input_dims = input.shape();
   int batch_size_ = (decoding_strategy == "beam_search" ||
-                     decoding_strategy == "beam_search_v2")
+                     decoding_strategy == "beam_search_v2" ||
+                     decoding_strategy == "beam_search_v3")
                         ? input_dims[0] / beam_width_
                         : input_dims[0];
   const int memory_max_seq_len = input_dims[1];
@@ -107,6 +111,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
 
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = cublas_handle_;
+  decoding_params.cublaslt_handle = cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
@@ -127,6 +132,19 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
+    params[i].cublaslt_handle = cublaslt_handle_;
+
+    if (decoding_strategy == "beam_search" ||
+        decoding_strategy == "beam_search_v2" ||
+        decoding_strategy == "beam_search_v3") {
+      params[i].request_batch_size = batch_size_ * beam_width_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    } else if (decoding_strategy == "sampling" ||
+               decoding_strategy == "topk_sampling" ||
+               decoding_strategy == "topp_sampling") {
+      params[i].request_batch_size = batch_size_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    }
 
     // self attn
     params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
@@ -225,21 +243,14 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   // for weight sharing matmul
   decoding_params.embedding_kernel =
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
-  // NOTE: the data type of the embedding bias for logits is different
-  // between decoding with beam search and top-k/top-p sampling in
-  // FasterTransformer when using float16.
-  if ("beam_search" == decoding_strategy ||
-      "beam_search_v2" == decoding_strategy) {
-    // for matmul bias
-    decoding_params.embedding_bias =
-        reinterpret_cast<const float*>(embedding_bias.data<float>());
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
-    decoding_params.embedding_bias_T =
-        reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
-  }
+  // for matmul bias
+  decoding_params.embedding_bias =
+      reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
+
+  int finished_candidate_num_ =
+      ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
   if ("beam_search" == decoding_strategy) {
     DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
@@ -257,17 +268,19 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        false,
-        false,
+        true,  /*is_fuse_topk_softMax*/
+        false, /*is_fuse_qkv*/
+        false, /*keep_alive_beam*/
         alpha,
-        false,
+        false, /*normalization_before*/
         2,
         ActivationType::GELU);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
     delete decoding_beamsearch_;
-  } else if ("beam_search_v2" == decoding_strategy) {
+  } else if ("beam_search_v2" == decoding_strategy ||
+             "beam_search_v3" == decoding_strategy) {
     DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
     decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
@@ -283,18 +296,24 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true,  // is_fuse_topk_softMax_
-        true,  // keep_alive_beam_
+        true,  /*is_fuse_topk_softMax*/
+        false, /*is_fuse_qkv*/
+        true,  /*keep_alive_beam*/
         alpha,
-        false,
+        false, /*normalization_before*/
         2,
-        ActivationType::GELU);
+        ActivationType::GELU,
+        false, /*pos_bias*/
+        false, /*prefix_lm*/
+        finished_candidate_num_,
+        early_stopping);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
     delete decoding_beamsearch_;
   } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
+             "topp_sampling" == decoding_strategy ||
+             "sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
     decoding_sampling_ =
         new DecodingSampling<DecodingTraits_::OpType>(allocator_,
@@ -310,6 +329,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
                                                       end_id_,
                                                       candidate_num_,
                                                       probability_threshold_,
+                                                      false,
                                                       false,
                                                       2,
                                                       ActivationType::GELU);
@@ -365,21 +385,24 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
-    std::string decoding_strategy,
-    int beam_size,
-    int topk,
-    float topp,
-    int n_head,
-    int size_per_head,
-    int num_layer,
-    int bos_id,
-    int eos_id,
-    int64_t max_len,
-    float beam_search_diversity_rate,
-    float alpha) {
+    const std::string& decoding_strategy,
+    const int& beam_size,
+    const int& topk,
+    const float& topp,
+    const int& n_head,
+    const int& size_per_head,
+    const int& num_layer,
+    const int& bos_id,
+    const int& eos_id,
+    const int64_t& max_len,
+    const float& beam_search_diversity_rate,
+    const float& alpha,
+    const bool& early_stopping) {
   auto stream = input.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
+  cublasLtHandle_t cublaslt_handle_;
+  cublasLtCreate(&cublaslt_handle_);
   cublasSetStream(cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
@@ -436,7 +459,9 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
+          early_stopping,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -491,7 +516,9 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
+          early_stopping,
           cublas_handle_,
+          cublaslt_handle_,
           stream);
       break;
     }
@@ -504,5 +531,6 @@ std::vector<paddle::Tensor> BartDecodingCUDAForward(
   }
 
   cublasDestroy(cublas_handle_);
+  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }
