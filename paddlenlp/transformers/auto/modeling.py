@@ -295,6 +295,9 @@ class AutoModel(_BaseAutoModelClass):
 
 
 class AutoModelForPretraining(_BaseAutoModelClass):
+    """
+    AutoModelForPretraining.
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForPretraining')
