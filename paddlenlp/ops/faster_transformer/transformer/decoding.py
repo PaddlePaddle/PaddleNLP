@@ -1246,7 +1246,6 @@ class InferUnifiedDecoding(nn.Layer):
                 pos_bias=True,
                 rel_len=False,
                 early_stopping=False):
-
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
             topk = 1
@@ -1265,7 +1264,6 @@ class InferUnifiedDecoding(nn.Layer):
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         elif decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
-        origin = self._model.lm_head.decoder_bias.clone()
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -1319,7 +1317,6 @@ class InferUnifiedDecoding(nn.Layer):
             _hidden_act=self._hidden_act,
             _rel_len=rel_len,
             _early_stopping=early_stopping)
-        self._model.lm_head.decoder_bias.set_value(origin)
         ids = finalize(
             beam_size,
             output_ids,
