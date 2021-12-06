@@ -465,11 +465,12 @@ __global__ void add_bias_input(
   // This kernel can run with any block size and grid size
   // Since the hidden dimension of GPT-3 would be larger than 1024
   const int bid = blockIdx.x;
-  const int blocks_per_row = n / blockDim.x;
-  const int col_index = (bid % blocks_per_row) * blockDim.x + threadIdx.x;
-  T bias_val = __ldg(&bias[col_index]);
+  // const int blocks_per_row = n / blockDim.x;
+  // const int col_index = (bid % blocks_per_row) * blockDim.x + threadIdx.x;
+  // T bias_val = __ldg(&bias[col_index]);
   for (int index = bid * blockDim.x + threadIdx.x; index < m * n;
        index += blockDim.x * gridDim.x) {
+    T bias_val = __ldg(&bias[index % n]);
     output[index] = output[index] + input[index] + bias_val;
   }
 }
