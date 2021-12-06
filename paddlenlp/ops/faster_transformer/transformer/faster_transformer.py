@@ -678,9 +678,10 @@ class FasterGPT(GPTPretrainedModel):
                                  axis=-1,
                                  dtype="int32")
 
-            if bos_token_id == pad_token_id:
+            if bos_token_id == pad_token_id and paddle.sum(
+                    paddle.any(input_ids == pad_token_id)) > 0:
                 seq_len = seq_len + 1
-        #seq_len -= 1
+
         if num_return_sequences > 1:
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids, expand_size=num_return_sequences, seq_len=seq_len)
