@@ -120,6 +120,9 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
 
   int memory_max_seq_len_{0};
   bool prefix_lm_{false};
+
+  int finished_candidate_num_{-1};
+  bool early_stopping_{false};
 };
 
 struct GptArguments : public DecodingSamplingArguments {

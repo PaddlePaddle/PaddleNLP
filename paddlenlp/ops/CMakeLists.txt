@@ -282,6 +282,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_dst)
+
 # Encoder patches.
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
@@ -304,6 +307,7 @@ set(FT_PATCH_COMMAND
   && cp ${open_decoder_h_src} ${open_decoder_h_dst}
   && cp ${standard_encoder_h_src} ${standard_encoder_h_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
+  && cp ${trans_kernels_cu_src} ${trans_kernels_cu_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
@@ -312,6 +316,7 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
+  && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
   && ${MUTE_COMMAND}
 )
 

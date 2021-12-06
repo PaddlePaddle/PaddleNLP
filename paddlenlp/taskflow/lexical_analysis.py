@@ -26,7 +26,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ..datasets import load_dataset, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+from .utils import download_file, add_docstrings, dygraph_mode_guard
+from .utils import Customization
 from .task import Task
 from .models import BiGruCrf
 
@@ -92,8 +93,9 @@ class LacTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = False
         self._usage = usage
+        self._custom_vocab = self.kwargs[
+            'custom_vocab'] if 'custom_vocab' in self.kwargs else None
         word_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "word.dic",
             URLS['lac_params'][0], URLS['lac_params'][1])
@@ -110,10 +112,12 @@ class LacTask(Task):
             zip(self._word_vocab.values(), self._word_vocab.keys()))
         self._id2tag_dict = dict(
             zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-        if self._static_mode:
-            self._get_inference_model()
+        self._get_inference_model()
+        if self._custom_vocab:
+            self._custom = Customization()
+            self._custom.load_customization(self._custom_vocab)
         else:
-            self._construct_model(model)
+            self._custom = None
 
     def _construct_input_spec(self):
         """
@@ -200,23 +204,14 @@ class LacTask(Task):
         """
         results = []
         lens = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                for batch in inputs['data_loader']:
-                    input_ids, seq_len = batch
-                    tags_ids = self._model(input_ids, seq_len)
-                    results.extend(tags_ids.numpy().tolist())
-                    lens.extend(seq_len.numpy().tolist())
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    input_ids, seq_len = batch
-                    self.input_handles[0].copy_from_cpu(input_ids)
-                    self.input_handles[1].copy_from_cpu(seq_len)
-                    self.predictor.run()
-                    tags_ids = self.output_handle[0].copy_to_cpu()
-                    results.extend(tags_ids.tolist())
-                    lens.extend(seq_len.tolist())
+        for batch in inputs['data_loader']:
+            input_ids, seq_len = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(seq_len.numpy())
+            self.predictor.run()
+            tags_ids = self.output_handle[0].copy_to_cpu()
+            results.extend(tags_ids.tolist())
+            lens.extend(seq_len.tolist())
         inputs['result'] = results
         inputs['lens'] = lens
         return inputs
@@ -237,6 +232,8 @@ class LacTask(Task):
                 for index in preds[sent_index][:lengths[sent_index]]
             ]
             sent = sents[sent_index]
+            if self._custom:
+                self._custom.parse_customization(sent, tags)
             sent_out = []
             tags_out = []
             parital_word = ""
@@ -254,6 +251,7 @@ class LacTask(Task):
 
             if len(sent_out) < len(tags_out):
                 sent_out.append(parital_word)
+
             single_result['text'] = sent
             single_result['segs'] = sent_out
             single_result['tags'] = tags_out
