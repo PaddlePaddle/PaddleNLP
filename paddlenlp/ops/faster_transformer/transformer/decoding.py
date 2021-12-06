@@ -441,6 +441,7 @@ def finalize(beam_size,
              output_ids,
              parent_ids,
              out_seq_lens,
+             forced_eos_token_id=None,
              max_seq_len=None,
              decoding_strategy="beam_search"):
     if max_seq_len is None:
@@ -451,6 +452,11 @@ def finalize(beam_size,
             beam_size * 2 if decoding_strategy.endswith("_v2") or
             decoding_strategy.endswith("_v3") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
+        if forced_eos_token_id is not None:
+            ids[-1, :, :] = forced_eos_token_id
+    else:
+        if forced_eos_token_id is not None:
+            ids[-1, :] = forced_eos_token_id
     return ids
 
 
@@ -858,6 +864,7 @@ class InferGptDecoding(nn.Layer):
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 max_out_len=256,
                 temperature=1):
         if attention_mask is None:
@@ -902,6 +909,8 @@ class InferGptDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding)
 
         output_ids = output_ids[paddle.shape(input_ids)[-1]:, :]
+        if forced_eos_token_id is not None:
+            output_ids[:, -1] = forced_eos_token_id
         return output_ids
 
 
@@ -1240,6 +1249,7 @@ class InferUnifiedDecoding(nn.Layer):
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
@@ -1322,17 +1332,13 @@ class InferUnifiedDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
         return ids
 
 
 class InferBartDecoding(nn.Layer):
-    def __init__(
-            self,
-            model,
-            decoding_strategy="beam_search_v3",
-            decoding_lib=None,
-            use_fp16_decoding=False, ):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
@@ -1511,16 +1517,17 @@ class InferBartDecoding(nn.Layer):
                 beam_size=4,
                 top_k=1,
                 top_p=0.0,
+                decoding_strategy="beam_search_v3",
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 alpha=0.6,
                 early_stopping=False):
         # beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
-        decoding_strategy = self._decoding_strategy
         if decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
         elif decoding_strategy == "greedy_search":
@@ -1562,5 +1569,6 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
         return ids

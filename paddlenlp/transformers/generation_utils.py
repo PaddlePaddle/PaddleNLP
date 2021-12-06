@@ -330,11 +330,6 @@ class GenerationMixin(object):
                              repetition_penalty=None):
         processors = LogitsProcessorList()
 
-        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
-            self, 'forced_bos_token_id', None)
-        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
-            self, 'forced_eos_token_id', None)
-
         if min_length is not None and eos_token_id is not None and min_length > -1:
             processors.append(
                 MinLengthLogitsProcessor(min_length, eos_token_id))
@@ -517,11 +512,6 @@ class GenerationMixin(object):
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
-            )
-        if kwargs['forced_eos_token_id'] is not None:
-            # not support for forced_eos_token_id yet in the faster version
-            raise AttributeError(
-                "'forced_eos_token_id != None' is not supported yet in the faster version"
             )
         self.prepare_faster_entry(kwargs)
 
@@ -722,6 +712,19 @@ class GenerationMixin(object):
         ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy)
 
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self, 'pad_token_id', None)
+        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
+            self, 'forced_bos_token_id', None)
+        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
+            self, 'forced_eos_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self, 'decoder_start_token_id', None)
+
         if getattr(self, '_faster_entry', None) is not False and use_faster:
             args = locals()
             args.pop('self')
@@ -755,13 +758,6 @@ class GenerationMixin(object):
                     "and the original version would be used instead.")
 
         # params check
-        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
-            self, 'bos_token_id', None)
-        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
-            self, 'eos_token_id', None)
-        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
-            self, 'pad_token_id', None)
-
         if input_ids is None:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
