@@ -101,7 +101,7 @@ def do_predict(args):
             if 50 == i:
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize(place)
-            start = time.perf_counter()
+                start = time.perf_counter()
             output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
@@ -122,7 +122,7 @@ def do_predict(args):
             if 50 == i:
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize(place)
-            start = time.perf_counter()
+                start = time.perf_counter()
             output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
@@ -154,8 +154,7 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                pass
-            start = time.time()
+                start = time.time()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
