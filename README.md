@@ -83,38 +83,38 @@ senta("这个产品用起来真的很流畅，我非常喜欢")
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**24**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。欢迎开发者加入贡献更多预训练模型！🤗
+覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
 
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+ernie = AutoModel.from_pretrained('ernie-1.0')
+ernie_gram = AutoModel.from_pretrained('ernie-gram-zh')
+bert = AutoModel.from_pretrained('bert-wwm-chinese')
+albert = AutoModel.from_pretrained('albert-chinese-tiny')
+roberta = AutoModel.from_pretrained('roberta-wwm-ext')
+electra = AutoModel.from_pretrained('chinese-electra-small')
+gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
 
 ```python
 import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import *
 
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
 # 语义表示
-model = ErnieModel.from_pretrained('ernie-1.0')
+model = AutoModel.from_pretrained('ernie-1.0')
 sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # 文本分类 & 句对匹配
-model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0')
 # 序列标注
-model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
+model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 # 问答
-model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
 请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
