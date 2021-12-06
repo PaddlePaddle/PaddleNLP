@@ -864,7 +864,9 @@ class InferGptDecoding(nn.Layer):
         if attention_mask is None:
             batch_size = paddle.shape(input_ids)[0]
             attention_mask = paddle.tril(
-                paddle.ones([batch_size, mem_seq_len, mem_seq_len]))
+                paddle.ones(
+                    [batch_size, mem_seq_len, mem_seq_len],
+                    dtype="float16" if self.use_fp16_decoding else "float32"))
 
         output_ids = infer_gpt_decoding(
             input=[input_ids],
