@@ -704,7 +704,7 @@ class MobileBertPreTrainingHeads(nn.Layer):
         return prediction_scores, seq_relationship_score
 
 
-class MobileBertPreTrainedModel(PretrainedModel):
+class MobileBertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained MobileBert models. It provides MobileBert related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -728,7 +728,6 @@ class MobileBertPreTrainedModel(PretrainedModel):
             "key_query_shared_bottleneck": True,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            "model_type": "mobilebert",
             "normalization_type": "no_norm",
             "num_attention_heads": 4,
             "num_feedforward_networks": 4,
@@ -775,7 +774,14 @@ class MobileBertPreTrainedModel(PretrainedModel):
             layer.weight.set_value(paddle.ones_like(layer.weight))
 
 
-class MobileBertForPreTraining(MobileBertPreTrainedModel):
+class MobileBertForPreTraining(MobileBertPretrainedModel):
+    """
+    MobileBert Model with pretraining tasks on top.
+    Args:
+        bert (:class:`MobileBertModel`):
+            An instance of :class:`MobileBertModel`.
+    """
+
     def __init__(self, mobilebert):
         super(MobileBertForPreTraining, self).__init__()
         self.mobilebert = mobilebert
@@ -802,30 +808,47 @@ class MobileBertForPreTraining(MobileBertPreTrainedModel):
             position_ids=None,
             head_mask=None,
             inputs_embeds=None,
-            labels=None,
-            next_sentence_label=None,
             output_attentions=None,
             output_hidden_states=None, ):
         r"""
-        labels (``paddle.Tensor`` of shape ``(batch_size, sequence_length)``, `optional`):
-            Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ...,
-            config.vocab_size]`` (see ``input_ids`` docstring) Tokens with indices set to ``-100`` are ignored
-            (masked), the loss is only computed for the tokens with labels in ``[0, ..., config.vocab_size]``
-        next_sentence_label (`paddle.Tensor`` of shape ``(batch_size,)``, `optional`):
-            Labels for computing the next sequence prediction (classification) loss. Input should be a sequence pair
-            (see :obj:`input_ids` docstring) Indices should be in ``[0, 1]``:
-            - 0 indicates sequence B is a continuation of sequence A,
-            - 1 indicates sequence B is a random sequence.
+        The MobileBertForPreTraining forward method, overrides the __call__() special method.
+        Args:
+            input_ids (Tensor):
+                See :class:`MobileBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`MobileBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`MobileBertModel`.
+            head_mask (Tensor, optional):
+                See :class:`MobileBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`MobileBertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`MobileBertModel`.
+            output_attentions (bool, optional):
+                See :class:`MobileBertModel`.
+            output_hidden_states (bool, optional):
+                See :class:`MobileBertModel`.
         Returns:
-        Examples::
-            >>> from paddlenlp.transformers import MobileBertTokenizer, MobileBertForPreTraining
-            >>> import paddle
-            >>> tokenizer = MobileBertTokenizer.from_pretrained("google/mobilebert-uncased")
-            >>> model = MobileBertForPreTraining.from_pretrained("google/mobilebert-uncased")
-            >>> input_ids = paddle.to_tensor(tokenizer.encode("Hello, my dog is cute", add_special_tokens=True)).unsqueeze(0)  # Batch size 1
-            >>> outputs = model(input_ids)
-            >>> prediction_logits = outputs[0]
-            >>> seq_relationship_logits = outputs[1]
+            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
+            With the fields:
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and its shape is [batch_size, 2].
+        .. code-block::
+                import paddle
+                from paddlenlp.transformers import MobileBertModel, MobileBertTokenizer
+                tokenizer = MobileBertTokenizer.from_pretrained('mobilebert-uncased')
+                model = MobileBertForPreTraining.from_pretrained('mobilebert-uncased')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+                prediction_logits = outputs[0]
+                seq_relationship_logits = outputs[1]
         """
 
         outputs = self.mobilebert(
@@ -846,7 +869,7 @@ class MobileBertForPreTraining(MobileBertPreTrainedModel):
 
 
 @register_base_model
-class MobileBertModel(MobileBertPreTrainedModel):
+class MobileBertModel(MobileBertPretrainedModel):
     """
     The bare MobileBert Model transformer outputting raw hidden-states.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -899,7 +922,7 @@ class MobileBertModel(MobileBertPreTrainedModel):
             Defaults to 0.02.
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`MobileBertPreTrainedModel.init_weights()` for how weights are initialized in `MobileBertModel`.
+                See :meth:`MobileBertPretrainedModel.init_weights()` for how weights are initialized in `MobileBertModel`.
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `1`.
@@ -1089,9 +1112,9 @@ class MobileBertModel(MobileBertPreTrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import MobileBertModel, MobileBertTokenizer
-                tokenizer = MobileBertTokenizer.from_pretrained('google/mobilebert-uncased')
-                model = MobileBertModel.from_pretrained('google/mobilebert-uncased')
-                inputs = tokenizer("Hello, my dog is cute")
+                tokenizer = MobileBertTokenizer.from_pretrained('mobilebert-uncased')
+                model = MobileBertModel.from_pretrained('mobilebert-uncased')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -1146,7 +1169,7 @@ class MobileBertModel(MobileBertPreTrainedModel):
         return (sequence_output, pooled_output) + encoder_outputs[1:]
 
 
-class MobileBertForSequenceClassification(MobileBertPreTrainedModel):
+class MobileBertForSequenceClassification(MobileBertPretrainedModel):
     """
     MobileBert Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
@@ -1206,8 +1229,8 @@ class MobileBertForSequenceClassification(MobileBertPreTrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import MobileBertForSequenceClassification, MobileBertTokenizer
-                tokenizer = MobileBertTokenizer.from_pretrained('google/mobilebert-uncased')
-                model = MobileBertForSequenceClassification.from_pretrained('google/mobilebert-uncased', num_classes=2)
+                tokenizer = MobileBertTokenizer.from_pretrained('mobilebert-uncased')
+                model = MobileBertForSequenceClassification.from_pretrained('mobilebert-uncased', num_classes=2)
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
@@ -1233,7 +1256,7 @@ class MobileBertForSequenceClassification(MobileBertPreTrainedModel):
         return logits
 
 
-class MobileBertForQuestionAnswering(MobileBertPreTrainedModel):
+class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
     """
     MobileBert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
@@ -1303,9 +1326,9 @@ class MobileBertForQuestionAnswering(MobileBertPreTrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import MobileBertForQuestionAnswering, MobileBertTokenizer
-                tokenizer = MobileBertTokenizer.from_pretrained('bert-base-cased')
-                model = MobileBertForQuestionAnswering.from_pretrained('bert-base-cased')
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", "PaddlePaddle and PaddleNLP")
+                tokenizer = MobileBertTokenizer.from_pretrained('mobilebert-uncased')
+                model = MobileBertForQuestionAnswering.from_pretrained('mobilebert-uncased')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
                 start_logits = outputs[0]
