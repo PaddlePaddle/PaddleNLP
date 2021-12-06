@@ -4,3 +4,5 @@ paddlenlp==2.1.1
 paddlepaddle-gpu==2.1.3
 hnswlib
 numpy
+visualdl
+pybind11

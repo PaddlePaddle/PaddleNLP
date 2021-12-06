@@ -11,11 +11,7 @@
 ....
 ```
 
-数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索，milvus的详细代码请参考：
-
-[milvus](./milvus/)
-
-我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1版本，搭建完以后启动milvus
+数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1版本，搭建完以后启动milvus
 
 
 ```
@@ -50,6 +46,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 | ------------ | ------------ |
 |1000万条|5hour50min03s|
 
+生成了向量后，需要把数据抽炒入到Milvus库中，首先修改配置：
 
 修改config.py的配置ip：
 
@@ -70,7 +67,7 @@ python3 embedding_insert.py
 
 另外，milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
 
-![](./img/mem.png)
+![](../img/mem.png)
 
 
 运行召回脚本：

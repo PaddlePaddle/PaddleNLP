@@ -89,6 +89,11 @@ Post-Training的时候使用的是全量的数据，使用了文本的query,titl
 |  召回 |  有监督训练 | 20000  | 300000 |3998 |
 |  排序 |  - | 37862  | - |1874103 |
 
+数据集的下载地址为：
+
+```
+wget https://bj.bcebos.com/v1/paddlenlp/data/wanfang_opensource_data.zip
+```
 
 
 ### 3.2 技术方案和评估指标
