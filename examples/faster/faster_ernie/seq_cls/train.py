@@ -42,6 +42,8 @@ parser.add_argument("--seed", type=int, default=1000, help="random seed for init
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
 parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
+parser.add_argument("--save_steps", default=100, type=int, help="The interval steps to save checkppoints.")
+parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -67,7 +69,7 @@ def evaluate(model, criterion, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
-    print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
+    print("eval loss: %.5f, accuracy: %.5f" % (np.mean(losses), accu))
     model.train()
     metric.reset()
 
@@ -136,6 +138,7 @@ def do_train():
 
     global_step = 0
     tic_train = time.time()
+    total_train_time = 0
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch["text"], batch["label"]
@@ -150,13 +153,6 @@ def do_train():
             metric.update(correct)
             acc = metric.accumulate()
 
-            global_step += 1
-            if global_step % 10 == 0:
-                print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc,
-                       10 / (time.time() - tic_train)))
-                tic_train = time.time()
             if args.use_amp:
                 scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
@@ -165,12 +161,25 @@ def do_train():
                 optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % 100 == 0:
+
+            global_step += 1
+            if global_step % args.logging_steps == 0:
+                time_diff = time.time() - tic_train
+                total_train_time += time_diff
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accuracy: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, acc,
+                       args.logging_steps / time_diff))
+                tic_train = time.time()
+            if global_step % args.save_steps == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
                 model.save_pretrained(save_dir)
+                tic_train = time.time()
+
+    print("Speed: %.2f steps/s" % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

@@ -93,7 +93,7 @@ class BiGruCrf(nn.Layer):
 
     def forward(self, inputs, lengths, labels=None):
         word_embed = self.word_embedding(inputs)
-        bigru_output, _ = self.gru(word_embed)
+        bigru_output, _ = self.gru(word_embed, sequence_length=lengths)
         emission = self.fc(bigru_output)
         if labels is not None:
             loss = self.crf_loss(emission, lengths, labels)
