@@ -645,7 +645,7 @@ class FasterGPT(GPTPretrainedModel):
 
     def forward(self,
                 input_ids,
-                mem_seq_len=None,
+                seq_len=None,
                 attention_mask=None,
                 top_k=4,
                 top_p=0.0,
@@ -672,22 +672,23 @@ class FasterGPT(GPTPretrainedModel):
             top_k = 1
         if top_p == 1.0:
             top_p = 0.0
-        if num_return_sequences > 1:
-            input_ids, _ = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_return_sequences)
-
-        if mem_seq_len is None:
-            mem_seq_len = paddle.sum(paddle.cast(
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(
                 input_ids != pad_token_id, dtype="int32"),
-                                     axis=-1,
-                                     dtype="int32")
+                                 axis=-1,
+                                 dtype="int32")
 
             if bos_token_id == pad_token_id:
-                mem_seq_len = mem_seq_len + 1
+                seq_len = seq_len + 1
+        #seq_len -= 1
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids, expand_size=num_return_sequences, seq_len=seq_len)
+            seq_len = model_kwargs["seq_len"]
 
         return self.decoding(
             input_ids,
-            mem_seq_len=mem_seq_len,
+            mem_seq_len=seq_len,
             attention_mask=attention_mask,
             topk=top_k,
             topp=top_p,
@@ -727,14 +728,9 @@ class FasterGPT(GPTPretrainedModel):
 
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
-    def __init__(self,
-                 model,
-                 decode_strategy="sampling",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
-        self._decode_strategy = decode_strategy
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
         self.unk_token_id = self._model.unk_token_id
         self.mask_token_id = self._model.mask_token_id
@@ -750,7 +746,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -786,12 +781,18 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decode_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -805,6 +806,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 max_length=128,
                 top_k=4,
                 top_p=0.0,
+                decode_strategy="sampling",
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
@@ -812,7 +814,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6):
+                length_penalty=0.6,
+                early_stopping=False,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -828,7 +832,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-        if self._decode_strategy.startswith("beam_search"):
+        if decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
                 expand_size=num_beams,
@@ -836,7 +840,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        elif self._decode_strategy == "sampling":
+        elif decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
                 expand_size=num_return_sequences,
@@ -844,7 +848,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        elif self._decode_strategy == "greedy_search":
+        elif decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
@@ -878,6 +882,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
+            decoding_strategy=decode_strategy,
             max_out_len=max_length,
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
@@ -885,20 +890,16 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             temperature=temperature,
             length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=True)
+            pos_bias=True,
+            early_stopping=early_stopping)
 
     generate = forward
 
 
 class FasterUNIMOText(UNIMOPretrainedModel):
-    def __init__(self,
-                 model,
-                 decode_strategy="sampling",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
-        self._decode_strategy = decode_strategy
         self.unk_token_id = self._model.unk_token_id
         self.mask_token_id = self._model.mask_token_id
         self.bos_token_id = self._model.bos_token_id
@@ -915,7 +916,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -951,12 +951,18 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decode_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
@@ -971,13 +977,16 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                decode_strategy="sampling",
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
                 diversity_rate=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
-                length_penalty=0.6):
+                length_penalty=0.6,
+                early_stopping=False,
+                **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self._model, 'bos_token_id', None)
@@ -993,7 +1002,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
-        if self._decode_strategy.startswith("beam_search"):
+        if decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
                 expand_size=num_beams,
@@ -1001,7 +1010,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        elif self._decode_strategy == "sampling":
+        elif decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
                 expand_size=num_return_sequences,
@@ -1009,7 +1018,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len)
-        elif self._decode_strategy == "greedy_search":
+        elif decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
@@ -1042,6 +1051,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
+            decoding_strategy=decode_strategy,
             max_out_len=max_length,
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
@@ -1049,7 +1059,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature,
             length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=False)
+            pos_bias=False,
+            early_stopping=early_stopping)
 
     generate = forward
 
@@ -1101,6 +1112,7 @@ class FasterBART(BartPretrainedModel):
                 diversity_rate=0.0,
                 length_penalty=0.6,
                 num_return_sequences=1,
+                early_stopping=False,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
@@ -1148,6 +1160,7 @@ class FasterBART(BartPretrainedModel):
             top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,
-            alpha=length_penalty)
+            alpha=length_penalty,
+            early_stopping=early_stopping)
 
     generate = forward

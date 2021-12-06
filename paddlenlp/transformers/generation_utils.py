@@ -467,9 +467,7 @@ class GenerationMixin(object):
 
             model_kwargs["encoder_output"] = encoder(input_ids,
                                                      **encoder_kwargs)
-            #print(input_ids)
-            #print(encoder_kwargs)
-            #print(model_kwargs["encoder_output"])                                         
+
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self,
@@ -745,6 +743,7 @@ class GenerationMixin(object):
                     # make result and faster result oneconsistent
                     dummy_srore = None
                     return output_ids, dummy_srore
+
             except Exception as e:
                 args['model_kwargs'] = model_kwargs
                 #TODO
@@ -980,8 +979,7 @@ class GenerationMixin(object):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-            #print("logits",logits)
-            #print(logits[0][464],logits[0][912])
+
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
@@ -997,7 +995,6 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
             next_tokens = paddle.multinomial(probs)
-            #print("next_tokens",next_tokens)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
@@ -1076,22 +1073,22 @@ class GenerationMixin(object):
             else:
                 next_scores, next_tokens = paddle.topk(
                     next_scores, 2 * num_beams, axis=1)
-                #print(next_scores)
+
                 sibling_score = paddle.arange(
                     1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
-                #print(sibling_score)
+
                 diversed_score = next_scores - sibling_score
-                #print(diversed_score)
+
                 next_scores = next_scores.reshape(
                     [batch_size, 2 * num_beams * num_beams])
                 next_tokens = next_tokens.reshape(
                     [batch_size, 2 * num_beams * num_beams])
-                print("next_tokens before", next_tokens)
+
                 diversed_score = diversed_score.reshape(
                     [batch_size, 2 * num_beams * num_beams])
                 diversed_score, diversed_tokens = paddle.topk(
                     diversed_score, 2 * num_beams, axis=1)
-                print("diversed_tokens", diversed_tokens)
+
                 # TODO
                 # Use gather_nd() to select origan token and score
                 next_scores = paddle.stack([
@@ -1102,7 +1099,7 @@ class GenerationMixin(object):
                     paddle.index_select(next_tokens[i], diversed_tokens[i])
                     for i in range(next_tokens.shape[0])
                 ])
-                print("next_tokens after", next_tokens)
+
                 next_indices = diversed_tokens // (2 * num_beams)
 
             # stateless

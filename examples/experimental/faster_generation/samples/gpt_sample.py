@@ -19,6 +19,7 @@ model_name = 'gpt-cpm-small-cn-distill'
 
 tokenizer = GPTChineseTokenizer.from_pretrained(model_name)
 model = GPTLMHeadModel.from_pretrained(model_name)
+model.eval()
 
 inputs = '花间一壶酒，独酌无相亲。举杯邀明月，'
 inputs_ids = tokenizer(inputs)["input_ids"]
