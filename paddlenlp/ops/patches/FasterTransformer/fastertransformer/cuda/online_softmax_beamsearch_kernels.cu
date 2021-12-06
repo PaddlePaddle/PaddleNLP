@@ -1100,7 +1100,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
           sequence_length[MAX_K / 2 + alive_num] = step;
           finished[MAX_K / 2 + alive_num] = 0;
           alive_finished[alive_num] = 0;
-          alive_num += 1;
+          alive_num++;
         }
       }
     }
@@ -1155,7 +1155,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
         }
         for (int i = MAX_K / 2; i < MAX_K; ++i) {
           finish_stop.insert(output_cum_log_probs[i] / length_penalty,
-                             word_ids[i],
+                             word_ids[i - MAX_K / 2],
                              output_parent_ids[i],
                              step);
         }

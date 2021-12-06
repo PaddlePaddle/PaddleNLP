@@ -923,7 +923,7 @@ public:
         } else {
           if (keep_alive_beam_ == true) {
             update_logits_v2(tmp_logits_buf_,
-                             decoding_params.embedding_bias,
+                             embedding_bias_ptr,
                              args_.end_id_,
                              finished_buf_,
                              m,
