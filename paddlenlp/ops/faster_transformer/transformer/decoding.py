@@ -1223,7 +1223,11 @@ class InferUnifiedDecoding(nn.Layer):
                 "lm_ln_bias"] = [self._model.lm_head.layer_norm.bias]
             self.sub_modules[
                 "linear_weight"] = [self._model.lm_head.decoder_weight.t()]
-            self.sub_modules["linear_bias"] = [self._model.lm_head.decoder_bias]
+
+            # NOTE: Fix self._model.lm_head.decoder_bias been changed in FT.
+            self.sub_modules["linear_bias"] = [
+                paddle.assign(self._model.lm_head.decoder_bias)
+            ]
 
     def forward(self,
                 cache_k,
