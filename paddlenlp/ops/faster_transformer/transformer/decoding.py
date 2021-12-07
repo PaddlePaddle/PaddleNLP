@@ -16,6 +16,7 @@ import numpy as np
 from functools import partial
 
 import paddle
+from paddle.fluid.layers.nn import pad
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.framework import in_dygraph_mode
@@ -160,7 +161,7 @@ def infer_force_decoding(
         'EmbBias': linear_bias,
         'PositionEncEmb': pos_emb,
         # The input of custom op must be given.
-        # Dispensable() and Intermediate() are not supported. 
+        # Dispensable() and Intermediate() are not supported.
         'TrgWord': trg_word
     }
 
@@ -455,16 +456,25 @@ def finalize(beam_size,
     return ids
 
 
-def transfer_param(p, is_bias=False, restore_data=False, reserve_var=False):
+def transfer_param(p, is_bias=False, restore_data=False):
     param_shape = p.shape
+    # Maybe we need allow users using `model.to('float16')` to use fp16 by this.
+    if (p.dtype == paddle.float16): return p
     if restore_data:
         if in_dygraph_mode():
             param_data = p.numpy()
+            # Creating parameters with Assign initializer is too slow. Maybe we
+            # can cast to fp16 directly and get a tensor, while we do it more
+            # elaborately to get a ParamBase. Also note `VarBase.set_value`
+            # enforce the same dtype and can not be used directly.
+            new_p = type(p)(shape=param_shape, dtype="float16", is_bias=is_bias)
+            new_p.value().get_tensor().set(
+                param_data.astype("float16"),
+                paddle.fluid.framework._current_expected_place())
+            return new_p
         else:
             param_data = np.array(paddle.static.global_scope().find_var(p.name)
                                   .get_tensor())
-    if not reserve_var:
-        del p
     return paddle.create_parameter(
         shape=param_shape,
         dtype="float16",
