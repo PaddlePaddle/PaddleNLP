@@ -99,9 +99,9 @@ std::vector<paddle::Tensor> gpt2_kernel(
   decoding_params.request_input_len = start_len;
   decoding_params.request_output_len = max_len - start_len;
 
-  decoding_params.d_start_ids = input.data<int>();
+  decoding_params.d_start_ids = const_cast<int *>(input.data<int>());
   decoding_params.d_attn_mask =
-      reinterpret_cast<DataType_*>(attn_mask.data<data_t_>());
+      reinterpret_cast<DataType_*>(const_cast<data_t_ *>(attn_mask.data<data_t_>()));
   decoding_params.d_start_lengths = start_length.data<int>();
 
   gpt_decoding =
