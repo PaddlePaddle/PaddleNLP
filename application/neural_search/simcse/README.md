@@ -70,9 +70,9 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 - [hnswlib](https://github.com/nmslib/hnswlib)
 
 
-## 快速开始
+<a name="代码结构"></a>
 
-### 代码结构说明
+## 3. 代码结构
 
 以下是本项目主要代码结构及说明：
 
