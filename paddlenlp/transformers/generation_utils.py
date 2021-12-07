@@ -358,36 +358,34 @@ class GenerationMixin(object):
                                      expand_size,
                                      attention_mask=None,
                                      **model_kwargs):
-        index = []
-        for i in range(input_ids.shape[0]):
-            index += [i] * expand_size
 
-        #TODO Change back to index_select
-        input_ids = paddle.stack([input_ids[i] for i in index], axis=0)
+        index = paddle.tile(
+            paddle.arange(input_ids.shape[0]).unsqueeze(-1),
+            [1, expand_size]).reshape([-1])
+
+        input_ids = paddle.gather(input_ids, index)
 
         if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.stack(
-                [attention_mask[i] for i in index], axis=0)
+            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
+                                                           index)
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.stack(
-                [token_type_ids[i] for i in index], axis=0)
+            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
+                                                           index)
 
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.stack(
-                [position_ids[i] for i in index], axis=0)
+            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
 
         if "seq_len" in model_kwargs:
             seq_len = model_kwargs["seq_len"]
-            model_kwargs["seq_len"] = paddle.stack(
-                [seq_len[i] for i in index], axis=0)
+            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
 
         if "encoder_output" in model_kwargs:
             encoder_output = model_kwargs["encoder_output"]
-            model_kwargs["encoder_output"] = paddle.stack(
-                [encoder_output[i] for i in index], axis=0)
+            model_kwargs["encoder_output"] = paddle.gather(encoder_output,
+                                                           index)
 
         return input_ids, model_kwargs
 
