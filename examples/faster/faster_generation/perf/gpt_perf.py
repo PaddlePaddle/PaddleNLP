@@ -21,7 +21,6 @@ import paddle
 import torch
 from paddlenlp.transformers import GPTLMHeadModel, GPTTokenizer
 from transformers import GPT2LMHeadModel as hf_gpt_model
-from paddlenlp.utils.log import logger
 import numpy as np
 
 
@@ -92,9 +91,12 @@ def do_predict(args):
                 eos_token_id=eos_id,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        faster_cost = (time.perf_counter() - start) / 50 * 1000
 
+    if args.use_fp16_decoding:
+        pprint(args)
+        print("Faster FP16 cost:", faster_cost)
+        return
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
@@ -112,8 +114,7 @@ def do_predict(args):
                 eos_token_id=eos_id,
                 use_faster=False)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        pd_cost = (time.perf_counter() - start) / 50 * 1000
 
     device = torch.device("cuda:0")
     hf_model = hf_gpt_model.from_pretrained(args.model_name_or_path[:-3])
@@ -131,20 +132,28 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                torch.cuda.synchronize()
+                start = time.perf_counter()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
                 max_length=args.max_length + 1,
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
+                pad_token_id=0,
                 top_k=args.top_k,
                 top_p=args.top_p)
-        logger.info("Average test time for hf decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+        torch.cuda.synchronize()
+        hf_cost = (time.perf_counter() - start) / 50 * 1000
+
+    pprint(args)
+    print("Faster FP32 cost:", faster_cost)
+    print("PD cost:", pd_cost)
+    print("HF cost:", hf_cost)
+    print("Speed up Faster FP32/PD:", pd_cost / faster_cost)
+    print("Speed up Faster FP32/HF:", hf_cost / faster_cost)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    pprint(args)
     do_predict(args)

@@ -22,7 +22,6 @@ import torch
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import BartForConditionalGeneration as hf_bart_model
 from paddlenlp.data import Pad
-from paddlenlp.utils.log import logger
 
 
 def prepare_input(tokenizer, sentences):
@@ -112,8 +111,12 @@ def do_predict(args):
                 early_stopping=True,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        faster_cost = (time.perf_counter() - start) / 50 * 1000
+
+    if args.use_fp16_decoding:
+        pprint(args)
+        print("Faster FP16 cost:", faster_cost)
+        return
 
     with paddle.no_grad():
         for i in range(num_loop):
@@ -132,8 +135,7 @@ def do_predict(args):
                 early_stopping=True,
                 use_faster=False)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        pd_cost = (time.perf_counter() - start) / 50 * 1000
 
     device = torch.device("cuda:0")
     hf_model = hf_bart_model.from_pretrained("facebook/" +
@@ -152,21 +154,28 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                torch.cuda.synchronize()
+                start = time.perf_counter()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
-                max_length=args.max_length + 1,
+                max_length=32,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 no_repeat_ngram_size=0,
                 length_penalty=0.0)
-        logger.info("Average test time for hf decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+        torch.cuda.synchronize()
+        hf_cost = (time.perf_counter() - start) / 50 * 1000
+
+    pprint(args)
+    print("Faster FP32 cost:", faster_cost)
+    print("PD cost:", pd_cost)
+    print("HF cost:", hf_cost)
+    print("Speed up Faster FP32/PD:", pd_cost / faster_cost)
+    print("Speed up Faster FP32/HF:", hf_cost / faster_cost)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    pprint(args)
     do_predict(args)
