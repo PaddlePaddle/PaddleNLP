@@ -16,7 +16,6 @@ import numpy as np
 from functools import partial
 
 import paddle
-from paddle.fluid.layers.nn import pad
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.framework import in_dygraph_mode
