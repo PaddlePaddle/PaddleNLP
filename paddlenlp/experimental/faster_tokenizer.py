@@ -19,6 +19,7 @@ from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
+from paddle import _C_ops
 
 __all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
 
@@ -88,7 +89,12 @@ class FasterTokenizer(nn.Layer):
                 max_seq_len=0,
                 pad_to_max_seq_len=True):
         if in_dygraph_mode():
-            input_ids, seg_ids = core.ops.faster_tokenizer(
+            if isinstance(text, list) or isinstance(text, tuple):
+                text = to_tensor(list(text))
+            if text_pair is not None:
+                if isinstance(text_pair, list) or isinstance(text_pair, tuple):
+                    text_pair = to_tensor(list(text_pair))
+            input_ids, seg_ids = _C_ops.faster_tokenizer(
                 self.vocab, text, text_pair, "do_lower_case",
                 self.do_lower_case, "max_seq_len", max_seq_len,
                 "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",

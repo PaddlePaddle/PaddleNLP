@@ -9,8 +9,10 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **21** 种网络结构， **107** 种预训练的参数权重供用户使用，
-其中包含了 **52** 种中文语言模型的预训练权重。
+
+
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **25** 种网络结构， **120** 种预训练的参数权重供用户使用，
+其中包含了 **59** 种中文语言模型的预训练权重。
 
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 | Model              | Pretrained Weight                                                                | Language     | Details of the model                    |
@@ -163,10 +165,53 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, 108M parameters.              |
 |                    |                                                                                  |              | Trained on 22 million pairs of similar  |
 |                    |                                                                                  |              | sentences crawed from Baidu Know.       |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``huhuiwen/mengzi-bert-base``                                                     | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained on 300G Chinese Corpus Datasets.|
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``huhuiwen/mengzi-bert-base-fin``                                                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained on 20G Finacial Corpus,         |
+|                    |                                                                                  |              | based on ``huhuiwen/mengzi-bert-base``. |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|BERT-Japanese_      |``iverxin/bert-base-japanese``                                                    | Japanese     | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 110M parameters.              |
+|                    |                                                                                  |              | Trained on Japanese text.               |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``iverxin/bert-base-japanese-whole-word-masking``                                 | Japanese     | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 109M parameters.              |
+|                    |                                                                                  |              | Trained on Japanese text using          |
+|                    |                                                                                  |              | Whole-Word-Masking.                     |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``iverxin/bert-base-japanese-char``                                               | Japanese     | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 89M parameters.               |
+|                    |                                                                                  |              | Trained on Japanese char text.          |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``iverxin/bert-base-japanese-char-whole-word-masking``                            | Japanese     | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 89M parameters.               |
+|                    |                                                                                  |              | Trained on Japanese char text using     |
+|                    |                                                                                  |              | Whole-Word-Masking.                     |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |BigBird_            |``bigbird-base-uncased``                                                          | English      | 12-layer, 768-hidden,                   |
-|                    |                                                                                  |              | 12-heads, _M parameters.                |
+|                    |                                                                                  |              | 12-heads, 127M parameters.              |
 |                    |                                                                                  |              | Trained on lower-cased English text.    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|Blenderbot_         |``blenderbot-3B``                                                                 | English      | 26-layer,                               |
+|                    |                                                                                  |              | 32-heads, 3B parameters.                |
+|                    |                                                                                  |              | The Blenderbot base model.              |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``blenderbot-400M-distill``                                                       | English      | 14-layer, 384-hidden,                   |
+|                    |                                                                                  |              | 32-heads, 400M parameters.              |
+|                    |                                                                                  |              | The Blenderbot distil model.            |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``blenderbot-1B-distill``                                                         | English      | 14-layer,                               |
+|                    |                                                                                  |              | 32-heads, 1478M parameters.             |
+|                    |                                                                                  |              | The Blenderbot Distil 1B model.         |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|Blenderbot-Small_   |``blenderbot_small-90M``                                                          | English      | 16-layer,                               |
+|                    |                                                                                  |              | 16-heads, 90M parameters.               |
+|                    |                                                                                  |              | The Blenderbot small model.             |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |ConvBert_           |``convbert-base``                                                                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 106M parameters.              |
@@ -180,6 +225,14 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 4-heads, 13M parameters.                |
 |                    |                                                                                  |              | The ConvBERT small model.               |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|CTRL_               |``ctrl``                                                                          | English      | 48-layer, 1280-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 1701M parameters.             |
+|                    |                                                                                  |              | The CTRL base model.                    |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``sshleifer-tiny-ctrl``                                                           | English      | 2-layer, 16-hidden,                     |
+|                    |                                                                                  |              | 2-heads, 5M parameters.                 |
+|                    |                                                                                  |              | The Tiny CTRL model.                    |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |DistilBert_         |``distilbert-base-uncased``                                                       | English      | 6-layer, 768-hidden,                    |
 |                    |                                                                                  |              | 12-heads, 66M parameters.               |
 |                    |                                                                                  |              | The DistilBERT model distilled from     |
@@ -189,6 +242,16 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, 66M parameters.               |
 |                    |                                                                                  |              | The DistilBERT model distilled from     |
 |                    |                                                                                  |              | the BERT model ``bert-base-cased``      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``distilbert-base-multilingual-cased``                                            | English      | 6-layer, 768-hidden,                    |
+|                    |                                                                                  |              | 12-heads, 200M parameters.              |
+|                    |                                                                                  |              | The DistilBERT model distilled from     |
+|                    |                                                                                  |              | the BERT model                          |
+|                    |                                                                                  |              | ``bert-base-multilingual-cased``        |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``sshleifer-tiny-distilbert-base-uncase-finetuned-sst-2-english``                 | English      | 2-layer, 2-hidden,                      |
+|                    |                                                                                  |              | 2-heads, 50K parameters.                |
+|                    |                                                                                  |              | The DistilBERT model                    |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |ELECTRA_            |``electra-small``                                                                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 4-heads, _M parameters.                 |
@@ -403,6 +466,18 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | Trained using the RoBERTa model         |
 |                    |                                                                                  |              | ``roberta_large_en``                    |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|SqueezeBert_        |``squeezebert-uncased``                                                           | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Uncased model.              |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``squeezebert-mnli``                                                              | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Mnli model.                 |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``squeezebert-mnli-headless``                                                     | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 51M parameters.               |
+|                    |                                                                                  |              | SqueezeBert Mnli Headless model.        |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |TinyBert_           |``tinybert-4l-312d``                                                              | English      | 4-layer, 312-hidden,                    |
 |                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
 |                    |                                                                                  |              | The TinyBert model distilled from       |
@@ -445,11 +520,15 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, 66M parameters.               |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|UNIMO_              |``unimo-text-1.0``                                                                | English      | 12-layer, 768-hidden,                   |
+|UNIMO_              |``unimo-text-1.0``                                                                | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 99M parameters.               |
 |                    |                                                                                  |              | UNIMO-text-1.0 model.                   |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``unimo-text-1.0-large``                                                          | English      | 24-layer, 768-hidden,                   |
+|                    |``unimo-text-1.0--lcsts-new``                                                     | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 99M parameters.               |
+|                    |                                                                                  |              | Finetuned on lcsts_new dataset.         |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``unimo-text-1.0-large``                                                          | Chinese      | 24-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 16-heads, 316M parameters.              |
 |                    |                                                                                  |              | UNIMO-text-1.0 large model.             |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
@@ -490,7 +569,13 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |BigBird_            | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|Blenderbot_         | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|Blenderbot-Small_   | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |ConvBert_           | ✅                      | ✅                   | ✅                 | ✅              | ✅              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|CTRL_               | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |DistilBert_         | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
@@ -516,6 +601,8 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |SKEP_               | ✅                      | ✅                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
+|SqueezeBert_        | ✅                      | ✅                   | ✅                 | ❌              | ❌              |
++--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |TinyBert_           | ✅                      | ❌                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |UnifiedTransformer_ | ❌                      | ❌                   | ❌                 | ✅              | ❌              |
@@ -526,8 +613,12 @@ Transformer预训练模型适用任务汇总
 .. _ALBERT: https://arxiv.org/abs/1909.11942
 .. _BART: https://arxiv.org/abs/1910.13461
 .. _BERT: https://arxiv.org/abs/1810.04805
+.. _BERT-Japanese: https://arxiv.org/abs/1810.04805
 .. _BigBird: https://arxiv.org/abs/2007.14062
+.. _Blenderbot: https://arxiv.org/pdf/2004.13637.pdf
+.. _Blenderbot-Small: https://arxiv.org/pdf/2004.13637.pdf
 .. _ConvBert: https://arxiv.org/abs/2008.02496
+.. _CTRL: https://arxiv.org/abs/1909.05858
 .. _DistilBert: https://arxiv.org/abs/1910.01108
 .. _ELECTRA: https://arxiv.org/abs/2003.10555
 .. _ERNIE: https://arxiv.org/abs/1904.09223
@@ -540,6 +631,7 @@ Transformer预训练模型适用任务汇总
 .. _RoBERTa: https://arxiv.org/abs/1907.11692
 .. _RoFormer: https://arxiv.org/abs/2104.09864
 .. _SKEP: https://arxiv.org/abs/2005.05635
+.. _SqueezeBert: https://arxiv.org/abs/2006.11316
 .. _TinyBert: https://arxiv.org/abs/1909.10351
 .. _UnifiedTransformer: https://arxiv.org/abs/2006.16779
 .. _UNIMO: https://arxiv.org/abs/2012.15409
@@ -550,7 +642,8 @@ Transformer预训练模型适用任务汇总
 ------------------------------------
 
 PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。
-只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
+使用Auto模块，可以加载不同网络结构的预训练模型，无需查找
+模型对应的类别。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
 
 .. code:: python
 
@@ -559,13 +652,13 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
     import paddle
     from paddlenlp.datasets import load_dataset
-    from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+    from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     train_ds = load_dataset("chnsenticorp", splits=["train"])
 
-    model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
+    model = AutoModelForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
-    tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
+    tokenizer = AutoTokenizer.from_pretrained("bert-wwm-chinese")
 
     def convert_example(example, tokenizer):
         encoded_inputs = tokenizer(text=example["text"], max_seq_len=512, pad_to_max_seq_len=True)
@@ -592,8 +685,10 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
 1. 加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。
 2. 加载预训练模型：PaddleNLP的预训练模型可以很容易地通过 ``from_pretrained()`` 方法加载。
+   Auto模块（包括AutoModel, AutoTokenizer, 及各种下游任务类）提供了方便易用的接口，
+   无需指定类别，即可调用不同网络结构的预训练模型。
    第一个参数是汇总表中对应的 ``Pretrained Weight``，可加载对应的预训练权重。
-   ``BertForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 ``num_classes`` 等，
+   ``AutoModelForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 ``num_classes`` 等，
    也是通过 ``from_pretrained()`` 传入。``Tokenizer`` 使用同样的 ``from_pretrained`` 方法加载。
 3. 通过 ``Dataset`` 的 ``map`` 函数，使用 ``tokenizer`` 将 ``dataset`` 从原始文本处理成模型的输入。
 4. 定义 ``BatchSampler`` 和 ``DataLoader``，shuffle数据、组合Batch。
@@ -615,7 +710,10 @@ Reference
 - Lewis, Mike, et al. "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension." arXiv preprint arXiv:1910.13461 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Zaheer, Manzil, et al. "Big bird: Transformers for longer sequences." arXiv preprint arXiv:2007.14062 (2020).
+- Stephon, Emily, et al. "Blenderbot: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
+- Stephon, Emily, et al. "Blenderbot-Small: Recipes for building an open-domain chatbot." arXiv preprint arXiv:2004.13637 (2020).
 - Jiang, Zihang, et al. "ConvBERT: Improving BERT with Span-based Dynamic Convolution." arXiv preprint arXiv:2008.02496 (2020).
+- Nitish, Bryan, et al. "CTRL: A Conditional Transformer Language Model for Controllable Generation." arXiv preprint arXiv:1909.05858 (2019).
 - Sanh, Victor, et al. "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter." arXiv preprint arXiv:1910.01108 (2019).
 - Clark, Kevin, et al. "Electra: Pre-training text encoders as discriminators rather than generators." arXiv preprint arXiv:2003.10555 (2020).
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
@@ -627,6 +725,7 @@ Reference
 - Liu, Yinhan, et al. "Roberta: A robustly optimized bert pretraining approach." arXiv preprint arXiv:1907.11692 (2019).
 - Su Jianlin, et al. "RoFormer: Enhanced Transformer with Rotary Position Embedding." arXiv preprint arXiv:2104.09864 (2021).
 - Tian, Hao, et al. "SKEP: Sentiment knowledge enhanced pre-training for sentiment analysis." arXiv preprint arXiv:2005.05635 (2020).
+- Forrest, ALbert, et al. "SqueezeBERT: What can computer vision teach NLP about efficient neural networks?" arXiv preprint arXiv:2006.11316 (2020).
 - Vaswani, Ashish, et al. "Attention is all you need." arXiv preprint arXiv:1706.03762 (2017).
 - Jiao, Xiaoqi, et al. "Tinybert: Distilling bert for natural language understanding." arXiv preprint arXiv:1909.10351 (2019).
 - Bao, Siqi, et al. "Plato-2: Towards building an open-domain chatbot via curriculum learning." arXiv preprint arXiv:2006.16779 (2020).
