@@ -54,9 +54,9 @@ def merge_corups(list_paths,output_path):
 
 
 if __name__ == "__main__":
-    # num=580000
-    # generate_recall_dataset(num)
-    # generate_milvus_dataset()
+    num=280000
+    generate_recall_dataset(num)
+    generate_milvus_dataset()
     list_paths=['data/milvus_corpus.csv','data/other_files.txt']
     output_path='data/milvus_data.csv'
     merge_corups(list_paths,output_path)

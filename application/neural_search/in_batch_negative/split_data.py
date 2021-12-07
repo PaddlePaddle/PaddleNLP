@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # split_train_ratio(ratio_or_size)
     # ratio_or_size=0.01
     # split_train_ratio(ratio_or_size)
-    # ratio_or_size=0.001
-    # split_train_ratio(ratio_or_size)
-    ratio_or_size=0.0001
+    ratio_or_size=0.001
     split_train_ratio(ratio_or_size)
+    # ratio_or_size=0.0001
+    # split_train_ratio(ratio_or_size)
