@@ -1,6 +1,73 @@
-# SimCSE
+
+ **目录**
+
+* [背景介绍](#背景介绍)
+* [SimCSE](#SimCSE)
+    * [1. 技术方案和评估指标](#技术方案)
+    * [2. 环境依赖](#环境依赖)  
+    * [3. 代码结构](#代码结构)
+    * [4. 数据准备](#数据准备)
+    * [5. 模型训练](#模型训练)
+    * [6. 评估](#开始评估)
+    * [7. 预测](#预测)
+    * [8. 部署](#部署)
+
+<a name="背景介绍"></a>
+
+# 背景介绍
+
+语义索引（可通俗理解为向量索引）技术是搜索引擎、推荐系统、广告系统在召回阶段的核心技术之一。语义索引模型的目标是：给定输入文本，模型可以从海量候选召回库中**快速、准确**地召回一批语义相关文本。语义索引模型的效果直接决定了语义相关的物料能否被成功召回进入系统参与上层排序，从基础层面影响整个系统的效果。
+
+在召回阶段，最常见的方式是通过双塔模型，学习Document(简写为Doc)的向量表示，对Doc端建立索引，用ANN召回。我们在这种方式的基础上，引入无监督预训练策略，以如下训练数据为例：
+
+
+```
+煤矸石-污泥基活性炭介导强化污水厌氧消化
+煤矸石-污泥基活性炭介导强化污水厌氧消化煤矸石,污泥,复合基活性炭,厌氧消化,直接种间电子传递
+. 睡眠障碍与常见神经系统疾病的关系
+睡眠障碍与常见神经系统疾病的关系睡眠觉醒障碍,神经系统疾病,睡眠,快速眼运动,细胞增殖,阿尔茨海默病
+城市道路交通流中观仿真研究
+城市道路交通流中观仿真研究智能运输系统;城市交通管理;计算机仿真;城市道路;交通流;路径选择
+```
 
 SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
+
+
+<a name="SimCSE"></a>
+
+# SimCSE 
+
+<a name="技术方案"></a>
+
+## 1. 技术方案和评估指标
+
+### 技术方案
+双塔模型，采用ERNIE1.0热启
+在...阶段引入SimCSE 策略...
+
+
+### 评估指标
+
+（1）采用 Recall@1，Recall@5 ，Recall@10 ，Recall@20  和 Recall@50 指标来评估语义索引模型的召回效果。
+
+**效果评估**
+
+|  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
+| ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
+|  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
+
+
+<a name="环境依赖"></a>
+
+## 2. 环境依赖和安装说明
+
+**环境依赖**
+* python >= 3.x
+* paddlepaddle-gpu >= 2.1.3
+* paddlenlp >= 2.1
+* hnswlib >=0.5.2
+
+- [hnswlib](https://github.com/nmslib/hnswlib)
 
 
 ## 快速开始
@@ -14,21 +81,67 @@ simcse/
 ├── model.py # SimCSE 模型组网代码
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
 ├── predict.py # 基于训练好的无监督语义匹配模型计算文本 Pair 相似度
+├── evaluate.py # 根据召回结果和评估集计算评估指标
+|—— predict.py # 给定输入文件，计算文本 pair 的相似度
+|—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
 └── train.py # SimCSE 模型训练、评估逻辑
 ```
 
+<a name="数据准备"></a>
 
-### 模型训练
-训练数据使用的是万方的数据集:
+## 4. 数据准备
 
-无监督预训练的数据的数据格式为：
+### 数据集说明
+
+我们基于语义匹配数据集构造生成了面向语义索引的训练集、评估集、召回库。
+
+样例数据如下:
+```
+煤矸石-污泥基活性炭介导强化污水厌氧消化 煤矸石-污泥基活性炭介导强化污水厌氧消化煤矸石,污泥,复合基活性炭,厌氧消化,直接种间电子传递
+. 睡眠障碍与常见神经系统疾病的关系      睡眠障碍与常见神经系统疾病的关系睡眠觉醒障碍,神经系统疾病,睡眠,快速眼运动,细胞增殖,阿尔茨海默病
+城市道路交通流中观仿真研究      城市道路交通流中观仿真研究智能运输系统;城市交通管理;计算机仿真;城市道路;交通流;路径选择
+网络健康可信性研究      网络健康可信性研究网络健康信息;可信性;评估模式
+脑瘫患儿家庭复原力的影响因素及干预模式雏形 研究 脑瘫患儿家庭复原力的影响因素及干预模式雏形研究脑瘫患儿;家庭功能;干预模式
+地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较      地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较
+```
+
+#### 构造数据集
+
+用下面的脚本构建无监督训练集
 
 ```
-煤矸石-污泥基活性炭介导强化污水厌氧消化
-睡眠障碍与常见神经系统疾病的关系睡眠觉醒障碍,神经系统疾病,睡眠,快速眼运动,细胞增殖,阿尔茨海默病
-......
+python process_data.py
+```
+召回集和测试集合与inbatch-negative实验的数据保持一致
+
+### 数据集下载
+
+
+- [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
+
+<a name="模型训练"></a>
+
+## 5. 模型训练
+
+**语义索引预训练模型下载链接：**
+
+以下模型结构参数为: `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
+
+|Model|训练参数配置|硬件|MD5|
+| ------------ | ------------ | ------------ |-----------|
+|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+
+### 训练环境说明
+
+```
+NVIDIA Driver Version: 440.64.00 
+Ubuntu 16.04.6 LTS (Docker)
+Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 ```
 
+### 单机单卡训练/单机多卡训练
+
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
 
 训练的命令如下：
 
@@ -83,74 +196,141 @@ checkpoints/
 └── ...
 ```
 
-**NOTE:**
-* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
+<a name="评估"></a>
 
-### 构建索引
+## 6. 评估
 
-```
-root_dir="checkpoints" 
+效果评估分为 4 个步骤:
 
-python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
-        recall.py \
-        --device gpu \
-        --recall_result_dir "recall_result_dir" \
-        --recall_result_file "recall_result.txt" \
-        --params_path "${root_dir}/model_10000/model_state.pdparams" \
-        --hnsw_m 100 \
-        --hnsw_ef 100 \
-        --batch_size 64 \
-        --output_emb_size 256\
-        --max_seq_length 60 \
-        --recall_num 50 \
-        --similar_text_pair "data/test.csv" \
-        --corpus_file "data/corpus.csv" 
+a. 获取Doc端Embedding
+基于语义索引模型抽取出Doc样本库的文本向量，
 
+b. 采用hnswlib对Doc端Embedding建库
+使用 ANN 引擎构建索引库(这里基于 [hnswlib](https://github.com/nmslib/hnswlib) 进行 ANN 索引)
 
-```
-也可以使用bash脚本：
+c. 获取Query的Embedding并查询相似结果
+基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
-```
-sh run_build_index.sh
-```
+d. 评估
+基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
 
-### 召回评估
+运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
+接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50 指标:
 ```
 python -u evaluate.py \
-    --similar_text_pair "data/test.csv" \
-    --recall_result_file "./recall_result_dir/recall_result.txt" \
-    --recall_num 50
+        --similar_text_pair "data/test.csv" \
+        --recall_result_file "./recall_result_dir/recall_result.txt" \
+        --recall_num 50
 ```
-可以使用bash脚本：
+也可以使用下面的bash脚本：
 
 ```
-sh evaluate.sh
+bash evaluate.sh
 ```
 
-### 基于动态图模型预测
- 
-测试数据示例如下，：
-```text
-煤矸石-污泥基活性炭介导强化污水厌氧消化 煤矸石-污泥基活性炭介导强化污水厌氧消化煤矸石,污泥,复合基活性炭,厌氧消化,直接种间电子传递
-. 睡眠障碍与常见神经系统疾病的关系      睡眠障碍与常见神经系统疾病的关系睡眠觉醒障碍,神经系统疾病,睡眠,快速眼运动,细胞增殖,阿尔茨海默病
-城市道路交通流中观仿真研究      城市道路交通流中观仿真研究智能运输系统;城市交通管理;计算机仿真;城市道路;交通流;路径选择
-网络健康可信性研究      网络健康可信性研究网络健康信息;可信性;评估模式
-脑瘫患儿家庭复原力的影响因素及干预模式雏形 研究 脑瘫患儿家庭复原力的影响因素及干预模式雏形研究脑瘫患儿;家庭功能;干预模式
-地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较      地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较
+参数含义说明
+* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
+* `recall_num`: 对 1 个文本召回的相似文本数量
+
+成功运行结束后，会输出如下评估指标:
+
+```
+recall@1=45.183
+recall@5=60.444
+recall@10=65.224
+recall@20=69.562
+recall@50=74.848
 ```
 
-执行如下命令开始预测：
-```shell
-python -u -m paddle.distributed.launch --gpus "0" \
-        predict.py \
-        --device gpu \
-        --params_path "./checkpoints/model_4400/model_state.pdparams"\
-        --batch_size 64 \
-        --max_seq_length 64 \
-        --text_pair_file 'test.tsv'
+<a name="预测"></a>
+
+## 7. 预测
+
+### 准备预测数据
+
+待预测数据为 tab 分隔的 tsv 文件，每一行为 1 个文本 Pair，部分示例如下:
+```
+热处理对尼龙6 及其与聚酰胺嵌段共聚物共混体系晶体熔融行为和结晶结构的影响        热处理对尼龙6及其与聚酰胺嵌段共聚物共混体系晶体熔融行为和结晶结构的影响尼龙6,聚酰胺嵌段共聚物,芳香聚酰胺,热处理
+面向生态系统服务的生态系统分类方案研发与应用.   面向生态系统服务的生态系统分类方案研发与应用
+huntington舞蹈病的动物模型      Huntington舞蹈病的动物模型
+试论我国海岸带经济开发的问题与前景      试论我国海岸带经济开发的问题与前景海岸带,经济开发,问题,前景
 ```
 
+### 开始预测
+
+以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
+```
+root_dir="checkpoints/train_0.001" 
+
+python -u -m paddle.distributed.launch --gpus "3" \
+    predict.py \
+    --device gpu \
+    --params_path "${root_dir}/model_40/model_state.pdparams" \
+    --output_emb_size 256 \
+    --batch_size 128 \
+    --max_seq_length 64 \
+    --text_pair_file "data/test.csv"
+```
+
+参数含义说明
+* `device`: 使用 cpu/gpu 进行训练
+* `params_path`： 预训练模型的参数文件名
+* `output_emb_size`: Transformer 顶层输出的文本向量维度
+* `text_pair_file`: 由文本 Pair 构成的待预测数据集
+
+也可以运行下面的bash脚本：
+
+```
+sh predict.sh
+```
+
+产出如下结果
+```
+0.7143095135688782
+0.7503598928451538
+0.5986768007278442
+0.15477174520492554
+0.7013391256332397
+0.16833056509494781
+0.40420448780059814
+0.8042442202568054
+0.475838303565979
+......
+```
+
+<a name="部署"></a>
+
+## 8. 部署
+
+### 动转静导出
+
+首先把动态图模型转换为静态图：
+
+```
+python export_model.py --params_path checkpoints/model_20000/model_state.pdparams --output_path=./output
+```
+也可以运行下面的bash脚本：
+
+```
+sh export.sh
+```
+
+### Python服务
+
+
+然后使用PaddleInference
+
+```
+python deploy/python/predict.py --model_dir=./output
+```
+也可以运行下面的bash脚本：
+
+```
+sh deploy.sh
+```
+最终输出的是256维度的特征向量
 
 
 

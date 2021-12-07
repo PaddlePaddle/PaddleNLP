@@ -202,19 +202,17 @@ c. 获取Query的Embedding并查询相似结果
 基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
 d. 评估
-基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 R@10 和 R@50
+基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
 ```
-root_dir="checkpoints/train_0.001" 
-corpus_num=280000
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "${root_dir}/model_10/model_state.pdparams" \
+        --params_path "checkpoints/model_25000/model_state.pdparams" \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -222,7 +220,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --max_seq_length 60 \
         --recall_num 50 \
         --similar_text_pair "data/test.csv" \
-        --corpus_file "data/corpus_${corpus_num}.csv" 
+        --corpus_file "data/corpus.csv" 
 ```
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
@@ -313,7 +311,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
 也可以运行下面的bash脚本：
 
 ```
-sh export.sh
+sh predict.sh
 ```
 
 产出如下结果
