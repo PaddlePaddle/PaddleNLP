@@ -120,7 +120,7 @@ URLS = {
     ],
     "name_category_map.json": [
         "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/name_category_map.json",
-        "40e8adaaadb567e90978c5389d595b48",
+        "c60810205993d307d919a26a3b96786f",
     ],
 }
 
