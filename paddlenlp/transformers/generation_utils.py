@@ -1458,6 +1458,6 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_eos_token_id
-            ]] = -1e9
+            ]] = -1e9  #TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores

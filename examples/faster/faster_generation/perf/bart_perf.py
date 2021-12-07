@@ -45,7 +45,8 @@ def parse_args():
         "--decode_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
+        choices=['greedy_search', 'beam_search', 'sampling'],
+        help="The decoding strategy. Can be one of ['greedy_search', 'beam_search', 'sampling']"
     )
     parser.add_argument(
         "--num_beams",

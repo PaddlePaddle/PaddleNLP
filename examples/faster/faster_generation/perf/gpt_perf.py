@@ -37,12 +37,16 @@ def parse_args():
         "--decode_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, sampling]")
+        choices=['greedy_search', 'sampling'],
+        help="The decoding strategy. Can be one of ['greedy_search', 'sampling']"
+    )
     parser.add_argument(
         "--top_k",
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
+    parser.add_argument(
+        "--batch_size", default=4, type=int, help="The size of input batch. ")
     parser.add_argument(
         "--top_p",
         default=1.0,
@@ -70,7 +74,8 @@ def do_predict(args):
     eos_id = tokenizer.convert_tokens_to_ids("<|endoftext|>")
 
     input_ids_np = np.array(
-        [[bos_id] for i in range(4)]).astype("int64").reshape([4, 1])
+        [[bos_id] for i in range(args.batch_size)]).astype("int64").reshape(
+            [args.batch_size, 1])
     input_ids = paddle.to_tensor(input_ids_np)
     # Define model
     num_loop = 100
