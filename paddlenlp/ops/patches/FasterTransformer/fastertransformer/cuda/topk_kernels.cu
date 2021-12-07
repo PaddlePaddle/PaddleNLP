@@ -1023,7 +1023,7 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
             output_cum_log_probs[i + 1] = tmp_f;
             int tmp_i = output_word_ids[i];
             output_word_ids[i] = output_word_ids[i + 1];
-            output_word_ids[i + 1] = output_word_ids[tmp_i];
+            output_word_ids[i + 1] = tmp_i;
             tmp_i = output_parent_ids[i];
             output_parent_ids[i] = output_parent_ids[i + 1];
             output_parent_ids[i + 1] = tmp_i;
