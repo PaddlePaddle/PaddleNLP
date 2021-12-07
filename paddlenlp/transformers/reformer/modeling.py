@@ -1147,9 +1147,9 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
         # query vector with a vector at another position. We therefore modify the masking
         # to forbid a token from attending to itself, except in situations
         # where a token has no other valid attention targets (e.g. the first token in a sequence) "
-
         self_mask = paddle.not_equal(
-            query_bucket_idx.unsqueeze(-1), key_value_bucket_idx.unsqueeze(-2))
+            query_bucket_idx.unsqueeze(-1).astype("int64"),
+            key_value_bucket_idx.unsqueeze(-2).astype("int64"))
 
         # apply self_mask
         query_key_dots = paddle.where(self_mask, query_key_dots,
@@ -1326,7 +1326,7 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
 
         # expand start indices and add correct chunk offset via arange
         expanded_start_indices = start_indices_chunk.unsqueeze(-1).expand(
-            indices.shape[0], total_chunk_size)
+            shape=[indices.shape[0], total_chunk_size])
         chunk_sequence_indices = expanded_start_indices + paddle.arange(
             total_chunk_size).unsqueeze(0).expand(
                 shape=[indices.shape[0], total_chunk_size])
