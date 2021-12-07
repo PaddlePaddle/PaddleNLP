@@ -531,10 +531,10 @@ public:
         isConfigExist = access(GEMM_CONFIG, 0);
       if (isConfigExist == -1) {
         if (!allow_gemm_test_) {
-          printf(
-              "[WARNING][OpenEncoder] %s is not found; using default GEMM "
-              "algo\n",
-              int8_mode_ != 0 ? IGEMM_CONFIG : GEMM_CONFIG);
+          // printf(
+          //     "[WARNING][OpenEncoder] %s is not found; using default GEMM "
+          //     "algo\n",
+          //     int8_mode_ != 0 ? IGEMM_CONFIG : GEMM_CONFIG);
         }
       } else {
         readAlgoFromConfig(int8_mode_, cublasAlgoMap_, parameterMap_);
