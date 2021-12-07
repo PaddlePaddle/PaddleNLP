@@ -160,7 +160,7 @@ def do_predict(args):
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
-                max_length=args.max_length+1,
+                max_length=args.max_length + 1,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
