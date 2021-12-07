@@ -33,6 +33,7 @@ __all__ = [
     'GPTLMHeadModel',
     'GPTForTokenClassification',
     'GPTForSequenceClassification',
+    'GPTForCausalLM',
 ]
 
 
@@ -1298,3 +1299,6 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 axis=-1))
 
         return pooled_logits
+
+
+GPTForCausalLM = GPTLMHeadModel
