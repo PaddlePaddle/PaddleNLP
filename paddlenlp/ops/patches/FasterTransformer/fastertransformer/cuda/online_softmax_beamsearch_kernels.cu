@@ -1125,14 +1125,6 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     if (finished_candidate_num == MAX_K / 2) {
       if (finish_num == finished_candidate_num &&
           (lowest_finish > lower_bound || early_stopping)) {  // when finishing
-        for (int i = 0; finish_num < MAX_K / 2; ++finish_num, ++i) {
-          output_word_ids[finish_num] = word_ids[i];
-          output_cum_log_probs[finish_num] =
-              (float)output_cum_log_probs[i + beam_width] / length_penalty;
-          output_parent_ids[finish_num] = output_parent_ids[i + beam_width];
-          sequence_length[finish_num] = step;
-          finished[finish_num] = 1;
-        }
         // If early stop, also mark the alive beams finished.
         for (int i = MAX_K / 2; i < MAX_K; ++i) {
           finished[i] = 1;

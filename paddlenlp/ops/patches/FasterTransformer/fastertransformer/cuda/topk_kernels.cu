@@ -848,7 +848,9 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
                                          int k,
                                          //  T diversity_rate,
                                          float length_penalty,
-                                         float max_length_penalty) {
+                                         float max_length_penalty,
+                                         const int finished_candidate_num,
+                                         const bool early_stopping) {
   const int size = beam_width * BLOCKS_PER_BEAM_ * beam_width * 2;
   const int tid = threadIdx.x;
   const int batch_id = blockIdx.x;
@@ -915,7 +917,7 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
           for (int i = 0; i < beam_width; i++) {
             output_word_ids[i] = end_id;
             output_parent_ids[i] = i;
-            if (output_cum_log_probs[i] != -1e20f) finish_num += 1;
+            if (finished[i]) finish_num++;
           }
         }
       }
@@ -934,7 +936,7 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
       int beam_id_in_output =
           batch_id * k + (beam_id % beam_width) + beam_width;
       int word_id = abs_id % vocab_size;
-      if (word_id == end_id) {
+      if (word_id == end_id && ite < finished_candidate_num) {
         // grow finish
         float score = cum_log_prob / length_penalty;
         if (score > output_cum_log_probs[beam_width - 1]) {
@@ -964,7 +966,7 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
           }
         }
         if (finish_num != beam_width) finish_num += 1;
-      } else if (alive_num < beam_width) {
+      } else if (alive_num < beam_width && word_id != end_id) {
         // grow alive
         parent_ids[alive_num] = beam_id;
         word_ids[alive_num] = word_id;
@@ -1000,20 +1002,62 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
     float lower_bound =
         (float)output_cum_log_probs[beam_width] / max_length_penalty;
 
-    // output must include both the finish and alive to trace full path
-    if (step == max_out_len || lowest_finish > lower_bound) {  // when finishing
-      for (int i = 0; finish_num < beam_width; ++finish_num, ++i) {
-        output_word_ids[finish_num] = word_ids[i];
-        output_cum_log_probs[finish_num] =
-            output_cum_log_probs[i + beam_width] / length_penalty;
-        output_parent_ids[finish_num] = output_parent_ids[i + beam_width];
-        sequence_length[finish_num] = step;
-        finished[finish_num] = 1;
+    if (finished_candidate_num == beam_width) {
+      if (finish_num == finished_candidate_num &&
+          (lowest_finish > lower_bound || early_stopping)) {
+        // If early stop, also mark the alive beams finished.
+        for (int i = beam_width; i < beam_width * 2; ++i) {
+          finished[i] = 1;
+          alive_finished[i - beam_width] = 1;
+        }
+      } else if (step == max_out_len) {
+        // sort on finish sequences and alive sequences
+        for (int ite = beam_width; ite < beam_width * 2; ++ite) {
+          output_cum_log_probs[ite] =
+              output_cum_log_probs[ite] / length_penalty;
+          for (int i = ite - 1;
+               i >= 0 && output_cum_log_probs[i + 1] > output_cum_log_probs[i];
+               --i) {
+            float tmp_f = output_cum_log_probs[i];
+            output_cum_log_probs[i] = output_cum_log_probs[i + 1];
+            output_cum_log_probs[i + 1] = tmp_f;
+            int tmp_i = output_word_ids[i];
+            output_word_ids[i] = output_word_ids[i + 1];
+            output_word_ids[i + 1] = tmp_i;
+            tmp_i = output_parent_ids[i];
+            output_parent_ids[i] = output_parent_ids[i + 1];
+            output_parent_ids[i + 1] = tmp_i;
+            tmp_i = sequence_length[i];
+            sequence_length[i] = sequence_length[i + 1];
+            sequence_length[i + 1] = tmp_i;
+            finished[i] = 1;
+            finished[i + 1] = 1;
+          }
+        }
+        // If early stop, also mark the alive beams finished.
+        for (int i = beam_width; i < beam_width * 2; ++i) {
+          finished[i] = 1;
+          alive_finished[i - beam_width] = 1;
+        }
       }
-      // If early stop, also mark the alive beams finished.
-      for (int i = beam_width; i < beam_width * 2; ++i) {
-        finished[i] = 1;
-        alive_finished[i - beam_width] = 1;
+
+    } else {
+      // output must include both the finish and alive to trace full path
+      if (step == max_out_len ||
+          lowest_finish > lower_bound) {  // when finishing
+        for (int i = 0; finish_num < beam_width; ++finish_num, ++i) {
+          output_word_ids[finish_num] = word_ids[i];
+          output_cum_log_probs[finish_num] =
+              output_cum_log_probs[i + beam_width] / length_penalty;
+          output_parent_ids[finish_num] = output_parent_ids[i + beam_width];
+          sequence_length[finish_num] = step;
+          finished[finish_num] = 1;
+        }
+        // If early stop, also mark the alive beams finished.
+        for (int i = beam_width; i < beam_width * 2; ++i) {
+          finished[i] = 1;
+          alive_finished[i - beam_width] = 1;
+        }
       }
     }
   }
@@ -1057,7 +1101,9 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
         max_out_len,                                                         \
         beam_width * 2,                                                      \
         length_penalty,                                                      \
-        max_length_penalty);                                                 \
+        max_length_penalty,                                                  \
+        finished_candidate_num,                                              \
+        early_stopping);                                                     \
     break;
 
 template <typename T>
@@ -1111,8 +1157,15 @@ void topK_update_kernelLauncher(
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
     T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
-    float length_penalty = std::pow((5. + step + 1) / 6., alpha);
-    float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., alpha);
+    const int finished_candidate_num = args.finished_candidate_num_;
+    const bool early_stopping = args.early_stopping_;
+    float length_penalty = (finished_candidate_num == beam_width)
+                               ? std::pow((5. + step - 1) / 6., alpha)
+                               : std::pow((5. + step + 1) / 6., alpha);
+    float max_length_penalty =
+        (finished_candidate_num == beam_width)
+            ? length_penalty
+            : std::pow((5. + max_out_len + 1) / 6., alpha);
     if (diversity_rate == 0.0f) {
       switch (beam_width) {
         CASE_K(1, 128, 128, 8);
@@ -1154,7 +1207,9 @@ void topK_update_kernelLauncher(
               beam_width * 2,
               // diversity_rate,
               length_penalty,
-              max_length_penalty);
+              max_length_penalty,
+              finished_candidate_num,
+              early_stopping);
           break;
       }
     } else {
@@ -1192,7 +1247,9 @@ void topK_update_kernelLauncher(
           beam_width * 2,
           // diversity_rate,
           length_penalty,
-          max_length_penalty);
+          max_length_penalty,
+          finished_candidate_num,
+          early_stopping);
     }
     return;
   }

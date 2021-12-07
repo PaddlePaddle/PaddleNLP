@@ -125,7 +125,8 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
-    if (args_.beam_width_ > 16) is_fuse_topk_softMax_ = false;
+    if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
+      is_fuse_topk_softMax_ = false;
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;
     else if (std::is_same<DataType_, half>::value)
@@ -143,9 +144,6 @@ public:
                                         ? beam_width * 2
                                         : finished_candidate_num;
     args_.early_stopping_ = early_stopping;
-
-    if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
-      is_fuse_topk_softMax_ = false;
 
     K_cache_ = new DataType_ *[2];
     V_cache_ = new DataType_ *[2];
