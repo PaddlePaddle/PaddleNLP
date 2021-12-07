@@ -1,2 +1,0 @@
-transformers
-tensorflow_text

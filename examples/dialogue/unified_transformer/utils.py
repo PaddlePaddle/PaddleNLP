@@ -234,9 +234,7 @@ def select_response(ids,
             preds = sorted(preds, key=lambda x: -x[1])
             results.append(preds[0][0])
     else:
-        if len(ids.shape) > 2:
-            ids = ids[:, :, 0]
-        ids = ids.numpy().transpose()
+        ids = ids.numpy()
 
         for pred in ids:
             pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
@@ -246,8 +244,17 @@ def select_response(ids,
             else:
                 response = "".join(pred_tokens)
 
-            # TODO: Support return scores in FT.
-            tmp.append([response])
+            in_turn_repetition = get_in_turn_repetition(
+                pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
+
+            last_pos = 0
+            if (max_dec_len is not None and
+                    num_token >= max_dec_len) or in_turn_repetition:
+                tmp.append([response])
+            else:
+                tmp.insert(last_pos, [response])
+                last_pos += 1
+
             if len(tmp) == num_return_sequences:
                 group.append(tmp)
                 tmp = []

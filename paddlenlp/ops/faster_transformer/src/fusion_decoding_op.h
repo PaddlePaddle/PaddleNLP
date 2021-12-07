@@ -16,10 +16,10 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
-#include "fastertransformer/common.h"
 #include "fastertransformer/decoding_beamsearch.h"
 #include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/open_decoder.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
@@ -66,15 +66,15 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
-    std::string decoding_strategy,
-    int beam_size,
-    int topk,
-    float topp,
-    int n_head,
-    int size_per_head,
-    int num_layer,
-    int bos_id,
-    int eos_id,
-    int64_t max_len,
-    float beam_search_diversity_rate,
-    float alpha);
+    const std::string& decoding_strategy,
+    const int& beam_size,
+    const int& topk,
+    const float& topp,
+    const int& n_head,
+    const int& size_per_head,
+    const int& num_layer,
+    const int& bos_id,
+    const int& eos_id,
+    const int64_t& max_len,
+    const float& beam_search_diversity_rate,
+    const float& alpha);
