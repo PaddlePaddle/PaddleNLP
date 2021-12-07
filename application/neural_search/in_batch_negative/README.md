@@ -87,6 +87,7 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 |—— data.py # 数据读取、数据转换等预处理逻辑
 |—— evaluate.py # 根据召回结果和评估集计算评估指标
 |—— predict.py # 给定输入文件，计算文本 pair 的相似度
+|—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
 ```
 

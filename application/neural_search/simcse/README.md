@@ -79,10 +79,15 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 ```
 simcse/
 ├── model.py # SimCSE 模型组网代码
+|—— deploy
+    |—— python
+        |—— predict.py # PaddleInference
+|—— ann_util.py # Ann 建索引库相关函数
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
 ├── predict.py # 基于训练好的无监督语义匹配模型计算文本 Pair 相似度
 ├── evaluate.py # 根据召回结果和评估集计算评估指标
 |—— predict.py # 给定输入文件，计算文本 pair 的相似度
+|—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
 └── train.py # SimCSE 模型训练、评估逻辑
 ```

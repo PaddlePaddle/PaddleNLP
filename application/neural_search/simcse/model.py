@@ -49,6 +49,7 @@ class SimCSE(nn.Layer):
         # Used scaling cosine similarity to ease converge
         self.sacle = scale
 
+    @paddle.jit.to_static(input_spec=[paddle.static.InputSpec(shape=[None, None], dtype='int64'),paddle.static.InputSpec(shape=[None, None], dtype='int64')])
     def get_pooled_embedding(self,
                              input_ids,
                              token_type_ids=None,
