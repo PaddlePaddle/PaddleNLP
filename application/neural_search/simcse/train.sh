@@ -13,6 +13,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
     --output_emb_size 256 \
 	--train_set_file "./data/train_unsupervised.csv" \
 	--test_set_file "./data/test.csv" 
+	--model_name_or_path "post_ernie"
 	# --init_from_ckpt "./init_from_ckpt/model_state.pdparams"
 
 

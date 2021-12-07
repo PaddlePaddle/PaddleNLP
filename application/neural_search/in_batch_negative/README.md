@@ -68,6 +68,7 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 * paddlepaddle-gpu >= 2.1.3
 * paddlenlp >= 2.1
 * hnswlib >=0.5.2
+* visualdl
 
 - [hnswlib](https://github.com/nmslib/hnswlib)
 
