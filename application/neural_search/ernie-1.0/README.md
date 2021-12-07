@@ -1,4 +1,19 @@
-# Ernie-1.0 预训练
+
+ **目录**
+
+* [背景介绍](#背景介绍)
+* [Ernie-1.0](#Ernie-1.0)
+    * [1. 技术方案和评估指标](#技术方案)
+    * [2. 环境依赖](#环境依赖)  
+    * [3. 代码结构](#代码结构)
+    * [4. 数据准备](#数据准备)
+    * [5. 模型训练](#模型训练)
+    * [6. 模型转换](#模型转换)
+
+<a name="背景介绍"></a>
+
+# 背景介绍
+
 
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
@@ -7,50 +22,112 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 同时，ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
 本示例采用了全新数据流程，适配了ERNIE预训练任务，具有高效易用，方便快捷的特点。支持动态文本mask，自动断点训练重启等。
-用户可以根据自己的需求，灵活修改mask方式。具体可以参考`../data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
+用户可以根据自己的需求，灵活修改mask方式。具体可以参考`./data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
 用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
 
-### 环境依赖
 
-- visualdl
-- pybind11
+<a name="Ernie-1.0"></a>
+
+# Ernie-1.0
+
+
+<a name="技术方案"></a>
+
+## 1. 技术方案和评估指标
+
+### 技术方案
+采用ERNIE1.0预训练垂直领域的模型
+
+
+<a name="环境依赖"></a>
+
+## 2. 环境依赖和安装说明
+
+**环境依赖**
+* python >= 3.x
+* paddlepaddle-gpu >= 2.1.3
+* paddlenlp >= 2.1
+* visualdl
+* pybind11
 
 安装命令 `pip install visualdl pybind11`
 
-### 数据准备
+<a name="代码结构"></a>
+
+## 3. 代码结构
+
+以下是本项目主要代码结构及说明：
+
+```
+ernie-1.0/
+├── ernie_static_to_dynamic.py # 静态图转动态图
+├── run_pretrain_static.py # ernie1.0静态图预训练
+├── args.py # 预训练的参数配置文件
+└── data_tools # 预训练数据处理文件目录
+        └── python
+```
+
+<a name="数据准备"></a>
+
+## 4. 数据准备
+
 数据准备部分请移步[data_tools](./data_tools/)目录，根据文档，创建训练数据。
 
-### 使用方法
+## 5. 模型训练
+
+**排序模型下载链接：**
+
+|Model|训练参数配置|硬件|MD5|
+| ------------ | ------------ | ------------ |-----------|
+|[ERNIE-1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">8卡 v100-32g</div>|-|
+
+### 训练环境说明
+
+```
+NVIDIA Driver Version: 440.64.00 
+Ubuntu 16.04.6 LTS (Docker)
+Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+```
+
+### 单机单卡训练/单机多卡训练
+
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
+
+
+
+### 模型训练
+
+
 ```
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/ernie-1.0-dp8-gb512/log" \
+    --gpus "0,1,2,3" \
+    --log_dir "output/$task_name/log" \
     run_pretrain_static.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0" \
     --input_dir "./data" \
-    --output_dir "output/ernie-1.0-dp8-gb512" \
+    --output_dir "output/$task_name" \
     --max_seq_len 512 \
-    --micro_batch_size 64 \
-    --global_batch_size 512 \
+    --micro_batch_size 32 \
+    --global_batch_size 128 \
     --sharding_degree 1\
-    --dp_degree 8 \
+    --dp_degree 4 \
     --use_sharding false \
     --use_amp true \
     --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
-    --max_steps 4000000 \
-    --save_steps 50000 \
+    --max_steps 200000 \
+    --save_steps 100000 \
     --checkpoint_steps 5000 \
-    --decay_steps 3960000 \
-    --weight_decay 0.01 \
-    --warmup_rate 0.0025 \
+    --decay_steps 1980000 \
+    --weight_decay 0.01\
+    --warmup_rate 0.01 \
     --grad_clip 1.0 \
-    --logging_freq 20\
     --num_workers 2 \
+    --logging_freq 20\
     --eval_freq 1000 \
-    --device "gpu"\
+    --device "gpu"
 ```
 也可以直接运行脚本：
 
@@ -87,7 +164,12 @@ sh run_static.sh
 - 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。可以使用梯度累积的方式增大`global_batch_size`。设置`global_batch_size`为理论值的整数倍是，默认启用梯度累积。
 - 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
 
+<a name="模型转换"></a>
+
+## 7. 模型转换
+
 ### 静态图转动态图
+
 修改代码中的路径：
 
 ```
@@ -98,7 +180,6 @@ static_model_path="./output/ernie-1.0-dp8-gb1024/model_last/static_vars"
 python ernie_static_to_dynamic.py
 ```
 运行结束后，动态图的模型就会保存到ernie_checkpoint文件夹里，也可以根据情况，修改代码，保存到自己的指定路径
-
 
 ### 参考文献
 - [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/pdf/1904.09223.pdf)

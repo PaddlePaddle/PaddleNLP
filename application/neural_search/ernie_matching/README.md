@@ -105,7 +105,7 @@ python generate_data.py
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE-Gram-Sort](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+|[ERNIE-Gram-Sort](https://bj.bcebos.com/v1/paddlenlp/models/ernie_gram_sort.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
 
 
 ### 训练环境说明
