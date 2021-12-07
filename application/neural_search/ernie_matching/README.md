@@ -1,17 +1,59 @@
-# 基于预训练模型 ERNIE-Gram 的单塔文本匹配
 
-我们基于预训练模型 ERNIE-Gram 给出了单塔文本匹配的 2 种训练范式: Point-wise 和 Pair-wise。其中单塔 Point-wise 匹配模型适合直接对文本对进行 2 分类的应用场景: 例如判断 2 个文本是否为语义相似；Pair-wise 匹配模型适合将文本对相似度作为特征之一输入到上层排序模块进行排序的应用场景。
+ **目录**
 
-## 模型下载
-本项目使用语义匹配数据集万方的真实场景的数据 为训练集 , 基于 ERNIE-Gram 预训练模型热启训练并开源了单塔 Point-wise 语义匹配模型， 用户可以直接基于这个模型对文本对进行语义匹配的 2 分类任务。
+* [背景介绍](#背景介绍)
+* [ERNIE-Gram](#ERNIE-Gram)
+    * [1. 技术方案和评估指标](#技术方案)
+    * [2. 环境依赖](#环境依赖)  
+    * [3. 代码结构](#代码结构)
+    * [4. 数据准备](#数据准备)
+    * [5. 模型训练](#模型训练)
+    * [6. 评估](#开始评估)
+    * [7. 预测](#预测)
+    * [8. 部署](#部署)
 
-| 模型  | dev acc |
-| ---- | ------- |
-| [ERNIE-Gram-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 98.773% |
+<a name="背景介绍"></a>
 
-## 快速开始
+# 背景介绍
 
-### 代码结构说明
+基于ERNIE-Gram训练Pair-wise模型。Pair-wise 匹配模型适合将文本对相似度作为特征之一输入到上层排序模块进行排序的应用场景。
+
+
+<a name="ERNIE-Gram"></a>
+
+# ERNIE-Gram 
+
+<a name="技术方案"></a>
+
+## 1. 技术方案和评估指标
+
+### 技术方案
+双塔模型，采用ERNIE1.0热启
+在...阶段引入SimCSE 策略...
+
+
+### 评估指标
+
+（1）采用 AUC 指标来评估排序模型的排序效果。
+
+**效果评估**
+
+|  模型 |  AUC |
+| ------------ | ------------ |
+|  ERNIE-Gram |  0.801 | 
+
+<a name="环境依赖"></a>
+
+## 2. 环境依赖和安装说明
+
+**环境依赖**
+* python >= 3.x
+* paddlepaddle-gpu >= 2.1.3
+* paddlenlp >= 2.1
+
+<a name="代码结构"></a>
+
+## 3. 代码结构
 
 以下是本项目主要代码结构及说明：
 
@@ -28,127 +70,171 @@ ernie_matching/
 └── train.py # 模型训练评估
 ```
 
-### 模型训练
+<a name="数据准备"></a>
 
-数据集使用的是万方的数据集，可以运行下面的命令，在训练集（wanfang_train.csv）上进行单塔 Point-wise 模型训练，并在测试集（wanfang_test.csv）验证。
+## 4. 数据准备
 
-|  训练集 | 测试集 | 
-| ------------ | ------------ | 
- |  59849| 29924 |
+### 数据集说明
+
+样例数据如下:
+```
+个人所得税税务筹划      基于新个税视角下的个人所得税纳税筹划分析新个税;个人所得税;纳税筹划      个人所得税工资薪金税务筹划研究个人所得税,工资薪金,税务筹划
+液压支架底座受力分析    ZY4000/09/19D型液压支架的有限元分析液压支架,有限元分析,两端加载,偏载,扭转       基于ANSYS的液压支架多工况受力分析液压支架,四种工况,仿真分析,ANSYS,应力集中,优化
+迟发性血管痉挛  西洛他唑治疗动脉瘤性蛛网膜下腔出血后脑血管痉挛的Meta分析西洛他唑,蛛网膜下腔出血,脑血管痉挛,Meta分析     西洛他唑治疗动脉瘤性蛛网膜下腔出血后脑血管痉挛的Meta分析西洛他唑,蛛网膜下腔出血,脑血管痉挛,Meta分析
+氧化亚硅        复合溶胶-凝胶一锅法制备锂离子电池氧化亚硅/碳复合负极材料氧化亚硅,溶胶-凝胶法,纳米颗粒,负极,锂离子电池   负载型聚酰亚胺-二氧化硅-银杂化膜的制备和表征聚酰亚胺,二氧化硅,银,杂化膜,促进传输
+```
+#### 构造数据集
+
+用下面的脚本构建排序数据集
+
+```
+python generate_data.py
+```
+
+### 数据集下载
 
 
-```shell
-$ unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "0" train_pointwise.py \
+- [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
+
+<a name="模型训练"></a>
+
+## 5. 模型训练
+
+**排序模型下载链接：**
+
+
+|Model|训练参数配置|硬件|MD5|
+| ------------ | ------------ | ------------ |-----------|
+|[ERNIE-Gram-Sort](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+
+
+### 训练环境说明
+
+```
+NVIDIA Driver Version: 440.64.00 
+Ubuntu 16.04.6 LTS (Docker)
+Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+```
+
+### 单机单卡训练/单机多卡训练
+
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
+
+训练的命令如下：
+
+```
+python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
         --device gpu \
         --save_dir ./checkpoints \
         --batch_size 32 \
-        --learning_rate 2E-5
+        --learning_rate 2E-5 \
+        --margin 0.1 \
+        --eval_step 100 \
+        --train_file data/train_pairwise.csv \
+        --test_file data/test_pairwise.csv
 ```
-也可以直接执行下面的命令：
+也可以运行bash脚本：
 
 ```
 sh train.sh
 ```
 
-可支持配置的参数：
+<a name="评估"></a>
 
-* `save_dir`：可选，保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
-* `max_seq_length`：可选，ERNIE-Gram 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
-* `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。
-* `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.0。
-* `epochs`: 训练轮次，默认为3。
-* `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
-* `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
-* `seed`：可选，随机种子，默认为1000.
-* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
+## 6. 评估
 
-代码示例中使用的预训练模型是 ERNIE-Gram，如果想要使用其他预训练模型如 ERNIE, BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 
-```python
-
-# 使用 ERNIE-Gram 预训练模型
-model = ppnlp.transformers.ErnieGramModel.from_pretrained('ernie-gram-zh')
-tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained('ernie-gram-zh')
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
-
-程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
-如：
-```text
-checkpoints/
-├── model_100
-│   ├── model_state.pdparams
-│   ├── tokenizer_config.json
-│   └── vocab.txt
-└── ...
+unset CUDA_VISIBLE_DEVICES
+python -u -m paddle.distributed.launch --gpus "0" evaluate.py \
+        --device gpu \
+        --batch_size 32 \
+        --learning_rate 2E-5 \
+        --init_from_ckpt "./checkpoints/model_30000/model_state.pdparams" \
+        --test_file data/test_pairwise.csv
 ```
 
-**NOTE:**
-* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
+成功运行后会输出下面的指标：
 
-### 基于动态图模型预测
-
-我们用 万方 的测试集作为预测数据,  测试数据示例如下，：
-```text
-基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试      基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测     1
-肺炎链球菌脑膜炎        儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点     1
-小学生  学习态度        数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养 1
-乙状结肠冗长症的诊断及手术治疗  乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗    1
-电动叉车线控转向系统建模与控制策略研究  电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术     1
-基于Python的京东        一种基于Python的商品评论数据智能获取与分析技术商品评论,Python,爬虫,分词,数据分析        1
-广西横县华支睾吸虫      广西横县集贸市场淡水鱼虾华支睾吸虫囊蚴感染调查淡水鱼、虾,华支睾吸虫,囊蚴,感染   1
-. 从国家自然科学基金申请和评审程序 探讨如何提高申请书质量       从国家自然科学基金申请和评审程序探讨如何提高申请书质量国家自然科学基金,申请书,评审程序,撰写提纲,写作技巧   1
+```
+eval_dev auc:0.796
 ```
 
-启动预测：
+<a name="预测"></a>
+
+## 7. 预测
+
+### 准备预测数据
+
+待预测数据为 tab 分隔的 tsv 文件，每一行为 1 个文本 Pair，和文本pair的语义索引相似度，部分示例如下:
+
+```
+中西方语言与文化的差异  第二语言习得的一大障碍就是文化差异。    0.5160342454910278
+中西方语言与文化的差异  跨文化视角下中国文化对外传播路径琐谈跨文化,中国文化,传播,翻译   0.5145505666732788
+中西方语言与文化的差异  从中西方民族文化心理的差异看英汉翻译语言,文化,民族文化心理,思维方式,翻译        0.5141439437866211
+中西方语言与文化的差异  中英文化差异对翻译的影响中英文化,差异,翻译的影响        0.5138794183731079
+中西方语言与文化的差异  浅谈文化与语言习得文化,语言,文化与语言的关系,文化与语言习得意识,跨文化交际      0.5131710171699524
+```
+
+
+
+
+
+### 开始预测
+
+以上述 demo 数据为例，运行如下命令基于我们开源的 ERNIE-Gram模型开始计算文本 Pair 的语义相似度:
 
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
 python -u -m paddle.distributed.launch --gpus "0" \
-        predict_pointwise.py \
+        predict_pairwise.py \
         --device gpu \
-        --params_path "./checkpoints/model_4400/model_state.pdparams"\
+        --params_path "./checkpoints/model_30000/model_state.pdparams"\
         --batch_size 128 \
         --max_seq_length 64 \
-        --input_file 'test.tsv'
+        --input_file 'data/recall_predict.csv'
 ```
 也可以直接执行下面的命令：
 
 ```
 sh predict.sh
 ```
+得到下面的输出：
 
-输出预测结果如下:
-```text
-{'query': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试', 'title': '基于微流控芯片的尿路感染细菌鉴定及抗生素敏感性测试微流控芯片,细菌鉴定,抗生素敏感性测试,快速检测', 'label': 1, 'pred_label': 1}
-{'query': '肺炎链球菌脑膜炎', 'title': '儿童重症监护病房肺炎链球菌感染的化脓性脑膜炎临床分析儿童重症监护室,肺炎链球菌,化脓性脑膜炎,临床特点', 'label': 1, 'pred_label': 1}
-{'query': '小学生  学习态度', 'title': '数学学科中如何培养小学生主动学习的态度学习态度,小学生,教学,培养', 'label': 1, 'pred_label': 1}
-{'query': '乙状结肠冗长症的诊断及手术治疗', 'title': '乙状结肠冗长症的诊断及手术治疗乙状结肠冗长,诊断,治疗', 'label': 1, 'pred_label': 1}
-{'query': '电动叉车线控转向系统建模与控制策略研究', 'title': '电动叉车线控转向系统建模与控制策略研究电动叉车;线控转向;模糊控制;计算机技术', 'label': 1, 'pred_label': 1}
+```
+中西方语言与文化的差异  中西方文化差异以及语言体现中西方文化,差异,语言体现      0.999848484992981
+中西方语言与文化的差异  论中西方语言与文化差异的历史渊源中西方语言,中西方文化,差异,历史渊源     0.9998375177383423
+中西方语言与文化的差异  从日常生活比较中西方语言与文化的差异中西方,语言,文化,比较       0.9985846281051636
+中西方语言与文化的差异  试论中西方语言文化教育的差异比较与融合中西方,语言文化教育,差异  0.9972485899925232
+中西方语言与文化的差异  中西方文化差异对英语学习的影响中西方文化,差异,英语,学习 0.9831035137176514
+中西方语言与文化的差异  跨文化视域下的中西文化差异研究跨文化,中西,文化差异      0.9781349897384644
 ```
 
-### 基于静态图部署预测
-#### 模型导出
-使用动态图训练结束之后，可以使用静态图导出工具 `export_model.py` 将动态图参数导出成静态图参数。 执行如下命令：
+<a name="部署"></a>
 
-`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+## 8. 部署
 
-也可以直接执行命令：
+### 动转静导出
+
+首先把动态图模型转换为静态图：
+
+```
+python export_model.py --params_path checkpoints/model_30000/model_state.pdparams --output_path=./output
+```
+也可以运行下面的bash脚本：
 
 ```
 sh export.sh
 ```
 
-其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
+### Python服务
 
-#### 预测部署
-导出静态图模型之后，可以基于静态图模型进行预测，`deploy/python/predict.py` 文件提供了静态图预测示例。执行如下命令：
 
-`python deploy/python/predict.py --model_dir ./output`
+然后使用PaddleInference
 
-也可以直接执行命令：
+```
+python deploy/python/predict.py --model_dir=./output
+```
+也可以运行下面的bash脚本：
 
 ```
 sh deploy.sh

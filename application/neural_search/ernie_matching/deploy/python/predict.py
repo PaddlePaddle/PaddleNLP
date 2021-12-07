@@ -223,7 +223,7 @@ if __name__ == "__main__":
         'ernie-gram-zh')
 
     # test_ds = load_dataset("lcqmc", splits=["test"])
-    input_file='data/wanfang_test.csv'
+    input_file='data/test_pairwise.csv'
     test_ds = load_dataset(read,src_path=input_file, lazy=False)
 
     data = [{'query': d['query'], 'title': d['title']} for d in test_ds]

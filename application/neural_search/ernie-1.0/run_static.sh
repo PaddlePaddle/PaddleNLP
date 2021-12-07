@@ -1,12 +1,4 @@
-set -x
-export PADDLE_WITH_GLOO=0
-export FLAGS_call_stack_level=2
 unset CUDA_VISIBLE_DEVICES
-
-rm -rf *.prototxt
-rm -rf core.*
-rm -rf start_sharding*
-rm -rf main_sharding*
 
 task_name="ernie-1.0-dp8-gb1024"
 rm -rf output/$task_name/log
