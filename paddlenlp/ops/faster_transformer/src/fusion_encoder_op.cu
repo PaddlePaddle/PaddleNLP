@@ -21,7 +21,6 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
-#include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fastertransformer/cuda/cuda_kernels.h"
@@ -72,6 +71,8 @@ std::vector<paddle::Tensor> encoder_kernel(
     bool allow_gemm_test,
     bool use_trt_kernel_,
     bool normalize_before,
+    cublasHandle_t cublas_handle_,
+    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   int batch_size_ = input.shape()[0];
   int max_seq_len_ = input.shape()[1];
@@ -96,9 +97,8 @@ std::vector<paddle::Tensor> encoder_kernel(
     BertInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
-    encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
-    encoder_param.cublaslt_handle =
-        CublasHandle::GetInstance()->cublaslt_handle_;
+    encoder_param.cublas_handle = cublas_handle_;
+    encoder_param.cublaslt_handle = cublaslt_handle_;
     encoder_param.from_tensor =
         reinterpret_cast<const DataType_*>(input.data<data_t_>());
 
@@ -149,7 +149,6 @@ std::vector<paddle::Tensor> encoder_kernel(
         reinterpret_cast<const DataType_*>(norm2_weight.data<data_t_>());
     encoder_param.ffn_layernorm.beta =
         reinterpret_cast<const DataType_*>(norm2_bias.data<data_t_>());
-
     int valid_word_num;
 
     encoder_param.sequence_id_offset = nullptr;
@@ -174,21 +173,19 @@ std::vector<paddle::Tensor> encoder_kernel(
                             head_num_,
                             size_per_head_,
                             use_trt_kernel_);
-
     encoder->initialize(encoder_param);
     encoder->forward();
     encoder->freeBuffer();
-
     delete allocator_;
     delete encoder;
   } else {
     // Pre-Normalization
+
     EncoderInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
-    encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
-    encoder_param.cublaslt_handle =
-        CublasHandle::GetInstance()->cublaslt_handle_;
+    encoder_param.cublas_handle = cublas_handle_;
+    encoder_param.cublaslt_handle = cublaslt_handle_;
     encoder_param.from_tensor =
         reinterpret_cast<const DataType_*>(input.data<data_t_>());
 
@@ -270,8 +267,10 @@ std::vector<paddle::Tensor> encoder_kernel(
     delete allocator_;
     delete encoder;
   }
+
   return {encoder_out};
 }
+
 
 std::vector<paddle::Tensor> EncoderCUDAForward(
     const paddle::Tensor& input,
@@ -316,7 +315,14 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     bool normalize_before) {
   auto stream = input.stream();
 
-  cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
+  cublasHandle_t cublas_handle_;
+  cublasLtHandle_t cublaslt_handle_;
+
+  cublasCreate(&cublas_handle_);
+  cublasSetStream(cublas_handle_, stream);
+
+  cublasLtCreate(&cublaslt_handle_);
+  // cublasLtSetStream(cublaslt_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
 
@@ -354,6 +360,8 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
                                                       allow_gemm_test,
                                                       use_trt_kernel,
                                                       normalize_before,
+                                                      cublas_handle_,
+                                                      cublaslt_handle_,
                                                       stream);
 
       break;
@@ -391,6 +399,8 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
                                                       allow_gemm_test,
                                                       use_trt_kernel,
                                                       normalize_before,
+                                                      cublas_handle_,
+                                                      cublaslt_handle_,
                                                       stream);
       break;
     }
@@ -401,5 +411,7 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
       break;
     }
   }
+
+  cublasDestroy(cublas_handle_);
   return ret;
 }
