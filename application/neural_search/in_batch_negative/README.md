@@ -143,14 +143,19 @@ python generate_recall.py
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[batch_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:128 max_len:64 </div>|<div style="width: 100pt">单卡v100-16g</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
+|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/inbatch_model.zip)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
 
 ### 训练环境说明
-说明系统（Linux or Windows，cpu or gpu）硬件情况
+
+```
+NVIDIA Driver Version: 440.64.00 
+Ubuntu 16.04.6 LTS (Docker)
+Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+```
 
 ### 单机单卡训练/单机多卡训练
-默认采用单机单卡训练，如果单机单卡跑不动，需要说明。
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，用时xx天/小时/分钟。
+
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
 
 ```
 root_path=train_0.001
@@ -262,6 +267,16 @@ bash evaluate.sh
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 
+成功运行结束后，会输出如下评估指标:
+
+```
+recall@1=51.261
+recall@5=65.279
+recall@10=69.848
+recall@20=73.971
+recall@50=78.84
+```
+
 <a name="预测"></a>
 
 ## 7. 预测
@@ -279,16 +294,19 @@ bash evaluate.sh
 ```
 
 ### 开始预测
+
 以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
 ```
-python -u -m paddle.distributed.launch --gpus "0" \
+root_dir="checkpoints/train_0.001" 
+
+python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
     --device gpu \
-    --params_path "./checkpoints/batch_neg_v1.0.0/model_state.pdparams" \
-    --output_emb_size 256
+    --params_path "${root_dir}/model_40/model_state.pdparams" \
+    --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
-    --text_pair_file ${your_input_file}
+    --text_pair_file "data/test.csv"
 ```
 
 参数含义说明
@@ -296,6 +314,20 @@ python -u -m paddle.distributed.launch --gpus "0" \
 * `params_path`： 预训练模型的参数文件名
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `text_pair_file`: 由文本 Pair 构成的待预测数据集
+
+也可以运行下面的bash脚本：
+
+```
+sh export.sh
+```
+
+产出如下结果
+```
+0.9702320098876953
+0.8640356659889221
+0.9705482721328735
+0.7790936231613159
+```
 
 <a name="部署"></a>
 
