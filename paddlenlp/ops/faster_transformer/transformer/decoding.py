@@ -986,15 +986,11 @@ class InferUnifiedDecoding(nn.Layer):
                     paddle.concat(
                         [
                             transfer_param(
-                                mod.self_attn.q_proj.weight,
-                                restore_data=True,
-                                reserve_var=True), transfer_param(
-                                    mod.self_attn.k_proj.weight,
-                                    restore_data=True,
-                                    reserve_var=True), transfer_param(
-                                        mod.self_attn.v_proj.weight,
-                                        restore_data=True,
-                                        reserve_var=True)
+                                mod.self_attn.q_proj.weight, restore_data=True),
+                            transfer_param(
+                                mod.self_attn.k_proj.weight, restore_data=True),
+                            transfer_param(
+                                mod.self_attn.v_proj.weight, restore_data=True)
                         ],
                         axis=-1))
                 self.sub_modules["slf_q_bias"].append(
@@ -1003,175 +999,132 @@ class InferUnifiedDecoding(nn.Layer):
                             transfer_param(
                                 mod.self_attn.q_proj.bias,
                                 is_bias=True,
-                                restore_data=True,
-                                reserve_var=True), transfer_param(
+                                restore_data=True), transfer_param(
                                     mod.self_attn.k_proj.bias,
                                     is_bias=True,
-                                    restore_data=True,
-                                    reserve_var=True), transfer_param(
+                                    restore_data=True), transfer_param(
                                         mod.self_attn.v_proj.bias,
                                         is_bias=True,
-                                        restore_data=True,
-                                        reserve_var=True)
+                                        restore_data=True)
                         ],
                         axis=-1))
                 self.sub_modules["slf_k_weight"].append(
                     transfer_param(
-                        mod.self_attn.k_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.k_proj.weight, restore_data=True))
                 self.sub_modules["slf_k_bias"].append(
                     transfer_param(
                         mod.self_attn.k_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["slf_v_weight"].append(
                     transfer_param(
-                        mod.self_attn.v_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.v_proj.weight, restore_data=True))
                 self.sub_modules["slf_v_bias"].append(
                     transfer_param(
                         mod.self_attn.v_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["slf_out_weight"].append(
                     transfer_param(
-                        mod.self_attn.out_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.out_proj.weight, restore_data=True))
                 self.sub_modules["slf_out_bias"].append(
                     transfer_param(
                         mod.self_attn.out_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["ffn_inter_weight"].append(
                     transfer_param(
-                        mod.linear1.weight, restore_data=True,
-                        reserve_var=True))
+                        mod.linear1.weight, restore_data=True))
                 self.sub_modules["ffn_inter_bias"].append(
                     transfer_param(
-                        mod.linear1.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.linear1.bias, is_bias=True, restore_data=True))
                 self.sub_modules["ffn_out_weight"].append(
                     transfer_param(
-                        mod.linear2.weight, restore_data=True,
-                        reserve_var=True))
+                        mod.linear2.weight, restore_data=True))
                 self.sub_modules["ffn_out_bias"].append(
                     transfer_param(
-                        mod.linear2.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.linear2.bias, is_bias=True, restore_data=True))
                 self.sub_modules["slf_ln_weight"].append(
                     transfer_param(
-                        mod.norm1.weight, restore_data=True, reserve_var=True))
+                        mod.norm1.weight, restore_data=True))
                 self.sub_modules["slf_ln_bias"].append(
                     transfer_param(
-                        mod.norm1.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.norm1.bias, is_bias=True, restore_data=True))
                 self.sub_modules["ffn_ln_weight"].append(
                     transfer_param(
-                        mod.norm2.weight, restore_data=True, reserve_var=True))
+                        mod.norm2.weight, restore_data=True))
                 self.sub_modules["ffn_ln_bias"].append(
                     transfer_param(
-                        mod.norm2.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.norm2.bias, is_bias=True, restore_data=True))
 
             self.sub_modules["word_emb"] = [
                 transfer_param(
                     self._model.embeddings.word_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["pos_emb"] = [
                 transfer_param(
                     self._model.embeddings.position_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["type_emb"] = [
                 transfer_param(
                     self._model.embeddings.token_type_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             if self._normalize_before:
                 self.sub_modules["decoder_ln_weight"] = [
                     transfer_param(
-                        self._model.encoder.norm.weight,
-                        restore_data=True,
-                        reserve_var=True)
+                        self._model.encoder.norm.weight, restore_data=True)
                 ]
                 self.sub_modules["decoder_ln_bias"] = [
                     transfer_param(
                         self._model.encoder.norm.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
+                        restore_data=True)
                 ]
             else:
                 self.sub_modules["decoder_ln_weight"] = [
                     transfer_param(
-                        self._model.encoder_norm.weight,
-                        restore_data=True,
-                        reserve_var=True)
+                        self._model.encoder_norm.weight, restore_data=True)
                 ]
                 self.sub_modules["decoder_ln_bias"] = [
                     transfer_param(
                         self._model.encoder_norm.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
+                        restore_data=True)
                 ]
             self.sub_modules["trans_weight"] = [
                 transfer_param(
-                    self._model.lm_head.transform.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    self._model.lm_head.transform.weight, restore_data=True)
             ]
             self.sub_modules["trans_bias"] = [
                 transfer_param(
                     self._model.lm_head.transform.bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["lm_ln_weight"] = [
                 transfer_param(
-                    self._model.lm_head.layer_norm.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    self._model.lm_head.layer_norm.weight, restore_data=True)
             ]
             self.sub_modules["lm_ln_bias"] = [
                 transfer_param(
                     self._model.lm_head.layer_norm.bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["linear_weight"] = [
                 paddle.transpose(
                     transfer_param(
-                        self._model.lm_head.decoder_weight,
-                        restore_data=True,
-                        reserve_var=True), [1, 0])
+                        self._model.lm_head.decoder_weight, restore_data=True),
+                    [1, 0])
             ]
             self.sub_modules["linear_bias"] = [
                 transfer_param(
                     self._model.lm_head.decoder_bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
         else:
             for mod in self._model.encoder.layers:
