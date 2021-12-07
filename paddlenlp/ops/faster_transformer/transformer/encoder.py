@@ -17,6 +17,7 @@ import paddle
 from paddle.fluid.layer_helper import LayerHelper
 import paddle.nn as nn
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
+from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load
@@ -235,7 +236,10 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self, need_build=True, use_fp16=False):
+def enable_faster_encoder(self,
+                          need_build=True,
+                          use_fp16=False,
+                          decoding_lib=None):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -277,7 +281,12 @@ def enable_faster_encoder(self, need_build=True, use_fp16=False):
     if not self.training:
         if need_build:
             try:
-                load("FasterTransformer", verbose=True)
+                # Pass decoding lib to prevent re-building encoder.
+                # Todo: check weather decoding lib have contained encoder or not.
+                if decoding_lib is not None:
+                    load_op_meta_info_and_register_op(decoding_lib)
+                else:
+                    load("FasterTransformer", verbose=True)
             except Exception:
                 logger.warning(
                     "Exception occurs when using FasterTransformer. " \
