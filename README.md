@@ -8,7 +8,6 @@
 [![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
 [![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
-![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
@@ -23,13 +22,13 @@
 PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。
 
 - **易用的文本领域API**
-  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
+  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供100+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
 
 - **多场景的应用示例**
-  - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+  - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
 
 - **高性能分布式训练**
-  - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成超大规模参数的模型训练。
+  - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成大规模预训练模型训练。
 
 ## 安装
 
@@ -72,50 +71,50 @@ ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
 
 # 句法分析
 ddp = Taskflow("dependency_parsing")
-ddp("百度是一家高科技公司")
->>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
+>>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
 
 # 情感分析
 senta = Taskflow("sentiment_analysis")
-senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
->>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
+senta("这个产品用起来真的很流畅，我非常喜欢")
+>>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
 ```
 更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**24**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。欢迎开发者加入贡献更多预训练模型！🤗
+覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
 
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+ernie = AutoModel.from_pretrained('ernie-1.0')
+ernie_gram = AutoModel.from_pretrained('ernie-gram-zh')
+bert = AutoModel.from_pretrained('bert-wwm-chinese')
+albert = AutoModel.from_pretrained('albert-chinese-tiny')
+roberta = AutoModel.from_pretrained('roberta-wwm-ext')
+electra = AutoModel.from_pretrained('chinese-electra-small')
+gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
 
 ```python
 import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import *
 
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
 # 语义表示
-model = ErnieModel.from_pretrained('ernie-1.0')
+model = AutoModel.from_pretrained('ernie-1.0')
 sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # 文本分类 & 句对匹配
-model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0')
 # 序列标注
-model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
+model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 # 问答
-model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
 请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。

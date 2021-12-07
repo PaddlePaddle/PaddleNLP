@@ -217,6 +217,7 @@ class BeamSearchScorer(object):
                  final_beam_scores,
                  final_beam_tokens,
                  final_beam_indices,
+                 origin_len=0,
                  pad_token_id=None,
                  eos_token_id=None):
         batch_size = len(self._beam_hyps)
@@ -232,7 +233,7 @@ class BeamSearchScorer(object):
                 batch_beam_idx = batch_idx * self.num_beams + beam_id
                 final_score = final_beam_scores[batch_beam_idx].numpy().item()
                 final_tokens = input_ids[batch_beam_idx]
-                beam_hyp.add(final_tokens, final_score)
+                beam_hyp.add(final_tokens, final_score, origin_len=origin_len)
 
         # select the best hypotheses
         sent_lengths = paddle.zeros(
@@ -317,14 +318,23 @@ class GenerationMixin(object):
                 (input_ids.shape[0], 1), input_ids.shape[1], dtype="int64")
         return seq_len
 
-    @staticmethod
-    def get_logits_processor(min_length=None,
+    def get_logits_processor(self,
+                             min_length=None,
+                             max_length=None,
                              eos_token_id=None,
+                             forced_bos_token_id=None,
+                             forced_eos_token_id=None,
                              num_beams=1,
                              num_beam_groups=1,
                              diversity_rate=0.0,
                              repetition_penalty=None):
         processors = LogitsProcessorList()
+
+        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
+            self, 'forced_bos_token_id', None)
+        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
+            self, 'forced_eos_token_id', None)
+
         if min_length is not None and eos_token_id is not None and min_length > -1:
             processors.append(
                 MinLengthLogitsProcessor(min_length, eos_token_id))
@@ -337,6 +347,12 @@ class GenerationMixin(object):
         if repetition_penalty is not None and repetition_penalty != 1.0:
             processors.append(
                 RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty))
+        if forced_bos_token_id is not None:
+            processors.append(
+                ForcedBOSTokenLogitsProcessor(forced_bos_token_id))
+        if forced_eos_token_id is not None:
+            processors.append(
+                ForcedEOSTokenLogitsProcessor(max_length, forced_eos_token_id))
         # TODO
         # Add more pre_processing for distribution
 
@@ -451,6 +467,19 @@ class GenerationMixin(object):
                                                      **encoder_kwargs)
         return model_kwargs
 
+    def prepare_decoder_input_ids_for_generation(self,
+                                                 input_ids,
+                                                 decoder_start_token_id=None,
+                                                 bos_token_id=None):
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self, 'decoder_start_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else bos_token_id
+
+        decoder_input_ids = paddle.ones(
+            [input_ids.shape[0], 1], dtype="int64") * decoder_start_token_id
+
+        return decoder_input_ids
+
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
         # generate method.
@@ -486,10 +515,15 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
             )
-        if kwargs['early_stopping'] != False:
-            # not support for early_stopping yet in the faster version
+        # if kwargs['early_stopping'] != False:
+        #     # not support for early_stopping yet in the faster version
+        #     raise AttributeError(
+        #         "'early_stopping != False' is not supported yet in the faster version"
+        #     )
+        if kwargs['forced_eos_token_id'] is not None:
+            # not support for forced_eos_token_id yet in the faster version
             raise AttributeError(
-                "'early_stopping != False' is not supported yet in the faster version"
+                "'forced_eos_token_id != None' is not supported yet in the faster version"
             )
         self.prepare_faster_entry(kwargs)
 
@@ -510,10 +544,13 @@ class GenerationMixin(object):
                  bos_token_id=None,
                  eos_token_id=None,
                  pad_token_id=None,
+                 decoder_start_token_id=None,
+                 forced_bos_token_id=None,
+                 forced_eos_token_id=None,
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
-                 use_fast=True,
+                 use_faster=True,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -566,14 +603,23 @@ class GenerationMixin(object):
                 None.
             pad_token_id (int, optional): The id of the `pad_token`. Default to 
                 None.
+            decoder_start_token_id (int, optional): The start token id for 
+                encoder-decoder models. Default to None.
+            forced_bos_token_id (int, optional): The id of the token to force as 
+                the first generated token. Usually use for multilingual models.
+                Default to None.
+            forced_eos_token_id (int, optional): The id of the token to force as 
+                the last generated token. Default to None.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
             diversity_rate (float, optional): If num_beam_groups is 1, this is the 
                 diversity_rate for Diverse Siblings Search. See 
                 `this paper https://arxiv.org/abs/1611.08562`__ for more details. 
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
-            use_cache: (bool, optional): Whether or not use the model cache to 
+            use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
+            use_faster: (bool, optional): Whether to use faster entry of model 
+                for generation. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
 
@@ -672,16 +718,23 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-        if getattr(self, '_faster_entry', None) is not False and use_fast:
+
+        assert (
+            decode_strategy in ["greedy_search", "sampling", "beam_search"]
+        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+            decode_strategy)
+
+        if getattr(self, '_faster_entry', None) is not False and use_faster:
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
+            model_kwargs = args.pop('model_kwargs')
+            args.update(model_kwargs)
             try:
                 if not hasattr(self, '_faster_entry'):
                     self._build_faster(args)
                 if self._faster_entry:
-                    model_kwargs = args.pop('model_kwargs')
-                    output_ids = self._faster_entry(**args, **model_kwargs)
+                    output_ids = self._faster_entry(**args)
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
                         output_ids = output_ids[:, :
@@ -699,7 +752,7 @@ class GenerationMixin(object):
                 self._convert_to_faster(args)
                 logger.warning(e)
                 logger.warning(
-                    "FasterGenerate is not available, "
+                    "FasterGeneration is not available, "
                     "and the original version would be used instead.")
 
         # params check
@@ -729,8 +782,8 @@ class GenerationMixin(object):
             if "decoder_input_ids" in model_kwargs:
                 input_ids = model_kwargs.pop("decoder_input_ids")
             else:
-                input_ids = self.prepare_input_ids_for_generation(
-                    bos_token_id, model_kwargs["encoder_output"])
+                input_ids = self.prepare_decoder_input_ids_for_generation(
+                    input_ids, decoder_start_token_id, bos_token_id)
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
@@ -740,9 +793,13 @@ class GenerationMixin(object):
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
         min_length += input_ids.shape[-1]
+
         logits_processors = self.get_logits_processor(
             min_length=min_length,
+            max_length=max_length,
             eos_token_id=eos_token_id,
+            forced_bos_token_id=forced_bos_token_id,
+            forced_eos_token_id=forced_eos_token_id,
             num_beams=num_beams,
             num_beam_groups=num_beam_groups,
             diversity_rate=diversity_rate)
@@ -811,11 +868,6 @@ class GenerationMixin(object):
                 return self.beam_search(
                     input_ids, beam_scorer, logits_processors, max_length,
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs)
-
-        else:
-            raise ValueError(
-                '`decode_strategy` must be one of "greedy_search", "sampling" '
-                'and "beam_search".')
 
     def greedy_search(self, input_ids, logits_processors, max_length,
                       pad_token_id, eos_token_id, **model_kwargs):
@@ -974,7 +1026,6 @@ class GenerationMixin(object):
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
-
         batch_beam_size, cur_len = input_ids.shape
         origin_len = cur_len
 
@@ -999,7 +1050,6 @@ class GenerationMixin(object):
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
-
             # beam search
             # [batch_size * num_beams, vocab_size]
             next_scores = F.softmax(logits)
@@ -1089,6 +1139,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
@@ -1225,6 +1276,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
@@ -1282,7 +1334,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         cur_len = input_ids.shape[-1]
         if cur_len < self.min_length:
-            logits[:, self.eos_token_id] = -1e9
+            logits[:, self.eos_token_id] = -float("inf")
         return logits
 
 
@@ -1323,14 +1375,12 @@ class HammingDiversityLogitsProcessor(LogitsProcessor):
     `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ for more details.
 
     Args:
-        diversity_rate (float):
-            This value is subtracted from a beam's score if it generates a 
-            token same as any beam from other group at a particular time. 
-        num_beams (int):
-            Number of beams used for group beam search. 
-        num_beam_groups (int):
-            Number of groups to divide `num_beams` into in order to ensure 
-            diversity among different groups of beams. 
+        diversity_rate (float): This value is subtracted from a beam's score if 
+            it generates a token same as any beam from other group at a particular 
+            time. 
+        num_beams (int): Number of beams used for group beam search. 
+        num_beam_groups (int): Number of groups to divide `num_beams` into in order 
+            to ensure diversity among different groups of beams. 
     """
 
     def __init__(self, diversity_rate, num_beams, num_beam_groups):
@@ -1367,4 +1417,51 @@ class HammingDiversityLogitsProcessor(LogitsProcessor):
             scores[batch_idx * group_size:(batch_idx + 1) *
                    group_size] -= self._diversity_rate * token_frequency
 
+        return scores
+
+
+class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces the first generated token to be the selected `forced_bos_token`.
+
+    Args:
+        forced_bos_token_id (:obj:`int`):
+            The id of the token to to be generated as the first token.
+    """
+
+    def __init__(self, forced_bos_token_id):
+        self.forced_bos_token_id = forced_bos_token_id
+
+    def __call__(self, input_ids, scores):
+        cur_len = input_ids.shape[-1]
+        if cur_len == 1:
+            num_tokens = scores.shape[1]
+            scores[:, [
+                i for i in range(num_tokens) if i != self.forced_bos_token_id
+            ]] = -float("inf")
+            scores[:, self.forced_bos_token_id] = 0
+        return scores
+
+
+class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
+
+    Args:
+        max_length (int): The maximum length of the sequence to be generated.
+        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+    """
+
+    def __init__(self, max_length, forced_eos_token_id):
+        self.max_length = max_length
+        self.forced_eos_token_id = forced_eos_token_id
+
+    def __call__(self, input_ids, scores):
+        cur_len = input_ids.shape[-1]
+        if cur_len == self.max_length - 1:
+            num_tokens = scores.shape[1]
+            scores[:, [
+                i for i in range(num_tokens) if i != self.forced_eos_token_id
+            ]] = -float("inf")
+            scores[:, self.forced_eos_token_id] = 0
         return scores

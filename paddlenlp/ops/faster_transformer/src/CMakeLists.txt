@@ -1,3 +1,8 @@
+if (${CUDA_VERSION} GREATER_EQUAL 11.0)
+  message(STATUS "Add DCUDA11_MODE")
+  add_definitions("-DCUDA11_MODE")
+endif()
+
 add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
 # Default is 1 in standard c++ when using gcc8.2
@@ -258,7 +263,7 @@ else(ON_INFER)
   endif()
 
   set(ft_lib_link
-    -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch
+    -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils
   )
 
   add_definitions(-DPADDLE_WITH_CUDA)
@@ -270,5 +275,5 @@ else(ON_INFER)
 
   add_library(decoding_op SHARED ${decoding_op_files})
   add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
-  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link} -lencoder)
+  target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
 endif()

@@ -7,6 +7,8 @@
 
 std::vector<paddle::Tensor> GPT2Forward(
     const paddle::Tensor& input,
+    const paddle::Tensor& attn_mask,
+    const paddle::Tensor& start_length,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
@@ -45,15 +47,9 @@ std::vector<paddle::Tensor> GPT2Forward(
   auto output_ids = paddle::Tensor(input.place(), output_dims);
 
   if (word_embedding.place() == paddle::PlaceType::kGPU) {
-    paddle::Tensor input_ids = paddle::Tensor(paddle::PlaceType::kCPU);
-
-    if (input.place() != paddle::PlaceType::kCPU) {
-      input_ids = input.copy_to<int>(paddle::PlaceType::kCPU);
-    } else {
-      input_ids = input;
-    }
-
-    return GPT2CUDAForward(input_ids,
+    return GPT2CUDAForward(input,
+                           attn_mask,
+                           start_length,
                            word_embedding,
                            self_ln_weight,
                            self_ln_bias,
@@ -93,6 +89,8 @@ std::vector<paddle::Tensor> GPT2Forward(
 
 std::vector<std::vector<int64_t>> GPT2InferShape(
     const std::vector<int64_t>& input_shape,
+    const std::vector<int64_t>& attn_mask_shape,
+    const std::vector<int64_t>& start_length,
     const std::vector<int64_t>& word_embedding_shape,
     const std::vector<std::vector<int64_t>>& self_ln_weight_shapes,
     const std::vector<std::vector<int64_t>>& self_ln_bias_shapes,
@@ -132,6 +130,8 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
 
 std::vector<paddle::DataType> GPT2InferDtype(
     const paddle::DataType& input_dtype,
+    const paddle::DataType& attn_mask_dtype,
+    const paddle::DataType& start_length_dtype,
     const paddle::DataType& word_embedding_dtype,
     const std::vector<paddle::DataType>& self_ln_weight_dtype,
     const std::vector<paddle::DataType>& self_ln_bias_dtype,
@@ -158,6 +158,8 @@ std::vector<paddle::DataType> GPT2InferDtype(
 
 PD_BUILD_OP(fusion_gpt)
     .Inputs({"Input",
+             "AttentionMask",
+             "StartLength",
              "WordEmbedding",
              paddle::Vec("SelfLayernormWeight"),
              paddle::Vec("SelfLayernormBias"),
