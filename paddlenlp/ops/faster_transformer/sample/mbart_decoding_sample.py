@@ -59,7 +59,7 @@ def parse_args():
         ])
     parser.add_argument(
         "--decoding_strategy",
-        default="sampling",
+        default="beam_search",
         type=str,
         help="The decoding strategy.",
         choices=["greedy_search", "beam_search", "sampling"])

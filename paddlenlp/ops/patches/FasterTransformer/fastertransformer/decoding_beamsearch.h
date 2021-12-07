@@ -105,6 +105,8 @@ public:
                      const ActivationType act = ActivationType::RELU,
                      const bool pos_bias = false,
                      const bool prefix_lm = false,
+                     const int finished_candidate_num = -1,
+                     const bool early_stopping = false,
                      const bool is_mbart = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
@@ -124,7 +126,8 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
-    if (args_.beam_width_ > 16) is_fuse_topk_softMax_ = false;
+    if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
+      is_fuse_topk_softMax_ = false;
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;
     else if (std::is_same<DataType_, half>::value)
@@ -139,8 +142,10 @@ public:
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
 
-    if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
-      is_fuse_topk_softMax_ = false;
+    args_.finished_candidate_num_ = (finished_candidate_num == -1)
+                                        ? beam_width * 2
+                                        : finished_candidate_num;
+    args_.early_stopping_ = early_stopping;
 
     K_cache_ = new DataType_ *[2];
     V_cache_ = new DataType_ *[2];
@@ -939,7 +944,7 @@ public:
         } else {
           if (keep_alive_beam_ == true) {
             update_logits_v2(tmp_logits_buf_,
-                             decoding_params.embedding_bias,
+                             embedding_bias_ptr,
                              args_.end_id_,
                              finished_buf_,
                              m,

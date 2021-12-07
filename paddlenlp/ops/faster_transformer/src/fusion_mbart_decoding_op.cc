@@ -69,6 +69,7 @@ std::vector<paddle::Tensor> MBartDecodingForward(
     const float& beam_search_diversity_rate,
     const bool& rel_len,
     const float& alpha,
+    const bool& early_stopping,
     const std::string& hidden_act) {
   int batch_size = input.shape()[0];
   int max_out_len = rel_len ? max_len + input.shape()[1] : max_len;
@@ -80,7 +81,8 @@ std::vector<paddle::Tensor> MBartDecodingForward(
     batch_size /= beam_size;
     output_dims = {max_out_len, batch_size, beam_size};
     parent_ids_dims = output_dims;
-  } else if (decoding_strategy == "beam_search_v2") {
+  } else if (decoding_strategy == "beam_search_v2" ||
+             decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
     // beams. The outputs must include both the finish and alive to trace full
     // path.
@@ -166,6 +168,7 @@ std::vector<paddle::Tensor> MBartDecodingForward(
                                     max_out_len,
                                     beam_search_diversity_rate,
                                     alpha,
+                                    early_stopping,
                                     hidden_act);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
@@ -223,6 +226,7 @@ std::vector<std::vector<int64_t>> MBartDecodingInferShape(
     const float& beam_search_diversity_rate,
     const bool& rel_len,
     const float& alpha,
+    const bool& early_stopping,
     const std::string& hidden_act) {
   int batch_size = input_shape[0];
 
@@ -234,7 +238,8 @@ std::vector<std::vector<int64_t>> MBartDecodingInferShape(
     }
     output_dims = {max_len, batch_size, beam_size};
     return {output_dims, output_dims, sequence_length_dims};
-  } else if (decoding_strategy == "beam_search_v2") {
+  } else if (decoding_strategy == "beam_search_v2" ||
+            decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
     // beams. The outputs must include both the finish and alive to trace full
     // path.
@@ -351,6 +356,7 @@ PD_BUILD_OP(fusion_mbart_decoding)
         "beam_search_diversity_rate: float",
         "rel_len: bool",
         "alpha: float",
+        "early_stopping: bool",
         "hidden_act: std::string",
     })
     .SetKernelFn(PD_KERNEL(MBartDecodingForward))

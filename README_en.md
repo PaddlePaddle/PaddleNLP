@@ -83,38 +83,38 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
 
 ### Transformer API: Awesome Pre-trained Model Ecosystem
 
-We provide **24** network architectures and over **100** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
+We provide **30** network architectures and over **100** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel to download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
 
 ```python
 from paddlenlp.transformers import *
 
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+ernie = AutoModel.from_pretrained('ernie-1.0')
+ernie_gram = AutoModel.from_pretrained('ernie-gram-zh')
+bert = AutoModel.from_pretrained('bert-wwm-chinese')
+albert = AutoModel.from_pretrained('albert-chinese-tiny')
+roberta = AutoModel.from_pretrained('roberta-wwm-ext')
+electra = AutoModel.from_pretrained('chinese-electra-small')
+gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 PaddleNLP also provides unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
 
 ```python
 import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import *
 
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('natural language understanding')
 
 # Semantic Representation
-model = ErnieModel.from_pretrained('ernie-1.0')
+model = AutoModel.from_pretrained('ernie-1.0')
 sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # Text Classificaiton and Matching
-model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0')
 # Sequence Labeling
-model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
+model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 # Question Answering
-model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
 For more pretrained model usage, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
