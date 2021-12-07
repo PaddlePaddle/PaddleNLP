@@ -262,12 +262,12 @@ huntington舞蹈病的动物模型      Huntington舞蹈病的动物模型
 
 以上述 demo 数据为例，运行如下命令基于我们开源的 SimCSE无监督语义索引模型开始计算文本 Pair 的语义相似度:
 ```
-root_dir="checkpoints/train_0.001" 
+root_dir="checkpoints" 
 
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
     --device gpu \
-    --params_path "${root_dir}/model_40/model_state.pdparams" \
+    --params_path "${root_dir}/model_20000/model_state.pdparams" \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
