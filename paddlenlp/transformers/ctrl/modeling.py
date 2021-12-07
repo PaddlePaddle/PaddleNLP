@@ -239,9 +239,9 @@ class CTRLPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ctrl":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ctrl/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ctrl/model_state.pdparams",
             "sshleifer-tiny-ctrl":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/sshleifer-tiny-ctrl/model_state.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/model_state.pdparams"
         }
     }
 

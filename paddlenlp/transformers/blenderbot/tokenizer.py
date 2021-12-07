@@ -61,19 +61,19 @@ class BlenderbotTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "blenderbot-400M-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
             "blenderbot-3B":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-vocab.json",
             "blenderbot-1B-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json"
         },
         "merges_file": {
             "blenderbot-400M-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
             "blenderbot-3B":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-merges.txt",
             "blenderbot-1B-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt"
         }
     }
     pretrained_init_configuration = {

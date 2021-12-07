@@ -103,7 +103,7 @@ class ErnieGramPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-gram-zh":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gram_zh/ernie_gram_zh.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/ernie_gram_zh.pdparams",
         },
     }
     base_model_prefix = "ernie_gram"

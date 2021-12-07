@@ -98,9 +98,9 @@ class BartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "bart-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
             "bart-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams"
         }
     }
     base_model_prefix = "bart"

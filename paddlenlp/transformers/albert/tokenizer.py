@@ -86,21 +86,21 @@ class AlbertTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "albert-base-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
             "albert-large-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
             "albert-xlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
             "albert-xxlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
             "albert-base-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
             "albert-large-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
             "albert-xlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
             "albert-xxlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
             "albert-chinese-tiny": None,
             "albert-chinese-small": None,
             "albert-chinese-base": None,
@@ -118,17 +118,17 @@ class AlbertTokenizer(PretrainedTokenizer):
             "albert-xlarge-v2": None,
             "albert-xxlarge-v2": None,
             "albert-chinese-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
             "albert-chinese-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
             "albert-chinese-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
             "albert-chinese-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
             "albert-chinese-xlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
             "albert-chinese-xxlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
         }
     }
 
@@ -423,21 +423,21 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "albert-base-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
             "albert-large-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
             "albert-xlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
             "albert-xxlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
             "albert-base-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
             "albert-large-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
             "albert-xlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
             "albert-xxlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
         },
     }
 
@@ -648,17 +648,17 @@ class AlbertChineseTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "albert-chinese-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
             "albert-chinese-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
             "albert-chinese-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
             "albert-chinese-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
             "albert-chinese-xlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
             "albert-chinese-xxlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
         }
     }
     pretrained_init_configuration = {
