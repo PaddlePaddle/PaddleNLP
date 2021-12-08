@@ -364,7 +364,7 @@ class GenerationMixin(object):
                                      attention_mask=None,
                                      **model_kwargs):
         index = paddle.tile(
-            paddle.arange(input_ids.shape[0]).unsqueeze(-1),
+            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
             [1, expand_size]).reshape([-1])
 
         input_ids = paddle.index_select(input_ids, index)
