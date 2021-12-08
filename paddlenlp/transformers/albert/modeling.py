@@ -19,7 +19,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
-
 from .. import PretrainedModel, register_base_model
 
 __all__ = [

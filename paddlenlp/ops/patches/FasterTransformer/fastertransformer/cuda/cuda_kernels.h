@@ -77,7 +77,7 @@ void update_KV_cache_kernelLauncher_v2(T** key_cache,
                                        const int cache_size,
                                        const int decoder_layers,
                                        cudaStream_t stream,
-                                       const int memory_max_seq_len);
+                                       const int memory_max_seq_len = -1);
 
 template <typename T>
 void embeddings_kernel_launcher(T* from_tensor,
@@ -114,6 +114,6 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       int vocab_size_padded,
                                       int vocab_size,
                                       cudaStream_t stream,
-                                      const T* logits_mask = nullptr);
+                                      const T* logits_mask);
 
 }  // namespace fastertransformer

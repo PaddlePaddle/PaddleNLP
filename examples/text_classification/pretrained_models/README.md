@@ -69,7 +69,7 @@ pretrained_models/
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
+$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints --use_amp False
 ```
 
 可支持配置的参数：
@@ -88,6 +88,7 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
+* `use_amp`: 是否使用混合精度训练，默认为False。
 
 代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT等，只需更换`model` 和 `tokenizer`即可。
 
