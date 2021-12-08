@@ -103,6 +103,16 @@ def do_predict(args):
             # input_ids
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int32"),
+            #
+            # If it's necessarry to provide mem_seq_len and attention_mask,
+            # the parameters should be:
+            # mem_seq_len
+            # paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            # attention_mask
+            # paddle.static.InputSpec(shape=[None, None, None], dtype="float16" if args.use_fp16_decoding else "float32"),
+            #
+            None,  # mem_seq_len
+            None,  # attention_mask
             args.topk,
             args.topp,
             args.max_out_len,

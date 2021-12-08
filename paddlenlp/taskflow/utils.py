@@ -616,3 +616,106 @@ class BurkhardKellerTree(object):
 
         res.sort(key=lambda d: (d[1], -max_prefix(d[0], word)))
         return res
+
+
+class TriedTree(object):
+    """Implementataion of TriedTree
+    """
+
+    def __init__(self):
+        self.tree = {}
+        
+    def add_word(self, word):
+        """add single word into TriedTree"""
+        self.tree[word] = len(word)
+        for i in range(1,len(word)):
+            wfrag = word[:i]
+            self.tree[wfrag] = self.tree.get(wfrag, None)
+
+    def search(self, content):
+        """Backward maximum matching
+
+        Args:
+            content (str): string to be searched
+        Returns:
+            List[Tuple]: list of maximum matching words, each element represents 
+                the starting and ending position of the matching string.
+        """
+        result = []
+        length = len(content)
+        for start in range(length):
+            for end in range(start+1, length+1):
+                pos = self.tree.get(content[start:end], -1)
+                if pos == -1:
+                    break
+                if pos and (len(result)==0 or end > result[-1][1]):
+                    result.append((start, end))
+        return result
+
+
+class Customization(object):
+    """
+    User intervention based on Aho-Corasick automaton
+    """
+
+    def __init__(self):
+        self.dictitem = {}
+        self.ac = None
+
+    def load_customization(self, filename, sep=None):
+        """Load the custom vocab"""
+        self.ac = TriedTree()
+        with open(filename, 'r', encoding='utf8') as f:
+            for line in f:
+                if sep == None:
+                    words = line.strip().split()
+                else:
+                    sep = strdecode(sep)
+                    words = line.strip().split(sep)
+
+                if len(words) == 0:
+                    continue
+
+                phrase = ""
+                tags = []
+                offset = []
+                for word in words:
+                    if word.rfind('/') < 1:
+                        phrase += word
+                        tags.append('')
+                    else:
+                        phrase += word[:word.rfind('/')]
+                        tags.append(word[word.rfind('/') + 1:])
+                    offset.append(len(phrase))
+
+                if len(phrase) < 2 and tags[0] == '':
+                    continue
+
+                self.dictitem[phrase] = (tags, offset)
+                self.ac.add_word(phrase)
+
+    def parse_customization(self, query, lac_tags):
+        """Use custom vocab to modify the lac results"""
+        if not self.ac:
+            logging.warning("customization dict is not load")
+            return
+        ac_res = self.ac.search(query)
+
+        for begin, end in ac_res:
+            phrase = query[begin:end]
+            index = begin
+
+            tags, offsets = self.dictitem[phrase]
+            for tag, offset in zip(tags, offsets):
+                while index < begin + offset:
+                    if len(tag) == 0:
+                        lac_tags[index] = lac_tags[index][:-1] + 'I'
+                    else:
+                        lac_tags[index] = tag + "-I"
+                    index += 1
+
+            lac_tags[begin] = lac_tags[begin][:-1] + 'B'
+            for offset in offsets:
+                index = begin + offset
+                if index < len(lac_tags):
+                    lac_tags[index] = lac_tags[index][:-1] + 'B'

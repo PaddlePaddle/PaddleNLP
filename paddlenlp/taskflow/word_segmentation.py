@@ -75,6 +75,8 @@ class WordSegmentationTask(LacTask):
                 for index in preds[sent_index][:lengths[sent_index]]
             ]
             sent = sents[sent_index]
+            if self._custom:
+                self._custom.parse_customization(sent, tags)
             sent_out = []
             tags_out = []
             parital_word = ""

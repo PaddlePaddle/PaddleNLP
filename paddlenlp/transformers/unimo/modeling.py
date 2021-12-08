@@ -483,9 +483,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                     "Only topk sampling or topp sampling are supported. " \
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         self._faster_entry = FasterUNIMOText(
-            self,
-            decode_strategy=decode_strategy,
-            use_fp16_decoding=use_fp16_decoding).forward
+            self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
