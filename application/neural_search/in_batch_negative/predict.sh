@@ -1,4 +1,4 @@
-root_dir="checkpoints/train_0.001" 
+root_dir="checkpoints/inbatch" 
 
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
