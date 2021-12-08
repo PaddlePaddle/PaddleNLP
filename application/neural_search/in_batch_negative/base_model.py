@@ -172,10 +172,10 @@ class SemanticIndexBaseStatic(nn.Layer):
                 attention_mask=None):
         _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
                                     attention_mask)
-        return cls_embedding
-        # if self.output_emb_size > 0:
-        #     cls_embedding = self.emb_reduce_linear(cls_embedding)
-        # cls_embedding = self.dropout(cls_embedding)
-        # cls_embedding = F.normalize(cls_embedding, p=2, axis=-1)
 
-        # return cls_embedding
+        if self.output_emb_size > 0:
+            cls_embedding = self.emb_reduce_linear(cls_embedding)
+        cls_embedding = self.dropout(cls_embedding)
+        cls_embedding = F.normalize(cls_embedding, p=2, axis=-1)
+        
+        return cls_embedding

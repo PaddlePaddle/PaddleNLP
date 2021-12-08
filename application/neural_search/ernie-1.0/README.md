@@ -79,7 +79,7 @@ ernie-1.0/
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE-1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">8卡 v100-32g</div>|-|
+|[ERNIE-1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|-|
 
 ### 训练环境说明
 
@@ -182,4 +182,5 @@ python ernie_static_to_dynamic.py
 运行结束后，动态图的模型就会保存到ernie_checkpoint文件夹里，也可以根据情况，修改代码，保存到自己的指定路径
 
 ### 参考文献
+
 - [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/pdf/1904.09223.pdf)

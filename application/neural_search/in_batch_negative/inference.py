@@ -18,27 +18,6 @@ from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
 from tqdm import tqdm 
-from milvus_recall import RecallByMilvus
-from ernie_modeling import ErnieModel
-
-def search_in_milvus(text_embedding):
-    collection_name = 'wanfang1'
-    partition_tag = 'partition_2'
-    client = RecallByMilvus()
-    status, results = client.search(collection_name=collection_name, vectors=text_embedding.tolist(), partition_tag=partition_tag)
-    # print(status)
-    # print(resultes)
-    corpus_file="data/milvus_data.csv"
-    id2corpus = gen_id2corpus(corpus_file)
-    # print(status)
-    # print(results)
-    for line in results:
-        for item in line:
-            idx=item.id
-            distance=item.distance
-            text=id2corpus[idx]
-            print(idx,text,distance)
-
 
 
 if __name__ == "__main__":
@@ -61,7 +40,6 @@ if __name__ == "__main__":
     ): [data for data in fn(samples)]
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-    # pretrained_model=ErnieModel.from_pretrained("ernie-1.0")
 
     model = SemanticIndexBaseStatic(
         pretrained_model, output_emb_size=output_emb_size)
@@ -89,22 +67,6 @@ if __name__ == "__main__":
         trans_fn=trans_func)
 
     all_embeddings = []
-    # pretrained_model.eval()
-    # with paddle.no_grad():
-    #     for batch_data in corpus_data_loader:
-    #         input_ids, token_type_ids = batch_data
-    #         input_ids = paddle.to_tensor(input_ids)
-    #         token_type_ids = paddle.to_tensor(token_type_ids)
-    #         print(input_ids)
-    #         print(token_type_ids)
-
-    #         token_embeddings,text_embeddings = pretrained_model(input_ids, token_type_ids)
-    #         # text_embeddings=pretrained_model(input_ids, token_type_ids)
-    #         # print(token_embeddings)
-    #         all_embeddings.append(text_embeddings)
-    # print(all_embeddings)
-
-    all_embeddings = []
     model.eval()
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
@@ -118,6 +80,5 @@ if __name__ == "__main__":
     text_embedding=all_embeddings[0]
     print(text_embedding.shape)
     print(text_embedding)
-    # search_in_milvus(text_embedding)
     
 
