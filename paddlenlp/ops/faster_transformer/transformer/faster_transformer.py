@@ -1159,7 +1159,6 @@ class FasterMBART(MBartPretrainedModel):
         self.encoder = model.mbart.get_encoder()
         self.decoder = model.mbart.get_decoder()
         self.pad_token_id = model.mbart.config['pad_token_id']
-        self._decode_strategy = decode_strategy
 
         self.decoding = InferMBartDecoding(
             model=self._model,
@@ -1246,7 +1245,7 @@ class FasterMBART(MBartPretrainedModel):
             trg_word=trg_word,
             top_k=top_k,
             top_p=top_p,
-            decode_strategy=decode_strategy,
+            decoding_strategy=decode_strategy,
             diversity_rate=diversity_rate,
             max_out_len=max_length,
             bos_token_id=bos_token_id,

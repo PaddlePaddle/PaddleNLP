@@ -839,6 +839,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterMBART
+        decode_strategy = kwargs.get('decode_strategy')
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         if decode_strategy == 'sampling' and kwargs.get(
                 'top_k') != 0 and kwargs.get('top_p') != 1:
