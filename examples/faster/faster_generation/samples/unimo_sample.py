@@ -17,6 +17,7 @@ from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 model_name = 'unimo-text-1.0-lcsts-new'
 
 model = UNIMOLMHeadModel.from_pretrained(model_name)
+model.eval()
 tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
 

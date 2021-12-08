@@ -21,23 +21,14 @@ import paddle
 import torch
 from paddlenlp.transformers import GPTLMHeadModel, GPTTokenizer
 from transformers import GPT2LMHeadModel as hf_gpt_model
-from paddlenlp.data import Pad
-from paddlenlp.utils.log import logger
-
-
-def prepare_input(tokenizer, sentences):
-    word_pad = Pad(tokenizer.pad_token_id, dtype="int64")
-    tokenized = tokenizer(sentences)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
-    input_ids = paddle.to_tensor(inputs)
-    return input_ids
+import numpy as np
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_name_or_path",
-        default="bart-base",
+        default="gpt2-en",
         type=str,
         choices=['gpt2-en', 'gpt2-medium-en', 'gpt2-large-en'],
         help="The model name to specify the bart to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt2-large-en']. "
@@ -46,12 +37,16 @@ def parse_args():
         "--decode_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, sampling]")
+        choices=['greedy_search', 'sampling'],
+        help="The decoding strategy. Can be one of ['greedy_search', 'sampling']"
+    )
     parser.add_argument(
         "--top_k",
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
+    parser.add_argument(
+        "--batch_size", default=4, type=int, help="The size of input batch. ")
     parser.add_argument(
         "--top_p",
         default=1.0,
@@ -69,63 +64,69 @@ def parse_args():
 
 def do_predict(args):
     place = "gpu"
-    paddle.set_device(place)
+    place = paddle.set_device(place)
 
     tokenizer = GPTTokenizer.from_pretrained(args.model_name_or_path)
     model = GPTLMHeadModel.from_pretrained(args.model_name_or_path)
     # Set evaluate mode
     model.eval()
-    sentences = ["<|endoftext|>" for _ in range(4)]
+    bos_id = tokenizer.convert_tokens_to_ids("<|endoftext|>")
+    eos_id = tokenizer.convert_tokens_to_ids("<|endoftext|>")
 
-    input_ids = prepare_input(tokenizer, sentences)
-
+    input_ids_np = np.array(
+        [[bos_id] for i in range(args.batch_size)]).astype("int64").reshape(
+            [args.batch_size, 1])
+    input_ids = paddle.to_tensor(input_ids_np)
     # Define model
-    faster_bart = model
-    faster_bart.eval()
-
     num_loop = 100
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
+                paddle.device.cuda.synchronize(place)
                 start = time.perf_counter()
-            output, _ = faster_bart.generate(
+            output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
+                bos_token_id=bos_id,
+                eos_token_id=eos_id,
                 use_fp16_decoding=args.use_fp16_decoding)
-        paddle.device.cuda.synchronize()
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        paddle.device.cuda.synchronize(place)
+        faster_cost = (time.perf_counter() - start) / 50 * 1000
 
+    if args.use_fp16_decoding:
+        pprint(args)
+        print("Faster FP16 cost:", faster_cost)
+        return
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
+                paddle.device.cuda.synchronize(place)
                 start = time.perf_counter()
-            output, _ = faster_bart.generate(
+            output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
+                bos_token_id=bos_id,
+                eos_token_id=eos_id,
                 use_faster=False)
-        paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        paddle.device.cuda.synchronize(place)
+        pd_cost = (time.perf_counter() - start) / 50 * 1000
 
     device = torch.device("cuda:0")
     hf_model = hf_gpt_model.from_pretrained(args.model_name_or_path[:-3])
     hf_model.to(device)
     hf_model.eval()
-    hf_input_ids = prepare_input(tokenizer, sentences)
-    hf_input_ids = torch.tensor(hf_input_ids.numpy())
+
+    hf_input_ids = torch.tensor(input_ids_np)
     hf_input_ids = hf_input_ids.to(device)
 
     if args.decode_strategy == 'sampling':
@@ -136,18 +137,28 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                torch.cuda.synchronize()
+                start = time.perf_counter()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
                 max_length=args.max_length + 1,
+                bos_token_id=bos_id,
+                eos_token_id=eos_id,
+                pad_token_id=0,
                 top_k=args.top_k,
                 top_p=args.top_p)
-        logger.info("Average test time for hf decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+        torch.cuda.synchronize()
+        hf_cost = (time.perf_counter() - start) / 50 * 1000
+
+    pprint(args)
+    print("Faster FP32 cost:", faster_cost)
+    print("PD cost:", pd_cost)
+    print("HF cost:", hf_cost)
+    print("Speed up Faster FP32/PD:", pd_cost / faster_cost)
+    print("Speed up Faster FP32/HF:", hf_cost / faster_cost)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    pprint(args)
     do_predict(args)
