@@ -330,11 +330,6 @@ class GenerationMixin(object):
                              repetition_penalty=None):
         processors = LogitsProcessorList()
 
-        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
-            self, 'forced_bos_token_id', None)
-        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
-            self, 'forced_eos_token_id', None)
-
         if min_length is not None and eos_token_id is not None and min_length > -1:
             processors.append(
                 MinLengthLogitsProcessor(min_length, eos_token_id))
@@ -363,34 +358,34 @@ class GenerationMixin(object):
                                      expand_size,
                                      attention_mask=None,
                                      **model_kwargs):
+
         index = paddle.tile(
             paddle.arange(input_ids.shape[0]).unsqueeze(-1),
             [1, expand_size]).reshape([-1])
 
-        input_ids = paddle.index_select(input_ids, index)
+        input_ids = paddle.gather(input_ids, index)
 
         if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.index_select(attention_mask,
-                                                                 index)
+            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
+                                                           index)
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.index_select(token_type_ids,
-                                                                 index)
+            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
+                                                           index)
 
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.index_select(position_ids,
-                                                               index)
+            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
 
         if "seq_len" in model_kwargs:
             seq_len = model_kwargs["seq_len"]
-            model_kwargs["seq_len"] = paddle.index_select(seq_len, index)
+            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
 
         if "encoder_output" in model_kwargs:
             encoder_output = model_kwargs["encoder_output"]
-            model_kwargs["encoder_output"] = paddle.index_select(encoder_output,
-                                                                 index)
+            model_kwargs["encoder_output"] = paddle.gather(encoder_output,
+                                                           index)
 
         return input_ids, model_kwargs
 
@@ -465,6 +460,7 @@ class GenerationMixin(object):
 
             model_kwargs["encoder_output"] = encoder(input_ids,
                                                      **encoder_kwargs)
+
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self,
@@ -514,16 +510,6 @@ class GenerationMixin(object):
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
-            )
-        # if kwargs['early_stopping'] != False:
-        #     # not support for early_stopping yet in the faster version
-        #     raise AttributeError(
-        #         "'early_stopping != False' is not supported yet in the faster version"
-        #     )
-        if kwargs['forced_eos_token_id'] is not None:
-            # not support for forced_eos_token_id yet in the faster version
-            raise AttributeError(
-                "'forced_eos_token_id != None' is not supported yet in the faster version"
             )
         self.prepare_faster_entry(kwargs)
 
@@ -724,6 +710,19 @@ class GenerationMixin(object):
         ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy)
 
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self, 'pad_token_id', None)
+        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
+            self, 'forced_bos_token_id', None)
+        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
+            self, 'forced_eos_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self, 'decoder_start_token_id', None)
+
         if getattr(self, '_faster_entry', None) is not False and use_faster:
             args = locals()
             args.pop('self')
@@ -745,6 +744,7 @@ class GenerationMixin(object):
                     # make result and faster result oneconsistent
                     dummy_srore = None
                     return output_ids, dummy_srore
+
             except Exception as e:
                 args['model_kwargs'] = model_kwargs
                 #TODO
@@ -756,13 +756,6 @@ class GenerationMixin(object):
                     "and the original version would be used instead.")
 
         # params check
-        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
-            self, 'bos_token_id', None)
-        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
-            self, 'eos_token_id', None)
-        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
-            self, 'pad_token_id', None)
-
         if input_ids is None:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
@@ -997,6 +990,7 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
             next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1044,6 +1038,7 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                               **model_kwargs)
+
             outputs = self(**model_inputs)
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
@@ -1463,6 +1458,6 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
             num_tokens = scores.shape[1]
             scores[:, [
                 i for i in range(num_tokens) if i != self.forced_eos_token_id
-            ]] = -float("inf")
+            ]] = -1e9  #TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores

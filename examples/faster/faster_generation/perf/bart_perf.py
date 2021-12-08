@@ -22,7 +22,6 @@ import torch
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
 from transformers import BartForConditionalGeneration as hf_bart_model
 from paddlenlp.data import Pad
-from paddlenlp.utils.log import logger
 
 
 def prepare_input(tokenizer, sentences):
@@ -46,7 +45,8 @@ def parse_args():
         "--decode_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
+        choices=['greedy_search', 'beam_search', 'sampling'],
+        help="The decoding strategy. Can be one of ['greedy_search', 'beam_search', 'sampling']"
     )
     parser.add_argument(
         "--num_beams",
@@ -75,7 +75,7 @@ def parse_args():
 
 def do_predict(args):
     place = "gpu"
-    paddle.set_device(place)
+    place = paddle.set_device(place)
 
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     model = BartForConditionalGeneration.from_pretrained(
@@ -92,8 +92,7 @@ def do_predict(args):
     input_ids = prepare_input(tokenizer, sentences)
 
     # Define model
-    faster_bart = model
-    faster_bart.eval()
+    model.eval()
 
     num_loop = 100
     with paddle.no_grad():
@@ -101,38 +100,43 @@ def do_predict(args):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
+                paddle.device.cuda.synchronize(place)
                 start = time.perf_counter()
-            output, _ = faster_bart.generate(
+            output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
+                early_stopping=True,
                 use_fp16_decoding=args.use_fp16_decoding)
-        paddle.device.cuda.synchronize()
-        logger.info("Average test time for fast decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        paddle.device.cuda.synchronize(place)
+        faster_cost = (time.perf_counter() - start) / 50 * 1000
+
+    if args.use_fp16_decoding:
+        pprint(args)
+        print("Faster FP16 cost:", faster_cost)
+        return
 
     with paddle.no_grad():
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
+                paddle.device.cuda.synchronize(place)
                 start = time.perf_counter()
-            output, _ = faster_bart.generate(
+            output, _ = model.generate(
                 input_ids=input_ids,
                 max_length=args.max_length,
                 decode_strategy=args.decode_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
+                early_stopping=True,
                 use_faster=False)
-        paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        paddle.device.cuda.synchronize(place)
+        pd_cost = (time.perf_counter() - start) / 50 * 1000
 
     device = torch.device("cuda:0")
     hf_model = hf_bart_model.from_pretrained("facebook/" +
@@ -151,19 +155,28 @@ def do_predict(args):
         for i in range(num_loop):
             # For warmup.
             if 50 == i:
-                start = time.time()
+                torch.cuda.synchronize()
+                start = time.perf_counter()
             output = hf_model.generate(
                 hf_input_ids,
                 do_sample=do_sample,
                 max_length=args.max_length + 1,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                num_beams=args.num_beams)
-        logger.info("Average test time for hf decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+                num_beams=args.num_beams,
+                no_repeat_ngram_size=0,
+                length_penalty=0.0)
+        torch.cuda.synchronize()
+        hf_cost = (time.perf_counter() - start) / 50 * 1000
+
+    pprint(args)
+    print("Faster FP32 cost:", faster_cost)
+    print("PD cost:", pd_cost)
+    print("HF cost:", hf_cost)
+    print("Speed up Faster FP32/PD:", pd_cost / faster_cost)
+    print("Speed up Faster FP32/HF:", hf_cost / faster_cost)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    pprint(args)
     do_predict(args)
