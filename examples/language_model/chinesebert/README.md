@@ -159,11 +159,6 @@ python eval.py --model_name_or_path outputs/step-340 --n_best_size 35 --max_answ
 test数据集 EM为78.55，达到论文精度要求
 
 
-### 训练日志
-
-Training logs  can be find [HERE](logs)
-
-
 ## Reference
 
 ```bibtex
