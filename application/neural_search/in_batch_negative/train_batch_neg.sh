@@ -10,7 +10,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 10 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file data/train.csv 
+    --train_set_file recall/train.csv 
 
 
 # 加载simcse训练的模型，模型放在simcse/model_20000

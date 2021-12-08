@@ -79,10 +79,6 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 ```
 |—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
 |—— train_batch_neg.sh  # In-batch negatives训练的bash脚本
-|—— data
-    |—— train.csv # 训练集合
-    |—— test.csv. # 测试集合
-    |—— corpus.csv # 召回集合
 |—— batch_negative
     |—— model.py # In-batch negatives 策略核心网络结构
 |—— deploy
@@ -128,6 +124,19 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 - [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
 
+```
+├── milvus # milvus建库数据集
+│   └── milvus_data.csv.  # 构建召回库的数据
+├── recall  # 召回数据集
+│   ├── corpus.csv # 用于测试的召回库
+│   ├── test.csv  # 召回测试集
+│   ├── train.csv  # 召回训练集
+│   └── train_unsupervise.csv # 无监督训练集
+└── sort # 排序数据集
+    ├── test_pairwise.csv   # 排序测试集
+    └── train_pairwise.csv  # 排序训练集
+
+```
 
 <a name="模型训练"></a>
 
@@ -157,7 +166,7 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 
 ```
-root_path=inbatch
+root_path=recall
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train_batch_neg.py \
     --device gpu \
@@ -169,7 +178,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 1 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file data/train.csv 
+    --train_set_file recall/train.csv 
 
 ```
 参数含义说明
@@ -223,8 +232,8 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --output_emb_size 256\
         --max_seq_length 60 \
         --recall_num 50 \
-        --similar_text_pair "data/test.csv" \
-        --corpus_file "data/corpus.csv" 
+        --similar_text_pair "recall/test.csv" \
+        --corpus_file "recall/corpus.csv" 
 ```
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
@@ -251,7 +260,7 @@ sh run_build_index.sh
 接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50 指标:
 ```
 python -u evaluate.py \
-        --similar_text_pair "data/test.csv" \
+        --similar_text_pair "recall/test.csv" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 50
 ```
@@ -294,7 +303,7 @@ huntington舞蹈病的动物模型      Huntington舞蹈病的动物模型
 
 以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
 ```
-root_dir="checkpoints/train_0.001" 
+root_dir="checkpoints/inbatch" 
 
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
@@ -303,7 +312,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
-    --text_pair_file "data/test.csv"
+    --text_pair_file "recall/test.csv"
 ```
 
 参数含义说明
@@ -335,7 +344,7 @@ sh predict.sh
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/train_0.001/model_40/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/inbatch/model_40/model_state.pdparams --output_path=./output
 ```
 也可以运行下面的bash脚本：
 

@@ -11,5 +11,5 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --output_emb_size 256\
         --max_seq_length 60 \
         --recall_num 50 \
-        --similar_text_pair "data/test.csv" \
-        --corpus_file "data/corpus.csv" 
+        --similar_text_pair "recall/test.csv" \
+        --corpus_file "recall/corpus.csv" 
