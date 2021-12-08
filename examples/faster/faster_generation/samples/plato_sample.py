@@ -18,6 +18,7 @@ model_name = 'plato-mini'
 
 tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
+model.eval()
 
 
 def postprocess_response(token_ids, tokenizer):
@@ -33,7 +34,7 @@ def postprocess_response(token_ids, tokenizer):
     return tokens
 
 
-inputs = ['你好啊，你今年多大了']
+inputs = '你好啊，你今年多大了'
 
 inputs_ids = tokenizer.dialogue_encode(
     inputs,

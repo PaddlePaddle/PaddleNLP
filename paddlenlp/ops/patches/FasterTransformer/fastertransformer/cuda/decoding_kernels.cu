@@ -224,7 +224,7 @@ void update_KV_cache_kernelLauncher_v2(T** key_cache,
                                        const int cache_size,
                                        const int decoder_layers,
                                        cudaStream_t stream,
-                                       const int memory_max_seq_len = -1) {
+                                       const int memory_max_seq_len) {
   int src_id = step & 0x1;
   int tgt_id = 1 - src_id;
   int tmp_len = (memory_max_seq_len != -1) ? step + memory_max_seq_len : step;
@@ -425,7 +425,7 @@ template void apply_logits_mask_kernelLauncher(
     int vocab_size_padded,
     int vocab_size,
     cudaStream_t stream,
-    const float* logits_mask = nullptr);
+    const float* logits_mask);
 
 template void apply_logits_mask_kernelLauncher(
     half* log_probs,
@@ -435,6 +435,6 @@ template void apply_logits_mask_kernelLauncher(
     int vocab_size_padded,
     int vocab_size,
     cudaStream_t stream,
-    const half* logits_mask = nullptr);
+    const half* logits_mask);
 
 }  // end of name space fastertransformer
