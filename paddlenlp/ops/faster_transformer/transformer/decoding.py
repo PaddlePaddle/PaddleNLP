@@ -160,7 +160,7 @@ def infer_force_decoding(
         'EmbBias': linear_bias,
         'PositionEncEmb': pos_emb,
         # The input of custom op must be given.
-        # Dispensable() and Intermediate() are not supported. 
+        # Dispensable() and Intermediate() are not supported.
         'TrgWord': trg_word
     }
 
@@ -441,30 +441,44 @@ def finalize(beam_size,
              output_ids,
              parent_ids,
              out_seq_lens,
+             forced_eos_token_id=None,
              max_seq_len=None,
              decoding_strategy="beam_search"):
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
     ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
-
     if decoding_strategy.startswith("beam_search"):
         parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
             beam_size * 2 if decoding_strategy.endswith("_v2") or
             decoding_strategy.endswith("_v3") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
+        if forced_eos_token_id is not None:
+            ids[-1, :, :] = forced_eos_token_id
+    else:
+        if forced_eos_token_id is not None:
+            ids[-1, :] = forced_eos_token_id
     return ids
 
 
-def transfer_param(p, is_bias=False, restore_data=False, reserve_var=False):
+def transfer_param(p, is_bias=False, restore_data=False):
     param_shape = p.shape
+    # Maybe we need allow users using `model.to('float16')` to use fp16 by this.
+    if (p.dtype == paddle.float16): return p
     if restore_data:
         if in_dygraph_mode():
             param_data = p.numpy()
+            # Creating parameters with Assign initializer is too slow. Maybe we
+            # can cast to fp16 directly and get a tensor, while we do it more
+            # elaborately to get a ParamBase. Also note `VarBase.set_value`
+            # enforce the same dtype and can not be used directly.
+            new_p = type(p)(shape=param_shape, dtype="float16", is_bias=is_bias)
+            new_p.value().get_tensor().set(
+                param_data.astype("float16"),
+                paddle.fluid.framework._current_expected_place())
+            return new_p
         else:
             param_data = np.array(paddle.static.global_scope().find_var(p.name)
                                   .get_tensor())
-    if not reserve_var:
-        del p
     return paddle.create_parameter(
         shape=param_shape,
         dtype="float16",
@@ -811,24 +825,27 @@ class InferGptDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        for mod in self.model.gpt.decoder.layers:
+        for i, mod in enumerate(self.model.gpt.decoder.layers):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
 
-            self.slf_q_weight.append(
-                paddle.concat(
-                    [
-                        mod.self_attn.q_proj.weight,
-                        mod.self_attn.k_proj.weight, mod.self_attn.v_proj.weight
-                    ],
-                    axis=-1))
-            self.slf_q_bias.append(
-                paddle.concat(
-                    [
-                        mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
-                        mod.self_attn.v_proj.bias
-                    ],
-                    axis=-1))
+            q_weights = paddle.concat(
+                [
+                    mod.self_attn.q_proj.weight, mod.self_attn.k_proj.weight,
+                    mod.self_attn.v_proj.weight
+                ],
+                axis=-1)
+            setattr(self, "slf_q_weight_" + str(i), q_weights)
+            self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
+
+            q_biases = paddle.concat(
+                [
+                    mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
+                    mod.self_attn.v_proj.bias
+                ],
+                axis=-1)
+            setattr(self, "slf_q_bias_" + str(i), q_biases)
+            self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
 
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
@@ -859,6 +876,7 @@ class InferGptDecoding(nn.Layer):
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 max_out_len=256,
                 temperature=1):
         if attention_mask is None:
@@ -907,13 +925,14 @@ class InferGptDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding)
 
         output_ids = output_ids[paddle.shape(input_ids)[-1]:, :]
+        if forced_eos_token_id is not None:
+            output_ids[:, -1] = forced_eos_token_id
         return output_ids
 
 
 class InferUnifiedDecoding(nn.Layer):
     def __init__(self,
                  model,
-                 decoding_strategy="topk_sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  logits_mask=None,
@@ -976,15 +995,11 @@ class InferUnifiedDecoding(nn.Layer):
                     paddle.concat(
                         [
                             transfer_param(
-                                mod.self_attn.q_proj.weight,
-                                restore_data=True,
-                                reserve_var=True), transfer_param(
-                                    mod.self_attn.k_proj.weight,
-                                    restore_data=True,
-                                    reserve_var=True), transfer_param(
-                                        mod.self_attn.v_proj.weight,
-                                        restore_data=True,
-                                        reserve_var=True)
+                                mod.self_attn.q_proj.weight, restore_data=True),
+                            transfer_param(
+                                mod.self_attn.k_proj.weight, restore_data=True),
+                            transfer_param(
+                                mod.self_attn.v_proj.weight, restore_data=True)
                         ],
                         axis=-1))
                 self.sub_modules["slf_q_bias"].append(
@@ -993,175 +1008,132 @@ class InferUnifiedDecoding(nn.Layer):
                             transfer_param(
                                 mod.self_attn.q_proj.bias,
                                 is_bias=True,
-                                restore_data=True,
-                                reserve_var=True), transfer_param(
+                                restore_data=True), transfer_param(
                                     mod.self_attn.k_proj.bias,
                                     is_bias=True,
-                                    restore_data=True,
-                                    reserve_var=True), transfer_param(
+                                    restore_data=True), transfer_param(
                                         mod.self_attn.v_proj.bias,
                                         is_bias=True,
-                                        restore_data=True,
-                                        reserve_var=True)
+                                        restore_data=True)
                         ],
                         axis=-1))
                 self.sub_modules["slf_k_weight"].append(
                     transfer_param(
-                        mod.self_attn.k_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.k_proj.weight, restore_data=True))
                 self.sub_modules["slf_k_bias"].append(
                     transfer_param(
                         mod.self_attn.k_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["slf_v_weight"].append(
                     transfer_param(
-                        mod.self_attn.v_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.v_proj.weight, restore_data=True))
                 self.sub_modules["slf_v_bias"].append(
                     transfer_param(
                         mod.self_attn.v_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["slf_out_weight"].append(
                     transfer_param(
-                        mod.self_attn.out_proj.weight,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.self_attn.out_proj.weight, restore_data=True))
                 self.sub_modules["slf_out_bias"].append(
                     transfer_param(
                         mod.self_attn.out_proj.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        restore_data=True))
                 self.sub_modules["ffn_inter_weight"].append(
                     transfer_param(
-                        mod.linear1.weight, restore_data=True,
-                        reserve_var=True))
+                        mod.linear1.weight, restore_data=True))
                 self.sub_modules["ffn_inter_bias"].append(
                     transfer_param(
-                        mod.linear1.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.linear1.bias, is_bias=True, restore_data=True))
                 self.sub_modules["ffn_out_weight"].append(
                     transfer_param(
-                        mod.linear2.weight, restore_data=True,
-                        reserve_var=True))
+                        mod.linear2.weight, restore_data=True))
                 self.sub_modules["ffn_out_bias"].append(
                     transfer_param(
-                        mod.linear2.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.linear2.bias, is_bias=True, restore_data=True))
                 self.sub_modules["slf_ln_weight"].append(
                     transfer_param(
-                        mod.norm1.weight, restore_data=True, reserve_var=True))
+                        mod.norm1.weight, restore_data=True))
                 self.sub_modules["slf_ln_bias"].append(
                     transfer_param(
-                        mod.norm1.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.norm1.bias, is_bias=True, restore_data=True))
                 self.sub_modules["ffn_ln_weight"].append(
                     transfer_param(
-                        mod.norm2.weight, restore_data=True, reserve_var=True))
+                        mod.norm2.weight, restore_data=True))
                 self.sub_modules["ffn_ln_bias"].append(
                     transfer_param(
-                        mod.norm2.bias,
-                        is_bias=True,
-                        restore_data=True,
-                        reserve_var=True))
+                        mod.norm2.bias, is_bias=True, restore_data=True))
 
             self.sub_modules["word_emb"] = [
                 transfer_param(
                     self._model.embeddings.word_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["pos_emb"] = [
                 transfer_param(
                     self._model.embeddings.position_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["type_emb"] = [
                 transfer_param(
                     self._model.embeddings.token_type_embeddings.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             if self._normalize_before:
                 self.sub_modules["decoder_ln_weight"] = [
                     transfer_param(
-                        self._model.encoder.norm.weight,
-                        restore_data=True,
-                        reserve_var=True)
+                        self._model.encoder.norm.weight, restore_data=True)
                 ]
                 self.sub_modules["decoder_ln_bias"] = [
                     transfer_param(
                         self._model.encoder.norm.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
+                        restore_data=True)
                 ]
             else:
                 self.sub_modules["decoder_ln_weight"] = [
                     transfer_param(
-                        self._model.encoder_norm.weight,
-                        restore_data=True,
-                        reserve_var=True)
+                        self._model.encoder_norm.weight, restore_data=True)
                 ]
                 self.sub_modules["decoder_ln_bias"] = [
                     transfer_param(
                         self._model.encoder_norm.bias,
                         is_bias=True,
-                        restore_data=True,
-                        reserve_var=True)
+                        restore_data=True)
                 ]
             self.sub_modules["trans_weight"] = [
                 transfer_param(
-                    self._model.lm_head.transform.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    self._model.lm_head.transform.weight, restore_data=True)
             ]
             self.sub_modules["trans_bias"] = [
                 transfer_param(
                     self._model.lm_head.transform.bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["lm_ln_weight"] = [
                 transfer_param(
-                    self._model.lm_head.layer_norm.weight,
-                    restore_data=True,
-                    reserve_var=True)
+                    self._model.lm_head.layer_norm.weight, restore_data=True)
             ]
             self.sub_modules["lm_ln_bias"] = [
                 transfer_param(
                     self._model.lm_head.layer_norm.bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
             self.sub_modules["linear_weight"] = [
                 paddle.transpose(
                     transfer_param(
-                        self._model.lm_head.decoder_weight,
-                        restore_data=True,
-                        reserve_var=True), [1, 0])
+                        self._model.lm_head.decoder_weight, restore_data=True),
+                    [1, 0])
             ]
             self.sub_modules["linear_bias"] = [
                 transfer_param(
                     self._model.lm_head.decoder_bias,
                     is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
+                    restore_data=True)
             ]
         else:
             for mod in self._model.encoder.layers:
@@ -1241,17 +1213,18 @@ class InferUnifiedDecoding(nn.Layer):
                 beam_size=4,
                 topk=4,
                 topp=0.0,
+                decoding_strategy="greedy_search",
                 max_out_len=256,
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 temperature=1.0,
                 length_penalty=1.0,
                 diversity_rate=0.0,
                 pos_bias=True,
                 rel_len=False,
                 early_stopping=False):
-        decoding_strategy = self._decoding_strategy
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
             topk = 1
@@ -1270,7 +1243,6 @@ class InferUnifiedDecoding(nn.Layer):
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         elif decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
-
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -1324,24 +1296,18 @@ class InferUnifiedDecoding(nn.Layer):
             _hidden_act=self._hidden_act,
             _rel_len=rel_len,
             _early_stopping=early_stopping)
-
         ids = finalize(
             beam_size,
             output_ids,
             parent_ids,
             sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
-
         return ids
 
 
 class InferBartDecoding(nn.Layer):
-    def __init__(
-            self,
-            model,
-            decoding_strategy="beam_search_v3",
-            decoding_lib=None,
-            use_fp16_decoding=False, ):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
@@ -1520,16 +1486,17 @@ class InferBartDecoding(nn.Layer):
                 beam_size=4,
                 top_k=1,
                 top_p=0.0,
+                decoding_strategy="beam_search_v3",
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
+                forced_eos_token_id=None,
                 alpha=0.6,
                 early_stopping=False):
         # beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
-        decoding_strategy = self._decoding_strategy
         if decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
         elif decoding_strategy == "greedy_search":
@@ -1571,5 +1538,6 @@ class InferBartDecoding(nn.Layer):
             output_ids,
             parent_ids,
             sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
         return ids
