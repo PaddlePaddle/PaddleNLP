@@ -49,7 +49,8 @@ outputs, _ = model.generate(
     attention_mask=inputs_ids['attention_mask'],
     max_length=64,
     decode_strategy='sampling',
-    top_k=5)
+    top_k=5,
+    use_faster=True)
 
 result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)

@@ -536,7 +536,7 @@ class GenerationMixin(object):
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
-                 use_faster=True,
+                 use_faster=False,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -605,7 +605,7 @@ class GenerationMixin(object):
             use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
             use_faster: (bool, optional): Whether to use faster entry of model 
-                for generation. Default to True.
+                for generation. Default to False.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
 
