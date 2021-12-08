@@ -42,7 +42,7 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 ### 技术方案
 
-双塔模型，采用ERNIE1.0热启,在召回训练阶段引入In-batch negatives 策略，使用hnswlib建立索引库，进行召回测试。
+双塔模型，采用ERNIE1.0热启，在召回训练阶段引入In-batch negatives 策略，使用hnswlib建立索引库，进行召回测试。
 
 
 ### 评估指标
@@ -96,7 +96,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— export.sh  # 动态图转换成静态图脚本
 |—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
-|—— deploy.sh # PaddleInference部署脚本
+|—— deploy.sh # Paddle Inference部署脚本
 
 ```
 
@@ -205,16 +205,20 @@ sh train_batch_neg.sh
 效果评估分为 4 个步骤:
 
 a. 获取Doc端Embedding
-基于语义索引模型抽取出Doc样本库的文本向量，
+
+基于语义索引模型抽取出Doc样本库的文本向量。
 
 b. 采用hnswlib对Doc端Embedding建库
+
 使用 ANN 引擎构建索引库(这里基于 [hnswlib](https://github.com/nmslib/hnswlib) 进行 ANN 索引)
 
 c. 获取Query的Embedding并查询相似结果
-基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
+
+基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件。
 
 d. 评估
-基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
+
+基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50。
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
