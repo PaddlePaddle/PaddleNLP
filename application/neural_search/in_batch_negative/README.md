@@ -145,7 +145,8 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可
 
-把下载的数据集帮在data目录下：
+把下载的数据集放data目录下，训练集位train.csv，测试集test.csv，召回集为corpus.csv，然后运行下面的命令：
+
 
 ```
 root_path=inbatch
