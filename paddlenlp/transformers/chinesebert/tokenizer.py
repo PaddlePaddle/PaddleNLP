@@ -13,40 +13,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# MIT License
+
+# Copyright (c) 2021 ShannonAI
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from paddlenlp.transformers import BertTokenizer
 from pypinyin import NORMAL, Style, pinyin
 from functools import lru_cache
 
+
 class ChineseBertTokenizer(BertTokenizer):
+    """
+    Construct a ChineseBert tokenizer. `ChineseBertTokenizer` is identical to `BertTokenizerr`.
+    For more information regarding those methods, please refer to this superclass.
+    """
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ChineseBERT-base": "/home/aistudio/work/vocab.txt",
-            "ChineseBERT-large": "/home/aistudio/data/data109231/vocab.txt",
+            "ChineseBERT-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/vocab.txt",
+            "ChineseBERT-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/tokenizer_config.json",
         },
         "tokenizer_config_file": {
-            "ChineseBERT-base": "/home/aistudio/work/tokenizer_config.json",
-            "ChineseBERT-large": "/home/aistudio/work/tokenizer_config.json",
+            "ChineseBERT-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/vocab.txt",
+            "ChineseBERT-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/tokenizer_config.json",
         },
     }
     pretrained_init_configuration = {
-        "ChineseBERT-base": {"do_lower_case": True},
-        "ChineseBERT-large": {"do_lower_case": True},
+        "ChineseBERT-base": {
+            "do_lower_case": True
+        },
+        "ChineseBERT-large": {
+            "do_lower_case": True
+        },
     }
     padding_side = "right"
 
     def __init__(
-        self,
-        vocab_file,
-        do_lower_case=True,
-        pinyin_map=None,
-        id2pinyin=None,
-        pinyin2tensor=None,
-        unk_token="[UNK]",
-        sep_token="[SEP]",
-        pad_token="[PAD]",
-        cls_token="[CLS]",
-        mask_token="[MASK]",
-    ):
+            self,
+            vocab_file,
+            do_lower_case=True,
+            pinyin_map=None,
+            id2pinyin=None,
+            pinyin2tensor=None,
+            unk_token="[UNK]",
+            sep_token="[SEP]",
+            pad_token="[PAD]",
+            cls_token="[CLS]",
+            mask_token="[MASK]", ):
         super().__init__(
             vocab_file,
             do_lower_case,
@@ -54,13 +88,11 @@ class ChineseBertTokenizer(BertTokenizer):
             sep_token,
             pad_token,
             cls_token,
-            mask_token,
-        )
+            mask_token, )
         self.pinyin_dict = pinyin_map
         self.id2pinyin = id2pinyin
         self.pinyin2tensor = pinyin2tensor
         self.special_tokens_pinyin_ids = [0] * 8
-
 
     def encode(self,
                text,
@@ -74,7 +106,6 @@ class ChineseBertTokenizer(BertTokenizer):
                return_length=False,
                return_overflowing_tokens=False,
                return_special_tokens_mask=False):
-
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self._tokenize(text)
@@ -113,7 +144,7 @@ class ChineseBertTokenizer(BertTokenizer):
             token_pair_offset_mapping = None
 
         if max_seq_len and total_len > max_seq_len:
-            ids, pair_ids,token_offset_mapping,token_pair_offset_mapping, overflowing_tokens = self.truncate_sequences(
+            ids, pair_ids, token_offset_mapping, token_pair_offset_mapping, overflowing_tokens = self.truncate_sequences(
                 ids,
                 pair_ids=pair_ids,
                 token_offset_mapping=token_offset_mapping,
@@ -136,7 +167,8 @@ class ChineseBertTokenizer(BertTokenizer):
 
         # Build output dictionnary
         encoded_inputs["input_ids"] = sequence
-        encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair, offset_mapping)
+        encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair,
+                                                           offset_mapping)
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = token_type_ids
@@ -157,7 +189,8 @@ class ChineseBertTokenizer(BertTokenizer):
 
         if needs_to_be_padded:
             difference = max_seq_len - len(encoded_inputs["input_ids"])
-            encoded_inputs["pinyin_ids"] = encoded_inputs["pinyin_ids"] + self.special_tokens_pinyin_ids * difference          
+            encoded_inputs["pinyin_ids"] = encoded_inputs[
+                "pinyin_ids"] + self.special_tokens_pinyin_ids * difference
             if self.padding_side == 'right':
                 if return_attention_mask:
                     encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
@@ -243,7 +276,8 @@ class ChineseBertTokenizer(BertTokenizer):
                 first_ids = get_input_ids(text)
                 second_ids = get_input_ids(text_pair)
 
-                max_len_for_pair = max_seq_len - len(first_ids) - self.num_special_tokens_to_add(pair=True)
+                max_len_for_pair = max_seq_len - len(
+                    first_ids) - self.num_special_tokens_to_add(pair=True)
                 token_offset_mapping = self.get_offset_mapping(text)
                 token_pair_offset_mapping = self.get_offset_mapping(text_pair)
 
@@ -252,18 +286,19 @@ class ChineseBertTokenizer(BertTokenizer):
 
                     ids = first_ids
                     mapping = token_offset_mapping
-                    if len(second_ids)<=max_len_for_pair:
+                    if len(second_ids) <= max_len_for_pair:
                         pair_ids = second_ids
                         pair_mapping = token_pair_offset_mapping
                     else:
                         pair_ids = second_ids[:max_len_for_pair]
-                        pair_mapping = token_pair_offset_mapping[:max_len_for_pair]
-
+                        pair_mapping = token_pair_offset_mapping[:
+                                                                 max_len_for_pair]
 
                     offset_mapping = self.build_offset_mapping_with_special_tokens(
                         mapping, pair_mapping)
                     # add_pinyin_ids
-                    encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair, offset_mapping)
+                    encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(
+                        text, text_pair, offset_mapping)
 
                     sequence = self.build_inputs_with_special_tokens(ids,
                                                                      pair_ids)
@@ -296,7 +331,8 @@ class ChineseBertTokenizer(BertTokenizer):
                         difference = max_seq_len - len(encoded_inputs[
                             "input_ids"])
                         # padding pinyin_ids
-                        encoded_inputs["pinyin_ids"] = encoded_inputs["pinyin_ids"] + self.special_tokens_pinyin_ids * difference
+                        encoded_inputs["pinyin_ids"] = encoded_inputs[
+                            "pinyin_ids"] + self.special_tokens_pinyin_ids * difference
                         if self.padding_side == 'right':
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [1] * len(
@@ -350,11 +386,12 @@ class ChineseBertTokenizer(BertTokenizer):
                     encoded_inputs['overflow_to_sample'] = example_id
                     batch_encode_inputs.append(encoded_inputs)
 
-                    if len(second_ids)<=max_len_for_pair:
+                    if len(second_ids) <= max_len_for_pair:
                         break
                     else:
-                        second_ids = second_ids[max_len_for_pair-stride:]
-                        token_pair_offset_mapping = token_pair_offset_mapping[max_len_for_pair-stride:]
+                        second_ids = second_ids[max_len_for_pair - stride:]
+                        token_pair_offset_mapping = token_pair_offset_mapping[
+                            max_len_for_pair - stride:]
 
             else:
                 batch_encode_inputs.append(
@@ -408,7 +445,8 @@ class ChineseBertTokenizer(BertTokenizer):
             window_len = min(len(pair_ids), stride + num_tokens_to_remove)
             overflowing_tokens = pair_ids[-window_len:]
             pair_ids = pair_ids[:-num_tokens_to_remove]
-            token_pair_offset_mapping = token_pair_offset_mapping[:-num_tokens_to_remove]
+            token_pair_offset_mapping = token_pair_offset_mapping[:
+                                                                  -num_tokens_to_remove]
         elif truncation_strategy == 'do_not_truncate':
             raise ValueError(
                 "Input sequence are too long for max_length. Please select a truncation strategy."
@@ -417,7 +455,8 @@ class ChineseBertTokenizer(BertTokenizer):
             raise ValueError(
                 "Truncation_strategy should be selected in ['longest_first', 'only_first', 'only_second', 'do_not_truncate']"
             )
-        return (ids, pair_ids,token_offset_mapping,token_pair_offset_mapping, overflowing_tokens)
+        return (ids, pair_ids, token_offset_mapping, token_pair_offset_mapping,
+                overflowing_tokens)
 
     @lru_cache(9999)
     def pinyin_locs_map(self, text):
@@ -425,8 +464,7 @@ class ChineseBertTokenizer(BertTokenizer):
             text,
             style=Style.TONE3,
             heteronym=True,
-            errors=lambda x: [["not chinese"] for _ in x],
-        )
+            errors=lambda x: [["not chinese"] for _ in x], )
         pinyin_locs = {}
         # get pinyin of each location
         for index, item in enumerate(pinyin_list):
@@ -475,4 +513,3 @@ class ChineseBertTokenizer(BertTokenizer):
                 pinyin_ids.extend([0] * 8)
 
         return pinyin_ids
-
