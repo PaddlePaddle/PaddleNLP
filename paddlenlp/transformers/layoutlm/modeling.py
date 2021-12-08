@@ -16,6 +16,7 @@
 
 import copy
 import math
+
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
@@ -23,7 +24,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
-from paddlenlp.transformers import PretrainedModel, register_base_model
+from .. import PretrainedModel, register_base_model
 
 __all__ = [
     "LayoutLMModel",
@@ -264,7 +265,6 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             pad_token_id=0,
             pool_act="tanh", ):
         super(LayoutLMModel, self).__init__()
-        #self.config = kwargs
         self.num_hidden_layers = num_hidden_layers
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -343,7 +343,6 @@ class LayoutLMModel(LayoutLMPretrainedModel):
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and its shape is [batch_size, hidden_size].
         '''
-
         input_shape = input_ids.shape
 
         if attention_mask is None:
@@ -355,28 +354,14 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-        '''
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
         if position_ids is None:
             seq_length = input_shape[1]
             position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)'''
+            position_ids = position_ids.expand_as(input_ids)
         if bbox is None:
             bbox = paddle.zeros(tuple(list(input_shape) + [4]), dtype="int64")
-        '''
-        if head_mask is not None:
-            if head_mask.dim() == 1:
-                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(
-                    -1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.num_hidden_layers,
-                                             -1, -1, -1, -1)
-            elif head_mask.dim() == 2:
-                head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
-            head_mask = head_mask.to(dtype=next(self.parameters()).dtype)
-        else:
-            head_mask = [None] * self.num_hidden_layers
-        '''
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
