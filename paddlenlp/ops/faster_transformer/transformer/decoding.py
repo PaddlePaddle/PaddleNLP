@@ -815,40 +815,22 @@ class InferGptDecoding(nn.Layer):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
 
-            q_weights = np.concatenate(
+            q_weights = paddle.concat(
                 [
-                    mod.self_attn.q_proj.weight.numpy(),
-                    mod.self_attn.k_proj.weight.numpy(),
-                    mod.self_attn.v_proj.weight.numpy()
+                    mod.self_attn.q_proj.weight, mod.self_attn.k_proj.weight,
+                    mod.self_attn.v_proj.weight
                 ],
                 axis=-1)
-            setattr(
-                self,
-                "slf_q_weight_" + str(i),
-                paddle.create_parameter(
-                    name=mod.self_attn.q_proj.weight.name + "_" + str(i),
-                    shape=q_weights.shape,
-                    dtype="float16" if self.use_fp16_decoding else "float32",
-                    default_initializer=paddle.nn.initializer.Assign(
-                        q_weights)))
+            setattr(self, "slf_q_weight_" + str(i), q_weights)
             self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
 
-            q_biases = np.concatenate(
+            q_biases = paddle.concat(
                 [
-                    mod.self_attn.q_proj.bias.numpy(),
-                    mod.self_attn.k_proj.bias.numpy(),
-                    mod.self_attn.v_proj.bias.numpy()
+                    mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
+                    mod.self_attn.v_proj.bias
                 ],
                 axis=-1)
-            setattr(
-                self,
-                "slf_q_bias_" + str(i),
-                paddle.create_parameter(
-                    name=mod.self_attn.q_proj.bias.name + "_" + str(i),
-                    shape=q_biases.shape,
-                    dtype="float16" if self.use_fp16_decoding else "float32",
-                    is_bias=True,
-                    default_initializer=paddle.nn.initializer.Assign(q_biases)))
+            setattr(self, "slf_q_bias_" + str(i), q_biases)
             self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
 
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
