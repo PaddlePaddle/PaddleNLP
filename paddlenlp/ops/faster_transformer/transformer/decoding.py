@@ -437,6 +437,101 @@ def infer_bart_decoding(
     return output_ids, parent_ids, sequence_length
 
 
+def infer_mbart_decoding(
+        enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, mbart_ln_weight, mbart_ln_bias, linear_weight,
+        linear_bias, pos_emb, trg_word, _decoding_strategy, _beam_size, _topk,
+        _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
+        _max_out_len, _diversity_rate, _rel_len, _alpha, _temperature,
+        _early_stopping, _hidden_act):
+    helper = LayerHelper('fusion_mbart_decoding', **locals())
+
+    inputs = {
+        'Input': enc_output,
+        'MemSeqLen': memory_seq_lens,
+        'WordEmbedding': word_emb,
+        'SelfLayernormWeight@VECTOR': slf_ln_weight,
+        'SelfLayernormBias@VECTOR': slf_ln_bias,
+        'SelfQueryWeight@VECTOR': slf_q_weight,
+        'SelfQueryBias@VECTOR': slf_q_bias,
+        'SelfKeyWeight@VECTOR': slf_k_weight,
+        'SelfKeyBias@VECTOR': slf_k_bias,
+        'SelfValueWeight@VECTOR': slf_v_weight,
+        'SelfValueBias@VECTOR': slf_v_bias,
+        'SelfOutWeight@VECTOR': slf_out_weight,
+        'SelfOutBias@VECTOR': slf_out_bias,
+        'CrossLayernormWeight@VECTOR': cross_ln_weight,
+        'CrossLayernormBias@VECTOR': cross_ln_bias,
+        'CrossQueryWeight@VECTOR': cross_q_weight,
+        'CrossQueryBias@VECTOR': cross_q_bias,
+        'CrossKeyWeight@VECTOR': cross_k_weight,
+        'CrossKeyBias@VECTOR': cross_k_bias,
+        'CrossValueWeight@VECTOR': cross_v_weight,
+        'CrossValueBias@VECTOR': cross_v_bias,
+        'CrossOutWeight@VECTOR': cross_out_weight,
+        'CrossOutBias@VECTOR': cross_out_bias,
+        'FFNLayernormWeight@VECTOR': ffn_ln_weight,
+        'FFNLayernormBias@VECTOR': ffn_ln_bias,
+        'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterBias@VECTOR': ffn_inter_bias,
+        'FFNOutWeight@VECTOR': ffn_out_weight,
+        'FFNOutBias@VECTOR': ffn_out_bias,
+        'DecoderLayernormWeight': decoder_ln_weight,
+        'DecoderLayernormBias': decoder_ln_bias,
+        'MBARTLayernormWeight': mbart_ln_weight,
+        'MBARTLayernormBias': mbart_ln_bias,
+        'EmbWeight': linear_weight,
+        'EmbBias': linear_bias,
+        'PositionEncEmb': pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported. 
+        'TrgWord': trg_word
+    }
+
+    attrs = {
+        'decoding_strategy': _decoding_strategy,
+        'beam_size': _beam_size,
+        'topk': _topk,
+        'topp': _topp,
+        'n_head': _n_head,
+        'size_per_head': _size_per_head,
+        'num_layer': _n_layer,
+        'bos_id': _bos_id,
+        'eos_id': _eos_id,
+        'max_len': _max_out_len,
+        'beam_search_diversity_rate': _diversity_rate,
+        "rel_len": _rel_len,
+        "alpha": _alpha,
+        "temperature": _temperature,
+        "early_stopping": _early_stopping,
+        "hidden_act": _hidden_act
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
+
+    outputs = {
+        'OutputIds': output_ids,
+        'ParentIds': parent_ids,
+        'SequenceLength': sequence_length
+    }
+
+    helper.append_op(
+        type='fusion_mbart_decoding',
+        inputs=inputs,
+        outputs=outputs,
+        attrs=attrs)
+
+    return output_ids, parent_ids, sequence_length
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -1539,5 +1634,256 @@ class InferBartDecoding(nn.Layer):
             parent_ids,
             sequence_length,
             forced_eos_token_id=forced_eos_token_id,
+            decoding_strategy=decoding_strategy)
+        return ids
+
+
+class InferMBartDecoding(nn.Layer):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 hidden_act="gelu"):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                decoding_lib)
+        else:
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
+            load("FasterTransformer", verbose=True)
+
+        super(InferMBartDecoding, self).__init__()
+        for arg, value in locals().items():
+            if arg not in [
+                    "self", "model", "word_embedding", "positional_embedding",
+                    "linear"
+            ]:
+                setattr(self, "_" + arg, value)
+        self._num_decoder_layers = model.mbart.config['num_decoder_layers']
+        self._n_head = model.mbart.config['decoder_attention_heads']
+        self._d_model = model.mbart.config['d_model']
+
+        # process weights
+        if use_fp16_decoding:
+            for mod in model.mbart.decoder.decoder.layers:
+                mod.norm1.weight = transfer_param(
+                    mod.norm1.weight, restore_data=True)
+                mod.norm1.bias = transfer_param(
+                    mod.norm1.bias, is_bias=True, restore_data=True)
+                mod.self_attn.q_proj.weight = transfer_param(
+                    mod.self_attn.q_proj.weight, restore_data=True)
+                mod.self_attn.q_proj.bias = transfer_param(
+                    mod.self_attn.q_proj.bias, is_bias=True, restore_data=True)
+                mod.self_attn.k_proj.weight = transfer_param(
+                    mod.self_attn.k_proj.weight, restore_data=True)
+                mod.self_attn.k_proj.bias = transfer_param(
+                    mod.self_attn.k_proj.bias, is_bias=True, restore_data=True)
+                mod.self_attn.v_proj.weight = transfer_param(
+                    mod.self_attn.v_proj.weight, restore_data=True)
+                mod.self_attn.v_proj.bias = transfer_param(
+                    mod.self_attn.v_proj.bias, is_bias=True, restore_data=True)
+                mod.self_attn.out_proj.weight = transfer_param(
+                    mod.self_attn.out_proj.weight, restore_data=True)
+                mod.self_attn.out_proj.bias = transfer_param(
+                    mod.self_attn.out_proj.bias,
+                    is_bias=True,
+                    restore_data=True)
+
+                mod.norm2.weight = transfer_param(
+                    mod.norm2.weight, restore_data=True)
+                mod.norm2.bias = transfer_param(
+                    mod.norm2.bias, is_bias=True, restore_data=True)
+                mod.cross_attn.q_proj.weight = transfer_param(
+                    mod.cross_attn.q_proj.weight, restore_data=True)
+                mod.cross_attn.q_proj.bias = transfer_param(
+                    mod.cross_attn.q_proj.bias, is_bias=True, restore_data=True)
+                mod.cross_attn.k_proj.weight = transfer_param(
+                    mod.cross_attn.k_proj.weight, restore_data=True)
+                mod.cross_attn.k_proj.bias = transfer_param(
+                    mod.cross_attn.k_proj.bias, is_bias=True, restore_data=True)
+                mod.cross_attn.v_proj.weight = transfer_param(
+                    mod.cross_attn.v_proj.weight, restore_data=True)
+                mod.cross_attn.v_proj.bias = transfer_param(
+                    mod.cross_attn.v_proj.bias, is_bias=True, restore_data=True)
+                mod.cross_attn.out_proj.weight = transfer_param(
+                    mod.cross_attn.out_proj.weight, restore_data=True)
+                mod.cross_attn.out_proj.bias = transfer_param(
+                    mod.cross_attn.out_proj.bias,
+                    is_bias=True,
+                    restore_data=True)
+
+                mod.norm3.weight = transfer_param(
+                    mod.norm3.weight, restore_data=True)
+                mod.norm3.bias = transfer_param(
+                    mod.norm3.bias, is_bias=True, restore_data=True)
+                mod.linear1.weight = transfer_param(
+                    mod.linear1.weight, restore_data=True)
+                mod.linear1.bias = transfer_param(
+                    mod.linear1.bias, is_bias=True, restore_data=True)
+                mod.linear2.weight = transfer_param(
+                    mod.linear2.weight, restore_data=True)
+                mod.linear2.bias = transfer_param(
+                    mod.linear2.bias, is_bias=True, restore_data=True)
+
+            model.decoder.decoder_layernorm_embedding.weight = transfer_param(
+                model.decoder.decoder_layernorm_embedding.weight,
+                restore_data=True)
+            model.decoder.decoder_layernorm_embedding.bias = transfer_param(
+                model.decoder.decoder_layernorm_embedding.bias,
+                is_bias=True,
+                restore_data=True)
+
+            model.decoder.decoder.norm.weight = transfer_param(
+                model.decoder.decoder.norm.weight, restore_data=True)
+            model.decoder.decoder.norm.bias = transfer_param(
+                model.decoder.decoder.norm.bias,
+                is_bias=True,
+                restore_data=True)
+
+            model.lm_head_weight = transfer_param(
+                model.lm_head_weight, restore_data=True)
+            model.final_logits_bias = transfer_param(
+                model.final_logits_bias, is_bias=True, restore_data=True)
+
+            model.decoder.decoder_embed_positions.weight = transfer_param(
+                model.decoder.decoder_embed_positions.weight, restore_data=True)
+            model.decoder.embed_tokens.weight = transfer_param(
+                model.decoder.embed_tokens.weight, restore_data=True)
+
+        self.slf_ln_weight = []
+        self.slf_ln_bias = []
+        self.slf_q_weight = []
+        self.slf_q_bias = []
+        self.slf_k_weight = []
+        self.slf_k_bias = []
+        self.slf_v_weight = []
+        self.slf_v_bias = []
+        self.slf_out_weight = []
+        self.slf_out_bias = []
+
+        self.cross_ln_weight = []
+        self.cross_ln_bias = []
+        self.cross_q_weight = []
+        self.cross_q_bias = []
+        self.cross_k_weight = []
+        self.cross_k_bias = []
+        self.cross_v_weight = []
+        self.cross_v_bias = []
+        self.cross_out_weight = []
+        self.cross_out_bias = []
+
+        self.ffn_ln_weight = []
+        self.ffn_ln_bias = []
+        self.ffn_inter_weight = []
+        self.ffn_inter_bias = []
+        self.ffn_out_weight = []
+        self.ffn_out_bias = []
+
+        for mod in model.mbart.decoder.decoder.layers:
+            self.slf_ln_weight.append(mod.norm1.weight)
+            self.slf_ln_bias.append(mod.norm1.bias)
+            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+            self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+            self.slf_k_bias.append(mod.self_attn.k_proj.bias)
+            self.slf_v_weight.append(mod.self_attn.v_proj.weight)
+            self.slf_v_bias.append(mod.self_attn.v_proj.bias)
+            self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+            self.slf_out_bias.append(mod.self_attn.out_proj.bias)
+
+            self.cross_ln_weight.append(mod.norm2.weight)
+            self.cross_ln_bias.append(mod.norm2.bias)
+            self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
+            self.cross_q_bias.append(mod.cross_attn.q_proj.bias)
+            self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
+            self.cross_k_bias.append(mod.cross_attn.k_proj.bias)
+            self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
+            self.cross_v_bias.append(mod.cross_attn.v_proj.bias)
+            self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+            self.cross_out_bias.append(mod.cross_attn.out_proj.bias)
+
+            self.ffn_ln_weight.append(mod.norm3.weight)
+            self.ffn_ln_bias.append(mod.norm3.bias)
+            self.ffn_inter_weight.append(mod.linear1.weight)
+            self.ffn_inter_bias.append(mod.linear1.bias)
+            self.ffn_out_weight.append(mod.linear2.weight)
+            self.ffn_out_bias.append(mod.linear2.bias)
+
+        self.decoder_ln_weight = [model.decoder.decoder.norm.weight]
+        self.decoder_ln_bias = [model.decoder.decoder.norm.bias]
+
+        self.mbart_ln_weight = [
+            model.decoder.decoder_layernorm_embedding.weight
+        ]
+        self.mbart_ln_bias = [model.decoder.decoder_layernorm_embedding.bias]
+
+        self.pos_emb = [model.decoder.decoder_embed_positions.weight]
+        self.word_emb = [model.decoder.embed_tokens.weight]
+
+        self.linear_weight = [model.lm_head_weight.t()]
+        self.linear_bias = [model.final_logits_bias]
+
+    def forward(self,
+                enc_output,
+                memory_seq_lens,
+                trg_word=None,
+                beam_size=4,
+                top_k=1,
+                top_p=0.0,
+                decoding_strategy="beam_search_v3",
+                max_out_len=256,
+                diversity_rate=0.0,
+                rel_len=False,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                alpha=0.6,
+                temperature=1.0,
+                early_stopping=False):
+        # Beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
+        if decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v3"
+        elif decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
+            top_k = 1
+            top_p = 0.0
+        elif decoding_strategy in [
+                "sampling", "topk_sampling", "topp_sampling"
+        ]:
+            if top_p == 1 and top_k > 0:
+                decoding_strategy = "topk_sampling"
+                top_p = 0.0
+            elif top_p > 0 and top_k == 0:
+                decoding_strategy = "topp_sampling"
+            else:
+                raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version. ")
+        output_ids, parent_ids, sequence_length = infer_mbart_decoding(
+            [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
+            self.slf_ln_bias, self.slf_q_weight, self.slf_q_bias,
+            self.slf_k_weight, self.slf_k_bias, self.slf_v_weight,
+            self.slf_v_bias, self.slf_out_weight, self.slf_out_bias,
+            self.cross_ln_weight, self.cross_ln_bias, self.cross_q_weight,
+            self.cross_q_bias, self.cross_k_weight, self.cross_k_bias,
+            self.cross_v_weight, self.cross_v_bias, self.cross_out_weight,
+            self.cross_out_bias, self.ffn_ln_weight, self.ffn_ln_bias,
+            self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
+            self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
+            self.mbart_ln_weight, self.mbart_ln_bias, self.linear_weight,
+            self.linear_bias, self.pos_emb, trg_word, decoding_strategy,
+            beam_size, top_k, top_p, self._n_head,
+            int(self._d_model / self._n_head), self._num_decoder_layers,
+            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
+            alpha, temperature, early_stopping, self._hidden_act)
+
+        ids = finalize(
+            beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
             decoding_strategy=decoding_strategy)
         return ids
