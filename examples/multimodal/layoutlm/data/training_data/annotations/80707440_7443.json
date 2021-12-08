@@ -1,0 +1,2158 @@
+{
+    "form": [
+        {
+            "box": [
+                49,
+                229,
+                87,
+                243
+            ],
+            "text": "CLIENT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        49,
+                        229,
+                        87,
+                        243
+                    ],
+                    "text": "CLIENT:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    11
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                49,
+                257,
+                95,
+                271
+            ],
+            "text": "PRODUCT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        49,
+                        257,
+                        95,
+                        271
+                    ],
+                    "text": "PRODUCT:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    12
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                596,
+                147,
+                667,
+                176
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        596,
+                        147,
+                        667,
+                        176
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                373,
+                225,
+                437,
+                240
+            ],
+            "text": "PUBLICATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        373,
+                        225,
+                        437,
+                        240
+                    ],
+                    "text": "PUBLICATION"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    14
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                373,
+                254,
+                404,
+                268
+            ],
+            "text": "ISSUE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        373,
+                        254,
+                        404,
+                        268
+                    ],
+                    "text": "ISSUE:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    15
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                373,
+                278,
+                407,
+                292
+            ],
+            "text": "SPACE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        373,
+                        278,
+                        407,
+                        292
+                    ],
+                    "text": "SPACE:"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    16
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                547,
+                275,
+                575,
+                289
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        547,
+                        275,
+                        575,
+                        289
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    17
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                102,
+                391,
+                193,
+                405
+            ],
+            "text": "ALTERNATIVES:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        102,
+                        391,
+                        193,
+                        405
+                    ],
+                    "text": "ALTERNATIVES:"
+                }
+            ],
+            "linking": [
+                [
+                    7,
+                    20
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                103,
+                434,
+                167,
+                447
+            ],
+            "text": "HEADLINE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        103,
+                        434,
+                        167,
+                        447
+                    ],
+                    "text": "HEADLINE:"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    21
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                106,
+                461,
+                194,
+                474
+            ],
+            "text": "ILLUSTRATION:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        106,
+                        461,
+                        194,
+                        474
+                    ],
+                    "text": "ILLUSTRATION:"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    22
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                599,
+                832,
+                621,
+                917
+            ],
+            "text": "80707440",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        599,
+                        832,
+                        621,
+                        917
+                    ],
+                    "text": "80707440"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "text": "LORILLARD CORPORATION",
+            "box": [
+                108,
+                228,
+                256,
+                242
+            ],
+            "linking": [
+                [
+                    0,
+                    11
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        108,
+                        228,
+                        174,
+                        242
+                    ]
+                },
+                {
+                    "text": "CORPORATION",
+                    "box": [
+                        179,
+                        228,
+                        256,
+                        241
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Kent, Newport, True and Old Gold",
+            "box": [
+                110,
+                251,
+                328,
+                271
+            ],
+            "linking": [
+                [
+                    1,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Kent,",
+                    "box": [
+                        110,
+                        257,
+                        145,
+                        271
+                    ]
+                },
+                {
+                    "text": "Newport,",
+                    "box": [
+                        151,
+                        256,
+                        205,
+                        270
+                    ]
+                },
+                {
+                    "text": "True",
+                    "box": [
+                        211,
+                        256,
+                        242,
+                        269
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        246,
+                        254,
+                        270,
+                        268
+                    ]
+                },
+                {
+                    "text": "Old",
+                    "box": [
+                        274,
+                        254,
+                        295,
+                        267
+                    ]
+                },
+                {
+                    "text": "Gold",
+                    "box": [
+                        300,
+                        251,
+                        328,
+                        265
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "JOB NO:",
+            "box": [
+                50,
+                281,
+                91,
+                295
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "JOB",
+                    "box": [
+                        50,
+                        281,
+                        67,
+                        294
+                    ]
+                },
+                {
+                    "text": "NO:",
+                    "box": [
+                        70,
+                        281,
+                        91,
+                        295
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "Daily Newspapers",
+            "box": [
+                457,
+                223,
+                567,
+                238
+            ],
+            "linking": [
+                [
+                    3,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Daily",
+                    "box": [
+                        457,
+                        223,
+                        492,
+                        237
+                    ]
+                },
+                {
+                    "text": "Newspapers",
+                    "box": [
+                        499,
+                        223,
+                        567,
+                        238
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "August 19, 1969",
+            "box": [
+                455,
+                251,
+                561,
+                266
+            ],
+            "linking": [
+                [
+                    4,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "August",
+                    "box": [
+                        455,
+                        251,
+                        500,
+                        266
+                    ]
+                },
+                {
+                    "text": "19,",
+                    "box": [
+                        506,
+                        251,
+                        526,
+                        264
+                    ]
+                },
+                {
+                    "text": "1969",
+                    "box": [
+                        534,
+                        251,
+                        561,
+                        264
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "1000 lines B&W 1750 lines 2- color",
+            "box": [
+                415,
+                278,
+                542,
+                307
+            ],
+            "linking": [
+                [
+                    5,
+                    16
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1000",
+                    "box": [
+                        418,
+                        279,
+                        447,
+                        292
+                    ]
+                },
+                {
+                    "text": "lines",
+                    "box": [
+                        453,
+                        278,
+                        488,
+                        292
+                    ]
+                },
+                {
+                    "text": "B&W",
+                    "box": [
+                        492,
+                        278,
+                        516,
+                        292
+                    ]
+                },
+                {
+                    "text": "1750",
+                    "box": [
+                        415,
+                        292,
+                        446,
+                        305
+                    ]
+                },
+                {
+                    "text": "lines",
+                    "box": [
+                        451,
+                        293,
+                        487,
+                        307
+                    ]
+                },
+                {
+                    "text": "2-",
+                    "box": [
+                        492,
+                        293,
+                        506,
+                        306
+                    ]
+                },
+                {
+                    "text": "color",
+                    "box": [
+                        508,
+                        293,
+                        542,
+                        304
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "8/ 8/ 69",
+            "box": [
+                587,
+                274,
+                630,
+                291
+            ],
+            "linking": [
+                [
+                    6,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "8/",
+                    "box": [
+                        587,
+                        275,
+                        602,
+                        289
+                    ]
+                },
+                {
+                    "text": "8/",
+                    "box": [
+                        601,
+                        274,
+                        616,
+                        289
+                    ]
+                },
+                {
+                    "text": "69",
+                    "box": [
+                        617,
+                        277,
+                        630,
+                        291
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "New York Football Fans",
+            "box": [
+                172,
+                362,
+                323,
+                377
+            ],
+            "linking": [
+                [
+                    19,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "New",
+                    "box": [
+                        172,
+                        365,
+                        196,
+                        376
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        200,
+                        365,
+                        229,
+                        376
+                    ]
+                },
+                {
+                    "text": "Football",
+                    "box": [
+                        233,
+                        363,
+                        289,
+                        377
+                    ]
+                },
+                {
+                    "text": "Fans",
+                    "box": [
+                        292,
+                        362,
+                        323,
+                        376
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "LEAD- IN:",
+            "box": [
+                105,
+                365,
+                161,
+                379
+            ],
+            "linking": [
+                [
+                    19,
+                    18
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LEAD-",
+                    "box": [
+                        105,
+                        366,
+                        140,
+                        379
+                    ]
+                },
+                {
+                    "text": "IN:",
+                    "box": [
+                        141,
+                        365,
+                        161,
+                        378
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "Los Angeles Football Fans Chicago Football Fans",
+            "box": [
+                205,
+                388,
+                377,
+                419
+            ],
+            "linking": [
+                [
+                    7,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Los",
+                    "box": [
+                        205,
+                        392,
+                        229,
+                        405
+                    ]
+                },
+                {
+                    "text": "Angeles",
+                    "box": [
+                        232,
+                        390,
+                        282,
+                        405
+                    ]
+                },
+                {
+                    "text": "Football",
+                    "box": [
+                        286,
+                        388,
+                        343,
+                        403
+                    ]
+                },
+                {
+                    "text": "Fans",
+                    "box": [
+                        348,
+                        388,
+                        377,
+                        403
+                    ]
+                },
+                {
+                    "text": "Chicago",
+                    "box": [
+                        205,
+                        405,
+                        257,
+                        419
+                    ]
+                },
+                {
+                    "text": "Football",
+                    "box": [
+                        261,
+                        402,
+                        317,
+                        417
+                    ]
+                },
+                {
+                    "text": "Fans",
+                    "box": [
+                        323,
+                        405,
+                        354,
+                        418
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "Pick The Winners And Win Up $ 5 ,000",
+            "box": [
+                180,
+                430,
+                436,
+                449
+            ],
+            "linking": [
+                [
+                    8,
+                    21
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Pick",
+                    "box": [
+                        180,
+                        433,
+                        209,
+                        446
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        214,
+                        432,
+                        235,
+                        446
+                    ]
+                },
+                {
+                    "text": "Winners",
+                    "box": [
+                        240,
+                        433,
+                        289,
+                        447
+                    ]
+                },
+                {
+                    "text": "And",
+                    "box": [
+                        295,
+                        432,
+                        317,
+                        446
+                    ]
+                },
+                {
+                    "text": "Win",
+                    "box": [
+                        321,
+                        432,
+                        345,
+                        446
+                    ]
+                },
+                {
+                    "text": "Up",
+                    "box": [
+                        349,
+                        432,
+                        366,
+                        449
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        369,
+                        432,
+                        389,
+                        445
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        392,
+                        430,
+                        399,
+                        444
+                    ]
+                },
+                {
+                    "text": "5",
+                    "box": [
+                        399,
+                        430,
+                        406,
+                        444
+                    ]
+                },
+                {
+                    "text": ",000",
+                    "box": [
+                        408,
+                        430,
+                        436,
+                        444
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Line Drawings of Football Scenes",
+            "box": [
+                207,
+                458,
+                426,
+                474
+            ],
+            "linking": [
+                [
+                    9,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Line",
+                    "box": [
+                        207,
+                        461,
+                        238,
+                        472
+                    ]
+                },
+                {
+                    "text": "Drawings",
+                    "box": [
+                        242,
+                        461,
+                        298,
+                        474
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        302,
+                        461,
+                        319,
+                        472
+                    ]
+                },
+                {
+                    "text": "Football",
+                    "box": [
+                        323,
+                        459,
+                        376,
+                        472
+                    ]
+                },
+                {
+                    "text": "Scenes",
+                    "box": [
+                        383,
+                        458,
+                        426,
+                        471
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "BOLD SUB- HEAD:",
+            "box": [
+                106,
+                487,
+                202,
+                502
+            ],
+            "linking": [
+                [
+                    23,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "BOLD",
+                    "box": [
+                        106,
+                        489,
+                        134,
+                        502
+                    ]
+                },
+                {
+                    "text": "SUB-",
+                    "box": [
+                        140,
+                        487,
+                        168,
+                        501
+                    ]
+                },
+                {
+                    "text": "HEAD:",
+                    "box": [
+                        166,
+                        487,
+                        202,
+                        498
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "1st Prize $ 5,000 2nd Prize 2,000 3rd Prize 1,000 4th Prizes 500 fans will receive copies of \"The Golden Anniversary of Pro- Football\"",
+            "box": [
+                214,
+                497,
+                574,
+                567
+            ],
+            "linking": [
+                [
+                    23,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1st",
+                    "box": [
+                        215,
+                        501,
+                        236,
+                        512
+                    ]
+                },
+                {
+                    "text": "Prize",
+                    "box": [
+                        242,
+                        500,
+                        277,
+                        513
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        295,
+                        499,
+                        303,
+                        512
+                    ]
+                },
+                {
+                    "text": "5,000",
+                    "box": [
+                        303,
+                        497,
+                        339,
+                        510
+                    ]
+                },
+                {
+                    "text": "2nd",
+                    "box": [
+                        215,
+                        514,
+                        236,
+                        527
+                    ]
+                },
+                {
+                    "text": "Prize",
+                    "box": [
+                        240,
+                        514,
+                        275,
+                        527
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        297,
+                        514,
+                        303,
+                        527
+                    ]
+                },
+                {
+                    "text": "2,000",
+                    "box": [
+                        304,
+                        513,
+                        339,
+                        526
+                    ]
+                },
+                {
+                    "text": "3rd",
+                    "box": [
+                        214,
+                        528,
+                        236,
+                        541
+                    ]
+                },
+                {
+                    "text": "Prize",
+                    "box": [
+                        242,
+                        528,
+                        276,
+                        541
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        296,
+                        525,
+                        304,
+                        539
+                    ]
+                },
+                {
+                    "text": "1,000",
+                    "box": [
+                        303,
+                        524,
+                        339,
+                        539
+                    ]
+                },
+                {
+                    "text": "4th",
+                    "box": [
+                        214,
+                        542,
+                        238,
+                        555
+                    ]
+                },
+                {
+                    "text": "Prizes",
+                    "box": [
+                        242,
+                        541,
+                        283,
+                        556
+                    ]
+                },
+                {
+                    "text": "500",
+                    "box": [
+                        296,
+                        541,
+                        317,
+                        554
+                    ]
+                },
+                {
+                    "text": "fans",
+                    "box": [
+                        323,
+                        541,
+                        351,
+                        554
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        355,
+                        539,
+                        386,
+                        554
+                    ]
+                },
+                {
+                    "text": "receive",
+                    "box": [
+                        391,
+                        539,
+                        441,
+                        553
+                    ]
+                },
+                {
+                    "text": "copies",
+                    "box": [
+                        448,
+                        539,
+                        489,
+                        553
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        494,
+                        538,
+                        508,
+                        551
+                    ]
+                },
+                {
+                    "text": "\"The",
+                    "box": [
+                        295,
+                        553,
+                        324,
+                        567
+                    ]
+                },
+                {
+                    "text": "Golden",
+                    "box": [
+                        331,
+                        553,
+                        374,
+                        567
+                    ]
+                },
+                {
+                    "text": "Anniversary",
+                    "box": [
+                        377,
+                        554,
+                        454,
+                        567
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        461,
+                        550,
+                        475,
+                        567
+                    ]
+                },
+                {
+                    "text": "Pro-",
+                    "box": [
+                        480,
+                        552,
+                        508,
+                        567
+                    ]
+                },
+                {
+                    "text": "Football\"",
+                    "box": [
+                        508,
+                        550,
+                        574,
+                        565
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "TEXT: Over 500 Prizes To Be Awarded",
+            "box": [
+                105,
+                580,
+                352,
+                595
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TEXT:",
+                    "box": [
+                        105,
+                        582,
+                        141,
+                        595
+                    ]
+                },
+                {
+                    "text": "Over",
+                    "box": [
+                        152,
+                        582,
+                        184,
+                        595
+                    ]
+                },
+                {
+                    "text": "500",
+                    "box": [
+                        187,
+                        582,
+                        211,
+                        595
+                    ]
+                },
+                {
+                    "text": "Prizes",
+                    "box": [
+                        216,
+                        580,
+                        258,
+                        594
+                    ]
+                },
+                {
+                    "text": "To",
+                    "box": [
+                        263,
+                        582,
+                        277,
+                        595
+                    ]
+                },
+                {
+                    "text": "Be",
+                    "box": [
+                        282,
+                        580,
+                        297,
+                        594
+                    ]
+                },
+                {
+                    "text": "Awarded",
+                    "box": [
+                        302,
+                        580,
+                        352,
+                        594
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "Now you can win up $ 5,000 for simply picking the winners of the games listed below. Just check the box next to the team you think will win. Allow for the point spread in your selections. (For example, if a team is quoted as +7 pts. this means they must win the game by at least 7 points.) Prizes will be awarded by random drawings to those who have the greatest official number of winning selections. Full details are in the Rules.",
+            "box": [
+                154,
+                592,
+                597,
+                702
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Now",
+                    "box": [
+                        154,
+                        596,
+                        176,
+                        609
+                    ]
+                },
+                {
+                    "text": "you",
+                    "box": [
+                        182,
+                        598,
+                        203,
+                        609
+                    ]
+                },
+                {
+                    "text": "can",
+                    "box": [
+                        208,
+                        598,
+                        230,
+                        608
+                    ]
+                },
+                {
+                    "text": "win",
+                    "box": [
+                        235,
+                        596,
+                        257,
+                        606
+                    ]
+                },
+                {
+                    "text": "up",
+                    "box": [
+                        263,
+                        598,
+                        280,
+                        609
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        284,
+                        596,
+                        299,
+                        606
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        304,
+                        595,
+                        311,
+                        608
+                    ]
+                },
+                {
+                    "text": "5,000",
+                    "box": [
+                        311,
+                        595,
+                        346,
+                        608
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        353,
+                        594,
+                        371,
+                        607
+                    ]
+                },
+                {
+                    "text": "simply",
+                    "box": [
+                        378,
+                        595,
+                        420,
+                        606
+                    ]
+                },
+                {
+                    "text": "picking",
+                    "box": [
+                        425,
+                        594,
+                        477,
+                        604
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        480,
+                        592,
+                        501,
+                        605
+                    ]
+                },
+                {
+                    "text": "winners",
+                    "box": [
+                        507,
+                        592,
+                        556,
+                        606
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        154,
+                        610,
+                        168,
+                        621
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        176,
+                        610,
+                        196,
+                        623
+                    ]
+                },
+                {
+                    "text": "games",
+                    "box": [
+                        203,
+                        612,
+                        237,
+                        623
+                    ]
+                },
+                {
+                    "text": "listed",
+                    "box": [
+                        243,
+                        609,
+                        285,
+                        620
+                    ]
+                },
+                {
+                    "text": "below.",
+                    "box": [
+                        289,
+                        609,
+                        330,
+                        620
+                    ]
+                },
+                {
+                    "text": "Just",
+                    "box": [
+                        344,
+                        609,
+                        373,
+                        617
+                    ]
+                },
+                {
+                    "text": "check",
+                    "box": [
+                        380,
+                        609,
+                        415,
+                        619
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        419,
+                        608,
+                        441,
+                        619
+                    ]
+                },
+                {
+                    "text": "box",
+                    "box": [
+                        446,
+                        606,
+                        467,
+                        619
+                    ]
+                },
+                {
+                    "text": "next",
+                    "box": [
+                        472,
+                        608,
+                        503,
+                        619
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        508,
+                        608,
+                        523,
+                        619
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        528,
+                        608,
+                        550,
+                        619
+                    ]
+                },
+                {
+                    "text": "team",
+                    "box": [
+                        154,
+                        624,
+                        182,
+                        635
+                    ]
+                },
+                {
+                    "text": "you",
+                    "box": [
+                        187,
+                        624,
+                        209,
+                        635
+                    ]
+                },
+                {
+                    "text": "think",
+                    "box": [
+                        215,
+                        623,
+                        250,
+                        634
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        256,
+                        622,
+                        285,
+                        635
+                    ]
+                },
+                {
+                    "text": "win.",
+                    "box": [
+                        289,
+                        623,
+                        316,
+                        634
+                    ]
+                },
+                {
+                    "text": "Allow",
+                    "box": [
+                        330,
+                        622,
+                        365,
+                        635
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        372,
+                        620,
+                        394,
+                        633
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        398,
+                        622,
+                        420,
+                        633
+                    ]
+                },
+                {
+                    "text": "point",
+                    "box": [
+                        425,
+                        622,
+                        461,
+                        636
+                    ]
+                },
+                {
+                    "text": "spread",
+                    "box": [
+                        466,
+                        622,
+                        509,
+                        635
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        515,
+                        620,
+                        529,
+                        631
+                    ]
+                },
+                {
+                    "text": "your",
+                    "box": [
+                        535,
+                        622,
+                        563,
+                        632
+                    ]
+                },
+                {
+                    "text": "selections.",
+                    "box": [
+                        155,
+                        635,
+                        228,
+                        648
+                    ]
+                },
+                {
+                    "text": "(For",
+                    "box": [
+                        236,
+                        635,
+                        264,
+                        646
+                    ]
+                },
+                {
+                    "text": "example,",
+                    "box": [
+                        268,
+                        637,
+                        325,
+                        648
+                    ]
+                },
+                {
+                    "text": "if",
+                    "box": [
+                        332,
+                        635,
+                        346,
+                        648
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        352,
+                        637,
+                        360,
+                        647
+                    ]
+                },
+                {
+                    "text": "team",
+                    "box": [
+                        366,
+                        635,
+                        394,
+                        648
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        398,
+                        635,
+                        415,
+                        645
+                    ]
+                },
+                {
+                    "text": "quoted",
+                    "box": [
+                        419,
+                        637,
+                        460,
+                        648
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        465,
+                        634,
+                        480,
+                        645
+                    ]
+                },
+                {
+                    "text": "+7",
+                    "box": [
+                        487,
+                        633,
+                        501,
+                        646
+                    ]
+                },
+                {
+                    "text": "pts.",
+                    "box": [
+                        508,
+                        634,
+                        535,
+                        644
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        541,
+                        633,
+                        570,
+                        646
+                    ]
+                },
+                {
+                    "text": "means",
+                    "box": [
+                        155,
+                        652,
+                        189,
+                        663
+                    ]
+                },
+                {
+                    "text": "they",
+                    "box": [
+                        197,
+                        651,
+                        224,
+                        664
+                    ]
+                },
+                {
+                    "text": "must",
+                    "box": [
+                        228,
+                        652,
+                        257,
+                        660
+                    ]
+                },
+                {
+                    "text": "win",
+                    "box": [
+                        263,
+                        651,
+                        285,
+                        661
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        291,
+                        649,
+                        312,
+                        660
+                    ]
+                },
+                {
+                    "text": "game",
+                    "box": [
+                        317,
+                        651,
+                        345,
+                        662
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        352,
+                        649,
+                        366,
+                        662
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        372,
+                        649,
+                        386,
+                        660
+                    ]
+                },
+                {
+                    "text": "least",
+                    "box": [
+                        392,
+                        648,
+                        426,
+                        661
+                    ]
+                },
+                {
+                    "text": "7",
+                    "box": [
+                        433,
+                        647,
+                        440,
+                        660
+                    ]
+                },
+                {
+                    "text": "points.)",
+                    "box": [
+                        444,
+                        647,
+                        503,
+                        661
+                    ]
+                },
+                {
+                    "text": "Prizes",
+                    "box": [
+                        513,
+                        645,
+                        558,
+                        659
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        154,
+                        663,
+                        182,
+                        676
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        189,
+                        665,
+                        203,
+                        675
+                    ]
+                },
+                {
+                    "text": "awarded",
+                    "box": [
+                        208,
+                        663,
+                        257,
+                        674
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        261,
+                        665,
+                        278,
+                        678
+                    ]
+                },
+                {
+                    "text": "random",
+                    "box": [
+                        284,
+                        663,
+                        326,
+                        674
+                    ]
+                },
+                {
+                    "text": "drawings",
+                    "box": [
+                        332,
+                        661,
+                        385,
+                        676
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        391,
+                        663,
+                        406,
+                        673
+                    ]
+                },
+                {
+                    "text": "those",
+                    "box": [
+                        412,
+                        662,
+                        447,
+                        673
+                    ]
+                },
+                {
+                    "text": "who",
+                    "box": [
+                        453,
+                        661,
+                        474,
+                        672
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        478,
+                        662,
+                        509,
+                        672
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        514,
+                        661,
+                        536,
+                        672
+                    ]
+                },
+                {
+                    "text": "greatest",
+                    "box": [
+                        541,
+                        662,
+                        597,
+                        673
+                    ]
+                },
+                {
+                    "text": "official",
+                    "box": [
+                        528,
+                        673,
+                        584,
+                        684
+                    ]
+                },
+                {
+                    "text": "number",
+                    "box": [
+                        154,
+                        679,
+                        195,
+                        689
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        201,
+                        679,
+                        216,
+                        687
+                    ]
+                },
+                {
+                    "text": "winning",
+                    "box": [
+                        221,
+                        677,
+                        273,
+                        691
+                    ]
+                },
+                {
+                    "text": "selections.",
+                    "box": [
+                        278,
+                        677,
+                        351,
+                        687
+                    ]
+                },
+                {
+                    "text": "Full",
+                    "box": [
+                        365,
+                        675,
+                        393,
+                        686
+                    ]
+                },
+                {
+                    "text": "details",
+                    "box": [
+                        395,
+                        675,
+                        447,
+                        688
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        453,
+                        677,
+                        477,
+                        685
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        480,
+                        675,
+                        495,
+                        686
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        500,
+                        675,
+                        522,
+                        686
+                    ]
+                },
+                {
+                    "text": "Rules.",
+                    "box": [
+                        154,
+                        691,
+                        193,
+                        702
+                    ]
+                }
+            ],
+            "id": 26
+        }
+    ]
+}

@@ -1,0 +1,884 @@
+{
+    "form": [
+        {
+            "box": [
+                75,
+                105,
+                99,
+                113
+            ],
+            "text": "NAME",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        75,
+                        105,
+                        99,
+                        113
+                    ],
+                    "text": "NAME"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    8
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                75,
+                187,
+                122,
+                197
+            ],
+            "text": "STRUCTURE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        75,
+                        187,
+                        122,
+                        197
+                    ],
+                    "text": "STRUCTURE"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    12
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                205,
+                330,
+                222,
+                341
+            ],
+            "text": "II",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        205,
+                        330,
+                        222,
+                        341
+                    ],
+                    "text": "II"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                75,
+                351,
+                121,
+                362
+            ],
+            "text": "COMMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        75,
+                        351,
+                        121,
+                        362
+                    ],
+                    "text": "COMMENTS"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    15
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                461,
+                337,
+                486,
+                348
+            ],
+            "text": "A41",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        461,
+                        337,
+                        486,
+                        348
+                    ],
+                    "text": "A41"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                677,
+                799,
+                697,
+                890
+            ],
+            "text": "00838511",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        677,
+                        799,
+                        697,
+                        890
+                    ],
+                    "text": "00838511"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                513,
+                103,
+                537,
+                113
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        513,
+                        103,
+                        537,
+                        113
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    9
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "text": "DECISION TREE ESTIMATION OF TOXIC RISK",
+            "box": [
+                209,
+                78,
+                579,
+                96
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "DECISION",
+                    "box": [
+                        209,
+                        78,
+                        293,
+                        96
+                    ]
+                },
+                {
+                    "text": "TREE",
+                    "box": [
+                        297,
+                        78,
+                        338,
+                        95
+                    ]
+                },
+                {
+                    "text": "ESTIMATION",
+                    "box": [
+                        344,
+                        78,
+                        447,
+                        95
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        453,
+                        80,
+                        477,
+                        94
+                    ]
+                },
+                {
+                    "text": "TOXIC",
+                    "box": [
+                        482,
+                        78,
+                        535,
+                        95
+                    ]
+                },
+                {
+                    "text": "RISK",
+                    "box": [
+                        541,
+                        78,
+                        579,
+                        95
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "Paul Schickedantz, Jack Reid",
+            "box": [
+                106,
+                109,
+                319,
+                124
+            ],
+            "linking": [
+                [
+                    0,
+                    8
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Paul",
+                    "box": [
+                        106,
+                        110,
+                        137,
+                        123
+                    ]
+                },
+                {
+                    "text": "Schickedantz,",
+                    "box": [
+                        145,
+                        110,
+                        243,
+                        124
+                    ]
+                },
+                {
+                    "text": "Jack",
+                    "box": [
+                        250,
+                        110,
+                        282,
+                        123
+                    ]
+                },
+                {
+                    "text": "Reid",
+                    "box": [
+                        288,
+                        109,
+                        319,
+                        123
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "12- 4- 80",
+            "box": [
+                560,
+                108,
+                613,
+                122
+            ],
+            "linking": [
+                [
+                    6,
+                    9
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "12-",
+                    "box": [
+                        560,
+                        108,
+                        581,
+                        122
+                    ]
+                },
+                {
+                    "text": "4-",
+                    "box": [
+                        582,
+                        108,
+                        597,
+                        121
+                    ]
+                },
+                {
+                    "text": "80",
+                    "box": [
+                        598,
+                        108,
+                        613,
+                        121
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "COMPOUND NAME",
+            "box": [
+                74,
+                131,
+                148,
+                141
+            ],
+            "linking": [
+                [
+                    10,
+                    11
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        74,
+                        131,
+                        123,
+                        141
+                    ]
+                },
+                {
+                    "text": "NAME",
+                    "box": [
+                        124,
+                        131,
+                        148,
+                        141
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "2-Hydroxycyclododecanone",
+            "box": [
+                104,
+                154,
+                288,
+                169
+            ],
+            "linking": [
+                [
+                    10,
+                    11
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2-Hydroxycyclododecanone",
+                    "box": [
+                        104,
+                        154,
+                        288,
+                        169
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "OH O",
+            "box": [
+                123,
+                225,
+                209,
+                289
+            ],
+            "linking": [
+                [
+                    1,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "OH",
+                    "box": [
+                        191,
+                        232,
+                        209,
+                        246
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        123,
+                        225,
+                        191,
+                        289
+                    ]
+                },
+                {
+                    "text": "O",
+                    "box": [
+                        191,
+                        261,
+                        202,
+                        272
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "ESTIMATED TOXICITY CLASS",
+            "box": [
+                75,
+                324,
+                186,
+                335
+            ],
+            "linking": [
+                [
+                    13,
+                    2
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATED",
+                    "box": [
+                        75,
+                        325,
+                        120,
+                        335
+                    ]
+                },
+                {
+                    "text": "TOXICITY",
+                    "box": [
+                        122,
+                        325,
+                        158,
+                        333
+                    ]
+                },
+                {
+                    "text": "CLASS",
+                    "box": [
+                        161,
+                        324,
+                        186,
+                        335
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "LORILLARD COMPOUND CODE NUMBER",
+            "box": [
+                398,
+                324,
+                556,
+                336
+            ],
+            "linking": [
+                [
+                    14,
+                    4
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        398,
+                        324,
+                        444,
+                        332
+                    ]
+                },
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        444,
+                        324,
+                        493,
+                        334
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        494,
+                        324,
+                        518,
+                        334
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        521,
+                        325,
+                        556,
+                        336
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "This carbocyclic keto alcohol was placed in estimated toxicity class II due to the direct attachment of the ketone to the cyclic nucleus.",
+            "box": [
+                108,
+                377,
+                642,
+                407
+            ],
+            "linking": [
+                [
+                    3,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        108,
+                        378,
+                        139,
+                        391
+                    ]
+                },
+                {
+                    "text": "carbocyclic",
+                    "box": [
+                        145,
+                        378,
+                        230,
+                        392
+                    ]
+                },
+                {
+                    "text": "keto",
+                    "box": [
+                        235,
+                        377,
+                        267,
+                        391
+                    ]
+                },
+                {
+                    "text": "alcohol",
+                    "box": [
+                        272,
+                        377,
+                        325,
+                        391
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        332,
+                        380,
+                        357,
+                        391
+                    ]
+                },
+                {
+                    "text": "placed",
+                    "box": [
+                        363,
+                        377,
+                        409,
+                        392
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        416,
+                        378,
+                        433,
+                        392
+                    ]
+                },
+                {
+                    "text": "estimated",
+                    "box": [
+                        439,
+                        377,
+                        507,
+                        392
+                    ]
+                },
+                {
+                    "text": "toxicity",
+                    "box": [
+                        515,
+                        378,
+                        576,
+                        392
+                    ]
+                },
+                {
+                    "text": "class",
+                    "box": [
+                        581,
+                        378,
+                        622,
+                        391
+                    ]
+                },
+                {
+                    "text": "II",
+                    "box": [
+                        627,
+                        377,
+                        642,
+                        391
+                    ]
+                },
+                {
+                    "text": "due",
+                    "box": [
+                        108,
+                        392,
+                        135,
+                        406
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        138,
+                        395,
+                        155,
+                        405
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        162,
+                        394,
+                        183,
+                        407
+                    ]
+                },
+                {
+                    "text": "direct",
+                    "box": [
+                        190,
+                        394,
+                        237,
+                        407
+                    ]
+                },
+                {
+                    "text": "attachment",
+                    "box": [
+                        243,
+                        394,
+                        320,
+                        405
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        325,
+                        394,
+                        342,
+                        405
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        348,
+                        392,
+                        373,
+                        406
+                    ]
+                },
+                {
+                    "text": "ketone",
+                    "box": [
+                        377,
+                        392,
+                        424,
+                        405
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        433,
+                        394,
+                        447,
+                        405
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        453,
+                        391,
+                        480,
+                        406
+                    ]
+                },
+                {
+                    "text": "cyclic",
+                    "box": [
+                        485,
+                        392,
+                        530,
+                        407
+                    ]
+                },
+                {
+                    "text": "nucleus.",
+                    "box": [
+                        538,
+                        392,
+                        597,
+                        405
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "LORILLARD RESEARCH CENTER",
+            "box": [
+                74,
+                901,
+                200,
+                912
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        74,
+                        901,
+                        120,
+                        912
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        123,
+                        901,
+                        165,
+                        912
+                    ]
+                },
+                {
+                    "text": "CENTER",
+                    "box": [
+                        168,
+                        902,
+                        200,
+                        912
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "FORM 1 (580)",
+            "box": [
+                663,
+                899,
+                721,
+                909
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "FORM",
+                    "box": [
+                        663,
+                        899,
+                        688,
+                        909
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        689,
+                        899,
+                        697,
+                        909
+                    ]
+                },
+                {
+                    "text": "(580)",
+                    "box": [
+                        697,
+                        899,
+                        721,
+                        909
+                    ]
+                }
+            ],
+            "id": 17
+        }
+    ]
+}

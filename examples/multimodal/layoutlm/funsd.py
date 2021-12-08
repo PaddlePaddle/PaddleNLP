@@ -310,23 +310,6 @@ def convert_examples_to_features(examples,
             input_mask = np.reshape(
                 input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])
 
-        #         input_mask = (1 - np.reshape(input_mask.astype(np.float32),
-        #             [1, 1, input_mask.shape[0]])) * -1e9
-
-        #         if ex_index < 5:
-        #             logger.info("*** Example ***")
-        #             logger.info("guid: %s", example.guid)
-        #             logger.info("tokens: %s", " ".join([str(x) for x in tokens]))
-        #             logger.info("input_ids: %s", " ".join([str(x) for x in input_ids]))
-        #             logger.info("input_mask: %s",
-        #                         " ".join([str(x) for x in input_mask]))
-        #             logger.info("segment_ids: %s",
-        #                         " ".join([str(x) for x in segment_ids]))
-        #             logger.info("label_ids: %s", " ".join([str(x) for x in label_ids]))
-        #             logger.info("boxes: %s", " ".join([str(x) for x in token_boxes]))
-        #             logger.info("actual_bboxes: %s",
-        #                         " ".join([str(x) for x in actual_bboxes]))
-
         features.append(
             InputFeatures(
                 input_ids=input_ids,

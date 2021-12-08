@@ -1,0 +1,2276 @@
+{
+    "form": [
+        {
+            "box": [
+                54,
+                119,
+                93,
+                133
+            ],
+            "text": "NAME:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        54,
+                        119,
+                        93,
+                        133
+                    ],
+                    "text": "NAME:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    7
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                53,
+                545,
+                120,
+                558
+            ],
+            "text": "COMMENTS:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        53,
+                        545,
+                        120,
+                        558
+                    ],
+                    "text": "COMMENTS:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    2
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                126,
+                548,
+                167,
+                560
+            ],
+            "text": "none",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        126,
+                        548,
+                        167,
+                        560
+                    ],
+                    "text": "none"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                382,
+                119,
+                447,
+                130
+            ],
+            "text": "DIVISION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        382,
+                        119,
+                        447,
+                        130
+                    ],
+                    "text": "DIVISION"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    8
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                54,
+                742,
+                111,
+                759
+            ],
+            "text": "COMMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        54,
+                        742,
+                        111,
+                        759
+                    ],
+                    "text": "COMMENTS"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    32
+                ],
+                [
+                    4,
+                    33
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                351,
+                285,
+                385,
+                302
+            ],
+            "text": "yes",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        351,
+                        285,
+                        385,
+                        302
+                    ],
+                    "text": "yes"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "text": "RESEARCH COMPLETED OR IN PROGRESS WHICH HAS POSSIBILITIES FOR PRESENTATION OR PUBLICATION",
+            "box": [
+                164,
+                58,
+                558,
+                93
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        254,
+                        64,
+                        317,
+                        81
+                    ]
+                },
+                {
+                    "text": "COMPLETED",
+                    "box": [
+                        314,
+                        63,
+                        386,
+                        77
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        387,
+                        59,
+                        404,
+                        79
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        404,
+                        63,
+                        425,
+                        77
+                    ]
+                },
+                {
+                    "text": "PROGRESS",
+                    "box": [
+                        430,
+                        58,
+                        485,
+                        76
+                    ]
+                },
+                {
+                    "text": "WHICH",
+                    "box": [
+                        164,
+                        75,
+                        214,
+                        93
+                    ]
+                },
+                {
+                    "text": "HAS",
+                    "box": [
+                        209,
+                        72,
+                        235,
+                        91
+                    ]
+                },
+                {
+                    "text": "POSSIBILITIES",
+                    "box": [
+                        238,
+                        78,
+                        337,
+                        91
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        333,
+                        77,
+                        364,
+                        89
+                    ]
+                },
+                {
+                    "text": "PRESENTATION",
+                    "box": [
+                        363,
+                        75,
+                        453,
+                        87
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        453,
+                        75,
+                        475,
+                        90
+                    ]
+                },
+                {
+                    "text": "PUBLICATION",
+                    "box": [
+                        475,
+                        75,
+                        558,
+                        89
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "Ronald. W Davis",
+            "box": [
+                107,
+                120,
+                220,
+                134
+            ],
+            "linking": [
+                [
+                    0,
+                    7
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Ronald. W",
+                    "box": [
+                        107,
+                        120,
+                        172,
+                        134
+                    ]
+                },
+                {
+                    "text": "Davis",
+                    "box": [
+                        175,
+                        123,
+                        220,
+                        132
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "Analytical- Radiochemistry",
+            "box": [
+                452,
+                118,
+                636,
+                133
+            ],
+            "linking": [
+                [
+                    3,
+                    8
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Analytical-",
+                    "box": [
+                        452,
+                        118,
+                        533,
+                        133
+                    ]
+                },
+                {
+                    "text": "Radiochemistry",
+                    "box": [
+                        533,
+                        119,
+                        636,
+                        130
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "NATURE OF WORK:",
+            "box": [
+                53,
+                145,
+                161,
+                161
+            ],
+            "linking": [
+                [
+                    9,
+                    10
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NATURE",
+                    "box": [
+                        53,
+                        147,
+                        101,
+                        161
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        106,
+                        145,
+                        121,
+                        160
+                    ]
+                },
+                {
+                    "text": "WORK:",
+                    "box": [
+                        127,
+                        147,
+                        161,
+                        161
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Total aldehyde analysis in cigarette mainstream ",
+            "box": [
+                171,
+                143,
+                556,
+                162
+            ],
+            "linking": [
+                [
+                    9,
+                    10
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Total",
+                    "box": [
+                        171,
+                        146,
+                        208,
+                        161
+                    ]
+                },
+                {
+                    "text": "aldehyde",
+                    "box": [
+                        215,
+                        144,
+                        274,
+                        161
+                    ]
+                },
+                {
+                    "text": "analysis",
+                    "box": [
+                        281,
+                        143,
+                        338,
+                        162
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        340,
+                        147,
+                        361,
+                        159
+                    ]
+                },
+                {
+                    "text": "cigarette",
+                    "box": [
+                        363,
+                        146,
+                        428,
+                        161
+                    ]
+                },
+                {
+                    "text": "mainstream",
+                    "box": [
+                        432,
+                        146,
+                        507,
+                        158
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        505,
+                        149,
+                        556,
+                        160
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "PRESENT STATUS OF WORK (Cite progress reports where appropriate)",
+            "box": [
+                54,
+                198,
+                507,
+                219
+            ],
+            "linking": [
+                [
+                    11,
+                    12
+                ],
+                [
+                    11,
+                    13
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PRESENT",
+                    "box": [
+                        54,
+                        203,
+                        108,
+                        218
+                    ]
+                },
+                {
+                    "text": "STATUS",
+                    "box": [
+                        112,
+                        199,
+                        158,
+                        218
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        159,
+                        199,
+                        179,
+                        218
+                    ]
+                },
+                {
+                    "text": "WORK",
+                    "box": [
+                        177,
+                        199,
+                        215,
+                        218
+                    ]
+                },
+                {
+                    "text": "(Cite",
+                    "box": [
+                        217,
+                        198,
+                        254,
+                        219
+                    ]
+                },
+                {
+                    "text": "progress",
+                    "box": [
+                        257,
+                        202,
+                        318,
+                        219
+                    ]
+                },
+                {
+                    "text": "reports",
+                    "box": [
+                        322,
+                        204,
+                        375,
+                        218
+                    ]
+                },
+                {
+                    "text": "where",
+                    "box": [
+                        377,
+                        203,
+                        417,
+                        217
+                    ]
+                },
+                {
+                    "text": "appropriate)",
+                    "box": [
+                        420,
+                        204,
+                        507,
+                        218
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Techniques worked out",
+            "box": [
+                512,
+                202,
+                665,
+                216
+            ],
+            "linking": [
+                [
+                    11,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Techniques",
+                    "box": [
+                        512,
+                        202,
+                        591,
+                        216
+                    ]
+                },
+                {
+                    "text": "worked",
+                    "box": [
+                        588,
+                        203,
+                        636,
+                        214
+                    ]
+                },
+                {
+                    "text": "out",
+                    "box": [
+                        639,
+                        204,
+                        665,
+                        216
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "and reported for pure aldehyde samples; must be adapted for cigarette mainstream smoke by further laboratory work",
+            "box": [
+                55,
+                228,
+                667,
+                275
+            ],
+            "linking": [
+                [
+                    11,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "and",
+                    "box": [
+                        55,
+                        232,
+                        87,
+                        246
+                    ]
+                },
+                {
+                    "text": "reported",
+                    "box": [
+                        88,
+                        229,
+                        147,
+                        244
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        151,
+                        228,
+                        177,
+                        247
+                    ]
+                },
+                {
+                    "text": "pure",
+                    "box": [
+                        182,
+                        230,
+                        213,
+                        247
+                    ]
+                },
+                {
+                    "text": "aldehyde",
+                    "box": [
+                        217,
+                        228,
+                        272,
+                        248
+                    ]
+                },
+                {
+                    "text": "samples;",
+                    "box": [
+                        281,
+                        230,
+                        335,
+                        247
+                    ]
+                },
+                {
+                    "text": "must",
+                    "box": [
+                        335,
+                        229,
+                        373,
+                        244
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        373,
+                        229,
+                        398,
+                        244
+                    ]
+                },
+                {
+                    "text": "adapted",
+                    "box": [
+                        397,
+                        230,
+                        450,
+                        244
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        448,
+                        230,
+                        477,
+                        243
+                    ]
+                },
+                {
+                    "text": "cigarette",
+                    "box": [
+                        481,
+                        231,
+                        547,
+                        243
+                    ]
+                },
+                {
+                    "text": "mainstream",
+                    "box": [
+                        551,
+                        229,
+                        625,
+                        243
+                    ]
+                },
+                {
+                    "text": "smoke",
+                    "box": [
+                        627,
+                        235,
+                        667,
+                        243
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        57,
+                        259,
+                        76,
+                        274
+                    ]
+                },
+                {
+                    "text": "further",
+                    "box": [
+                        80,
+                        256,
+                        132,
+                        275
+                    ]
+                },
+                {
+                    "text": "laboratory",
+                    "box": [
+                        139,
+                        258,
+                        212,
+                        272
+                    ]
+                },
+                {
+                    "text": "work",
+                    "box": [
+                        211,
+                        258,
+                        248,
+                        272
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "HAS WORK BEEN REPORTED IN MANUSCRIPT ",
+            "box": [
+                54,
+                284,
+                351,
+                303
+            ],
+            "linking": [
+                [
+                    14,
+                    5
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "HAS",
+                    "box": [
+                        54,
+                        287,
+                        81,
+                        302
+                    ]
+                },
+                {
+                    "text": "WORK",
+                    "box": [
+                        83,
+                        287,
+                        114,
+                        302
+                    ]
+                },
+                {
+                    "text": "BEEN",
+                    "box": [
+                        113,
+                        288,
+                        150,
+                        302
+                    ]
+                },
+                {
+                    "text": "REPORTED",
+                    "box": [
+                        149,
+                        288,
+                        215,
+                        302
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        218,
+                        288,
+                        236,
+                        302
+                    ]
+                },
+                {
+                    "text": "MANUSCRIPT",
+                    "box": [
+                        238,
+                        284,
+                        309,
+                        301
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        311,
+                        291,
+                        351,
+                        303
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "IF SO, GIVE DATE AND TITLE:",
+            "box": [
+                397,
+                284,
+                595,
+                303
+            ],
+            "linking": [
+                [
+                    15,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "IF",
+                    "box": [
+                        397,
+                        287,
+                        417,
+                        301
+                    ]
+                },
+                {
+                    "text": "SO,",
+                    "box": [
+                        420,
+                        284,
+                        442,
+                        303
+                    ]
+                },
+                {
+                    "text": "GIVE",
+                    "box": [
+                        448,
+                        285,
+                        483,
+                        300
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        483,
+                        289,
+                        515,
+                        301
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        519,
+                        289,
+                        548,
+                        303
+                    ]
+                },
+                {
+                    "text": "TITLE:",
+                    "box": [
+                        545,
+                        289,
+                        595,
+                        301
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "MBTH- reagent for analysis of aliphatic aldehydes 7 / 5 / 67",
+            "box": [
+                53,
+                314,
+                498,
+                334
+            ],
+            "linking": [
+                [
+                    15,
+                    16
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "MBTH-",
+                    "box": [
+                        53,
+                        318,
+                        105,
+                        331
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        106,
+                        317,
+                        119,
+                        331
+                    ]
+                },
+                {
+                    "text": "reagent",
+                    "box": [
+                        118,
+                        317,
+                        177,
+                        331
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        179,
+                        317,
+                        201,
+                        330
+                    ]
+                },
+                {
+                    "text": "analysis",
+                    "box": [
+                        203,
+                        317,
+                        271,
+                        329
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        272,
+                        315,
+                        287,
+                        332
+                    ]
+                },
+                {
+                    "text": "aliphatic",
+                    "box": [
+                        291,
+                        314,
+                        361,
+                        329
+                    ]
+                },
+                {
+                    "text": "aldehydes",
+                    "box": [
+                        362,
+                        318,
+                        432,
+                        331
+                    ]
+                },
+                {
+                    "text": "7",
+                    "box": [
+                        454,
+                        314,
+                        461,
+                        331
+                    ]
+                },
+                {
+                    "text": "/",
+                    "box": [
+                        460,
+                        316,
+                        469,
+                        330
+                    ]
+                },
+                {
+                    "text": "5",
+                    "box": [
+                        468,
+                        315,
+                        477,
+                        328
+                    ]
+                },
+                {
+                    "text": "/",
+                    "box": [
+                        475,
+                        315,
+                        482,
+                        334
+                    ]
+                },
+                {
+                    "text": "67",
+                    "box": [
+                        485,
+                        315,
+                        498,
+                        329
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "NAMES OF OTHER PERSONS COLLABORATING IN WORK:",
+            "box": [
+                54,
+                343,
+                374,
+                360
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NAMES",
+                    "box": [
+                        54,
+                        346,
+                        92,
+                        360
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        93,
+                        347,
+                        112,
+                        358
+                    ]
+                },
+                {
+                    "text": "OTHER",
+                    "box": [
+                        117,
+                        344,
+                        156,
+                        356
+                    ]
+                },
+                {
+                    "text": "PERSONS",
+                    "box": [
+                        159,
+                        346,
+                        211,
+                        358
+                    ]
+                },
+                {
+                    "text": "COLLABORATING",
+                    "box": [
+                        213,
+                        346,
+                        311,
+                        360
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        315,
+                        347,
+                        334,
+                        360
+                    ]
+                },
+                {
+                    "text": "WORK:",
+                    "box": [
+                        330,
+                        343,
+                        374,
+                        356
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "L. W. McDowell",
+            "box": [
+                382,
+                343,
+                488,
+                360
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "L.",
+                    "box": [
+                        382,
+                        344,
+                        399,
+                        358
+                    ]
+                },
+                {
+                    "text": "W.",
+                    "box": [
+                        403,
+                        344,
+                        420,
+                        359
+                    ]
+                },
+                {
+                    "text": "McDowell",
+                    "box": [
+                        425,
+                        343,
+                        488,
+                        360
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "ESTIMATE OF TIME NEEDED TO COMPLETE WORK:",
+            "box": [
+                55,
+                400,
+                346,
+                419
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATE",
+                    "box": [
+                        55,
+                        401,
+                        115,
+                        419
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        117,
+                        403,
+                        135,
+                        418
+                    ]
+                },
+                {
+                    "text": "TIME",
+                    "box": [
+                        137,
+                        402,
+                        170,
+                        417
+                    ]
+                },
+                {
+                    "text": "NEEDED",
+                    "box": [
+                        172,
+                        400,
+                        219,
+                        417
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        219,
+                        401,
+                        240,
+                        418
+                    ]
+                },
+                {
+                    "text": "COMPLETE",
+                    "box": [
+                        244,
+                        403,
+                        303,
+                        416
+                    ]
+                },
+                {
+                    "text": "WORK:",
+                    "box": [
+                        307,
+                        402,
+                        346,
+                        416
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "approximately one month",
+            "box": [
+                354,
+                402,
+                523,
+                415
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "approximately",
+                    "box": [
+                        354,
+                        403,
+                        451,
+                        414
+                    ]
+                },
+                {
+                    "text": "one",
+                    "box": [
+                        449,
+                        404,
+                        478,
+                        415
+                    ]
+                },
+                {
+                    "text": "month",
+                    "box": [
+                        476,
+                        402,
+                        523,
+                        415
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "ESTIMATE OF TIME NEEDED TO PREPARE MANUSCRIPT FOR PRESENTATION:",
+            "box": [
+                54,
+                429,
+                500,
+                448
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATE",
+                    "box": [
+                        54,
+                        430,
+                        114,
+                        447
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        119,
+                        429,
+                        138,
+                        447
+                    ]
+                },
+                {
+                    "text": "TIME",
+                    "box": [
+                        138,
+                        430,
+                        169,
+                        448
+                    ]
+                },
+                {
+                    "text": "NEEDED",
+                    "box": [
+                        167,
+                        430,
+                        218,
+                        442
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        223,
+                        430,
+                        241,
+                        444
+                    ]
+                },
+                {
+                    "text": "PREPARE",
+                    "box": [
+                        242,
+                        433,
+                        300,
+                        442
+                    ]
+                },
+                {
+                    "text": "MANUSCRIPT",
+                    "box": [
+                        300,
+                        430,
+                        375,
+                        443
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        377,
+                        433,
+                        403,
+                        445
+                    ]
+                },
+                {
+                    "text": "PRESENTATION:",
+                    "box": [
+                        406,
+                        430,
+                        500,
+                        442
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "several weeks after completion",
+            "box": [
+                500,
+                426,
+                717,
+                446
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "several",
+                    "box": [
+                        500,
+                        426,
+                        554,
+                        446
+                    ]
+                },
+                {
+                    "text": "weeks",
+                    "box": [
+                        557,
+                        428,
+                        599,
+                        445
+                    ]
+                },
+                {
+                    "text": "after",
+                    "box": [
+                        603,
+                        428,
+                        642,
+                        442
+                    ]
+                },
+                {
+                    "text": "completion",
+                    "box": [
+                        642,
+                        430,
+                        717,
+                        444
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "ESTIMATE OF TIME NEEDED TO PREPARE MANUSCRIPT FOR PUBLICATION:",
+            "box": [
+                55,
+                458,
+                495,
+                475
+            ],
+            "linking": [
+                [
+                    23,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATE",
+                    "box": [
+                        55,
+                        461,
+                        114,
+                        474
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        113,
+                        460,
+                        134,
+                        475
+                    ]
+                },
+                {
+                    "text": "TIME",
+                    "box": [
+                        138,
+                        462,
+                        170,
+                        473
+                    ]
+                },
+                {
+                    "text": "NEEDED",
+                    "box": [
+                        167,
+                        460,
+                        221,
+                        472
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        224,
+                        458,
+                        241,
+                        472
+                    ]
+                },
+                {
+                    "text": "PREPARE",
+                    "box": [
+                        242,
+                        460,
+                        300,
+                        473
+                    ]
+                },
+                {
+                    "text": "MANUSCRIPT",
+                    "box": [
+                        301,
+                        460,
+                        375,
+                        473
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        375,
+                        460,
+                        406,
+                        473
+                    ]
+                },
+                {
+                    "text": "PUBLICATION:",
+                    "box": [
+                        404,
+                        461,
+                        495,
+                        472
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "several weeks after completion of work",
+            "box": [
+                500,
+                456,
+                718,
+                485
+            ],
+            "linking": [
+                [
+                    23,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "several",
+                    "box": [
+                        500,
+                        456,
+                        557,
+                        471
+                    ]
+                },
+                {
+                    "text": "weeks",
+                    "box": [
+                        559,
+                        456,
+                        596,
+                        474
+                    ]
+                },
+                {
+                    "text": "after",
+                    "box": [
+                        598,
+                        456,
+                        638,
+                        471
+                    ]
+                },
+                {
+                    "text": "completion",
+                    "box": [
+                        643,
+                        456,
+                        718,
+                        474
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        504,
+                        472,
+                        522,
+                        485
+                    ]
+                },
+                {
+                    "text": "work",
+                    "box": [
+                        520,
+                        472,
+                        557,
+                        485
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "SCIENTIFIC METING OF CHOICE:",
+            "box": [
+                51,
+                487,
+                260,
+                501
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SCIENTIFIC",
+                    "box": [
+                        51,
+                        487,
+                        131,
+                        501
+                    ]
+                },
+                {
+                    "text": "METING",
+                    "box": [
+                        129,
+                        487,
+                        187,
+                        500
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        183,
+                        488,
+                        208,
+                        499
+                    ]
+                },
+                {
+                    "text": "CHOICE:",
+                    "box": [
+                        208,
+                        487,
+                        260,
+                        499
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "none as yet",
+            "box": [
+                259,
+                489,
+                344,
+                501
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "none",
+                    "box": [
+                        259,
+                        489,
+                        294,
+                        501
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        298,
+                        489,
+                        316,
+                        501
+                    ]
+                },
+                {
+                    "text": "yet",
+                    "box": [
+                        316,
+                        489,
+                        344,
+                        501
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "SCIENTIFIC JOURNAL OF CHOICE:",
+            "box": [
+                53,
+                513,
+                262,
+                530
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SCIENTIFIC",
+                    "box": [
+                        53,
+                        518,
+                        128,
+                        530
+                    ]
+                },
+                {
+                    "text": "JOURNAL",
+                    "box": [
+                        127,
+                        515,
+                        186,
+                        530
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        183,
+                        513,
+                        204,
+                        527
+                    ]
+                },
+                {
+                    "text": "CHOICE:",
+                    "box": [
+                        205,
+                        515,
+                        262,
+                        529
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "Tobacco Science",
+            "box": [
+                262,
+                515,
+                371,
+                530
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        262,
+                        515,
+                        316,
+                        528
+                    ]
+                },
+                {
+                    "text": "Science",
+                    "box": [
+                        317,
+                        517,
+                        371,
+                        530
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "COMMENTS BY MANAGER OR DIRECTOR",
+            "box": [
+                54,
+                656,
+                276,
+                674
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "COMMENTS",
+                    "box": [
+                        54,
+                        658,
+                        113,
+                        670
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        116,
+                        657,
+                        137,
+                        669
+                    ]
+                },
+                {
+                    "text": "MANAGER",
+                    "box": [
+                        136,
+                        657,
+                        194,
+                        672
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        191,
+                        656,
+                        215,
+                        674
+                    ]
+                },
+                {
+                    "text": "DIRECTOR",
+                    "box": [
+                        212,
+                        658,
+                        276,
+                        670
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "DOES WORK MERIT PUBLICATION?",
+            "box": [
+                52,
+                683,
+                254,
+                701
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DOES",
+                    "box": [
+                        52,
+                        685,
+                        85,
+                        699
+                    ]
+                },
+                {
+                    "text": "WORK",
+                    "box": [
+                        85,
+                        685,
+                        123,
+                        699
+                    ]
+                },
+                {
+                    "text": "MERIT",
+                    "box": [
+                        120,
+                        683,
+                        161,
+                        700
+                    ]
+                },
+                {
+                    "text": "PUBLICATION?",
+                    "box": [
+                        164,
+                        684,
+                        254,
+                        701
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "CAN TIME BE SPARED FOR COMPLETION?",
+            "box": [
+                53,
+                711,
+                294,
+                730
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CAN",
+                    "box": [
+                        53,
+                        711,
+                        80,
+                        728
+                    ]
+                },
+                {
+                    "text": "TIME",
+                    "box": [
+                        79,
+                        713,
+                        113,
+                        730
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        113,
+                        712,
+                        134,
+                        727
+                    ]
+                },
+                {
+                    "text": "SPARED",
+                    "box": [
+                        134,
+                        712,
+                        184,
+                        725
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        180,
+                        715,
+                        212,
+                        726
+                    ]
+                },
+                {
+                    "text": "COMPLETION?",
+                    "box": [
+                        213,
+                        715,
+                        294,
+                        728
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "been with applicability",
+            "box": [
+                134,
+                735,
+                694,
+                765
+            ],
+            "linking": [
+                [
+                    4,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        134,
+                        743,
+                        171,
+                        760
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        183,
+                        737,
+                        253,
+                        759
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        262,
+                        738,
+                        293,
+                        758
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        294,
+                        738,
+                        327,
+                        756
+                    ]
+                },
+                {
+                    "text": "been",
+                    "box": [
+                        328,
+                        737,
+                        370,
+                        757
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        373,
+                        737,
+                        427,
+                        758
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        429,
+                        737,
+                        469,
+                        755
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        474,
+                        735,
+                        537,
+                        759
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        538,
+                        735,
+                        601,
+                        759
+                    ]
+                },
+                {
+                    "text": "applicability",
+                    "box": [
+                        598,
+                        739,
+                        694,
+                        765
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "may provide a technique.",
+            "box": [
+                75,
+                761,
+                599,
+                814
+            ],
+            "linking": [
+                [
+                    4,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        75,
+                        761,
+                        106,
+                        782
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        116,
+                        764,
+                        171,
+                        785
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        182,
+                        768,
+                        283,
+                        787
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        288,
+                        761,
+                        411,
+                        787
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        432,
+                        763,
+                        460,
+                        789
+                    ]
+                },
+                {
+                    "text": "may",
+                    "box": [
+                        469,
+                        767,
+                        506,
+                        791
+                    ]
+                },
+                {
+                    "text": "provide a",
+                    "box": [
+                        509,
+                        765,
+                        599,
+                        787
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        81,
+                        789,
+                        140,
+                        814
+                    ]
+                },
+                {
+                    "text": "technique.",
+                    "box": [
+                        144,
+                        787,
+                        262,
+                        814
+                    ]
+                }
+            ],
+            "id": 33
+        }
+    ]
+}

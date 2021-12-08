@@ -23,7 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
     "LayoutLMModel",
@@ -411,6 +411,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                                   self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
                                     num_classes)
+        self.dropout.apply(self.init_weights)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -433,10 +434,28 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            output_hidden_states=False)
+            output_hidden_states=output_hidden_states)
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
+        outputs = (logits, )  # + outputs[2:]
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            # Only keep active parts of the loss
+            if attention_mask is not None:
+                active_loss = attention_mask.reshape([-1, ]) == 1
+                # print("active_loss shape: {}, dtype: {}".format(active_loss.shape, active_loss.dtype))
+                active_logits = logits.reshape([-1, self.num_classes])
+                # print("active_logits: ", active_logits.shape)
+                active_logits = active_logits[active_loss]
+                active_labels = labels.reshape([-1, ])[active_loss]
+                loss = loss_fct(active_logits, active_labels)
+            else:
+                loss = loss_fct(
+                    logits.reshape([-1, self.num_classes]),
+                    labels.reshape([-1, ]))
+            outputs = (loss, ) + outputs
+
         return outputs
 
 

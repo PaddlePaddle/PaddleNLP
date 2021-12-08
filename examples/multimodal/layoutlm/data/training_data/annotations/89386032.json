@@ -1,0 +1,1153 @@
+{
+    "form": [
+        {
+            "box": [
+                70,
+                130,
+                123,
+                158
+            ],
+            "text": "EPL",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        70,
+                        130,
+                        123,
+                        158
+                    ],
+                    "text": "EPL"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                209,
+                405,
+                272,
+                416
+            ],
+            "text": "Multiple",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        209,
+                        405,
+                        272,
+                        416
+                    ],
+                    "text": "Multiple"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    1
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                571,
+                274,
+                607,
+                289
+            ],
+            "text": "1419A",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        571,
+                        274,
+                        607,
+                        289
+                    ],
+                    "text": "1419A"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                441,
+                405,
+                493,
+                419
+            ],
+            "text": "Species",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        441,
+                        405,
+                        493,
+                        419
+                    ],
+                    "text": "Species"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    4
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                527,
+                405,
+                561,
+                419
+            ],
+            "text": "Mice",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        527,
+                        405,
+                        561,
+                        419
+                    ],
+                    "text": "Mice"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                675,
+                832,
+                690,
+                921
+            ],
+            "text": "89386032",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        675,
+                        832,
+                        690,
+                        921
+                    ],
+                    "text": "89386032"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "text": "EXPERIMENTAL PATHOLOGY LABORATORIES, INC.",
+            "box": [
+                141,
+                168,
+                424,
+                182
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "EXPERIMENTAL",
+                    "box": [
+                        141,
+                        168,
+                        226,
+                        182
+                    ]
+                },
+                {
+                    "text": "PATHOLOGY",
+                    "box": [
+                        233,
+                        169,
+                        301,
+                        182
+                    ]
+                },
+                {
+                    "text": "LABORATORIES,",
+                    "box": [
+                        304,
+                        168,
+                        395,
+                        181
+                    ]
+                },
+                {
+                    "text": "INC.",
+                    "box": [
+                        399,
+                        168,
+                        424,
+                        181
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "QUALITY ASSURANCE REPORT CERTIFICATION",
+            "box": [
+                291,
+                218,
+                438,
+                245
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "QUALITY",
+                    "box": [
+                        300,
+                        218,
+                        349,
+                        232
+                    ]
+                },
+                {
+                    "text": "ASSURANCE",
+                    "box": [
+                        356,
+                        218,
+                        420,
+                        232
+                    ]
+                },
+                {
+                    "text": "REPORT",
+                    "box": [
+                        291,
+                        232,
+                        337,
+                        245
+                    ]
+                },
+                {
+                    "text": "CERTIFICATION",
+                    "box": [
+                        344,
+                        235,
+                        438,
+                        243
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "Client Name",
+            "box": [
+                106,
+                274,
+                188,
+                290
+            ],
+            "linking": [
+                [
+                    8,
+                    12
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Client",
+                    "box": [
+                        106,
+                        274,
+                        151,
+                        289
+                    ]
+                },
+                {
+                    "text": "Name",
+                    "box": [
+                        156,
+                        275,
+                        188,
+                        290
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "Study Director",
+            "box": [
+                106,
+                317,
+                208,
+                332
+            ],
+            "linking": [
+                [
+                    9,
+                    14
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Study",
+                    "box": [
+                        106,
+                        317,
+                        144,
+                        332
+                    ]
+                },
+                {
+                    "text": "Director",
+                    "box": [
+                        147,
+                        318,
+                        208,
+                        332
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Study Title",
+            "box": [
+                106,
+                360,
+                185,
+                375
+            ],
+            "linking": [
+                [
+                    10,
+                    15
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Study",
+                    "box": [
+                        106,
+                        360,
+                        144,
+                        375
+                    ]
+                },
+                {
+                    "text": "Title",
+                    "box": [
+                        149,
+                        360,
+                        185,
+                        375
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "Test Article",
+            "box": [
+                109,
+                404,
+                195,
+                419
+            ],
+            "linking": [
+                [
+                    11,
+                    1
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Test",
+                    "box": [
+                        109,
+                        405,
+                        137,
+                        419
+                    ]
+                },
+                {
+                    "text": "Article",
+                    "box": [
+                        141,
+                        404,
+                        195,
+                        417
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Borriston Laboratories, Inc.",
+            "box": [
+                200,
+                274,
+                397,
+                289
+            ],
+            "linking": [
+                [
+                    8,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Borriston",
+                    "box": [
+                        200,
+                        275,
+                        266,
+                        288
+                    ]
+                },
+                {
+                    "text": "Laboratories,",
+                    "box": [
+                        272,
+                        274,
+                        363,
+                        289
+                    ]
+                },
+                {
+                    "text": "Inc.",
+                    "box": [
+                        370,
+                        274,
+                        397,
+                        288
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "Client Study No.",
+            "box": [
+                404,
+                275,
+                521,
+                290
+            ],
+            "linking": [
+                [
+                    13,
+                    2
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Client",
+                    "box": [
+                        404,
+                        277,
+                        450,
+                        290
+                    ]
+                },
+                {
+                    "text": "Study",
+                    "box": [
+                        455,
+                        275,
+                        494,
+                        290
+                    ]
+                },
+                {
+                    "text": "No.",
+                    "box": [
+                        499,
+                        275,
+                        521,
+                        289
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "Dr. William O. Iverson Pathologist Dr. Charley E. Gilmore",
+            "box": [
+                212,
+                316,
+                636,
+                335
+            ],
+            "linking": [
+                [
+                    9,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        212,
+                        316,
+                        232,
+                        333
+                    ]
+                },
+                {
+                    "text": "William",
+                    "box": [
+                        242,
+                        318,
+                        295,
+                        332
+                    ]
+                },
+                {
+                    "text": "O.",
+                    "box": [
+                        300,
+                        316,
+                        310,
+                        331
+                    ]
+                },
+                {
+                    "text": "Iverson",
+                    "box": [
+                        320,
+                        317,
+                        370,
+                        334
+                    ]
+                },
+                {
+                    "text": "Pathologist",
+                    "box": [
+                        381,
+                        316,
+                        462,
+                        333
+                    ]
+                },
+                {
+                    "text": "Dr.",
+                    "box": [
+                        478,
+                        317,
+                        496,
+                        332
+                    ]
+                },
+                {
+                    "text": "Charley",
+                    "box": [
+                        504,
+                        318,
+                        564,
+                        335
+                    ]
+                },
+                {
+                    "text": "E.",
+                    "box": [
+                        564,
+                        318,
+                        578,
+                        331
+                    ]
+                },
+                {
+                    "text": "Gilmore",
+                    "box": [
+                        584,
+                        318,
+                        636,
+                        331
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "Bioassay of Cigarette Smoke Condensates for potential Tumorigenic Activity on Mouse Skin (Revised Pathology Report)",
+            "box": [
+                214,
+                344,
+                594,
+                391
+            ],
+            "linking": [
+                [
+                    10,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Bioassay",
+                    "box": [
+                        214,
+                        345,
+                        273,
+                        360
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        281,
+                        346,
+                        292,
+                        360
+                    ]
+                },
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        300,
+                        344,
+                        364,
+                        361
+                    ]
+                },
+                {
+                    "text": "Smoke",
+                    "box": [
+                        370,
+                        345,
+                        405,
+                        362
+                    ]
+                },
+                {
+                    "text": "Condensates",
+                    "box": [
+                        411,
+                        345,
+                        491,
+                        360
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        500,
+                        345,
+                        521,
+                        359
+                    ]
+                },
+                {
+                    "text": "potential",
+                    "box": [
+                        528,
+                        346,
+                        594,
+                        361
+                    ]
+                },
+                {
+                    "text": "Tumorigenic",
+                    "box": [
+                        214,
+                        362,
+                        292,
+                        373
+                    ]
+                },
+                {
+                    "text": "Activity",
+                    "box": [
+                        297,
+                        363,
+                        360,
+                        376
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        363,
+                        363,
+                        381,
+                        376
+                    ]
+                },
+                {
+                    "text": "Mouse",
+                    "box": [
+                        384,
+                        363,
+                        425,
+                        376
+                    ]
+                },
+                {
+                    "text": "Skin",
+                    "box": [
+                        429,
+                        362,
+                        460,
+                        377
+                    ]
+                },
+                {
+                    "text": "(Revised",
+                    "box": [
+                        216,
+                        377,
+                        273,
+                        388
+                    ]
+                },
+                {
+                    "text": "Pathology",
+                    "box": [
+                        281,
+                        377,
+                        344,
+                        388
+                    ]
+                },
+                {
+                    "text": "Report)",
+                    "box": [
+                        348,
+                        378,
+                        400,
+                        391
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "A11 parts of the pathology phase of this study, including the final report, were reviewed by Experimental Pathology Laboratories Quality Assurance Unit on March 2- June 8, 1983 . All Findings were reported to the Study Director and Management.",
+            "box": [
+                124,
+                486,
+                667,
+                593
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "A11",
+                    "box": [
+                        127,
+                        489,
+                        149,
+                        504
+                    ]
+                },
+                {
+                    "text": "parts",
+                    "box": [
+                        155,
+                        492,
+                        191,
+                        505
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        197,
+                        487,
+                        212,
+                        504
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        222,
+                        486,
+                        244,
+                        504
+                    ]
+                },
+                {
+                    "text": "pathology",
+                    "box": [
+                        249,
+                        487,
+                        317,
+                        507
+                    ]
+                },
+                {
+                    "text": "phase",
+                    "box": [
+                        321,
+                        490,
+                        357,
+                        505
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        365,
+                        490,
+                        378,
+                        505
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        385,
+                        486,
+                        414,
+                        504
+                    ]
+                },
+                {
+                    "text": "study,",
+                    "box": [
+                        419,
+                        489,
+                        465,
+                        507
+                    ]
+                },
+                {
+                    "text": "including",
+                    "box": [
+                        471,
+                        490,
+                        538,
+                        508
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        545,
+                        490,
+                        565,
+                        505
+                    ]
+                },
+                {
+                    "text": "final",
+                    "box": [
+                        571,
+                        490,
+                        603,
+                        503
+                    ]
+                },
+                {
+                    "text": "report,",
+                    "box": [
+                        613,
+                        492,
+                        662,
+                        506
+                    ]
+                },
+                {
+                    "text": "were",
+                    "box": [
+                        127,
+                        521,
+                        159,
+                        535
+                    ]
+                },
+                {
+                    "text": "reviewed",
+                    "box": [
+                        166,
+                        521,
+                        227,
+                        534
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        228,
+                        521,
+                        243,
+                        532
+                    ]
+                },
+                {
+                    "text": "Experimental",
+                    "box": [
+                        251,
+                        520,
+                        335,
+                        531
+                    ]
+                },
+                {
+                    "text": "Pathology",
+                    "box": [
+                        342,
+                        518,
+                        409,
+                        535
+                    ]
+                },
+                {
+                    "text": "Laboratories",
+                    "box": [
+                        412,
+                        517,
+                        499,
+                        534
+                    ]
+                },
+                {
+                    "text": "Quality",
+                    "box": [
+                        507,
+                        520,
+                        559,
+                        535
+                    ]
+                },
+                {
+                    "text": "Assurance",
+                    "box": [
+                        564,
+                        518,
+                        631,
+                        532
+                    ]
+                },
+                {
+                    "text": "Unit",
+                    "box": [
+                        633,
+                        520,
+                        667,
+                        534
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        128,
+                        549,
+                        145,
+                        560
+                    ]
+                },
+                {
+                    "text": "March",
+                    "box": [
+                        176,
+                        545,
+                        212,
+                        565
+                    ]
+                },
+                {
+                    "text": "2-",
+                    "box": [
+                        219,
+                        546,
+                        246,
+                        563
+                    ]
+                },
+                {
+                    "text": "June",
+                    "box": [
+                        251,
+                        547,
+                        280,
+                        561
+                    ]
+                },
+                {
+                    "text": "8,",
+                    "box": [
+                        286,
+                        549,
+                        300,
+                        563
+                    ]
+                },
+                {
+                    "text": "1983",
+                    "box": [
+                        307,
+                        546,
+                        336,
+                        563
+                    ]
+                },
+                {
+                    "text": ".",
+                    "box": [
+                        446,
+                        552,
+                        457,
+                        563
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        473,
+                        546,
+                        494,
+                        564
+                    ]
+                },
+                {
+                    "text": "Findings",
+                    "box": [
+                        500,
+                        549,
+                        556,
+                        564
+                    ]
+                },
+                {
+                    "text": "were",
+                    "box": [
+                        561,
+                        550,
+                        593,
+                        564
+                    ]
+                },
+                {
+                    "text": "reported",
+                    "box": [
+                        601,
+                        550,
+                        660,
+                        564
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        124,
+                        575,
+                        142,
+                        590
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        147,
+                        575,
+                        172,
+                        592
+                    ]
+                },
+                {
+                    "text": "Study",
+                    "box": [
+                        177,
+                        577,
+                        215,
+                        592
+                    ]
+                },
+                {
+                    "text": "Director",
+                    "box": [
+                        219,
+                        575,
+                        279,
+                        592
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        286,
+                        575,
+                        308,
+                        592
+                    ]
+                },
+                {
+                    "text": "Management.",
+                    "box": [
+                        314,
+                        575,
+                        391,
+                        593
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "6/8/83",
+            "box": [
+                398,
+                661,
+                627,
+                749
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        398,
+                        661,
+                        627,
+                        713
+                    ]
+                },
+                {
+                    "text": "6/8/83",
+                    "box": [
+                        468,
+                        722,
+                        576,
+                        749
+                    ]
+                }
+            ],
+            "id": 17
+        }
+    ]
+}

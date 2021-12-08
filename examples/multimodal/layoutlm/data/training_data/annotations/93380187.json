@@ -1,0 +1,2790 @@
+{
+    "form": [
+        {
+            "box": [
+                43,
+                79,
+                188,
+                130
+            ],
+            "text": "FAXED",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        43,
+                        79,
+                        188,
+                        130
+                    ],
+                    "text": "FAXED"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                99,
+                151,
+                144,
+                166
+            ],
+            "text": "FROM:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        151,
+                        144,
+                        166
+                    ],
+                    "text": "FROM:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    24
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                97,
+                178,
+                128,
+                193
+            ],
+            "text": "TO:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        97,
+                        178,
+                        128,
+                        193
+                    ],
+                    "text": "TO:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    25
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                99,
+                210,
+                130,
+                225
+            ],
+            "text": "CC:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        210,
+                        130,
+                        225
+                    ],
+                    "text": "CC:"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    26
+                ],
+                [
+                    3,
+                    27
+                ],
+                [
+                    3,
+                    28
+                ],
+                [
+                    3,
+                    29
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                335,
+                277,
+                372,
+                292
+            ],
+            "text": "TRUE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        335,
+                        277,
+                        372,
+                        292
+                    ],
+                    "text": "TRUE"
+                }
+            ],
+            "linking": [
+                [
+                    30,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                329,
+                496,
+                381,
+                509
+            ],
+            "text": "560,000",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        329,
+                        496,
+                        381,
+                        509
+                    ],
+                    "text": "560,000"
+                }
+            ],
+            "linking": [
+                [
+                    37,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                207,
+                792,
+                265,
+                802
+            ],
+            "text": "PROVIDENCE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        207,
+                        792,
+                        265,
+                        802
+                    ],
+                    "text": "PROVIDENCE"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                204,
+                807,
+                249,
+                817
+            ],
+            "text": "CAMDEN",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        204,
+                        807,
+                        249,
+                        817
+                    ],
+                    "text": "CAMDEN"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                208,
+                825,
+                254,
+                834
+            ],
+            "text": "CONCORD",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        208,
+                        825,
+                        254,
+                        834
+                    ],
+                    "text": "CONCORD"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                204,
+                837,
+                265,
+                850
+            ],
+            "text": "SPRINGFIELD",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        204,
+                        837,
+                        265,
+                        850
+                    ],
+                    "text": "SPRINGFIELD"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    9
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                205,
+                855,
+                259,
+                865
+            ],
+            "text": "BALTIMORE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        205,
+                        855,
+                        259,
+                        865
+                    ],
+                    "text": "BALTIMORE"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                90,
+                822,
+                139,
+                834
+            ],
+            "text": "HARTFORD",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        90,
+                        822,
+                        139,
+                        834
+                    ],
+                    "text": "HARTFORD"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                88,
+                853,
+                139,
+                863
+            ],
+            "text": "SYRACUSE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        853,
+                        139,
+                        863
+                    ],
+                    "text": "SYRACUSE"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                88,
+                870,
+                145,
+                880
+            ],
+            "text": "ROCHESTER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        870,
+                        145,
+                        880
+                    ],
+                    "text": "ROCHESTER"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                88,
+                916,
+                130,
+                926
+            ],
+            "text": "BUFFALO",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        916,
+                        130,
+                        926
+                    ],
+                    "text": "BUFFALO"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                295,
+                901,
+                308,
+                911
+            ],
+            "text": "DC",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        295,
+                        901,
+                        308,
+                        911
+                    ],
+                    "text": "DC"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                204,
+                918,
+                265,
+                927
+            ],
+            "text": "WILMINGTON",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        204,
+                        918,
+                        265,
+                        927
+                    ],
+                    "text": "WILMINGTON"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                88,
+                931,
+                127,
+                943
+            ],
+            "text": "ALBANY",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        931,
+                        127,
+                        943
+                    ],
+                    "text": "ALBANY"
+                }
+            ],
+            "linking": [
+                [
+                    45,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                445,
+                825,
+                514,
+                850
+            ],
+            "text": "57288",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        445,
+                        825,
+                        514,
+                        850
+                    ],
+                    "text": "57288"
+                }
+            ],
+            "linking": [
+                [
+                    55,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                457,
+                852,
+                494,
+                865
+            ],
+            "text": "1143",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        457,
+                        852,
+                        494,
+                        865
+                    ],
+                    "text": "1143"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                593,
+                804,
+                621,
+                876
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        593,
+                        804,
+                        621,
+                        876
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "text": "COUPON CODE REGISTRATION FORM",
+            "box": [
+                199,
+                118,
+                419,
+                136
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "COUPON",
+                    "box": [
+                        199,
+                        118,
+                        251,
+                        136
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        256,
+                        120,
+                        289,
+                        135
+                    ]
+                },
+                {
+                    "text": "REGISTRATION",
+                    "box": [
+                        295,
+                        120,
+                        382,
+                        136
+                    ]
+                },
+                {
+                    "text": "FORM",
+                    "box": [
+                        385,
+                        120,
+                        419,
+                        136
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "-95 92",
+            "box": [
+                457,
+                93,
+                555,
+                159
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "-95",
+                    "box": [
+                        500,
+                        93,
+                        555,
+                        135
+                    ]
+                },
+                {
+                    "text": "92",
+                    "box": [
+                        457,
+                        114,
+                        499,
+                        159
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "EXHIBIT ",
+            "box": [
+                560,
+                85,
+                627,
+                101
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "EXHIBIT",
+                    "box": [
+                        560,
+                        85,
+                        609,
+                        101
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        617,
+                        87,
+                        627,
+                        97
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "MICHELLE LEPRE",
+            "box": [
+                201,
+                148,
+                304,
+                169
+            ],
+            "linking": [
+                [
+                    1,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "MICHELLE",
+                    "box": [
+                        201,
+                        148,
+                        264,
+                        164
+                    ]
+                },
+                {
+                    "text": "LEPRE",
+                    "box": [
+                        268,
+                        148,
+                        304,
+                        169
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "V. M. LOSITO",
+            "box": [
+                204,
+                180,
+                278,
+                198
+            ],
+            "linking": [
+                [
+                    2,
+                    25
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "V.",
+                    "box": [
+                        204,
+                        181,
+                        216,
+                        196
+                    ]
+                },
+                {
+                    "text": "M.",
+                    "box": [
+                        217,
+                        180,
+                        230,
+                        195
+                    ]
+                },
+                {
+                    "text": "LOSITO",
+                    "box": [
+                        235,
+                        180,
+                        278,
+                        198
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "S. A. RAPISARLDI",
+            "box": [
+                202,
+                211,
+                306,
+                226
+            ],
+            "linking": [
+                [
+                    3,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "S.",
+                    "box": [
+                        202,
+                        211,
+                        215,
+                        226
+                    ]
+                },
+                {
+                    "text": "A.",
+                    "box": [
+                        216,
+                        213,
+                        229,
+                        225
+                    ]
+                },
+                {
+                    "text": "RAPISARLDI",
+                    "box": [
+                        234,
+                        213,
+                        306,
+                        226
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "J BAYLIES",
+            "box": [
+                202,
+                226,
+                271,
+                244
+            ],
+            "linking": [
+                [
+                    3,
+                    27
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "J",
+                    "box": [
+                        202,
+                        226,
+                        214,
+                        244
+                    ]
+                },
+                {
+                    "text": "BAYLIES",
+                    "box": [
+                        219,
+                        228,
+                        271,
+                        240
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "K. P. AUGUSTYN",
+            "box": [
+                201,
+                243,
+                301,
+                262
+            ],
+            "linking": [
+                [
+                    3,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "K.",
+                    "box": [
+                        201,
+                        246,
+                        217,
+                        258
+                    ]
+                },
+                {
+                    "text": "P.",
+                    "box": [
+                        217,
+                        243,
+                        229,
+                        258
+                    ]
+                },
+                {
+                    "text": "AUGUSTYN",
+                    "box": [
+                        231,
+                        244,
+                        301,
+                        262
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "M. McGLYNN",
+            "box": [
+                328,
+                225,
+                411,
+                246
+            ],
+            "linking": [
+                [
+                    3,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "M.",
+                    "box": [
+                        328,
+                        231,
+                        352,
+                        243
+                    ]
+                },
+                {
+                    "text": "McGLYNN",
+                    "box": [
+                        356,
+                        225,
+                        411,
+                        246
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "- BRAND(S) APPLICABLE",
+            "box": [
+                99,
+                275,
+                253,
+                290
+            ],
+            "linking": [
+                [
+                    30,
+                    4
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        99,
+                        280,
+                        108,
+                        287
+                    ]
+                },
+                {
+                    "text": "BRAND(S)",
+                    "box": [
+                        112,
+                        275,
+                        172,
+                        290
+                    ]
+                },
+                {
+                    "text": "APPLICABLE",
+                    "box": [
+                        174,
+                        275,
+                        253,
+                        288
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "- MEDIA TYPE",
+            "box": [
+                97,
+                307,
+                188,
+                322
+            ],
+            "linking": [
+                [
+                    31,
+                    46
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        97,
+                        310,
+                        109,
+                        320
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        112,
+                        307,
+                        151,
+                        322
+                    ]
+                },
+                {
+                    "text": "TYPE",
+                    "box": [
+                        154,
+                        307,
+                        188,
+                        320
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "- MEDIA NAME",
+            "box": [
+                97,
+                337,
+                192,
+                350
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        97,
+                        341,
+                        107,
+                        350
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        109,
+                        340,
+                        148,
+                        350
+                    ]
+                },
+                {
+                    "text": "NAME",
+                    "box": [
+                        153,
+                        337,
+                        192,
+                        350
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "- ISSUE FREQUENCY/YEAR",
+            "box": [
+                97,
+                368,
+                265,
+                383
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        97,
+                        371,
+                        104,
+                        381
+                    ]
+                },
+                {
+                    "text": "ISSUE",
+                    "box": [
+                        111,
+                        368,
+                        148,
+                        381
+                    ]
+                },
+                {
+                    "text": "FREQUENCY/YEAR",
+                    "box": [
+                        151,
+                        368,
+                        265,
+                        383
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "- SPACE/COLOR",
+            "box": [
+                97,
+                398,
+                202,
+                416
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        97,
+                        404,
+                        107,
+                        411
+                    ]
+                },
+                {
+                    "text": "SPACE/COLOR",
+                    "box": [
+                        109,
+                        398,
+                        202,
+                        416
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "- COUPON ISSUE DATE",
+            "box": [
+                94,
+                430,
+                242,
+                446
+            ],
+            "linking": [
+                [
+                    35,
+                    47
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        94,
+                        436,
+                        104,
+                        445
+                    ]
+                },
+                {
+                    "text": "COUPON",
+                    "box": [
+                        111,
+                        430,
+                        163,
+                        445
+                    ]
+                },
+                {
+                    "text": "ISSUE",
+                    "box": [
+                        166,
+                        430,
+                        202,
+                        446
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        205,
+                        433,
+                        242,
+                        446
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "- COUPON EXPIRATION DATE",
+            "box": [
+                96,
+                461,
+                273,
+                479
+            ],
+            "linking": [
+                [
+                    36,
+                    48
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        96,
+                        467,
+                        105,
+                        476
+                    ]
+                },
+                {
+                    "text": "COUPON",
+                    "box": [
+                        108,
+                        461,
+                        163,
+                        477
+                    ]
+                },
+                {
+                    "text": "EXPIRATION",
+                    "box": [
+                        166,
+                        464,
+                        239,
+                        479
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        243,
+                        464,
+                        273,
+                        477
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "- CIRCULATION",
+            "box": [
+                94,
+                494,
+                197,
+                507
+            ],
+            "linking": [
+                [
+                    37,
+                    5
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        94,
+                        497,
+                        104,
+                        504
+                    ]
+                },
+                {
+                    "text": "CIRCULATION",
+                    "box": [
+                        109,
+                        494,
+                        197,
+                        507
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "- GEOGRAPHICAL AREA(S)",
+            "box": [
+                94,
+                525,
+                256,
+                540
+            ],
+            "linking": [
+                [
+                    38,
+                    49
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        94,
+                        527,
+                        103,
+                        537
+                    ]
+                },
+                {
+                    "text": "GEOGRAPHICAL",
+                    "box": [
+                        106,
+                        525,
+                        202,
+                        538
+                    ]
+                },
+                {
+                    "text": "AREA(S)",
+                    "box": [
+                        207,
+                        525,
+                        256,
+                        540
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "- COUPON VALUE",
+            "box": [
+                94,
+                555,
+                204,
+                571
+            ],
+            "linking": [
+                [
+                    39,
+                    50
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        94,
+                        560,
+                        103,
+                        569
+                    ]
+                },
+                {
+                    "text": "COUPON",
+                    "box": [
+                        109,
+                        555,
+                        160,
+                        570
+                    ]
+                },
+                {
+                    "text": "VALUE",
+                    "box": [
+                        165,
+                        555,
+                        204,
+                        571
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "- PACK AND/OR CARTON",
+            "box": [
+                91,
+                584,
+                247,
+                602
+            ],
+            "linking": [
+                [
+                    40,
+                    51
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        91,
+                        588,
+                        104,
+                        600
+                    ]
+                },
+                {
+                    "text": "PACK",
+                    "box": [
+                        108,
+                        584,
+                        142,
+                        600
+                    ]
+                },
+                {
+                    "text": "AND/OR",
+                    "box": [
+                        144,
+                        585,
+                        192,
+                        601
+                    ]
+                },
+                {
+                    "text": "CARTON",
+                    "box": [
+                        192,
+                        587,
+                        247,
+                        602
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "- ADVERTISING CREATIVE TITLE",
+            "box": [
+                91,
+                617,
+                294,
+                633
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        91,
+                        623,
+                        103,
+                        629
+                    ]
+                },
+                {
+                    "text": "ADVERTISING",
+                    "box": [
+                        115,
+                        618,
+                        194,
+                        631
+                    ]
+                },
+                {
+                    "text": "CREATIVE",
+                    "box": [
+                        196,
+                        618,
+                        259,
+                        631
+                    ]
+                },
+                {
+                    "text": "TITLE",
+                    "box": [
+                        260,
+                        617,
+                        294,
+                        633
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "- SIGNATURE OF INITIATOR",
+            "box": [
+                93,
+                663,
+                260,
+                680
+            ],
+            "linking": [
+                [
+                    42,
+                    52
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        93,
+                        668,
+                        102,
+                        677
+                    ]
+                },
+                {
+                    "text": "SIGNATURE",
+                    "box": [
+                        105,
+                        663,
+                        177,
+                        678
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        177,
+                        665,
+                        195,
+                        677
+                    ]
+                },
+                {
+                    "text": "INITIATOR",
+                    "box": [
+                        196,
+                        665,
+                        260,
+                        680
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "- -DATE INITIATED",
+            "box": [
+                93,
+                695,
+                202,
+                708
+            ],
+            "linking": [
+                [
+                    43,
+                    53
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        93,
+                        698,
+                        103,
+                        707
+                    ]
+                },
+                {
+                    "text": "-DATE",
+                    "box": [
+                        105,
+                        695,
+                        141,
+                        707
+                    ]
+                },
+                {
+                    "text": "INITIATED",
+                    "box": [
+                        144,
+                        695,
+                        202,
+                        708
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "ANALYTICAL REQUIREMENTS:",
+            "box": [
+                88,
+                722,
+                271,
+                741
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ANALYTICAL",
+                    "box": [
+                        88,
+                        722,
+                        166,
+                        741
+                    ]
+                },
+                {
+                    "text": "REQUIREMENTS:",
+                    "box": [
+                        168,
+                        725,
+                        271,
+                        741
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "TRUE CORE AREAS",
+            "box": [
+                102,
+                757,
+                216,
+                772
+            ],
+            "linking": [
+                [
+                    45,
+                    59
+                ],
+                [
+                    45,
+                    62
+                ],
+                [
+                    45,
+                    61
+                ],
+                [
+                    45,
+                    11
+                ],
+                [
+                    45,
+                    63
+                ],
+                [
+                    45,
+                    12
+                ],
+                [
+                    45,
+                    13
+                ],
+                [
+                    45,
+                    64
+                ],
+                [
+                    45,
+                    65
+                ],
+                [
+                    45,
+                    14
+                ],
+                [
+                    45,
+                    17
+                ],
+                [
+                    45,
+                    60
+                ],
+                [
+                    45,
+                    6
+                ],
+                [
+                    45,
+                    7
+                ],
+                [
+                    45,
+                    8
+                ],
+                [
+                    45,
+                    9
+                ],
+                [
+                    45,
+                    10
+                ],
+                [
+                    45,
+                    69
+                ],
+                [
+                    45,
+                    68
+                ],
+                [
+                    45,
+                    67
+                ],
+                [
+                    45,
+                    16
+                ],
+                [
+                    45,
+                    66
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TRUE",
+                    "box": [
+                        102,
+                        757,
+                        135,
+                        772
+                    ]
+                },
+                {
+                    "text": "CORE",
+                    "box": [
+                        136,
+                        760,
+                        172,
+                        770
+                    ]
+                },
+                {
+                    "text": "AREAS",
+                    "box": [
+                        174,
+                        759,
+                        216,
+                        772
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "SALES FORCE APPLIED - IRC",
+            "box": [
+                334,
+                308,
+                509,
+                323
+            ],
+            "linking": [
+                [
+                    31,
+                    46
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "SALES",
+                    "box": [
+                        334,
+                        308,
+                        373,
+                        321
+                    ]
+                },
+                {
+                    "text": "FORCE",
+                    "box": [
+                        379,
+                        310,
+                        418,
+                        322
+                    ]
+                },
+                {
+                    "text": "APPLIED",
+                    "box": [
+                        419,
+                        308,
+                        471,
+                        321
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        475,
+                        311,
+                        484,
+                        323
+                    ]
+                },
+                {
+                    "text": "IRC",
+                    "box": [
+                        482,
+                        308,
+                        509,
+                        323
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "MAY 1992",
+            "box": [
+                332,
+                433,
+                392,
+                446
+            ],
+            "linking": [
+                [
+                    35,
+                    47
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "MAY",
+                    "box": [
+                        332,
+                        433,
+                        360,
+                        446
+                    ]
+                },
+                {
+                    "text": "1992",
+                    "box": [
+                        365,
+                        433,
+                        392,
+                        446
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "8 /31 /92",
+            "box": [
+                332,
+                464,
+                378,
+                479
+            ],
+            "linking": [
+                [
+                    36,
+                    48
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "8",
+                    "box": [
+                        332,
+                        464,
+                        339,
+                        479
+                    ]
+                },
+                {
+                    "text": "/31",
+                    "box": [
+                        341,
+                        466,
+                        357,
+                        478
+                    ]
+                },
+                {
+                    "text": "/92",
+                    "box": [
+                        356,
+                        466,
+                        378,
+                        478
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "TRUE CORE MARKETS *",
+            "box": [
+                332,
+                525,
+                474,
+                542
+            ],
+            "linking": [
+                [
+                    38,
+                    49
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TRUE",
+                    "box": [
+                        332,
+                        525,
+                        365,
+                        540
+                    ]
+                },
+                {
+                    "text": "CORE",
+                    "box": [
+                        370,
+                        525,
+                        401,
+                        540
+                    ]
+                },
+                {
+                    "text": "MARKETS",
+                    "box": [
+                        407,
+                        527,
+                        462,
+                        542
+                    ]
+                },
+                {
+                    "text": "*",
+                    "box": [
+                        467,
+                        527,
+                        474,
+                        536
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "50c",
+            "box": [
+                331,
+                555,
+                356,
+                571
+            ],
+            "linking": [
+                [
+                    39,
+                    50
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "50c",
+                    "box": [
+                        331,
+                        555,
+                        356,
+                        571
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "PACK",
+            "box": [
+                331,
+                587,
+                371,
+                602
+            ],
+            "linking": [
+                [
+                    40,
+                    51
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "PACK",
+                    "box": [
+                        331,
+                        587,
+                        371,
+                        602
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "Michell ",
+            "box": [
+                329,
+                654,
+                542,
+                690
+            ],
+            "linking": [
+                [
+                    42,
+                    52
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Michell",
+                    "box": [
+                        329,
+                        656,
+                        459,
+                        683
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        463,
+                        654,
+                        542,
+                        690
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "JANUARY 8, 1992",
+            "box": [
+                328,
+                695,
+                430,
+                711
+            ],
+            "linking": [
+                [
+                    43,
+                    53
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "JANUARY",
+                    "box": [
+                        328,
+                        695,
+                        385,
+                        710
+                    ]
+                },
+                {
+                    "text": "8,",
+                    "box": [
+                        388,
+                        696,
+                        400,
+                        711
+                    ]
+                },
+                {
+                    "text": "1992",
+                    "box": [
+                        403,
+                        695,
+                        430,
+                        710
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "FOA CONTROL USE ONLY:",
+            "box": [
+                328,
+                805,
+                482,
+                822
+            ],
+            "linking": [
+                [
+                    54,
+                    55
+                ],
+                [
+                    54,
+                    56
+                ],
+                [
+                    54,
+                    57
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "FOA",
+                    "box": [
+                        328,
+                        807,
+                        353,
+                        819
+                    ]
+                },
+                {
+                    "text": "CONTROL",
+                    "box": [
+                        355,
+                        807,
+                        415,
+                        822
+                    ]
+                },
+                {
+                    "text": "USE",
+                    "box": [
+                        418,
+                        805,
+                        443,
+                        821
+                    ]
+                },
+                {
+                    "text": "ONLY:",
+                    "box": [
+                        443,
+                        805,
+                        482,
+                        821
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "CODE ASSIGNED:",
+            "box": [
+                326,
+                837,
+                429,
+                852
+            ],
+            "linking": [
+                [
+                    54,
+                    55
+                ],
+                [
+                    55,
+                    18
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CODE",
+                    "box": [
+                        326,
+                        837,
+                        362,
+                        852
+                    ]
+                },
+                {
+                    "text": "ASSIGNED:",
+                    "box": [
+                        365,
+                        837,
+                        429,
+                        850
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "JOE NUMBER:",
+            "box": [
+                326,
+                855,
+                410,
+                867
+            ],
+            "linking": [
+                [
+                    54,
+                    56
+                ],
+                [
+                    56,
+                    19
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "JOE",
+                    "box": [
+                        326,
+                        855,
+                        350,
+                        867
+                    ]
+                },
+                {
+                    "text": "NUMBER:",
+                    "box": [
+                        353,
+                        855,
+                        410,
+                        867
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "EST. REDEMPTION:",
+            "box": [
+                325,
+                868,
+                439,
+                881
+            ],
+            "linking": [
+                [
+                    54,
+                    57
+                ],
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "EST.",
+                    "box": [
+                        325,
+                        870,
+                        353,
+                        880
+                    ]
+                },
+                {
+                    "text": "REDEMPTION:",
+                    "box": [
+                        358,
+                        868,
+                        439,
+                        881
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "80 %",
+            "box": [
+                464,
+                864,
+                527,
+                888
+            ],
+            "linking": [
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "80",
+                    "box": [
+                        464,
+                        867,
+                        492,
+                        882
+                    ]
+                },
+                {
+                    "text": "%",
+                    "box": [
+                        490,
+                        864,
+                        527,
+                        888
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "TOTAL NEW YORK",
+            "box": [
+                91,
+                775,
+                169,
+                787
+            ],
+            "linking": [
+                [
+                    45,
+                    59
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        91,
+                        777,
+                        119,
+                        787
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        120,
+                        777,
+                        141,
+                        787
+                    ]
+                },
+                {
+                    "text": "YORK",
+                    "box": [
+                        142,
+                        775,
+                        169,
+                        787
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "TOTAL NEW JERSEY",
+            "box": [
+                205,
+                777,
+                295,
+                787
+            ],
+            "linking": [
+                [
+                    45,
+                    60
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        205,
+                        777,
+                        233,
+                        787
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        237,
+                        777,
+                        258,
+                        787
+                    ]
+                },
+                {
+                    "text": "JERSEY",
+                    "box": [
+                        259,
+                        777,
+                        295,
+                        787
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "NEW HAVEN",
+            "box": [
+                88,
+                792,
+                145,
+                802
+            ],
+            "linking": [
+                [
+                    45,
+                    61
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NEW",
+                    "box": [
+                        88,
+                        792,
+                        110,
+                        802
+                    ]
+                },
+                {
+                    "text": "HAVEN",
+                    "box": [
+                        112,
+                        792,
+                        145,
+                        801
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "TOTAL BOSTON",
+            "box": [
+                91,
+                805,
+                160,
+                818
+            ],
+            "linking": [
+                [
+                    45,
+                    62
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        91,
+                        805,
+                        119,
+                        818
+                    ]
+                },
+                {
+                    "text": "BOSTON",
+                    "box": [
+                        121,
+                        807,
+                        160,
+                        817
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "TOTAL SAN FRANCISCO",
+            "box": [
+                88,
+                837,
+                191,
+                850
+            ],
+            "linking": [
+                [
+                    45,
+                    63
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        88,
+                        837,
+                        118,
+                        849
+                    ]
+                },
+                {
+                    "text": "SAN",
+                    "box": [
+                        121,
+                        840,
+                        139,
+                        850
+                    ]
+                },
+                {
+                    "text": "FRANCISCO",
+                    "box": [
+                        139,
+                        837,
+                        191,
+                        850
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "TOTAL PHILADELPHIA",
+            "box": [
+                88,
+                883,
+                181,
+                894
+            ],
+            "linking": [
+                [
+                    45,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        88,
+                        885,
+                        118,
+                        894
+                    ]
+                },
+                {
+                    "text": "PHILADELPHIA",
+                    "box": [
+                        121,
+                        883,
+                        181,
+                        893
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "TOTAL CHICAGO",
+            "box": [
+                88,
+                900,
+                162,
+                912
+            ],
+            "linking": [
+                [
+                    45,
+                    65
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        88,
+                        900,
+                        118,
+                        912
+                    ]
+                },
+                {
+                    "text": "CHICAGO",
+                    "box": [
+                        120,
+                        900,
+                        162,
+                        912
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "REGION 15 x SAN BERNADINO",
+            "box": [
+                202,
+                931,
+                336,
+                943
+            ],
+            "linking": [
+                [
+                    45,
+                    66
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "REGION",
+                    "box": [
+                        202,
+                        931,
+                        238,
+                        940
+                    ]
+                },
+                {
+                    "text": "15",
+                    "box": [
+                        241,
+                        933,
+                        251,
+                        942
+                    ]
+                },
+                {
+                    "text": "x",
+                    "box": [
+                        253,
+                        933,
+                        262,
+                        942
+                    ]
+                },
+                {
+                    "text": "SAN",
+                    "box": [
+                        265,
+                        931,
+                        281,
+                        943
+                    ]
+                },
+                {
+                    "text": "BERNADINO",
+                    "box": [
+                        281,
+                        931,
+                        336,
+                        943
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "TOTAL WASHINGTON",
+            "box": [
+                201,
+                900,
+                294,
+                913
+            ],
+            "linking": [
+                [
+                    45,
+                    67
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        201,
+                        900,
+                        231,
+                        913
+                    ]
+                },
+                {
+                    "text": "WASHINGTON",
+                    "box": [
+                        234,
+                        901,
+                        294,
+                        911
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "TOTAL DETROIT",
+            "box": [
+                202,
+                883,
+                274,
+                896
+            ],
+            "linking": [
+                [
+                    45,
+                    68
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        202,
+                        885,
+                        233,
+                        894
+                    ]
+                },
+                {
+                    "text": "DETROIT",
+                    "box": [
+                        235,
+                        883,
+                        274,
+                        896
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "PORTLAND, ME",
+            "box": [
+                207,
+                870,
+                272,
+                882
+            ],
+            "linking": [
+                [
+                    45,
+                    69
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "PORTLAND,",
+                    "box": [
+                        207,
+                        870,
+                        256,
+                        880
+                    ]
+                },
+                {
+                    "text": "ME",
+                    "box": [
+                        259,
+                        870,
+                        272,
+                        882
+                    ]
+                }
+            ],
+            "id": 69
+        }
+    ]
+}

@@ -1,0 +1,3078 @@
+{
+    "form": [
+        {
+            "box": [
+                263,
+                80,
+                304,
+                93
+            ],
+            "text": "LOCATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        263,
+                        80,
+                        304,
+                        93
+                    ],
+                    "text": "LOCATION"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    25
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                263,
+                108,
+                323,
+                122
+            ],
+            "text": "REQUISITIONER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        263,
+                        108,
+                        323,
+                        122
+                    ],
+                    "text": "REQUISITIONER"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    28
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                41,
+                134,
+                79,
+                147
+            ],
+            "text": "SUPPLIER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        41,
+                        134,
+                        79,
+                        147
+                    ],
+                    "text": "SUPPLIER"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    31
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                373,
+                250,
+                386,
+                260
+            ],
+            "text": "",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        373,
+                        250,
+                        386,
+                        260
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                372,
+                278,
+                397,
+                286
+            ],
+            "text": "TERMS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        372,
+                        278,
+                        397,
+                        286
+                    ],
+                    "text": "TERMS"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    38
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                39,
+                275,
+                63,
+                283
+            ],
+            "text": "FO",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        39,
+                        275,
+                        63,
+                        283
+                    ],
+                    "text": "FO"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                74,
+                303,
+                140,
+                317
+            ],
+            "text": "QUANTITY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        74,
+                        303,
+                        140,
+                        317
+                    ],
+                    "text": "QUANTITY"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                327,
+                306,
+                411,
+                319
+            ],
+            "text": "DESCRIPTION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        327,
+                        306,
+                        411,
+                        319
+                    ],
+                    "text": "DESCRIPTION"
+                }
+            ],
+            "linking": [
+                [
+                    7,
+                    39
+                ],
+                [
+                    7,
+                    40
+                ],
+                [
+                    7,
+                    41
+                ],
+                [
+                    7,
+                    42
+                ],
+                [
+                    7,
+                    43
+                ],
+                [
+                    7,
+                    44
+                ],
+                [
+                    7,
+                    45
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                606,
+                306,
+                648,
+                321
+            ],
+            "text": "PRICE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        606,
+                        306,
+                        648,
+                        321
+                    ],
+                    "text": "PRICE"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    47
+                ],
+                [
+                    8,
+                    48
+                ],
+                [
+                    8,
+                    49
+                ],
+                [
+                    8,
+                    50
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                64,
+                169,
+                99,
+                182
+            ],
+            "text": "Attn:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        64,
+                        169,
+                        99,
+                        182
+                    ],
+                    "text": "Attn:"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    32
+                ],
+                [
+                    9,
+                    33
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                225,
+                820,
+                247,
+                831
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        225,
+                        820,
+                        247,
+                        831
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                226,
+                849,
+                250,
+                857
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        226,
+                        849,
+                        250,
+                        857
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                226,
+                877,
+                248,
+                884
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        226,
+                        877,
+                        248,
+                        884
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                304,
+                877,
+                317,
+                887
+            ],
+            "text": "BY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        304,
+                        877,
+                        317,
+                        887
+                    ],
+                    "text": "BY"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                304,
+                849,
+                326,
+                860
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        304,
+                        849,
+                        326,
+                        860
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                47,
+                877,
+                75,
+                885
+            ],
+            "text": "OTHER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        877,
+                        75,
+                        885
+                    ],
+                    "text": "OTHER"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                469,
+                834,
+                515,
+                849
+            ],
+            "text": "M14789",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        469,
+                        834,
+                        515,
+                        849
+                    ],
+                    "text": "M14789"
+                }
+            ],
+            "linking": [
+                [
+                    63,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                222,
+                795,
+                237,
+                816
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        222,
+                        795,
+                        237,
+                        816
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                443,
+                878,
+                467,
+                888
+            ],
+            "text": "BUYER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        443,
+                        878,
+                        467,
+                        888
+                    ],
+                    "text": "BUYER"
+                }
+            ],
+            "linking": [
+                [
+                    18,
+                    65
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                443,
+                852,
+                464,
+                860
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        443,
+                        852,
+                        464,
+                        860
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    64
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                34,
+                818,
+                44,
+                893
+            ],
+            "text": "APPROVAL",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        34,
+                        818,
+                        44,
+                        893
+                    ],
+                    "text": "APPROVAL"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                43,
+                41,
+                96,
+                94
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        43,
+                        41,
+                        96,
+                        94
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "text": "THE AMERICAN TOBACCO COMPANY",
+            "box": [
+                99,
+                39,
+                186,
+                96
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "THE",
+                    "box": [
+                        101,
+                        39,
+                        135,
+                        53
+                    ]
+                },
+                {
+                    "text": "AMERICAN",
+                    "box": [
+                        102,
+                        53,
+                        186,
+                        67
+                    ]
+                },
+                {
+                    "text": "TOBACCO",
+                    "box": [
+                        99,
+                        67,
+                        177,
+                        80
+                    ]
+                },
+                {
+                    "text": "COMPANY",
+                    "box": [
+                        99,
+                        81,
+                        177,
+                        96
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "PURCHASE REQUISITION",
+            "box": [
+                492,
+                56,
+                702,
+                78
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PURCHASE",
+                    "box": [
+                        492,
+                        56,
+                        584,
+                        77
+                    ]
+                },
+                {
+                    "text": "REQUISITION",
+                    "box": [
+                        589,
+                        57,
+                        702,
+                        78
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "AT 135 ",
+            "box": [
+                644,
+                36,
+                701,
+                48
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "AT",
+                    "box": [
+                        644,
+                        36,
+                        655,
+                        46
+                    ]
+                },
+                {
+                    "text": "135",
+                    "box": [
+                        658,
+                        38,
+                        671,
+                        46
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        672,
+                        38,
+                        678,
+                        46
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        679,
+                        38,
+                        701,
+                        48
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "STAMFORD, CT",
+            "box": [
+                325,
+                85,
+                420,
+                102
+            ],
+            "linking": [
+                [
+                    0,
+                    25
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "STAMFORD,",
+                    "box": [
+                        325,
+                        85,
+                        396,
+                        102
+                    ]
+                },
+                {
+                    "text": "CT",
+                    "box": [
+                        398,
+                        88,
+                        420,
+                        101
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "AUTHORIZATION NO.",
+            "box": [
+                483,
+                81,
+                558,
+                91
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "AUTHORIZATION",
+                    "box": [
+                        483,
+                        81,
+                        543,
+                        91
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        543,
+                        82,
+                        558,
+                        90
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "BUDGET NO.",
+            "box": [
+                482,
+                110,
+                529,
+                120
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "BUDGET",
+                    "box": [
+                        482,
+                        110,
+                        513,
+                        120
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        515,
+                        110,
+                        529,
+                        120
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "Mr. G. Schumacher",
+            "box": [
+                265,
+                122,
+                384,
+                136
+            ],
+            "linking": [
+                [
+                    1,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Mr.",
+                    "box": [
+                        265,
+                        123,
+                        283,
+                        136
+                    ]
+                },
+                {
+                    "text": "G.",
+                    "box": [
+                        286,
+                        124,
+                        303,
+                        134
+                    ]
+                },
+                {
+                    "text": "Schumacher",
+                    "box": [
+                        307,
+                        122,
+                        384,
+                        135
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "January 3, 1995",
+            "box": [
+                66,
+                122,
+                166,
+                137
+            ],
+            "linking": [
+                [
+                    30,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "January",
+                    "box": [
+                        66,
+                        122,
+                        118,
+                        136
+                    ]
+                },
+                {
+                    "text": "3,",
+                    "box": [
+                        122,
+                        123,
+                        133,
+                        136
+                    ]
+                },
+                {
+                    "text": "1995",
+                    "box": [
+                        137,
+                        123,
+                        166,
+                        137
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "DATE OF REQUISITION",
+            "box": [
+                41,
+                106,
+                125,
+                118
+            ],
+            "linking": [
+                [
+                    30,
+                    29
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DATE",
+                    "box": [
+                        41,
+                        106,
+                        62,
+                        117
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        63,
+                        108,
+                        74,
+                        116
+                    ]
+                },
+                {
+                    "text": "REQUISITION",
+                    "box": [
+                        75,
+                        108,
+                        125,
+                        118
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "WEBCRAFT TECHNOLOGIES INC",
+            "box": [
+                64,
+                151,
+                280,
+                166
+            ],
+            "linking": [
+                [
+                    2,
+                    31
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "WEBCRAFT",
+                    "box": [
+                        64,
+                        151,
+                        139,
+                        165
+                    ]
+                },
+                {
+                    "text": "TECHNOLOGIES",
+                    "box": [
+                        145,
+                        151,
+                        253,
+                        166
+                    ]
+                },
+                {
+                    "text": "INC",
+                    "box": [
+                        256,
+                        154,
+                        280,
+                        165
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "Mr. Steven Katz",
+            "box": [
+                101,
+                168,
+                199,
+                182
+            ],
+            "linking": [
+                [
+                    9,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Mr.",
+                    "box": [
+                        101,
+                        168,
+                        121,
+                        182
+                    ]
+                },
+                {
+                    "text": "Steven",
+                    "box": [
+                        124,
+                        168,
+                        165,
+                        182
+                    ]
+                },
+                {
+                    "text": "Katz",
+                    "box": [
+                        170,
+                        169,
+                        199,
+                        180
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "Route 4 and Adams Station North Brunswick, NJ 08901- 0623",
+            "box": [
+                64,
+                182,
+                270,
+                213
+            ],
+            "linking": [
+                [
+                    9,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Route",
+                    "box": [
+                        66,
+                        182,
+                        101,
+                        197
+                    ]
+                },
+                {
+                    "text": "4",
+                    "box": [
+                        106,
+                        183,
+                        114,
+                        194
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        119,
+                        184,
+                        144,
+                        197
+                    ]
+                },
+                {
+                    "text": "Adams",
+                    "box": [
+                        147,
+                        184,
+                        189,
+                        197
+                    ]
+                },
+                {
+                    "text": "Station",
+                    "box": [
+                        190,
+                        183,
+                        237,
+                        197
+                    ]
+                },
+                {
+                    "text": "North",
+                    "box": [
+                        64,
+                        198,
+                        100,
+                        213
+                    ]
+                },
+                {
+                    "text": "Brunswick,",
+                    "box": [
+                        105,
+                        198,
+                        175,
+                        212
+                    ]
+                },
+                {
+                    "text": "NJ",
+                    "box": [
+                        177,
+                        200,
+                        195,
+                        211
+                    ]
+                },
+                {
+                    "text": "08901-",
+                    "box": [
+                        200,
+                        200,
+                        241,
+                        211
+                    ]
+                },
+                {
+                    "text": "0623",
+                    "box": [
+                        242,
+                        198,
+                        270,
+                        212
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "NO SHIPPING REQUIRED",
+            "box": [
+                388,
+                151,
+                546,
+                168
+            ],
+            "linking": [
+                [
+                    35,
+                    34
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NO",
+                    "box": [
+                        388,
+                        151,
+                        409,
+                        168
+                    ]
+                },
+                {
+                    "text": "SHIPPING",
+                    "box": [
+                        413,
+                        154,
+                        472,
+                        167
+                    ]
+                },
+                {
+                    "text": "REQUIRED",
+                    "box": [
+                        476,
+                        152,
+                        546,
+                        167
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "SHIP TO",
+            "box": [
+                373,
+                137,
+                403,
+                148
+            ],
+            "linking": [
+                [
+                    35,
+                    34
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SHIP",
+                    "box": [
+                        373,
+                        137,
+                        391,
+                        148
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        392,
+                        138,
+                        403,
+                        146
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "SHIPMENT TO ARRIVE NOT LATER THAN",
+            "box": [
+                39,
+                246,
+                187,
+                258
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SHIPMENT",
+                    "box": [
+                        39,
+                        246,
+                        78,
+                        257
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        80,
+                        247,
+                        90,
+                        257
+                    ]
+                },
+                {
+                    "text": "ARRIVE",
+                    "box": [
+                        92,
+                        247,
+                        119,
+                        257
+                    ]
+                },
+                {
+                    "text": "NOT",
+                    "box": [
+                        122,
+                        247,
+                        137,
+                        258
+                    ]
+                },
+                {
+                    "text": "LATER",
+                    "box": [
+                        138,
+                        247,
+                        163,
+                        258
+                    ]
+                },
+                {
+                    "text": "THAN",
+                    "box": [
+                        163,
+                        247,
+                        187,
+                        255
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "NO SHIPPING REQUIRED.",
+            "box": [
+                64,
+                258,
+                230,
+                275
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NO",
+                    "box": [
+                        64,
+                        258,
+                        84,
+                        272
+                    ]
+                },
+                {
+                    "text": "SHIPPING",
+                    "box": [
+                        88,
+                        260,
+                        152,
+                        274
+                    ]
+                },
+                {
+                    "text": "REQUIRED.",
+                    "box": [
+                        155,
+                        260,
+                        230,
+                        275
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "NET 30 Days",
+            "box": [
+                385,
+                279,
+                466,
+                295
+            ],
+            "linking": [
+                [
+                    4,
+                    38
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NET",
+                    "box": [
+                        385,
+                        279,
+                        410,
+                        293
+                    ]
+                },
+                {
+                    "text": "30",
+                    "box": [
+                        413,
+                        282,
+                        428,
+                        293
+                    ]
+                },
+                {
+                    "text": "Days",
+                    "box": [
+                        432,
+                        282,
+                        466,
+                        295
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "CARLTON \"Free\" Carton\" Direct Mail Piece",
+            "box": [
+                179,
+                318,
+                442,
+                338
+            ],
+            "linking": [
+                [
+                    7,
+                    39
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "CARLTON",
+                    "box": [
+                        179,
+                        318,
+                        243,
+                        338
+                    ]
+                },
+                {
+                    "text": "\"Free\"",
+                    "box": [
+                        246,
+                        318,
+                        282,
+                        338
+                    ]
+                },
+                {
+                    "text": "Carton\"",
+                    "box": [
+                        285,
+                        321,
+                        334,
+                        338
+                    ]
+                },
+                {
+                    "text": "Direct",
+                    "box": [
+                        337,
+                        321,
+                        373,
+                        336
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        376,
+                        323,
+                        403,
+                        337
+                    ]
+                },
+                {
+                    "text": "Piece",
+                    "box": [
+                        406,
+                        323,
+                        442,
+                        336
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "This Purchase order is to cover all costs incurred to- date listed below.",
+            "box": [
+                179,
+                352,
+                538,
+                382
+            ],
+            "linking": [
+                [
+                    7,
+                    40
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        179,
+                        352,
+                        206,
+                        366
+                    ]
+                },
+                {
+                    "text": "Purchase",
+                    "box": [
+                        209,
+                        353,
+                        266,
+                        367
+                    ]
+                },
+                {
+                    "text": "order",
+                    "box": [
+                        274,
+                        352,
+                        309,
+                        367
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        311,
+                        355,
+                        322,
+                        365
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        327,
+                        355,
+                        341,
+                        365
+                    ]
+                },
+                {
+                    "text": "cover",
+                    "box": [
+                        344,
+                        355,
+                        379,
+                        368
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        381,
+                        353,
+                        396,
+                        366
+                    ]
+                },
+                {
+                    "text": "costs",
+                    "box": [
+                        399,
+                        353,
+                        434,
+                        366
+                    ]
+                },
+                {
+                    "text": "incurred",
+                    "box": [
+                        439,
+                        353,
+                        489,
+                        366
+                    ]
+                },
+                {
+                    "text": "to-",
+                    "box": [
+                        494,
+                        353,
+                        504,
+                        366
+                    ]
+                },
+                {
+                    "text": "date",
+                    "box": [
+                        506,
+                        352,
+                        538,
+                        367
+                    ]
+                },
+                {
+                    "text": "listed",
+                    "box": [
+                        179,
+                        367,
+                        214,
+                        381
+                    ]
+                },
+                {
+                    "text": "below.",
+                    "box": [
+                        216,
+                        369,
+                        258,
+                        382
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "42,000 lbs. of 80 lb Sterling C/ 2/ S - 36- 1/ 2\" roll",
+            "box": [
+                179,
+                398,
+                469,
+                412
+            ],
+            "linking": [
+                [
+                    7,
+                    41
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "42,000",
+                    "box": [
+                        179,
+                        398,
+                        221,
+                        412
+                    ]
+                },
+                {
+                    "text": "lbs.",
+                    "box": [
+                        223,
+                        399,
+                        247,
+                        412
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        250,
+                        398,
+                        263,
+                        411
+                    ]
+                },
+                {
+                    "text": "80",
+                    "box": [
+                        267,
+                        399,
+                        282,
+                        412
+                    ]
+                },
+                {
+                    "text": "lb",
+                    "box": [
+                        285,
+                        399,
+                        300,
+                        412
+                    ]
+                },
+                {
+                    "text": "Sterling",
+                    "box": [
+                        306,
+                        399,
+                        352,
+                        412
+                    ]
+                },
+                {
+                    "text": "C/",
+                    "box": [
+                        355,
+                        399,
+                        366,
+                        410
+                    ]
+                },
+                {
+                    "text": "2/",
+                    "box": [
+                        365,
+                        399,
+                        376,
+                        410
+                    ]
+                },
+                {
+                    "text": "S",
+                    "box": [
+                        376,
+                        399,
+                        389,
+                        412
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        391,
+                        401,
+                        399,
+                        409
+                    ]
+                },
+                {
+                    "text": "36-",
+                    "box": [
+                        402,
+                        399,
+                        420,
+                        412
+                    ]
+                },
+                {
+                    "text": "1/",
+                    "box": [
+                        420,
+                        399,
+                        430,
+                        410
+                    ]
+                },
+                {
+                    "text": "2\"",
+                    "box": [
+                        430,
+                        399,
+                        443,
+                        412
+                    ]
+                },
+                {
+                    "text": "roll",
+                    "box": [
+                        447,
+                        401,
+                        469,
+                        412
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "31,000 lbs. of 80 lb. Sterling C/ 2/ S - 26- 1/ 2\" roll",
+            "box": [
+                177,
+                413,
+                469,
+                429
+            ],
+            "linking": [
+                [
+                    7,
+                    42
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "31,000",
+                    "box": [
+                        177,
+                        413,
+                        219,
+                        427
+                    ]
+                },
+                {
+                    "text": "lbs.",
+                    "box": [
+                        222,
+                        413,
+                        246,
+                        427
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        250,
+                        415,
+                        264,
+                        426
+                    ]
+                },
+                {
+                    "text": "80",
+                    "box": [
+                        267,
+                        415,
+                        281,
+                        426
+                    ]
+                },
+                {
+                    "text": "lb.",
+                    "box": [
+                        285,
+                        416,
+                        299,
+                        427
+                    ]
+                },
+                {
+                    "text": "Sterling",
+                    "box": [
+                        304,
+                        415,
+                        351,
+                        429
+                    ]
+                },
+                {
+                    "text": "C/",
+                    "box": [
+                        355,
+                        415,
+                        366,
+                        426
+                    ]
+                },
+                {
+                    "text": "2/",
+                    "box": [
+                        366,
+                        415,
+                        377,
+                        426
+                    ]
+                },
+                {
+                    "text": "S",
+                    "box": [
+                        376,
+                        415,
+                        389,
+                        428
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        391,
+                        418,
+                        399,
+                        426
+                    ]
+                },
+                {
+                    "text": "26-",
+                    "box": [
+                        402,
+                        413,
+                        420,
+                        428
+                    ]
+                },
+                {
+                    "text": "1/",
+                    "box": [
+                        419,
+                        415,
+                        430,
+                        426
+                    ]
+                },
+                {
+                    "text": "2\"",
+                    "box": [
+                        430,
+                        415,
+                        444,
+                        428
+                    ]
+                },
+                {
+                    "text": "roll",
+                    "box": [
+                        448,
+                        416,
+                        469,
+                        427
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "Prep. (line negatives, paper prints, camera/ stripping)",
+            "box": [
+                179,
+                444,
+                506,
+                460
+            ],
+            "linking": [
+                [
+                    7,
+                    43
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Prep.",
+                    "box": [
+                        179,
+                        444,
+                        213,
+                        458
+                    ]
+                },
+                {
+                    "text": "(line",
+                    "box": [
+                        215,
+                        444,
+                        242,
+                        458
+                    ]
+                },
+                {
+                    "text": "negatives,",
+                    "box": [
+                        247,
+                        446,
+                        310,
+                        460
+                    ]
+                },
+                {
+                    "text": "paper",
+                    "box": [
+                        313,
+                        444,
+                        351,
+                        459
+                    ]
+                },
+                {
+                    "text": "prints,",
+                    "box": [
+                        353,
+                        444,
+                        392,
+                        459
+                    ]
+                },
+                {
+                    "text": "camera/",
+                    "box": [
+                        397,
+                        444,
+                        446,
+                        457
+                    ]
+                },
+                {
+                    "text": "stripping)",
+                    "box": [
+                        446,
+                        444,
+                        506,
+                        459
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Federal Express charges",
+            "box": [
+                179,
+                472,
+                335,
+                489
+            ],
+            "linking": [
+                [
+                    7,
+                    44
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Federal",
+                    "box": [
+                        179,
+                        473,
+                        228,
+                        488
+                    ]
+                },
+                {
+                    "text": "Express",
+                    "box": [
+                        230,
+                        473,
+                        279,
+                        488
+                    ]
+                },
+                {
+                    "text": "charges",
+                    "box": [
+                        285,
+                        472,
+                        335,
+                        489
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "ALL MATERIALS HAVE BEEN CANCELLED.",
+            "box": [
+                179,
+                504,
+                448,
+                518
+            ],
+            "linking": [
+                [
+                    7,
+                    45
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "ALL",
+                    "box": [
+                        179,
+                        504,
+                        206,
+                        518
+                    ]
+                },
+                {
+                    "text": "MATERIALS",
+                    "box": [
+                        208,
+                        504,
+                        283,
+                        517
+                    ]
+                },
+                {
+                    "text": "HAVE",
+                    "box": [
+                        286,
+                        504,
+                        322,
+                        517
+                    ]
+                },
+                {
+                    "text": "BEEN",
+                    "box": [
+                        327,
+                        504,
+                        363,
+                        517
+                    ]
+                },
+                {
+                    "text": "CANCELLED.",
+                    "box": [
+                        366,
+                        504,
+                        448,
+                        518
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "Charges to 1 /4 /95",
+            "box": [
+                419,
+                542,
+                677,
+                672
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Charges",
+                    "box": [
+                        419,
+                        542,
+                        489,
+                        580
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        503,
+                        543,
+                        523,
+                        572
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        543,
+                        545,
+                        607,
+                        574
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        571,
+                        561,
+                        677,
+                        641
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        581,
+                        634,
+                        594,
+                        656
+                    ]
+                },
+                {
+                    "text": "/4",
+                    "box": [
+                        589,
+                        623,
+                        618,
+                        672
+                    ]
+                },
+                {
+                    "text": "/95",
+                    "box": [
+                        620,
+                        613,
+                        654,
+                        658
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "$20, 580. 00",
+            "box": [
+                575,
+                398,
+                642,
+                412
+            ],
+            "linking": [
+                [
+                    8,
+                    47
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$20,",
+                    "box": [
+                        575,
+                        398,
+                        597,
+                        412
+                    ]
+                },
+                {
+                    "text": "580.",
+                    "box": [
+                        598,
+                        398,
+                        625,
+                        412
+                    ]
+                },
+                {
+                    "text": "00",
+                    "box": [
+                        624,
+                        398,
+                        642,
+                        411
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "$15, 190. 00",
+            "box": [
+                574,
+                415,
+                642,
+                429
+            ],
+            "linking": [
+                [
+                    8,
+                    48
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$15,",
+                    "box": [
+                        574,
+                        415,
+                        596,
+                        429
+                    ]
+                },
+                {
+                    "text": "190.",
+                    "box": [
+                        598,
+                        415,
+                        625,
+                        428
+                    ]
+                },
+                {
+                    "text": "00",
+                    "box": [
+                        624,
+                        415,
+                        642,
+                        428
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "$431 .25",
+            "box": [
+                592,
+                444,
+                643,
+                459
+            ],
+            "linking": [
+                [
+                    8,
+                    49
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$431",
+                    "box": [
+                        592,
+                        444,
+                        621,
+                        458
+                    ]
+                },
+                {
+                    "text": ".25",
+                    "box": [
+                        623,
+                        446,
+                        643,
+                        459
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "$48 .75",
+            "box": [
+                599,
+                473,
+                642,
+                488
+            ],
+            "linking": [
+                [
+                    8,
+                    50
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$48",
+                    "box": [
+                        599,
+                        473,
+                        623,
+                        486
+                    ]
+                },
+                {
+                    "text": ".75",
+                    "box": [
+                        624,
+                        473,
+                        642,
+                        488
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "DEPARTMENT CHARGED",
+            "box": [
+                35,
+                764,
+                127,
+                775
+            ],
+            "linking": [
+                [
+                    51,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DEPARTMENT",
+                    "box": [
+                        35,
+                        764,
+                        87,
+                        775
+                    ]
+                },
+                {
+                    "text": "CHARGED",
+                    "box": [
+                        88,
+                        765,
+                        127,
+                        772
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "ACCOUNTING CHARGE NO.",
+            "box": [
+                256,
+                764,
+                358,
+                775
+            ],
+            "linking": [
+                [
+                    52,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ACCOUNTING",
+                    "box": [
+                        256,
+                        764,
+                        309,
+                        774
+                    ]
+                },
+                {
+                    "text": "CHARGE",
+                    "box": [
+                        309,
+                        765,
+                        343,
+                        775
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        344,
+                        765,
+                        358,
+                        775
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "EXTRA COPIES TO:",
+            "box": [
+                378,
+                763,
+                448,
+                776
+            ],
+            "linking": [
+                [
+                    53,
+                    54
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "EXTRA",
+                    "box": [
+                        378,
+                        763,
+                        405,
+                        776
+                    ]
+                },
+                {
+                    "text": "COPIES",
+                    "box": [
+                        408,
+                        765,
+                        435,
+                        776
+                    ]
+                },
+                {
+                    "text": "TO:",
+                    "box": [
+                        437,
+                        765,
+                        448,
+                        775
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "D. Barcia",
+            "box": [
+                385,
+                777,
+                443,
+                791
+            ],
+            "linking": [
+                [
+                    53,
+                    54
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "D.",
+                    "box": [
+                        385,
+                        778,
+                        399,
+                        791
+                    ]
+                },
+                {
+                    "text": "Barcia",
+                    "box": [
+                        402,
+                        777,
+                        443,
+                        791
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "Adv. Expense",
+            "box": [
+                261,
+                777,
+                346,
+                792
+            ],
+            "linking": [
+                [
+                    52,
+                    55
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Adv.",
+                    "box": [
+                        261,
+                        777,
+                        290,
+                        792
+                    ]
+                },
+                {
+                    "text": "Expense",
+                    "box": [
+                        293,
+                        777,
+                        346,
+                        792
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "Brand Operations",
+            "box": [
+                60,
+                778,
+                175,
+                789
+            ],
+            "linking": [
+                [
+                    51,
+                    56
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Brand",
+                    "box": [
+                        60,
+                        778,
+                        102,
+                        789
+                    ]
+                },
+                {
+                    "text": "Operations",
+                    "box": [
+                        105,
+                        778,
+                        175,
+                        789
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "STATE TAX STATUS",
+            "box": [
+                35,
+                792,
+                109,
+                802
+            ],
+            "linking": [
+                [
+                    57,
+                    59
+                ],
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "STATE",
+                    "box": [
+                        35,
+                        792,
+                        60,
+                        802
+                    ]
+                },
+                {
+                    "text": "TAX",
+                    "box": [
+                        60,
+                        792,
+                        75,
+                        802
+                    ]
+                },
+                {
+                    "text": "STATUS",
+                    "box": [
+                        77,
+                        792,
+                        109,
+                        802
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "NOT TO BE CHARGED BY SUPPLIER",
+            "box": [
+                236,
+                804,
+                364,
+                817
+            ],
+            "linking": [
+                [
+                    58,
+                    17
+                ],
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NOT",
+                    "box": [
+                        236,
+                        804,
+                        251,
+                        815
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        256,
+                        806,
+                        264,
+                        814
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        267,
+                        806,
+                        275,
+                        816
+                    ]
+                },
+                {
+                    "text": "CHARGED",
+                    "box": [
+                        278,
+                        804,
+                        314,
+                        817
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        317,
+                        806,
+                        327,
+                        816
+                    ]
+                },
+                {
+                    "text": "SUPPLIER",
+                    "box": [
+                        325,
+                        806,
+                        364,
+                        817
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "☐ TO BE CHARGED",
+            "box": [
+                432,
+                804,
+                500,
+                816
+            ],
+            "linking": [
+                [
+                    57,
+                    59
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "☐",
+                    "box": [
+                        432,
+                        804,
+                        440,
+                        814
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        441,
+                        806,
+                        451,
+                        816
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        453,
+                        807,
+                        464,
+                        815
+                    ]
+                },
+                {
+                    "text": "CHARGED",
+                    "box": [
+                        464,
+                        807,
+                        500,
+                        815
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "LOCAL APPROVAL",
+            "box": [
+                47,
+                820,
+                118,
+                830
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LOCAL",
+                    "box": [
+                        47,
+                        820,
+                        74,
+                        828
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        75,
+                        820,
+                        118,
+                        830
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "ADMIN CTR/MGMT CTR. (AS REQUIRED)",
+            "box": [
+                47,
+                846,
+                198,
+                860
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ADMIN",
+                    "box": [
+                        47,
+                        846,
+                        74,
+                        859
+                    ]
+                },
+                {
+                    "text": "CTR/MGMT",
+                    "box": [
+                        77,
+                        846,
+                        119,
+                        859
+                    ]
+                },
+                {
+                    "text": "CTR.",
+                    "box": [
+                        123,
+                        848,
+                        141,
+                        859
+                    ]
+                },
+                {
+                    "text": "(AS REQUIRED)",
+                    "box": [
+                        142,
+                        849,
+                        198,
+                        860
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "LOCAL P/ORELEASE NO.",
+            "box": [
+                306,
+                821,
+                398,
+                831
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LOCAL",
+                    "box": [
+                        306,
+                        821,
+                        330,
+                        829
+                    ]
+                },
+                {
+                    "text": "P/ORELEASE",
+                    "box": [
+                        332,
+                        821,
+                        381,
+                        831
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        383,
+                        823,
+                        398,
+                        831
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "ADMIN CTR/MGMT CTR PURCHASE ORDER NO.",
+            "box": [
+                443,
+                821,
+                617,
+                833
+            ],
+            "linking": [
+                [
+                    63,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ADMIN",
+                    "box": [
+                        443,
+                        821,
+                        465,
+                        832
+                    ]
+                },
+                {
+                    "text": "CTR/MGMT",
+                    "box": [
+                        469,
+                        823,
+                        514,
+                        833
+                    ]
+                },
+                {
+                    "text": "CTR",
+                    "box": [
+                        515,
+                        821,
+                        530,
+                        832
+                    ]
+                },
+                {
+                    "text": "PURCHASE",
+                    "box": [
+                        534,
+                        824,
+                        575,
+                        832
+                    ]
+                },
+                {
+                    "text": "ORDER",
+                    "box": [
+                        577,
+                        824,
+                        602,
+                        832
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        603,
+                        824,
+                        617,
+                        832
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "January 3, 1995",
+            "box": [
+                469,
+                855,
+                568,
+                871
+            ],
+            "linking": [
+                [
+                    19,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "January",
+                    "box": [
+                        469,
+                        855,
+                        519,
+                        870
+                    ]
+                },
+                {
+                    "text": "3,",
+                    "box": [
+                        524,
+                        856,
+                        534,
+                        871
+                    ]
+                },
+                {
+                    "text": "1995",
+                    "box": [
+                        539,
+                        855,
+                        568,
+                        870
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "M. Stock/ smm ",
+            "box": [
+                468,
+                876,
+                654,
+                901
+            ],
+            "linking": [
+                [
+                    18,
+                    65
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "M.",
+                    "box": [
+                        468,
+                        878,
+                        486,
+                        892
+                    ]
+                },
+                {
+                    "text": "Stock/",
+                    "box": [
+                        486,
+                        878,
+                        522,
+                        892
+                    ]
+                },
+                {
+                    "text": "smm",
+                    "box": [
+                        521,
+                        880,
+                        550,
+                        891
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        552,
+                        876,
+                        654,
+                        901
+                    ]
+                }
+            ],
+            "id": 65
+        }
+    ]
+}

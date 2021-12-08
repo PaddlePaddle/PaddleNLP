@@ -1,0 +1,614 @@
+{
+    "form": [
+        {
+            "box": [
+                149,
+                170,
+                217,
+                181
+            ],
+            "text": "Supplier:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        149,
+                        170,
+                        217,
+                        181
+                    ],
+                    "text": "Supplier:"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                196,
+                352,
+                259,
+                363
+            ],
+            "text": "APPROVED",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        196,
+                        352,
+                        259,
+                        363
+                    ],
+                    "text": "APPROVED"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                149,
+                596,
+                196,
+                610
+            ],
+            "text": "Tester",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        149,
+                        596,
+                        196,
+                        610
+                    ],
+                    "text": "Tester"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                149,
+                655,
+                206,
+                670
+            ],
+            "text": "Manager",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        149,
+                        655,
+                        206,
+                        670
+                    ],
+                    "text": "Manager"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "text": "TEST ADHESIVE EVALUATION",
+            "box": [
+                288,
+                92,
+                479,
+                105
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "TEST",
+                    "box": [
+                        288,
+                        95,
+                        320,
+                        105
+                    ]
+                },
+                {
+                    "text": "ADHESIVE",
+                    "box": [
+                        325,
+                        92,
+                        392,
+                        103
+                    ]
+                },
+                {
+                    "text": "EVALUATION",
+                    "box": [
+                        394,
+                        94,
+                        479,
+                        105
+                    ]
+                }
+            ],
+            "id": 4
+        },
+        {
+            "text": "Adhesive Code:",
+            "box": [
+                149,
+                208,
+                260,
+                222
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Adhesive",
+                    "box": [
+                        149,
+                        208,
+                        212,
+                        222
+                    ]
+                },
+                {
+                    "text": "Code:",
+                    "box": [
+                        219,
+                        209,
+                        260,
+                        220
+                    ]
+                }
+            ],
+            "id": 5
+        },
+        {
+            "text": "Application: tipping, carton end flaps, etc.)",
+            "box": [
+                148,
+                249,
+                404,
+                276
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Application:",
+                    "box": [
+                        148,
+                        249,
+                        244,
+                        260
+                    ]
+                },
+                {
+                    "text": "tipping,",
+                    "box": [
+                        154,
+                        260,
+                        220,
+                        274
+                    ]
+                },
+                {
+                    "text": "carton",
+                    "box": [
+                        225,
+                        261,
+                        272,
+                        272
+                    ]
+                },
+                {
+                    "text": "end",
+                    "box": [
+                        279,
+                        263,
+                        307,
+                        274
+                    ]
+                },
+                {
+                    "text": "flaps,",
+                    "box": [
+                        311,
+                        263,
+                        357,
+                        276
+                    ]
+                },
+                {
+                    "text": "etc.)",
+                    "box": [
+                        365,
+                        264,
+                        404,
+                        275
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "Test Period:",
+            "box": [
+                148,
+                299,
+                243,
+                312
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Test",
+                    "box": [
+                        148,
+                        299,
+                        184,
+                        312
+                    ]
+                },
+                {
+                    "text": "Period:",
+                    "box": [
+                        187,
+                        299,
+                        243,
+                        312
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "NOT APPROVED",
+            "box": [
+                405,
+                353,
+                500,
+                366
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NOT",
+                    "box": [
+                        405,
+                        353,
+                        427,
+                        366
+                    ]
+                },
+                {
+                    "text": "APPROVED",
+                    "box": [
+                        436,
+                        353,
+                        500,
+                        366
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "If not approved state reasons.",
+            "box": [
+                149,
+                402,
+                381,
+                418
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "If",
+                    "box": [
+                        149,
+                        404,
+                        164,
+                        417
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        173,
+                        402,
+                        197,
+                        416
+                    ]
+                },
+                {
+                    "text": "approved",
+                    "box": [
+                        201,
+                        402,
+                        268,
+                        416
+                    ]
+                },
+                {
+                    "text": "state",
+                    "box": [
+                        274,
+                        405,
+                        312,
+                        418
+                    ]
+                },
+                {
+                    "text": "reasons.",
+                    "box": [
+                        320,
+                        405,
+                        381,
+                        418
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Quality Control",
+            "box": [
+                148,
+                616,
+                268,
+                631
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Quality",
+                    "box": [
+                        148,
+                        616,
+                        205,
+                        629
+                    ]
+                },
+                {
+                    "text": "Control",
+                    "box": [
+                        211,
+                        616,
+                        268,
+                        631
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "Local Purchasing",
+            "box": [
+                147,
+                634,
+                275,
+                651
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Local",
+                    "box": [
+                        147,
+                        634,
+                        189,
+                        648
+                    ]
+                },
+                {
+                    "text": "Purchasing",
+                    "box": [
+                        193,
+                        637,
+                        275,
+                        651
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Complete and return to D. R. Brickey, Department of Research and Development, as soon as possible.",
+            "box": [
+                147,
+                689,
+                617,
+                720
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Complete",
+                    "box": [
+                        148,
+                        691,
+                        215,
+                        704
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        221,
+                        691,
+                        246,
+                        704
+                    ]
+                },
+                {
+                    "text": "return",
+                    "box": [
+                        249,
+                        690,
+                        299,
+                        703
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        303,
+                        691,
+                        321,
+                        704
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        325,
+                        690,
+                        345,
+                        704
+                    ]
+                },
+                {
+                    "text": "R.",
+                    "box": [
+                        348,
+                        691,
+                        366,
+                        702
+                    ]
+                },
+                {
+                    "text": "Brickey,",
+                    "box": [
+                        373,
+                        691,
+                        437,
+                        704
+                    ]
+                },
+                {
+                    "text": "Department",
+                    "box": [
+                        443,
+                        693,
+                        520,
+                        706
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        528,
+                        693,
+                        546,
+                        704
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        550,
+                        689,
+                        617,
+                        704
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        147,
+                        703,
+                        176,
+                        717
+                    ]
+                },
+                {
+                    "text": "Development,",
+                    "box": [
+                        180,
+                        707,
+                        271,
+                        715
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        271,
+                        705,
+                        292,
+                        716
+                    ]
+                },
+                {
+                    "text": "soon",
+                    "box": [
+                        297,
+                        704,
+                        328,
+                        718
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        334,
+                        707,
+                        352,
+                        720
+                    ]
+                },
+                {
+                    "text": "possible.",
+                    "box": [
+                        356,
+                        704,
+                        429,
+                        718
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "ATXO2 0083035",
+            "box": [
+                520,
+                883,
+                634,
+                897
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "ATXO2",
+                    "box": [
+                        520,
+                        883,
+                        563,
+                        896
+                    ]
+                },
+                {
+                    "text": "0083035",
+                    "box": [
+                        573,
+                        883,
+                        634,
+                        897
+                    ]
+                }
+            ],
+            "id": 13
+        }
+    ]
+}

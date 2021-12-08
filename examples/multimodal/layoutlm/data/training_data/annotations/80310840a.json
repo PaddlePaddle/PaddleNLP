@@ -1,0 +1,3053 @@
+{
+    "form": [
+        {
+            "box": [
+                535,
+                71,
+                589,
+                105
+            ],
+            "text": "Scott",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        535,
+                        71,
+                        589,
+                        105
+                    ],
+                    "text": "Scott"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                468,
+                230,
+                514,
+                247
+            ],
+            "text": "Job#:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        468,
+                        230,
+                        514,
+                        247
+                    ],
+                    "text": "Job#:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    18
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                80,
+                250,
+                137,
+                264
+            ],
+            "text": "Revision",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        80,
+                        250,
+                        137,
+                        264
+                    ],
+                    "text": "Revision"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    3
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                142,
+                246,
+                166,
+                268
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        142,
+                        246,
+                        166,
+                        268
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                243,
+                250,
+                297,
+                270
+            ],
+            "text": "Reason:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        243,
+                        250,
+                        297,
+                        270
+                    ],
+                    "text": "Reason:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    33
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                628,
+                795,
+                648,
+                914
+            ],
+            "text": "803108404",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        628,
+                        795,
+                        648,
+                        914
+                    ],
+                    "text": "803108404"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                203,
+                817,
+                216,
+                831
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        203,
+                        817,
+                        216,
+                        831
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                221,
+                817,
+                277,
+                835
+            ],
+            "text": "Pasholuk",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        221,
+                        817,
+                        277,
+                        835
+                    ],
+                    "text": "Pasholuk"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                399,
+                665,
+                424,
+                682
+            ],
+            "text": "Jan",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        399,
+                        665,
+                        424,
+                        682
+                    ],
+                    "text": "Jan"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                398,
+                683,
+                427,
+                697
+            ],
+            "text": "Feb",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        398,
+                        683,
+                        427,
+                        697
+                    ],
+                    "text": "Feb"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                529,
+                668,
+                553,
+                679
+            ],
+            "text": "Jul",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        529,
+                        668,
+                        553,
+                        679
+                    ],
+                    "text": "Jul"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                532,
+                683,
+                560,
+                697
+            ],
+            "text": "Aug",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        532,
+                        683,
+                        560,
+                        697
+                    ],
+                    "text": "Aug"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                528,
+                700,
+                557,
+                713
+            ],
+            "text": "Sep",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        528,
+                        700,
+                        557,
+                        713
+                    ],
+                    "text": "Sep"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                525,
+                715,
+                556,
+                729
+            ],
+            "text": "Oct",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        525,
+                        715,
+                        556,
+                        729
+                    ],
+                    "text": "Oct"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                529,
+                730,
+                557,
+                741
+            ],
+            "text": "Nov",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        529,
+                        730,
+                        557,
+                        741
+                    ],
+                    "text": "Nov"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                528,
+                744,
+                559,
+                759
+            ],
+            "text": "Dec",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        528,
+                        744,
+                        559,
+                        759
+                    ],
+                    "text": "Dec"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                221,
+                838,
+                280,
+                848
+            ],
+            "text": "Director",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        221,
+                        838,
+                        280,
+                        848
+                    ],
+                    "text": "Director"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                186,
+                834,
+                217,
+                848
+            ],
+            "text": "MPIO",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        186,
+                        834,
+                        217,
+                        848
+                    ],
+                    "text": "MPIO"
+                }
+            ],
+            "linking": [
+                [
+                    51,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                534,
+                228,
+                595,
+                245
+            ],
+            "text": "5543/295",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        534,
+                        228,
+                        595,
+                        245
+                    ],
+                    "text": "5543/295"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                193,
+                250,
+                229,
+                270
+            ],
+            "text": "1",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        193,
+                        250,
+                        229,
+                        270
+                    ],
+                    "text": "1"
+                }
+            ],
+            "linking": [],
+            "id": 19
+        },
+        {
+            "box": [
+                176,
+                247,
+                190,
+                269
+            ],
+            "text": "#",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        176,
+                        247,
+                        190,
+                        269
+                    ],
+                    "text": "#"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                397,
+                697,
+                426,
+                712
+            ],
+            "text": "Mar",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        397,
+                        697,
+                        426,
+                        712
+                    ],
+                    "text": "Mar"
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "box": [
+                401,
+                714,
+                428,
+                727
+            ],
+            "text": "Apr",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        401,
+                        714,
+                        428,
+                        727
+                    ],
+                    "text": "Apr"
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "box": [
+                398,
+                729,
+                426,
+                740
+            ],
+            "text": "May",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        398,
+                        729,
+                        426,
+                        740
+                    ],
+                    "text": "May"
+                }
+            ],
+            "linking": [],
+            "id": 23
+        },
+        {
+            "box": [
+                399,
+                743,
+                426,
+                756
+            ],
+            "text": "Jun",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        399,
+                        743,
+                        426,
+                        756
+                    ],
+                    "text": "Jun"
+                }
+            ],
+            "linking": [],
+            "id": 24
+        },
+        {
+            "box": [
+                197,
+                811,
+                381,
+                865
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        197,
+                        811,
+                        381,
+                        865
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 25
+        },
+        {
+            "text": "January 18, 1998",
+            "box": [
+                536,
+                119,
+                643,
+                135
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "January",
+                    "box": [
+                        536,
+                        122,
+                        588,
+                        135
+                    ]
+                },
+                {
+                    "text": "18,",
+                    "box": [
+                        591,
+                        120,
+                        608,
+                        131
+                    ]
+                },
+                {
+                    "text": "1998",
+                    "box": [
+                        612,
+                        119,
+                        643,
+                        133
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "Date: PROJECT APPROVAL MARKET PLANNING AND INFORMATION DEPARTMENT",
+            "box": [
+                177,
+                117,
+                548,
+                180
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Date:",
+                    "box": [
+                        472,
+                        117,
+                        507,
+                        132
+                    ]
+                },
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        291,
+                        145,
+                        357,
+                        160
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        362,
+                        147,
+                        435,
+                        164
+                    ]
+                },
+                {
+                    "text": "MARKET",
+                    "box": [
+                        177,
+                        159,
+                        238,
+                        172
+                    ]
+                },
+                {
+                    "text": "PLANNING",
+                    "box": [
+                        239,
+                        162,
+                        314,
+                        173
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        314,
+                        162,
+                        346,
+                        176
+                    ]
+                },
+                {
+                    "text": "INFORMATION",
+                    "box": [
+                        351,
+                        163,
+                        447,
+                        180
+                    ]
+                },
+                {
+                    "text": "DEPARTMENT",
+                    "box": [
+                        454,
+                        163,
+                        548,
+                        178
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "Sales Analysis ☐",
+            "box": [
+                211,
+                177,
+                345,
+                199
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Sales",
+                    "box": [
+                        211,
+                        180,
+                        247,
+                        193
+                    ]
+                },
+                {
+                    "text": "Analysis",
+                    "box": [
+                        250,
+                        180,
+                        310,
+                        194
+                    ]
+                },
+                {
+                    "text": "☐",
+                    "box": [
+                        321,
+                        177,
+                        345,
+                        199
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "Consumor Research ☑",
+            "box": [
+                358,
+                180,
+                523,
+                200
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Consumor",
+                    "box": [
+                        358,
+                        182,
+                        426,
+                        196
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        429,
+                        183,
+                        495,
+                        198
+                    ]
+                },
+                {
+                    "text": "☑",
+                    "box": [
+                        501,
+                        180,
+                        523,
+                        200
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "Newport Lights",
+            "box": [
+                194,
+                214,
+                289,
+                229
+            ],
+            "linking": [
+                [
+                    32,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Newport",
+                    "box": [
+                        194,
+                        214,
+                        248,
+                        229
+                    ]
+                },
+                {
+                    "text": "Lights",
+                    "box": [
+                        250,
+                        216,
+                        289,
+                        227
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "Direct Mail Conversion Research",
+            "box": [
+                193,
+                229,
+                395,
+                246
+            ],
+            "linking": [
+                [
+                    32,
+                    31
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Direct",
+                    "box": [
+                        193,
+                        230,
+                        232,
+                        241
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        233,
+                        230,
+                        258,
+                        244
+                    ]
+                },
+                {
+                    "text": "Conversion",
+                    "box": [
+                        261,
+                        230,
+                        331,
+                        244
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        334,
+                        229,
+                        395,
+                        246
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "Project Title:",
+            "box": [
+                81,
+                229,
+                166,
+                244
+            ],
+            "linking": [
+                [
+                    32,
+                    31
+                ],
+                [
+                    32,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Project",
+                    "box": [
+                        81,
+                        229,
+                        126,
+                        244
+                    ]
+                },
+                {
+                    "text": "Title:",
+                    "box": [
+                        131,
+                        229,
+                        166,
+                        242
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "Lower Incidence",
+            "box": [
+                324,
+                251,
+                430,
+                267
+            ],
+            "linking": [
+                [
+                    4,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Lower",
+                    "box": [
+                        324,
+                        251,
+                        360,
+                        264
+                    ]
+                },
+                {
+                    "text": "Incidence",
+                    "box": [
+                        362,
+                        253,
+                        430,
+                        267
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "Marketing and or Research Objectives",
+            "box": [
+                80,
+                285,
+                331,
+                303
+            ],
+            "linking": [
+                [
+                    34,
+                    35
+                ],
+                [
+                    34,
+                    36
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Marketing",
+                    "box": [
+                        80,
+                        285,
+                        147,
+                        302
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        149,
+                        286,
+                        178,
+                        303
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        179,
+                        289,
+                        197,
+                        300
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        198,
+                        286,
+                        262,
+                        301
+                    ]
+                },
+                {
+                    "text": "Objectives",
+                    "box": [
+                        264,
+                        286,
+                        331,
+                        301
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "Determine the level of interest and conversion opportunities among pompotitive smokers. receiving a Direct Mail offer for Newport Lights.",
+            "box": [
+                78,
+                316,
+                618,
+                349
+            ],
+            "linking": [
+                [
+                    34,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Determine",
+                    "box": [
+                        78,
+                        317,
+                        139,
+                        331
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        142,
+                        316,
+                        166,
+                        331
+                    ]
+                },
+                {
+                    "text": "level",
+                    "box": [
+                        168,
+                        318,
+                        200,
+                        328
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        200,
+                        317,
+                        213,
+                        331
+                    ]
+                },
+                {
+                    "text": "interest",
+                    "box": [
+                        214,
+                        318,
+                        263,
+                        333
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        264,
+                        317,
+                        284,
+                        332
+                    ]
+                },
+                {
+                    "text": "conversion",
+                    "box": [
+                        291,
+                        320,
+                        355,
+                        333
+                    ]
+                },
+                {
+                    "text": "opportunities",
+                    "box": [
+                        359,
+                        320,
+                        440,
+                        334
+                    ]
+                },
+                {
+                    "text": "among",
+                    "box": [
+                        443,
+                        321,
+                        488,
+                        335
+                    ]
+                },
+                {
+                    "text": "pompotitive",
+                    "box": [
+                        492,
+                        323,
+                        560,
+                        336
+                    ]
+                },
+                {
+                    "text": "smokers.",
+                    "box": [
+                        564,
+                        321,
+                        618,
+                        335
+                    ]
+                },
+                {
+                    "text": "receiving",
+                    "box": [
+                        81,
+                        332,
+                        137,
+                        345
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        137,
+                        335,
+                        148,
+                        343
+                    ]
+                },
+                {
+                    "text": "Direct",
+                    "box": [
+                        149,
+                        334,
+                        185,
+                        344
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        189,
+                        332,
+                        216,
+                        346
+                    ]
+                },
+                {
+                    "text": "offer",
+                    "box": [
+                        216,
+                        334,
+                        243,
+                        347
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        243,
+                        334,
+                        265,
+                        345
+                    ]
+                },
+                {
+                    "text": "Newport",
+                    "box": [
+                        267,
+                        331,
+                        319,
+                        346
+                    ]
+                },
+                {
+                    "text": "Lights.",
+                    "box": [
+                        320,
+                        334,
+                        361,
+                        349
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "Provide insight into the reasons for offer acceptance or rejection of offer and examine consumer perceptions about Newport Lights.",
+            "box": [
+                78,
+                362,
+                594,
+                392
+            ],
+            "linking": [
+                [
+                    34,
+                    36
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Provide",
+                    "box": [
+                        80,
+                        362,
+                        127,
+                        376
+                    ]
+                },
+                {
+                    "text": "insight",
+                    "box": [
+                        128,
+                        362,
+                        171,
+                        377
+                    ]
+                },
+                {
+                    "text": "into",
+                    "box": [
+                        173,
+                        365,
+                        197,
+                        376
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        197,
+                        365,
+                        221,
+                        376
+                    ]
+                },
+                {
+                    "text": "reasons",
+                    "box": [
+                        222,
+                        365,
+                        271,
+                        376
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        272,
+                        366,
+                        292,
+                        376
+                    ]
+                },
+                {
+                    "text": "offer",
+                    "box": [
+                        295,
+                        366,
+                        322,
+                        376
+                    ]
+                },
+                {
+                    "text": "acceptance",
+                    "box": [
+                        324,
+                        366,
+                        395,
+                        379
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        397,
+                        367,
+                        414,
+                        378
+                    ]
+                },
+                {
+                    "text": "rejection",
+                    "box": [
+                        415,
+                        367,
+                        469,
+                        380
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        469,
+                        367,
+                        483,
+                        380
+                    ]
+                },
+                {
+                    "text": "offer",
+                    "box": [
+                        486,
+                        367,
+                        513,
+                        378
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        515,
+                        367,
+                        540,
+                        377
+                    ]
+                },
+                {
+                    "text": "examine",
+                    "box": [
+                        542,
+                        367,
+                        594,
+                        378
+                    ]
+                },
+                {
+                    "text": "consumer",
+                    "box": [
+                        78,
+                        380,
+                        142,
+                        391
+                    ]
+                },
+                {
+                    "text": "perceptions",
+                    "box": [
+                        144,
+                        378,
+                        218,
+                        392
+                    ]
+                },
+                {
+                    "text": "about",
+                    "box": [
+                        221,
+                        378,
+                        256,
+                        392
+                    ]
+                },
+                {
+                    "text": "Newport",
+                    "box": [
+                        258,
+                        380,
+                        311,
+                        391
+                    ]
+                },
+                {
+                    "text": "Lights.",
+                    "box": [
+                        313,
+                        380,
+                        354,
+                        391
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "Research Design",
+            "box": [
+                80,
+                398,
+                191,
+                411
+            ],
+            "linking": [
+                [
+                    37,
+                    38
+                ],
+                [
+                    37,
+                    39
+                ],
+                [
+                    37,
+                    40
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        80,
+                        398,
+                        140,
+                        409
+                    ]
+                },
+                {
+                    "text": "Design",
+                    "box": [
+                        145,
+                        398,
+                        191,
+                        411
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Interviews divided among 3 gorups:",
+            "box": [
+                78,
+                426,
+                296,
+                444
+            ],
+            "linking": [
+                [
+                    37,
+                    38
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Interviews",
+                    "box": [
+                        78,
+                        427,
+                        139,
+                        440
+                    ]
+                },
+                {
+                    "text": "divided",
+                    "box": [
+                        142,
+                        426,
+                        188,
+                        440
+                    ]
+                },
+                {
+                    "text": "among",
+                    "box": [
+                        190,
+                        429,
+                        233,
+                        444
+                    ]
+                },
+                {
+                    "text": "3",
+                    "box": [
+                        236,
+                        429,
+                        243,
+                        440
+                    ]
+                },
+                {
+                    "text": "gorups:",
+                    "box": [
+                        247,
+                        429,
+                        296,
+                        444
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Group 1= Best redeeming customers (2+ paid coupons): n= 750 Group 2= Paid redeoming customers 1 paid coupon) n= 750 Group 3= Non- redeeming customers (no redemption) n= 750",
+            "box": [
+                140,
+                458,
+                533,
+                506
+            ],
+            "linking": [
+                [
+                    37,
+                    39
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Group",
+                    "box": [
+                        145,
+                        458,
+                        180,
+                        471
+                    ]
+                },
+                {
+                    "text": "1=",
+                    "box": [
+                        184,
+                        459,
+                        204,
+                        470
+                    ]
+                },
+                {
+                    "text": "Best",
+                    "box": [
+                        205,
+                        459,
+                        230,
+                        472
+                    ]
+                },
+                {
+                    "text": "redeeming",
+                    "box": [
+                        236,
+                        462,
+                        302,
+                        475
+                    ]
+                },
+                {
+                    "text": "customers",
+                    "box": [
+                        304,
+                        462,
+                        365,
+                        475
+                    ]
+                },
+                {
+                    "text": "(2+",
+                    "box": [
+                        369,
+                        461,
+                        391,
+                        475
+                    ]
+                },
+                {
+                    "text": "paid",
+                    "box": [
+                        397,
+                        461,
+                        424,
+                        474
+                    ]
+                },
+                {
+                    "text": "coupons):",
+                    "box": [
+                        427,
+                        465,
+                        490,
+                        476
+                    ]
+                },
+                {
+                    "text": "n=",
+                    "box": [
+                        490,
+                        462,
+                        505,
+                        475
+                    ]
+                },
+                {
+                    "text": "750",
+                    "box": [
+                        508,
+                        459,
+                        533,
+                        477
+                    ]
+                },
+                {
+                    "text": "Group",
+                    "box": [
+                        142,
+                        473,
+                        181,
+                        487
+                    ]
+                },
+                {
+                    "text": "2=",
+                    "box": [
+                        184,
+                        476,
+                        204,
+                        489
+                    ]
+                },
+                {
+                    "text": "Paid",
+                    "box": [
+                        203,
+                        476,
+                        234,
+                        486
+                    ]
+                },
+                {
+                    "text": "redeoming",
+                    "box": [
+                        239,
+                        476,
+                        300,
+                        489
+                    ]
+                },
+                {
+                    "text": "customers",
+                    "box": [
+                        304,
+                        476,
+                        368,
+                        491
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        369,
+                        479,
+                        382,
+                        490
+                    ]
+                },
+                {
+                    "text": "paid",
+                    "box": [
+                        385,
+                        478,
+                        410,
+                        488
+                    ]
+                },
+                {
+                    "text": "coupon)",
+                    "box": [
+                        418,
+                        479,
+                        475,
+                        490
+                    ]
+                },
+                {
+                    "text": "n=",
+                    "box": [
+                        479,
+                        479,
+                        496,
+                        489
+                    ]
+                },
+                {
+                    "text": "750",
+                    "box": [
+                        499,
+                        479,
+                        520,
+                        490
+                    ]
+                },
+                {
+                    "text": "Group",
+                    "box": [
+                        140,
+                        489,
+                        182,
+                        504
+                    ]
+                },
+                {
+                    "text": "3=",
+                    "box": [
+                        184,
+                        492,
+                        205,
+                        506
+                    ]
+                },
+                {
+                    "text": "Non-",
+                    "box": [
+                        204,
+                        489,
+                        238,
+                        502
+                    ]
+                },
+                {
+                    "text": "redeeming",
+                    "box": [
+                        240,
+                        490,
+                        304,
+                        504
+                    ]
+                },
+                {
+                    "text": "customers",
+                    "box": [
+                        307,
+                        493,
+                        373,
+                        504
+                    ]
+                },
+                {
+                    "text": "(no",
+                    "box": [
+                        376,
+                        493,
+                        397,
+                        504
+                    ]
+                },
+                {
+                    "text": "redemption)",
+                    "box": [
+                        401,
+                        492,
+                        478,
+                        506
+                    ]
+                },
+                {
+                    "text": "n=",
+                    "box": [
+                        478,
+                        493,
+                        496,
+                        504
+                    ]
+                },
+                {
+                    "text": "750",
+                    "box": [
+                        496,
+                        493,
+                        525,
+                        506
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "The total sample size is 2,250. All smokers 21+ years of age.",
+            "box": [
+                78,
+                515,
+                451,
+                535
+            ],
+            "linking": [
+                [
+                    37,
+                    40
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        78,
+                        515,
+                        103,
+                        529
+                    ]
+                },
+                {
+                    "text": "total",
+                    "box": [
+                        105,
+                        515,
+                        134,
+                        529
+                    ]
+                },
+                {
+                    "text": "sample",
+                    "box": [
+                        137,
+                        518,
+                        180,
+                        531
+                    ]
+                },
+                {
+                    "text": "size",
+                    "box": [
+                        182,
+                        518,
+                        207,
+                        531
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        207,
+                        520,
+                        221,
+                        530
+                    ]
+                },
+                {
+                    "text": "2,250.",
+                    "box": [
+                        221,
+                        520,
+                        255,
+                        533
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        263,
+                        518,
+                        281,
+                        532
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        285,
+                        520,
+                        337,
+                        533
+                    ]
+                },
+                {
+                    "text": "21+",
+                    "box": [
+                        339,
+                        521,
+                        364,
+                        534
+                    ]
+                },
+                {
+                    "text": "years",
+                    "box": [
+                        367,
+                        521,
+                        402,
+                        535
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        405,
+                        521,
+                        420,
+                        532
+                    ]
+                },
+                {
+                    "text": "age.",
+                    "box": [
+                        422,
+                        522,
+                        451,
+                        535
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "Respondent Incidence:",
+            "box": [
+                71,
+                578,
+                157,
+                615
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Respondent",
+                    "box": [
+                        77,
+                        578,
+                        157,
+                        596
+                    ]
+                },
+                {
+                    "text": "Incidence:",
+                    "box": [
+                        71,
+                        595,
+                        148,
+                        615
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "38% revised from 70%",
+            "box": [
+                168,
+                596,
+                250,
+                629
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "38%",
+                    "box": [
+                        168,
+                        596,
+                        200,
+                        610
+                    ]
+                },
+                {
+                    "text": "revised",
+                    "box": [
+                        204,
+                        596,
+                        250,
+                        610
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        170,
+                        615,
+                        201,
+                        629
+                    ]
+                },
+                {
+                    "text": "70%",
+                    "box": [
+                        205,
+                        616,
+                        232,
+                        627
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "Interview Length:",
+            "box": [
+                332,
+                587,
+                398,
+                615
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Interview",
+                    "box": [
+                        335,
+                        587,
+                        398,
+                        597
+                    ]
+                },
+                {
+                    "text": "Length:",
+                    "box": [
+                        332,
+                        601,
+                        386,
+                        615
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Screener Questionnaire",
+            "box": [
+                413,
+                584,
+                513,
+                617
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ],
+                [
+                    44,
+                    46
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Screener",
+                    "box": [
+                        413,
+                        584,
+                        480,
+                        599
+                    ]
+                },
+                {
+                    "text": "Questionnaire",
+                    "box": [
+                        418,
+                        603,
+                        513,
+                        617
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "5 minutes",
+            "box": [
+                568,
+                588,
+                634,
+                600
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "5",
+                    "box": [
+                        568,
+                        588,
+                        581,
+                        599
+                    ]
+                },
+                {
+                    "text": "minutes",
+                    "box": [
+                        585,
+                        589,
+                        634,
+                        600
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "10 minutes",
+            "box": [
+                564,
+                605,
+                632,
+                616
+            ],
+            "linking": [
+                [
+                    44,
+                    46
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "10",
+                    "box": [
+                        564,
+                        605,
+                        579,
+                        616
+                    ]
+                },
+                {
+                    "text": "minutes",
+                    "box": [
+                        582,
+                        605,
+                        632,
+                        615
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "Research Firm:",
+            "box": [
+                77,
+                642,
+                178,
+                656
+            ],
+            "linking": [
+                [
+                    47,
+                    64
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        77,
+                        642,
+                        136,
+                        656
+                    ]
+                },
+                {
+                    "text": "Firm:",
+                    "box": [
+                        140,
+                        642,
+                        178,
+                        656
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "Cost Estimate:",
+            "box": [
+                77,
+                675,
+                175,
+                692
+            ],
+            "linking": [
+                [
+                    48,
+                    52
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cost",
+                    "box": [
+                        77,
+                        677,
+                        108,
+                        690
+                    ]
+                },
+                {
+                    "text": "Estimate:",
+                    "box": [
+                        112,
+                        675,
+                        175,
+                        692
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "Revised From:",
+            "box": [
+                73,
+                708,
+                174,
+                723
+            ],
+            "linking": [
+                [
+                    49,
+                    53
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Revised",
+                    "box": [
+                        73,
+                        708,
+                        127,
+                        721
+                    ]
+                },
+                {
+                    "text": "From:",
+                    "box": [
+                        128,
+                        708,
+                        174,
+                        723
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "Prepared by",
+            "box": [
+                74,
+                754,
+                162,
+                771
+            ],
+            "linking": [
+                [
+                    50,
+                    54
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Prepared",
+                    "box": [
+                        74,
+                        754,
+                        134,
+                        771
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        138,
+                        756,
+                        162,
+                        770
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "Approved by:",
+            "box": [
+                70,
+                785,
+                162,
+                803
+            ],
+            "linking": [
+                [
+                    51,
+                    55
+                ],
+                [
+                    51,
+                    17
+                ],
+                [
+                    51,
+                    57
+                ],
+                [
+                    51,
+                    56
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Approved",
+                    "box": [
+                        70,
+                        788,
+                        138,
+                        801
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        141,
+                        785,
+                        162,
+                        803
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "$100 600",
+            "box": [
+                204,
+                677,
+                263,
+                692
+            ],
+            "linking": [
+                [
+                    48,
+                    52
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$100",
+                    "box": [
+                        204,
+                        677,
+                        235,
+                        692
+                    ]
+                },
+                {
+                    "text": "600",
+                    "box": [
+                        236,
+                        677,
+                        263,
+                        692
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "$76 600",
+            "box": [
+                205,
+                708,
+                254,
+                722
+            ],
+            "linking": [
+                [
+                    49,
+                    53
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$76",
+                    "box": [
+                        205,
+                        708,
+                        226,
+                        722
+                    ]
+                },
+                {
+                    "text": "600",
+                    "box": [
+                        225,
+                        709,
+                        254,
+                        722
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "S. R. Benson ",
+            "box": [
+                201,
+                736,
+                380,
+                790
+            ],
+            "linking": [
+                [
+                    50,
+                    54
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "S.",
+                    "box": [
+                        201,
+                        756,
+                        218,
+                        773
+                    ]
+                },
+                {
+                    "text": "R.",
+                    "box": [
+                        221,
+                        757,
+                        235,
+                        774
+                    ]
+                },
+                {
+                    "text": "Benson",
+                    "box": [
+                        237,
+                        757,
+                        287,
+                        775
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        281,
+                        736,
+                        380,
+                        790
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "Group Manager",
+            "box": [
+                187,
+                803,
+                290,
+                815
+            ],
+            "linking": [
+                [
+                    51,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Group",
+                    "box": [
+                        187,
+                        804,
+                        230,
+                        815
+                    ]
+                },
+                {
+                    "text": "Manager",
+                    "box": [
+                        236,
+                        803,
+                        290,
+                        814
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "Group Product Manager",
+            "box": [
+                187,
+                895,
+                352,
+                912
+            ],
+            "linking": [
+                [
+                    51,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Group",
+                    "box": [
+                        187,
+                        895,
+                        228,
+                        912
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        232,
+                        895,
+                        285,
+                        910
+                    ]
+                },
+                {
+                    "text": "Manager",
+                    "box": [
+                        289,
+                        897,
+                        352,
+                        910
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "Product Manager",
+            "box": [
+                184,
+                865,
+                303,
+                880
+            ],
+            "linking": [
+                [
+                    51,
+                    57
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Product",
+                    "box": [
+                        184,
+                        865,
+                        238,
+                        879
+                    ]
+                },
+                {
+                    "text": "Manager",
+                    "box": [
+                        243,
+                        867,
+                        303,
+                        880
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "Start Field w/o 11 /13 /95",
+            "box": [
+                398,
+                821,
+                545,
+                837
+            ],
+            "linking": [
+                [
+                    63,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Start",
+                    "box": [
+                        398,
+                        823,
+                        427,
+                        836
+                    ]
+                },
+                {
+                    "text": "Field",
+                    "box": [
+                        430,
+                        821,
+                        461,
+                        835
+                    ]
+                },
+                {
+                    "text": "w/o",
+                    "box": [
+                        464,
+                        823,
+                        489,
+                        837
+                    ]
+                },
+                {
+                    "text": "11",
+                    "box": [
+                        492,
+                        821,
+                        503,
+                        836
+                    ]
+                },
+                {
+                    "text": "/13",
+                    "box": [
+                        504,
+                        823,
+                        524,
+                        837
+                    ]
+                },
+                {
+                    "text": "/95",
+                    "box": [
+                        524,
+                        824,
+                        545,
+                        835
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "Reporting Schedule:",
+            "box": [
+                388,
+                852,
+                537,
+                866
+            ],
+            "linking": [
+                [
+                    59,
+                    60
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Reporting",
+                    "box": [
+                        388,
+                        852,
+                        462,
+                        866
+                    ]
+                },
+                {
+                    "text": "Schedule:",
+                    "box": [
+                        466,
+                        853,
+                        537,
+                        866
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "Topline w/o 12 /18 /95 Final Report 12/ 31/ 95",
+            "box": [
+                397,
+                881,
+                528,
+                914
+            ],
+            "linking": [
+                [
+                    59,
+                    60
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Topline",
+                    "box": [
+                        398,
+                        883,
+                        443,
+                        897
+                    ]
+                },
+                {
+                    "text": "w/o",
+                    "box": [
+                        447,
+                        883,
+                        471,
+                        896
+                    ]
+                },
+                {
+                    "text": "12",
+                    "box": [
+                        472,
+                        881,
+                        486,
+                        898
+                    ]
+                },
+                {
+                    "text": "/18",
+                    "box": [
+                        489,
+                        884,
+                        506,
+                        894
+                    ]
+                },
+                {
+                    "text": "/95",
+                    "box": [
+                        506,
+                        883,
+                        526,
+                        897
+                    ]
+                },
+                {
+                    "text": "Final",
+                    "box": [
+                        397,
+                        899,
+                        428,
+                        910
+                    ]
+                },
+                {
+                    "text": "Report",
+                    "box": [
+                        432,
+                        901,
+                        474,
+                        914
+                    ]
+                },
+                {
+                    "text": "12/",
+                    "box": [
+                        476,
+                        898,
+                        490,
+                        912
+                    ]
+                },
+                {
+                    "text": "31/",
+                    "box": [
+                        489,
+                        899,
+                        510,
+                        910
+                    ]
+                },
+                {
+                    "text": "95",
+                    "box": [
+                        508,
+                        899,
+                        528,
+                        912
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "$100 600",
+            "box": [
+                577,
+                742,
+                635,
+                759
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "$100",
+                    "box": [
+                        577,
+                        742,
+                        606,
+                        757
+                    ]
+                },
+                {
+                    "text": "600",
+                    "box": [
+                        608,
+                        746,
+                        635,
+                        759
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "Revised Costs (if any)",
+            "box": [
+                398,
+                761,
+                560,
+                779
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        398,
+                        761,
+                        409,
+                        774
+                    ]
+                },
+                {
+                    "text": "Revised",
+                    "box": [
+                        408,
+                        761,
+                        464,
+                        775
+                    ]
+                },
+                {
+                    "text": "Costs",
+                    "box": [
+                        466,
+                        761,
+                        505,
+                        775
+                    ]
+                },
+                {
+                    "text": "(if any)",
+                    "box": [
+                        508,
+                        761,
+                        560,
+                        779
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "Fieldwork Schedule:",
+            "box": [
+                397,
+                788,
+                532,
+                806
+            ],
+            "linking": [
+                [
+                    63,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Fieldwork",
+                    "box": [
+                        397,
+                        788,
+                        464,
+                        806
+                    ]
+                },
+                {
+                    "text": "Schedule:",
+                    "box": [
+                        468,
+                        789,
+                        532,
+                        803
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "A & G Research",
+            "box": [
+                204,
+                642,
+                295,
+                659
+            ],
+            "linking": [
+                [
+                    47,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "A",
+                    "box": [
+                        204,
+                        642,
+                        214,
+                        657
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        216,
+                        642,
+                        224,
+                        659
+                    ]
+                },
+                {
+                    "text": "G",
+                    "box": [
+                        226,
+                        644,
+                        237,
+                        657
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        239,
+                        644,
+                        295,
+                        659
+                    ]
+                }
+            ],
+            "id": 64
+        }
+    ]
+}

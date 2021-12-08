@@ -1,0 +1,4167 @@
+{
+    "form": [
+        {
+            "box": [
+                76,
+                129,
+                118,
+                139
+            ],
+            "text": "Brand:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        76,
+                        129,
+                        118,
+                        139
+                    ],
+                    "text": "Brand:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    2
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                73,
+                141,
+                119,
+                153
+            ],
+            "text": "Style:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        73,
+                        141,
+                        119,
+                        153
+                    ],
+                    "text": "Style:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    36
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                145,
+                127,
+                197,
+                137
+            ],
+            "text": "PHOENIX",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        145,
+                        127,
+                        197,
+                        137
+                    ],
+                    "text": "PHOENIX"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                349,
+                130,
+                409,
+                139
+            ],
+            "text": "Company:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        130,
+                        409,
+                        139
+                    ],
+                    "text": "Company:"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    37
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                350,
+                142,
+                407,
+                155
+            ],
+            "text": "Country:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        350,
+                        142,
+                        407,
+                        155
+                    ],
+                    "text": "Country:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    6
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                350,
+                157,
+                402,
+                167
+            ],
+            "text": "Macket:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        350,
+                        157,
+                        402,
+                        167
+                    ],
+                    "text": "Macket:"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                419,
+                144,
+                467,
+                154
+            ],
+            "text": "CYPRUS",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        419,
+                        144,
+                        467,
+                        154
+                    ],
+                    "text": "CYPRUS"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                512,
+                171,
+                567,
+                183
+            ],
+            "text": "NICOSIA",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        512,
+                        171,
+                        567,
+                        183
+                    ],
+                    "text": "NICOSIA"
+                }
+            ],
+            "linking": [
+                [
+                    38,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                404,
+                240,
+                461,
+                255
+            ],
+            "text": "Weights",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        404,
+                        240,
+                        461,
+                        255
+                    ],
+                    "text": "Weights"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    66
+                ],
+                [
+                    8,
+                    71
+                ],
+                [
+                    8,
+                    70
+                ],
+                [
+                    40,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                377,
+                475,
+                441,
+                487
+            ],
+            "text": "Adhesive:",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        475,
+                        441,
+                        487
+                    ],
+                    "text": "Adhesive:"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    85
+                ],
+                [
+                    9,
+                    86
+                ],
+                [
+                    9,
+                    18
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                70,
+                488,
+                151,
+                498
+            ],
+            "text": "Supplier(s)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        70,
+                        488,
+                        151,
+                        498
+                    ],
+                    "text": "Supplier(s)"
+                }
+            ],
+            "linking": [
+                [
+                    73,
+                    10
+                ],
+                [
+                    10,
+                    14
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                72,
+                513,
+                109,
+                525
+            ],
+            "text": "Color",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        72,
+                        513,
+                        109,
+                        525
+                    ],
+                    "text": "Color"
+                }
+            ],
+            "linking": [
+                [
+                    73,
+                    11
+                ],
+                [
+                    11,
+                    75
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                72,
+                557,
+                135,
+                569
+            ],
+            "text": "Porosity",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        72,
+                        557,
+                        135,
+                        569
+                    ],
+                    "text": "Porosity"
+                }
+            ],
+            "linking": [
+                [
+                    73,
+                    12
+                ],
+                [
+                    12,
+                    17
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                73,
+                609,
+                140,
+                621
+            ],
+            "text": "substance",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        73,
+                        609,
+                        140,
+                        621
+                    ],
+                    "text": "substance"
+                }
+            ],
+            "linking": [
+                [
+                    73,
+                    13
+                ],
+                [
+                    13,
+                    81
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                234,
+                488,
+                285,
+                500
+            ],
+            "text": "Ecusta",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        234,
+                        488,
+                        285,
+                        500
+                    ],
+                    "text": "Ecusta"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                235,
+                501,
+                287,
+                514
+            ],
+            "text": "E.30639",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        235,
+                        501,
+                        287,
+                        514
+                    ],
+                    "text": "E.30639"
+                }
+            ],
+            "linking": [
+                [
+                    74,
+                    15
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                228,
+                543,
+                259,
+                555
+            ],
+            "text": "None",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        228,
+                        543,
+                        259,
+                        555
+                    ],
+                    "text": "None"
+                }
+            ],
+            "linking": [
+                [
+                    76,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                293,
+                558,
+                356,
+                567
+            ],
+            "text": "(coresta)",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        293,
+                        558,
+                        356,
+                        567
+                    ],
+                    "text": "(coresta)"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                377,
+                515,
+                407,
+                527
+            ],
+            "text": "Type",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        515,
+                        407,
+                        527
+                    ],
+                    "text": "Type"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    18
+                ],
+                [
+                    18,
+                    88
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                377,
+                558,
+                428,
+                568
+            ],
+            "text": "Overall",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        558,
+                        428,
+                        568
+                    ],
+                    "text": "Overall"
+                }
+            ],
+            "linking": [
+                [
+                    89,
+                    19
+                ],
+                [
+                    19,
+                    26
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                475,
+                558,
+                508,
+                570
+            ],
+            "text": "skip",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        475,
+                        558,
+                        508,
+                        570
+                    ],
+                    "text": "skip"
+                }
+            ],
+            "linking": [
+                [
+                    89,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                377,
+                599,
+                443,
+                609
+            ],
+            "text": "Dimension",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        599,
+                        443,
+                        609
+                    ],
+                    "text": "Dimension"
+                }
+            ],
+            "linking": [
+                [
+                    21,
+                    92
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                377,
+                614,
+                458,
+                624
+            ],
+            "text": "Positioning",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        614,
+                        458,
+                        624
+                    ],
+                    "text": "Positioning"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    91
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                476,
+                488,
+                515,
+                500
+            ],
+            "text": "Swift",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        476,
+                        488,
+                        515,
+                        500
+                    ],
+                    "text": "Swift"
+                }
+            ],
+            "linking": [
+                [
+                    85,
+                    23
+                ]
+            ],
+            "id": 23
+        },
+        {
+            "box": [
+                554,
+                558,
+                591,
+                567
+            ],
+            "text": "Other",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        554,
+                        558,
+                        591,
+                        567
+                    ],
+                    "text": "Other"
+                }
+            ],
+            "linking": [],
+            "id": 24
+        },
+        {
+            "box": [
+                494,
+                587,
+                522,
+                596
+            ],
+            "text": "N/A",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        494,
+                        587,
+                        522,
+                        596
+                    ],
+                    "text": "N/A"
+                }
+            ],
+            "linking": [
+                [
+                    90,
+                    25
+                ]
+            ],
+            "id": 25
+        },
+        {
+            "box": [
+                448,
+                558,
+                457,
+                567
+            ],
+            "text": "x",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        448,
+                        558,
+                        457,
+                        567
+                    ],
+                    "text": "x"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    26
+                ]
+            ],
+            "id": 26
+        },
+        {
+            "box": [
+                299,
+                683,
+                336,
+                693
+            ],
+            "text": "Date:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        299,
+                        683,
+                        336,
+                        693
+                    ],
+                    "text": "Date:"
+                }
+            ],
+            "linking": [
+                [
+                    27,
+                    95
+                ]
+            ],
+            "id": 27
+        },
+        {
+            "box": [
+                299,
+                778,
+                333,
+                788
+            ],
+            "text": "Date:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        299,
+                        778,
+                        333,
+                        788
+                    ],
+                    "text": "Date:"
+                }
+            ],
+            "linking": [
+                [
+                    28,
+                    99
+                ]
+            ],
+            "id": 28
+        },
+        {
+            "box": [
+                533,
+                829,
+                653,
+                853
+            ],
+            "text": "620419245",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        533,
+                        829,
+                        653,
+                        853
+                    ],
+                    "text": "620419245"
+                }
+            ],
+            "linking": [],
+            "id": 29
+        },
+        {
+            "box": [
+                72,
+                750,
+                108,
+                762
+            ],
+            "text": "Date:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        72,
+                        750,
+                        108,
+                        762
+                    ],
+                    "text": "Date:"
+                }
+            ],
+            "linking": [
+                [
+                    30,
+                    98
+                ]
+            ],
+            "id": 30
+        },
+        {
+            "box": [
+                73,
+                777,
+                137,
+                789
+            ],
+            "text": "Replaces:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        73,
+                        777,
+                        137,
+                        789
+                    ],
+                    "text": "Replaces:"
+                }
+            ],
+            "linking": [
+                [
+                    31,
+                    33
+                ]
+            ],
+            "id": 31
+        },
+        {
+            "box": [
+                72,
+                804,
+                111,
+                816
+            ],
+            "text": "05045",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        72,
+                        804,
+                        111,
+                        816
+                    ],
+                    "text": "05045"
+                }
+            ],
+            "linking": [],
+            "id": 32
+        },
+        {
+            "box": [
+                165,
+                777,
+                192,
+                789
+            ],
+            "text": "New",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        165,
+                        777,
+                        192,
+                        789
+                    ],
+                    "text": "New"
+                }
+            ],
+            "linking": [
+                [
+                    31,
+                    33
+                ]
+            ],
+            "id": 33
+        },
+        {
+            "text": "Page 1 of 10",
+            "box": [
+                527,
+                33,
+                618,
+                48
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Page",
+                    "box": [
+                        527,
+                        33,
+                        557,
+                        46
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        564,
+                        33,
+                        574,
+                        46
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        578,
+                        33,
+                        597,
+                        48
+                    ]
+                },
+                {
+                    "text": "10",
+                    "box": [
+                        600,
+                        34,
+                        618,
+                        46
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "RESTRICTED BROWN & WILLIAMSON INTERNATIONAL TOBACCO PRODUCT SPECIFICATION",
+            "box": [
+                210,
+                45,
+                497,
+                113
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "RESTRICTED",
+                    "box": [
+                        286,
+                        45,
+                        424,
+                        60
+                    ]
+                },
+                {
+                    "text": "BROWN",
+                    "box": [
+                        210,
+                        70,
+                        246,
+                        85
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        251,
+                        72,
+                        260,
+                        85
+                    ]
+                },
+                {
+                    "text": "WILLIAMSON",
+                    "box": [
+                        266,
+                        72,
+                        339,
+                        87
+                    ]
+                },
+                {
+                    "text": "INTERNATIONAL",
+                    "box": [
+                        341,
+                        75,
+                        437,
+                        87
+                    ]
+                },
+                {
+                    "text": "TOBACCO",
+                    "box": [
+                        439,
+                        73,
+                        497,
+                        86
+                    ]
+                },
+                {
+                    "text": "PRODUCT",
+                    "box": [
+                        275,
+                        100,
+                        326,
+                        113
+                    ]
+                },
+                {
+                    "text": "SPECIFICATION",
+                    "box": [
+                        332,
+                        102,
+                        428,
+                        112
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "HLB- KS",
+            "box": [
+                145,
+                141,
+                208,
+                154
+            ],
+            "linking": [
+                [
+                    1,
+                    36
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "HLB-",
+                    "box": [
+                        145,
+                        142,
+                        185,
+                        154
+                    ]
+                },
+                {
+                    "text": "KS",
+                    "box": [
+                        184,
+                        141,
+                        208,
+                        154
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "B. A. T. CYPRUS",
+            "box": [
+                419,
+                129,
+                518,
+                144
+            ],
+            "linking": [
+                [
+                    3,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "B.",
+                    "box": [
+                        419,
+                        129,
+                        434,
+                        144
+                    ]
+                },
+                {
+                    "text": "A.",
+                    "box": [
+                        436,
+                        130,
+                        449,
+                        140
+                    ]
+                },
+                {
+                    "text": "T.",
+                    "box": [
+                        449,
+                        129,
+                        465,
+                        142
+                    ]
+                },
+                {
+                    "text": "CYPRUS",
+                    "box": [
+                        470,
+                        129,
+                        518,
+                        139
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Place of Manufacture:",
+            "box": [
+                349,
+                169,
+                500,
+                182
+            ],
+            "linking": [
+                [
+                    38,
+                    7
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Place",
+                    "box": [
+                        349,
+                        171,
+                        389,
+                        181
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        392,
+                        169,
+                        408,
+                        182
+                    ]
+                },
+                {
+                    "text": "Manufacture:",
+                    "box": [
+                        413,
+                        172,
+                        500,
+                        182
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Licensee Ref. NO.:",
+            "box": [
+                75,
+                156,
+                202,
+                168
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Licensee",
+                    "box": [
+                        75,
+                        156,
+                        136,
+                        168
+                    ]
+                },
+                {
+                    "text": "Ref.",
+                    "box": [
+                        135,
+                        156,
+                        168,
+                        166
+                    ]
+                },
+                {
+                    "text": "NO.:",
+                    "box": [
+                        175,
+                        156,
+                        202,
+                        166
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "CIGARETTE MAKING",
+            "box": [
+                73,
+                211,
+                191,
+                225
+            ],
+            "linking": [
+                [
+                    40,
+                    41
+                ],
+                [
+                    40,
+                    8
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "CIGARETTE",
+                    "box": [
+                        73,
+                        213,
+                        142,
+                        225
+                    ]
+                },
+                {
+                    "text": "MAKING",
+                    "box": [
+                        145,
+                        211,
+                        191,
+                        223
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "Physical Characteristics",
+            "box": [
+                73,
+                240,
+                247,
+                253
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ],
+                [
+                    41,
+                    43
+                ],
+                [
+                    41,
+                    45
+                ],
+                [
+                    41,
+                    44
+                ],
+                [
+                    41,
+                    46
+                ],
+                [
+                    41,
+                    47
+                ],
+                [
+                    41,
+                    48
+                ],
+                [
+                    41,
+                    49
+                ],
+                [
+                    41,
+                    50
+                ],
+                [
+                    41,
+                    51
+                ],
+                [
+                    41,
+                    52
+                ],
+                [
+                    41,
+                    53
+                ],
+                [
+                    40,
+                    41
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Physical",
+                    "box": [
+                        73,
+                        240,
+                        133,
+                        250
+                    ]
+                },
+                {
+                    "text": "Characteristics",
+                    "box": [
+                        133,
+                        241,
+                        247,
+                        253
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "Overall Cigarette Length",
+            "box": [
+                73,
+                266,
+                249,
+                280
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ],
+                [
+                    42,
+                    54
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Overall",
+                    "box": [
+                        73,
+                        266,
+                        127,
+                        276
+                    ]
+                },
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        132,
+                        266,
+                        199,
+                        278
+                    ]
+                },
+                {
+                    "text": "Length",
+                    "box": [
+                        198,
+                        268,
+                        249,
+                        280
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "Tobacco Rod Length",
+            "box": [
+                72,
+                280,
+                203,
+                291
+            ],
+            "linking": [
+                [
+                    41,
+                    43
+                ],
+                [
+                    43,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        72,
+                        280,
+                        127,
+                        289
+                    ]
+                },
+                {
+                    "text": "Rod",
+                    "box": [
+                        129,
+                        280,
+                        156,
+                        290
+                    ]
+                },
+                {
+                    "text": "Length",
+                    "box": [
+                        154,
+                        281,
+                        203,
+                        291
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Filter Plug Length",
+            "box": [
+                72,
+                295,
+                203,
+                305
+            ],
+            "linking": [
+                [
+                    41,
+                    44
+                ],
+                [
+                    44,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Filter",
+                    "box": [
+                        72,
+                        296,
+                        120,
+                        305
+                    ]
+                },
+                {
+                    "text": "Plug",
+                    "box": [
+                        123,
+                        295,
+                        154,
+                        305
+                    ]
+                },
+                {
+                    "text": "Length",
+                    "box": [
+                        157,
+                        295,
+                        203,
+                        305
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "Filter Plug Pressure Drop (unencap.)",
+            "box": [
+                73,
+                305,
+                329,
+                320
+            ],
+            "linking": [
+                [
+                    41,
+                    45
+                ],
+                [
+                    45,
+                    57
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Filter",
+                    "box": [
+                        73,
+                        308,
+                        118,
+                        317
+                    ]
+                },
+                {
+                    "text": "Plug",
+                    "box": [
+                        120,
+                        308,
+                        156,
+                        317
+                    ]
+                },
+                {
+                    "text": "Pressure",
+                    "box": [
+                        156,
+                        305,
+                        220,
+                        317
+                    ]
+                },
+                {
+                    "text": "Drop",
+                    "box": [
+                        222,
+                        310,
+                        255,
+                        319
+                    ]
+                },
+                {
+                    "text": "(unencap.)",
+                    "box": [
+                        259,
+                        308,
+                        329,
+                        320
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "Filter Plug Pressure Drop encap.",
+            "box": [
+                72,
+                320,
+                317,
+                332
+            ],
+            "linking": [
+                [
+                    41,
+                    46
+                ],
+                [
+                    46,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Filter",
+                    "box": [
+                        72,
+                        322,
+                        118,
+                        332
+                    ]
+                },
+                {
+                    "text": "Plug",
+                    "box": [
+                        123,
+                        320,
+                        154,
+                        330
+                    ]
+                },
+                {
+                    "text": "Pressure",
+                    "box": [
+                        157,
+                        320,
+                        220,
+                        330
+                    ]
+                },
+                {
+                    "text": "Drop",
+                    "box": [
+                        225,
+                        322,
+                        255,
+                        332
+                    ]
+                },
+                {
+                    "text": "encap.",
+                    "box": [
+                        257,
+                        323,
+                        317,
+                        332
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "Cigarette Circumference",
+            "box": [
+                70,
+                334,
+                240,
+                346
+            ],
+            "linking": [
+                [
+                    41,
+                    47
+                ],
+                [
+                    47,
+                    59
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        70,
+                        337,
+                        140,
+                        346
+                    ]
+                },
+                {
+                    "text": "Circumference",
+                    "box": [
+                        144,
+                        334,
+                        240,
+                        346
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "Total Pressure Drop (unencap.)",
+            "box": [
+                72,
+                347,
+                287,
+                361
+            ],
+            "linking": [
+                [
+                    41,
+                    48
+                ],
+                [
+                    48,
+                    60
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Total",
+                    "box": [
+                        72,
+                        347,
+                        109,
+                        357
+                    ]
+                },
+                {
+                    "text": "Pressure",
+                    "box": [
+                        115,
+                        349,
+                        175,
+                        361
+                    ]
+                },
+                {
+                    "text": "Drop",
+                    "box": [
+                        177,
+                        350,
+                        213,
+                        360
+                    ]
+                },
+                {
+                    "text": "(unencap.)",
+                    "box": [
+                        214,
+                        350,
+                        287,
+                        360
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "Total Pressure Drop (encap.)",
+            "box": [
+                73,
+                362,
+                274,
+                374
+            ],
+            "linking": [
+                [
+                    41,
+                    49
+                ],
+                [
+                    49,
+                    61
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Total",
+                    "box": [
+                        73,
+                        362,
+                        110,
+                        372
+                    ]
+                },
+                {
+                    "text": "Pressure",
+                    "box": [
+                        115,
+                        364,
+                        175,
+                        374
+                    ]
+                },
+                {
+                    "text": "Drop",
+                    "box": [
+                        178,
+                        364,
+                        211,
+                        374
+                    ]
+                },
+                {
+                    "text": "(encap.)",
+                    "box": [
+                        216,
+                        364,
+                        274,
+                        374
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "Tipping Length",
+            "box": [
+                67,
+                377,
+                175,
+                387
+            ],
+            "linking": [
+                [
+                    41,
+                    50
+                ],
+                [
+                    50,
+                    62
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tipping",
+                    "box": [
+                        67,
+                        377,
+                        125,
+                        387
+                    ]
+                },
+                {
+                    "text": "Length",
+                    "box": [
+                        130,
+                        377,
+                        175,
+                        386
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "Print Position (from filter end)",
+            "box": [
+                72,
+                391,
+                300,
+                402
+            ],
+            "linking": [
+                [
+                    41,
+                    51
+                ],
+                [
+                    51,
+                    63
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Print",
+                    "box": [
+                        72,
+                        391,
+                        111,
+                        401
+                    ]
+                },
+                {
+                    "text": "Position",
+                    "box": [
+                        114,
+                        391,
+                        178,
+                        401
+                    ]
+                },
+                {
+                    "text": "(from",
+                    "box": [
+                        178,
+                        391,
+                        218,
+                        401
+                    ]
+                },
+                {
+                    "text": "filter",
+                    "box": [
+                        222,
+                        392,
+                        268,
+                        402
+                    ]
+                },
+                {
+                    "text": "end)",
+                    "box": [
+                        269,
+                        392,
+                        300,
+                        402
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "Moisture content (ex-catcher)",
+            "box": [
+                75,
+                404,
+                280,
+                417
+            ],
+            "linking": [
+                [
+                    41,
+                    52
+                ],
+                [
+                    52,
+                    64
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Moisture",
+                    "box": [
+                        75,
+                        404,
+                        133,
+                        417
+                    ]
+                },
+                {
+                    "text": "content",
+                    "box": [
+                        135,
+                        406,
+                        192,
+                        415
+                    ]
+                },
+                {
+                    "text": "(ex-catcher)",
+                    "box": [
+                        193,
+                        404,
+                        280,
+                        416
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "Filter ventilation Rate",
+            "box": [
+                73,
+                419,
+                238,
+                431
+            ],
+            "linking": [
+                [
+                    41,
+                    53
+                ],
+                [
+                    53,
+                    65
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Filter",
+                    "box": [
+                        73,
+                        419,
+                        119,
+                        428
+                    ]
+                },
+                {
+                    "text": "ventilation",
+                    "box": [
+                        120,
+                        421,
+                        204,
+                        430
+                    ]
+                },
+                {
+                    "text": "Rate",
+                    "box": [
+                        208,
+                        421,
+                        238,
+                        431
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "84 mm",
+            "box": [
+                350,
+                268,
+                395,
+                280
+            ],
+            "linking": [
+                [
+                    42,
+                    54
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "84",
+                    "box": [
+                        350,
+                        268,
+                        365,
+                        280
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        377,
+                        271,
+                        395,
+                        278
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "64 mm",
+            "box": [
+                347,
+                280,
+                395,
+                293
+            ],
+            "linking": [
+                [
+                    43,
+                    55
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "64",
+                    "box": [
+                        347,
+                        280,
+                        365,
+                        292
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        377,
+                        283,
+                        395,
+                        293
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "20 mm",
+            "box": [
+                349,
+                296,
+                396,
+                307
+            ],
+            "linking": [
+                [
+                    44,
+                    56
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "20",
+                    "box": [
+                        349,
+                        296,
+                        365,
+                        306
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        377,
+                        298,
+                        396,
+                        307
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "56 mm",
+            "box": [
+                347,
+                308,
+                397,
+                320
+            ],
+            "linking": [
+                [
+                    45,
+                    57
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "56",
+                    "box": [
+                        347,
+                        308,
+                        366,
+                        320
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        376,
+                        311,
+                        397,
+                        320
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "56 mm",
+            "box": [
+                346,
+                322,
+                397,
+                334
+            ],
+            "linking": [
+                [
+                    46,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "56",
+                    "box": [
+                        346,
+                        322,
+                        365,
+                        334
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        376,
+                        325,
+                        397,
+                        332
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "24.75 mm",
+            "box": [
+                343,
+                337,
+                393,
+                347
+            ],
+            "linking": [
+                [
+                    47,
+                    59
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "24.75",
+                    "box": [
+                        343,
+                        337,
+                        382,
+                        347
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        380,
+                        338,
+                        393,
+                        347
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "90 mm",
+            "box": [
+                349,
+                349,
+                395,
+                361
+            ],
+            "linking": [
+                [
+                    48,
+                    60
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "90",
+                    "box": [
+                        349,
+                        349,
+                        367,
+                        359
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        377,
+                        349,
+                        395,
+                        361
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "110 mm",
+            "box": [
+                343,
+                362,
+                394,
+                374
+            ],
+            "linking": [
+                [
+                    49,
+                    61
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "110",
+                    "box": [
+                        343,
+                        362,
+                        365,
+                        374
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        376,
+                        364,
+                        394,
+                        373
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "25 mm",
+            "box": [
+                350,
+                377,
+                396,
+                391
+            ],
+            "linking": [
+                [
+                    50,
+                    62
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "25",
+                    "box": [
+                        350,
+                        377,
+                        365,
+                        387
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        377,
+                        379,
+                        396,
+                        391
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "27 mm",
+            "box": [
+                349,
+                392,
+                395,
+                402
+            ],
+            "linking": [
+                [
+                    51,
+                    63
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "27",
+                    "box": [
+                        349,
+                        392,
+                        365,
+                        402
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        376,
+                        392,
+                        395,
+                        402
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "13.5 %",
+            "box": [
+                343,
+                404,
+                386,
+                416
+            ],
+            "linking": [
+                [
+                    52,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "13.5",
+                    "box": [
+                        343,
+                        404,
+                        373,
+                        416
+                    ]
+                },
+                {
+                    "text": "%",
+                    "box": [
+                        379,
+                        404,
+                        386,
+                        414
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "Nil %",
+            "box": [
+                347,
+                416,
+                386,
+                430
+            ],
+            "linking": [
+                [
+                    53,
+                    65
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Nil",
+                    "box": [
+                        347,
+                        418,
+                        374,
+                        430
+                    ]
+                },
+                {
+                    "text": "%",
+                    "box": [
+                        377,
+                        416,
+                        386,
+                        428
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "Total Cigt. Wt.",
+            "box": [
+                407,
+                265,
+                513,
+                280
+            ],
+            "linking": [
+                [
+                    8,
+                    66
+                ],
+                [
+                    66,
+                    67
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Total",
+                    "box": [
+                        407,
+                        268,
+                        443,
+                        280
+                    ]
+                },
+                {
+                    "text": "Cigt.",
+                    "box": [
+                        449,
+                        265,
+                        486,
+                        278
+                    ]
+                },
+                {
+                    "text": "Wt.",
+                    "box": [
+                        488,
+                        266,
+                        513,
+                        278
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "974 mg",
+            "box": [
+                551,
+                266,
+                640,
+                281
+            ],
+            "linking": [
+                [
+                    66,
+                    67
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "974",
+                    "box": [
+                        551,
+                        266,
+                        578,
+                        279
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        618,
+                        269,
+                        640,
+                        281
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "749 mg",
+            "box": [
+                557,
+                295,
+                636,
+                308
+            ],
+            "linking": [
+                [
+                    71,
+                    68
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "749",
+                    "box": [
+                        557,
+                        295,
+                        582,
+                        307
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        618,
+                        296,
+                        636,
+                        308
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "245 mg/cc",
+            "box": [
+                555,
+                320,
+                636,
+                335
+            ],
+            "linking": [
+                [
+                    70,
+                    69
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "245",
+                    "box": [
+                        555,
+                        322,
+                        576,
+                        335
+                    ]
+                },
+                {
+                    "text": "mg/cc",
+                    "box": [
+                        599,
+                        320,
+                        636,
+                        335
+                    ]
+                }
+            ],
+            "id": 69
+        },
+        {
+            "text": "Net Tob. Rod Density",
+            "box": [
+                404,
+                320,
+                552,
+                334
+            ],
+            "linking": [
+                [
+                    8,
+                    70
+                ],
+                [
+                    70,
+                    69
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Net",
+                    "box": [
+                        404,
+                        322,
+                        429,
+                        334
+                    ]
+                },
+                {
+                    "text": "Tob.",
+                    "box": [
+                        433,
+                        320,
+                        463,
+                        332
+                    ]
+                },
+                {
+                    "text": "Rod",
+                    "box": [
+                        467,
+                        322,
+                        494,
+                        334
+                    ]
+                },
+                {
+                    "text": "Density",
+                    "box": [
+                        497,
+                        323,
+                        552,
+                        332
+                    ]
+                }
+            ],
+            "id": 70
+        },
+        {
+            "text": "Net Net Tobacco",
+            "box": [
+                404,
+                295,
+                515,
+                308
+            ],
+            "linking": [
+                [
+                    8,
+                    71
+                ],
+                [
+                    71,
+                    68
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Net",
+                    "box": [
+                        404,
+                        295,
+                        429,
+                        304
+                    ]
+                },
+                {
+                    "text": "Net",
+                    "box": [
+                        434,
+                        295,
+                        458,
+                        305
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        463,
+                        296,
+                        515,
+                        308
+                    ]
+                }
+            ],
+            "id": 71
+        },
+        {
+            "text": "Tipping and Tipping Application",
+            "box": [
+                75,
+                445,
+                293,
+                460
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tipping",
+                    "box": [
+                        75,
+                        445,
+                        126,
+                        460
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        127,
+                        448,
+                        152,
+                        458
+                    ]
+                },
+                {
+                    "text": "Tipping",
+                    "box": [
+                        157,
+                        446,
+                        211,
+                        459
+                    ]
+                },
+                {
+                    "text": "Application",
+                    "box": [
+                        214,
+                        448,
+                        293,
+                        460
+                    ]
+                }
+            ],
+            "id": 72
+        },
+        {
+            "text": "Tipping Paper:",
+            "box": [
+                73,
+                473,
+                172,
+                486
+            ],
+            "linking": [
+                [
+                    73,
+                    10
+                ],
+                [
+                    73,
+                    74
+                ],
+                [
+                    73,
+                    11
+                ],
+                [
+                    73,
+                    76
+                ],
+                [
+                    73,
+                    12
+                ],
+                [
+                    73,
+                    77
+                ],
+                [
+                    73,
+                    79
+                ],
+                [
+                    73,
+                    80
+                ],
+                [
+                    73,
+                    13
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Tipping",
+                    "box": [
+                        73,
+                        473,
+                        124,
+                        486
+                    ]
+                },
+                {
+                    "text": "Paper:",
+                    "box": [
+                        129,
+                        475,
+                        172,
+                        484
+                    ]
+                }
+            ],
+            "id": 73
+        },
+        {
+            "text": "Supplier Code No(s).",
+            "box": [
+                72,
+                501,
+                216,
+                513
+            ],
+            "linking": [
+                [
+                    73,
+                    74
+                ],
+                [
+                    74,
+                    15
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Supplier",
+                    "box": [
+                        72,
+                        503,
+                        133,
+                        513
+                    ]
+                },
+                {
+                    "text": "Code",
+                    "box": [
+                        135,
+                        501,
+                        166,
+                        513
+                    ]
+                },
+                {
+                    "text": "No(s).",
+                    "box": [
+                        171,
+                        501,
+                        216,
+                        513
+                    ]
+                }
+            ],
+            "id": 74
+        },
+        {
+            "text": "Imitation Cork",
+            "box": [
+                222,
+                516,
+                323,
+                525
+            ],
+            "linking": [
+                [
+                    11,
+                    75
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Imitation",
+                    "box": [
+                        222,
+                        516,
+                        288,
+                        525
+                    ]
+                },
+                {
+                    "text": "Cork",
+                    "box": [
+                        292,
+                        516,
+                        323,
+                        525
+                    ]
+                }
+            ],
+            "id": 75
+        },
+        {
+            "text": "Perforation Type and No. of lines",
+            "box": [
+                72,
+                528,
+                204,
+                554
+            ],
+            "linking": [
+                [
+                    73,
+                    76
+                ],
+                [
+                    76,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Perforation",
+                    "box": [
+                        72,
+                        528,
+                        153,
+                        541
+                    ]
+                },
+                {
+                    "text": "Type",
+                    "box": [
+                        156,
+                        530,
+                        190,
+                        540
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        87,
+                        543,
+                        112,
+                        553
+                    ]
+                },
+                {
+                    "text": "No.",
+                    "box": [
+                        115,
+                        543,
+                        137,
+                        553
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        142,
+                        542,
+                        158,
+                        554
+                    ]
+                },
+                {
+                    "text": "lines",
+                    "box": [
+                        165,
+                        543,
+                        204,
+                        553
+                    ]
+                }
+            ],
+            "id": 76
+        },
+        {
+            "text": "Print Description",
+            "box": [
+                75,
+                570,
+                196,
+                582
+            ],
+            "linking": [
+                [
+                    73,
+                    77
+                ],
+                [
+                    77,
+                    78
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Print",
+                    "box": [
+                        75,
+                        570,
+                        111,
+                        580
+                    ]
+                },
+                {
+                    "text": "Description",
+                    "box": [
+                        115,
+                        572,
+                        196,
+                        582
+                    ]
+                }
+            ],
+            "id": 77
+        },
+        {
+            "text": "Brown on yellow",
+            "box": [
+                213,
+                572,
+                324,
+                584
+            ],
+            "linking": [
+                [
+                    77,
+                    78
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Brown",
+                    "box": [
+                        213,
+                        572,
+                        253,
+                        582
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        256,
+                        572,
+                        275,
+                        582
+                    ]
+                },
+                {
+                    "text": "yellow",
+                    "box": [
+                        278,
+                        572,
+                        324,
+                        584
+                    ]
+                }
+            ],
+            "id": 78
+        },
+        {
+            "text": "Bobbin Width",
+            "box": [
+                73,
+                585,
+                163,
+                595
+            ],
+            "linking": [
+                [
+                    73,
+                    79
+                ],
+                [
+                    79,
+                    82
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Bobbin",
+                    "box": [
+                        73,
+                        585,
+                        118,
+                        595
+                    ]
+                },
+                {
+                    "text": "Width",
+                    "box": [
+                        120,
+                        585,
+                        163,
+                        594
+                    ]
+                }
+            ],
+            "id": 79
+        },
+        {
+            "text": "Robbin Length",
+            "box": [
+                73,
+                596,
+                169,
+                608
+            ],
+            "linking": [
+                [
+                    73,
+                    80
+                ],
+                [
+                    80,
+                    83
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Robbin",
+                    "box": [
+                        73,
+                        597,
+                        118,
+                        607
+                    ]
+                },
+                {
+                    "text": "Length",
+                    "box": [
+                        124,
+                        596,
+                        169,
+                        608
+                    ]
+                }
+            ],
+            "id": 80
+        },
+        {
+            "text": "36 gm/ m2",
+            "box": [
+                234,
+                612,
+                359,
+                625
+            ],
+            "linking": [
+                [
+                    13,
+                    81
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "36",
+                    "box": [
+                        234,
+                        612,
+                        255,
+                        625
+                    ]
+                },
+                {
+                    "text": "gm/",
+                    "box": [
+                        320,
+                        612,
+                        336,
+                        625
+                    ]
+                },
+                {
+                    "text": "m2",
+                    "box": [
+                        335,
+                        612,
+                        359,
+                        625
+                    ]
+                }
+            ],
+            "id": 81
+        },
+        {
+            "text": "50 mm mm",
+            "box": [
+                229,
+                584,
+                366,
+                597
+            ],
+            "linking": [
+                [
+                    79,
+                    82
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "50",
+                    "box": [
+                        229,
+                        584,
+                        244,
+                        596
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        250,
+                        585,
+                        268,
+                        597
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        347,
+                        587,
+                        366,
+                        597
+                    ]
+                }
+            ],
+            "id": 82
+        },
+        {
+            "text": "2700 m",
+            "box": [
+                229,
+                599,
+                358,
+                612
+            ],
+            "linking": [
+                [
+                    80,
+                    83
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2700",
+                    "box": [
+                        229,
+                        599,
+                        263,
+                        609
+                    ]
+                },
+                {
+                    "text": "m",
+                    "box": [
+                        349,
+                        600,
+                        358,
+                        612
+                    ]
+                }
+            ],
+            "id": 83
+        },
+        {
+            "text": "(Indicate N/A If Not Applicable)",
+            "box": [
+                73,
+                638,
+                301,
+                651
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(Indicate",
+                    "box": [
+                        73,
+                        639,
+                        139,
+                        651
+                    ]
+                },
+                {
+                    "text": "N/A",
+                    "box": [
+                        142,
+                        639,
+                        167,
+                        649
+                    ]
+                },
+                {
+                    "text": "If",
+                    "box": [
+                        172,
+                        639,
+                        188,
+                        651
+                    ]
+                },
+                {
+                    "text": "Not",
+                    "box": [
+                        192,
+                        638,
+                        217,
+                        651
+                    ]
+                },
+                {
+                    "text": "Applicable)",
+                    "box": [
+                        222,
+                        639,
+                        301,
+                        651
+                    ]
+                }
+            ],
+            "id": 84
+        },
+        {
+            "text": "Supplier (s)",
+            "box": [
+                377,
+                488,
+                456,
+                502
+            ],
+            "linking": [
+                [
+                    9,
+                    85
+                ],
+                [
+                    85,
+                    23
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Supplier",
+                    "box": [
+                        377,
+                        490,
+                        437,
+                        502
+                    ]
+                },
+                {
+                    "text": "(s)",
+                    "box": [
+                        437,
+                        488,
+                        456,
+                        501
+                    ]
+                }
+            ],
+            "id": 85
+        },
+        {
+            "text": "Supplier Code No (s)",
+            "box": [
+                376,
+                501,
+                521,
+                514
+            ],
+            "linking": [
+                [
+                    9,
+                    86
+                ],
+                [
+                    86,
+                    87
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Supplier",
+                    "box": [
+                        376,
+                        501,
+                        437,
+                        514
+                    ]
+                },
+                {
+                    "text": "Code",
+                    "box": [
+                        439,
+                        504,
+                        472,
+                        514
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        475,
+                        501,
+                        493,
+                        513
+                    ]
+                },
+                {
+                    "text": "(s)",
+                    "box": [
+                        493,
+                        501,
+                        521,
+                        513
+                    ]
+                }
+            ],
+            "id": 86
+        },
+        {
+            "text": "T.K. 9220",
+            "box": [
+                527,
+                501,
+                585,
+                514
+            ],
+            "linking": [
+                [
+                    86,
+                    87
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "T.K.",
+                    "box": [
+                        527,
+                        501,
+                        555,
+                        514
+                    ]
+                },
+                {
+                    "text": "9220",
+                    "box": [
+                        557,
+                        501,
+                        585,
+                        513
+                    ]
+                }
+            ],
+            "id": 87
+        },
+        {
+            "text": "Printed Imitation cork",
+            "box": [
+                418,
+                515,
+                580,
+                525
+            ],
+            "linking": [
+                [
+                    18,
+                    88
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Printed",
+                    "box": [
+                        418,
+                        515,
+                        472,
+                        525
+                    ]
+                },
+                {
+                    "text": "Imitation",
+                    "box": [
+                        475,
+                        518,
+                        545,
+                        525
+                    ]
+                },
+                {
+                    "text": "cork",
+                    "box": [
+                        546,
+                        515,
+                        580,
+                        525
+                    ]
+                }
+            ],
+            "id": 88
+        },
+        {
+            "text": "Application Pattern:",
+            "box": [
+                374,
+                543,
+                521,
+                556
+            ],
+            "linking": [
+                [
+                    89,
+                    19
+                ],
+                [
+                    89,
+                    20
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Application",
+                    "box": [
+                        374,
+                        543,
+                        456,
+                        556
+                    ]
+                },
+                {
+                    "text": "Pattern:",
+                    "box": [
+                        461,
+                        545,
+                        521,
+                        555
+                    ]
+                }
+            ],
+            "id": 89
+        },
+        {
+            "text": "Glue Pree Area",
+            "box": [
+                377,
+                585,
+                482,
+                597
+            ],
+            "linking": [
+                [
+                    90,
+                    25
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Glue",
+                    "box": [
+                        377,
+                        585,
+                        407,
+                        597
+                    ]
+                },
+                {
+                    "text": "Pree",
+                    "box": [
+                        412,
+                        587,
+                        443,
+                        597
+                    ]
+                },
+                {
+                    "text": "Area",
+                    "box": [
+                        448,
+                        588,
+                        482,
+                        597
+                    ]
+                }
+            ],
+            "id": 90
+        },
+        {
+            "text": "mm from mouth end",
+            "box": [
+                510,
+                614,
+                636,
+                624
+            ],
+            "linking": [
+                [
+                    22,
+                    91
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "mm",
+                    "box": [
+                        510,
+                        614,
+                        528,
+                        624
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        533,
+                        614,
+                        566,
+                        624
+                    ]
+                },
+                {
+                    "text": "mouth",
+                    "box": [
+                        567,
+                        614,
+                        606,
+                        623
+                    ]
+                },
+                {
+                    "text": "end",
+                    "box": [
+                        609,
+                        615,
+                        636,
+                        622
+                    ]
+                }
+            ],
+            "id": 91
+        },
+        {
+            "text": "mm x mm",
+            "box": [
+                510,
+                599,
+                630,
+                611
+            ],
+            "linking": [
+                [
+                    21,
+                    92
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "mm",
+                    "box": [
+                        510,
+                        599,
+                        526,
+                        611
+                    ]
+                },
+                {
+                    "text": "x",
+                    "box": [
+                        539,
+                        600,
+                        549,
+                        609
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        609,
+                        599,
+                        630,
+                        608
+                    ]
+                }
+            ],
+            "id": 92
+        },
+        {
+            "text": "Prepared by:",
+            "box": [
+                299,
+                656,
+                388,
+                666
+            ],
+            "linking": [
+                [
+                    93,
+                    94
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Prepared",
+                    "box": [
+                        299,
+                        656,
+                        357,
+                        666
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        361,
+                        656,
+                        388,
+                        666
+                    ]
+                }
+            ],
+            "id": 93
+        },
+        {
+            "text": "M. HAMERTON / enm",
+            "box": [
+                419,
+                656,
+                544,
+                668
+            ],
+            "linking": [
+                [
+                    93,
+                    94
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "M.",
+                    "box": [
+                        419,
+                        656,
+                        435,
+                        668
+                    ]
+                },
+                {
+                    "text": "HAMERTON",
+                    "box": [
+                        437,
+                        656,
+                        501,
+                        666
+                    ]
+                },
+                {
+                    "text": "/",
+                    "box": [
+                        504,
+                        656,
+                        513,
+                        666
+                    ]
+                },
+                {
+                    "text": "enm",
+                    "box": [
+                        516,
+                        657,
+                        544,
+                        666
+                    ]
+                }
+            ],
+            "id": 94
+        },
+        {
+            "text": "May 1, 1985",
+            "box": [
+                419,
+                680,
+                498,
+                693
+            ],
+            "linking": [
+                [
+                    27,
+                    95
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "May",
+                    "box": [
+                        419,
+                        680,
+                        441,
+                        693
+                    ]
+                },
+                {
+                    "text": "1,",
+                    "box": [
+                        451,
+                        681,
+                        463,
+                        693
+                    ]
+                },
+                {
+                    "text": "1985",
+                    "box": [
+                        470,
+                        681,
+                        498,
+                        693
+                    ]
+                }
+            ],
+            "id": 95
+        },
+        {
+            "text": "Approved by:",
+            "box": [
+                299,
+                710,
+                388,
+                721
+            ],
+            "linking": [
+                [
+                    96,
+                    97
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Approved",
+                    "box": [
+                        299,
+                        711,
+                        357,
+                        721
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        361,
+                        710,
+                        388,
+                        720
+                    ]
+                }
+            ],
+            "id": 96
+        },
+        {
+            "text": "Director of Technical Operations, Brown & Williamson International Tobacco",
+            "box": [
+                391,
+                723,
+                627,
+                762
+            ],
+            "linking": [
+                [
+                    96,
+                    97
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Director",
+                    "box": [
+                        391,
+                        725,
+                        449,
+                        735
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        455,
+                        725,
+                        473,
+                        734
+                    ]
+                },
+                {
+                    "text": "Technical",
+                    "box": [
+                        475,
+                        723,
+                        544,
+                        735
+                    ]
+                },
+                {
+                    "text": "Operations,",
+                    "box": [
+                        543,
+                        725,
+                        627,
+                        735
+                    ]
+                },
+                {
+                    "text": "Brown",
+                    "box": [
+                        391,
+                        738,
+                        428,
+                        748
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        433,
+                        737,
+                        445,
+                        750
+                    ]
+                },
+                {
+                    "text": "Williamson",
+                    "box": [
+                        448,
+                        737,
+                        524,
+                        749
+                    ]
+                },
+                {
+                    "text": "International",
+                    "box": [
+                        521,
+                        737,
+                        621,
+                        750
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        469,
+                        753,
+                        523,
+                        762
+                    ]
+                }
+            ],
+            "id": 97
+        },
+        {
+            "text": "May 1, 1985",
+            "box": [
+                139,
+                747,
+                226,
+                764
+            ],
+            "linking": [
+                [
+                    30,
+                    98
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "May",
+                    "box": [
+                        139,
+                        749,
+                        166,
+                        764
+                    ]
+                },
+                {
+                    "text": "1,",
+                    "box": [
+                        169,
+                        750,
+                        188,
+                        762
+                    ]
+                },
+                {
+                    "text": "1985",
+                    "box": [
+                        192,
+                        747,
+                        226,
+                        762
+                    ]
+                }
+            ],
+            "id": 98
+        },
+        {
+            "text": "May 1, 1985",
+            "box": [
+                410,
+                778,
+                493,
+                792
+            ],
+            "linking": [
+                [
+                    28,
+                    99
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "May",
+                    "box": [
+                        410,
+                        780,
+                        437,
+                        792
+                    ]
+                },
+                {
+                    "text": "1,",
+                    "box": [
+                        439,
+                        778,
+                        457,
+                        790
+                    ]
+                },
+                {
+                    "text": "1985",
+                    "box": [
+                        463,
+                        780,
+                        493,
+                        790
+                    ]
+                }
+            ],
+            "id": 99
+        }
+    ]
+}

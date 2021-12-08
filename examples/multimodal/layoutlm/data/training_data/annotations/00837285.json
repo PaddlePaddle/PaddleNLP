@@ -1,0 +1,3879 @@
+{
+    "form": [
+        {
+            "box": [
+                66,
+                138,
+                91,
+                146
+            ],
+            "text": "CLASS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        66,
+                        138,
+                        91,
+                        146
+                    ],
+                    "text": "CLASS"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    8
+                ],
+                [
+                    0,
+                    7
+                ],
+                [
+                    0,
+                    6
+                ],
+                [
+                    0,
+                    47
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                174,
+                91,
+                204,
+                103
+            ],
+            "text": "A32",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        174,
+                        91,
+                        204,
+                        103
+                    ],
+                    "text": "A32"
+                }
+            ],
+            "linking": [
+                [
+                    53,
+                    1
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                261,
+                111,
+                308,
+                119
+            ],
+            "text": "SOLUBILITY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        261,
+                        111,
+                        308,
+                        119
+                    ],
+                    "text": "SOLUBILITY"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    5
+                ],
+                [
+                    2,
+                    3
+                ],
+                [
+                    2,
+                    4
+                ],
+                [
+                    2,
+                    48
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                274,
+                125,
+                306,
+                132
+            ],
+            "text": "WATER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        274,
+                        125,
+                        306,
+                        132
+                    ],
+                    "text": "WATER"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                349,
+                123,
+                381,
+                131
+            ],
+            "text": "OTHER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        123,
+                        381,
+                        131
+                    ],
+                    "text": "OTHER"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                394,
+                111,
+                439,
+                118
+            ],
+            "text": "MEASURED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        394,
+                        111,
+                        439,
+                        118
+                    ],
+                    "text": "MEASURED"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                405,
+                148,
+                425,
+                156
+            ],
+            "text": "SALT",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        405,
+                        148,
+                        425,
+                        156
+                    ],
+                    "text": "SALT"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                289,
+                148,
+                311,
+                156
+            ],
+            "text": "BASE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        289,
+                        148,
+                        311,
+                        156
+                    ],
+                    "text": "BASE"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                154,
+                148,
+                176,
+                155
+            ],
+            "text": "ACID",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        154,
+                        148,
+                        176,
+                        155
+                    ],
+                    "text": "ACID"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                66,
+                174,
+                113,
+                184
+            ],
+            "text": "REACTIVITY",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        66,
+                        174,
+                        113,
+                        184
+                    ],
+                    "text": "REACTIVITY"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    59
+                ],
+                [
+                    9,
+                    60
+                ],
+                [
+                    9,
+                    61
+                ],
+                [
+                    9,
+                    62
+                ],
+                [
+                    9,
+                    63
+                ],
+                [
+                    9,
+                    64
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                248,
+                219,
+                299,
+                227
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        248,
+                        219,
+                        299,
+                        227
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    10
+                ],
+                [
+                    59,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                244,
+                244,
+                299,
+                251
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        244,
+                        244,
+                        299,
+                        251
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    11
+                ],
+                [
+                    60,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                246,
+                274,
+                299,
+                282
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        246,
+                        274,
+                        299,
+                        282
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    12
+                ],
+                [
+                    61,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                248,
+                302,
+                299,
+                310
+            ],
+            "text": "UNCHANCED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        248,
+                        302,
+                        299,
+                        310
+                    ],
+                    "text": "UNCHANCED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    13
+                ],
+                [
+                    62,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                248,
+                331,
+                301,
+                339
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        248,
+                        331,
+                        301,
+                        339
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    14
+                ],
+                [
+                    63,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                248,
+                357,
+                299,
+                365
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        248,
+                        357,
+                        299,
+                        365
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    15
+                ],
+                [
+                    64,
+                    15
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                352,
+                219,
+                418,
+                227
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        352,
+                        219,
+                        418,
+                        227
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    16
+                ],
+                [
+                    59,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                352,
+                244,
+                418,
+                251
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        352,
+                        244,
+                        418,
+                        251
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    17
+                ],
+                [
+                    60,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                352,
+                274,
+                418,
+                281
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        352,
+                        274,
+                        418,
+                        281
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    18
+                ],
+                [
+                    61,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                354,
+                302,
+                417,
+                310
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        354,
+                        302,
+                        417,
+                        310
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    19
+                ],
+                [
+                    62,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                354,
+                331,
+                420,
+                339
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        354,
+                        331,
+                        420,
+                        339
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    20
+                ],
+                [
+                    63,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                354,
+                357,
+                420,
+                364
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        354,
+                        357,
+                        420,
+                        364
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    56,
+                    21
+                ],
+                [
+                    64,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                505,
+                218,
+                555,
+                228
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        505,
+                        218,
+                        555,
+                        228
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    22
+                ],
+                [
+                    59,
+                    22
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                505,
+                243,
+                555,
+                253
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        505,
+                        243,
+                        555,
+                        253
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    23
+                ],
+                [
+                    59,
+                    23
+                ],
+                [
+                    60,
+                    23
+                ]
+            ],
+            "id": 23
+        },
+        {
+            "box": [
+                502,
+                274,
+                555,
+                282
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        502,
+                        274,
+                        555,
+                        282
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    24
+                ],
+                [
+                    61,
+                    24
+                ]
+            ],
+            "id": 24
+        },
+        {
+            "box": [
+                503,
+                302,
+                554,
+                310
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        302,
+                        554,
+                        310
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    25
+                ],
+                [
+                    62,
+                    25
+                ]
+            ],
+            "id": 25
+        },
+        {
+            "box": [
+                503,
+                331,
+                554,
+                339
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        331,
+                        554,
+                        339
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    26
+                ],
+                [
+                    63,
+                    26
+                ]
+            ],
+            "id": 26
+        },
+        {
+            "box": [
+                503,
+                355,
+                556,
+                363
+            ],
+            "text": "UNCHANGED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        355,
+                        556,
+                        363
+                    ],
+                    "text": "UNCHANGED"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    27
+                ],
+                [
+                    64,
+                    27
+                ]
+            ],
+            "id": 27
+        },
+        {
+            "box": [
+                613,
+                218,
+                679,
+                228
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        613,
+                        218,
+                        679,
+                        228
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    28
+                ],
+                [
+                    59,
+                    28
+                ]
+            ],
+            "id": 28
+        },
+        {
+            "box": [
+                611,
+                244,
+                679,
+                252
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        611,
+                        244,
+                        679,
+                        252
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    29
+                ],
+                [
+                    60,
+                    29
+                ]
+            ],
+            "id": 29
+        },
+        {
+            "box": [
+                610,
+                272,
+                680,
+                280
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        610,
+                        272,
+                        680,
+                        280
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    30
+                ],
+                [
+                    61,
+                    30
+                ]
+            ],
+            "id": 30
+        },
+        {
+            "box": [
+                611,
+                302,
+                677,
+                310
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        611,
+                        302,
+                        677,
+                        310
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    31
+                ],
+                [
+                    62,
+                    31
+                ]
+            ],
+            "id": 31
+        },
+        {
+            "box": [
+                611,
+                329,
+                677,
+                339
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        611,
+                        329,
+                        677,
+                        339
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    32
+                ],
+                [
+                    63,
+                    32
+                ]
+            ],
+            "id": 32
+        },
+        {
+            "box": [
+                610,
+                357,
+                680,
+                364
+            ],
+            "text": "DECOMPOSITION",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        610,
+                        357,
+                        680,
+                        364
+                    ],
+                    "text": "DECOMPOSITION"
+                }
+            ],
+            "linking": [
+                [
+                    58,
+                    33
+                ],
+                [
+                    64,
+                    33
+                ]
+            ],
+            "id": 33
+        },
+        {
+            "box": [
+                653,
+                384,
+                670,
+                470
+            ],
+            "text": "00837285",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        653,
+                        384,
+                        670,
+                        470
+                    ],
+                    "text": "00837285"
+                }
+            ],
+            "linking": [],
+            "id": 34
+        },
+        {
+            "box": [
+                81,
+                553,
+                94,
+                561
+            ],
+            "text": "AIR",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        81,
+                        553,
+                        94,
+                        561
+                    ],
+                    "text": "AIR"
+                }
+            ],
+            "linking": [
+                [
+                    70,
+                    35
+                ]
+            ],
+            "id": 35
+        },
+        {
+            "box": [
+                128,
+                551,
+                148,
+                561
+            ],
+            "text": "HEAT",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        128,
+                        551,
+                        148,
+                        561
+                    ],
+                    "text": "HEAT"
+                }
+            ],
+            "linking": [
+                [
+                    70,
+                    36
+                ]
+            ],
+            "id": 36
+        },
+        {
+            "box": [
+                186,
+                553,
+                208,
+                561
+            ],
+            "text": "LIGHT",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        186,
+                        553,
+                        208,
+                        561
+                    ],
+                    "text": "LIGHT"
+                }
+            ],
+            "linking": [
+                [
+                    70,
+                    37
+                ]
+            ],
+            "id": 37
+        },
+        {
+            "box": [
+                243,
+                553,
+                286,
+                561
+            ],
+            "text": "MOISTURE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        243,
+                        553,
+                        286,
+                        561
+                    ],
+                    "text": "MOISTURE"
+                }
+            ],
+            "linking": [
+                [
+                    70,
+                    38
+                ]
+            ],
+            "id": 38
+        },
+        {
+            "box": [
+                321,
+                551,
+                348,
+                561
+            ],
+            "text": "OTHER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        321,
+                        551,
+                        348,
+                        561
+                    ],
+                    "text": "OTHER"
+                }
+            ],
+            "linking": [
+                [
+                    70,
+                    39
+                ]
+            ],
+            "id": 39
+        },
+        {
+            "box": [
+                68,
+                585,
+                116,
+                592
+            ],
+            "text": "COMMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        68,
+                        585,
+                        116,
+                        592
+                    ],
+                    "text": "COMMENTS"
+                }
+            ],
+            "linking": [
+                [
+                    40,
+                    72
+                ],
+                [
+                    40,
+                    73
+                ],
+                [
+                    40,
+                    74
+                ],
+                [
+                    40,
+                    75
+                ]
+            ],
+            "id": 40
+        },
+        {
+            "box": [
+                71,
+                855,
+                116,
+                862
+            ],
+            "text": "SIGNATURE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        71,
+                        855,
+                        116,
+                        862
+                    ],
+                    "text": "SIGNATURE"
+                }
+            ],
+            "linking": [
+                [
+                    41,
+                    77
+                ]
+            ],
+            "id": 41
+        },
+        {
+            "box": [
+                510,
+                854,
+                535,
+                862
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        510,
+                        854,
+                        535,
+                        862
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ]
+            ],
+            "id": 42
+        },
+        {
+            "box": [
+                563,
+                849,
+                666,
+                892
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        563,
+                        849,
+                        666,
+                        892
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ]
+            ],
+            "id": 43
+        },
+        {
+            "box": [
+                543,
+                90,
+                618,
+                103
+            ],
+            "text": "11/1381",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        543,
+                        90,
+                        618,
+                        103
+                    ],
+                    "text": "11/1381"
+                }
+            ],
+            "linking": [
+                [
+                    50,
+                    44
+                ]
+            ],
+            "id": 44
+        },
+        {
+            "box": [
+                676,
+                120,
+                708,
+                133
+            ],
+            "text": "g100ml",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        676,
+                        120,
+                        708,
+                        133
+                    ],
+                    "text": "g100ml"
+                }
+            ],
+            "linking": [
+                [
+                    46,
+                    45
+                ]
+            ],
+            "id": 45
+        },
+        {
+            "box": [
+                523,
+                121,
+                558,
+                131
+            ],
+            "text": "AMOUNT",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        523,
+                        121,
+                        558,
+                        131
+                    ],
+                    "text": "AMOUNT"
+                }
+            ],
+            "linking": [
+                [
+                    46,
+                    45
+                ]
+            ],
+            "id": 46
+        },
+        {
+            "box": [
+                515,
+                146,
+                543,
+                156
+            ],
+            "text": "OTHER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        515,
+                        146,
+                        543,
+                        156
+                    ],
+                    "text": "OTHER"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    47
+                ]
+            ],
+            "id": 47
+        },
+        {
+            "box": [
+                513,
+                110,
+                561,
+                118
+            ],
+            "text": "ESTIMATED",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        513,
+                        110,
+                        561,
+                        118
+                    ],
+                    "text": "ESTIMATED"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    48
+                ]
+            ],
+            "id": 48
+        },
+        {
+            "box": [
+                713,
+                17,
+                730,
+                29
+            ],
+            "text": "24",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        713,
+                        17,
+                        730,
+                        29
+                    ],
+                    "text": "24"
+                }
+            ],
+            "linking": [],
+            "id": 49
+        },
+        {
+            "box": [
+                508,
+                80,
+                533,
+                88
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        508,
+                        80,
+                        533,
+                        88
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    50,
+                    44
+                ]
+            ],
+            "id": 50
+        },
+        {
+            "text": "ADDENDUM II",
+            "box": [
+                367,
+                18,
+                454,
+                30
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "ADDENDUM",
+                    "box": [
+                        367,
+                        18,
+                        432,
+                        30
+                    ]
+                },
+                {
+                    "text": "II",
+                    "box": [
+                        439,
+                        18,
+                        454,
+                        28
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "COMPOUND PHYSICAL PARAMETERS",
+            "box": [
+                224,
+                48,
+                549,
+                69
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        224,
+                        48,
+                        340,
+                        66
+                    ]
+                },
+                {
+                    "text": "PHYSICAL",
+                    "box": [
+                        344,
+                        51,
+                        429,
+                        68
+                    ]
+                },
+                {
+                    "text": "PARAMETERS",
+                    "box": [
+                        434,
+                        51,
+                        549,
+                        69
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "LRC COMPOUND CODE",
+            "box": [
+                65,
+                81,
+                154,
+                91
+            ],
+            "linking": [
+                [
+                    53,
+                    1
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LRC",
+                    "box": [
+                        65,
+                        83,
+                        82,
+                        91
+                    ]
+                },
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        81,
+                        83,
+                        128,
+                        90
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        131,
+                        81,
+                        154,
+                        91
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "MOLECULAR WEIGHT",
+            "box": [
+                66,
+                110,
+                150,
+                118
+            ],
+            "linking": [
+                [
+                    54,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "MOLECULAR",
+                    "box": [
+                        66,
+                        110,
+                        114,
+                        118
+                    ]
+                },
+                {
+                    "text": "WEIGHT",
+                    "box": [
+                        113,
+                        110,
+                        150,
+                        117
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "200. 29",
+            "box": [
+                159,
+                121,
+                213,
+                133
+            ],
+            "linking": [
+                [
+                    54,
+                    55
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "200.",
+                    "box": [
+                        159,
+                        121,
+                        191,
+                        133
+                    ]
+                },
+                {
+                    "text": "29",
+                    "box": [
+                        196,
+                        121,
+                        213,
+                        131
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "WITHOUT HEATING",
+            "box": [
+                277,
+                199,
+                351,
+                207
+            ],
+            "linking": [
+                [
+                    56,
+                    10
+                ],
+                [
+                    56,
+                    11
+                ],
+                [
+                    56,
+                    12
+                ],
+                [
+                    56,
+                    13
+                ],
+                [
+                    56,
+                    14
+                ],
+                [
+                    56,
+                    15
+                ],
+                [
+                    56,
+                    16
+                ],
+                [
+                    56,
+                    17
+                ],
+                [
+                    56,
+                    18
+                ],
+                [
+                    56,
+                    19
+                ],
+                [
+                    56,
+                    20
+                ],
+                [
+                    56,
+                    21
+                ],
+                [
+                    57,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "WITHOUT",
+                    "box": [
+                        277,
+                        199,
+                        312,
+                        207
+                    ]
+                },
+                {
+                    "text": "HEATING",
+                    "box": [
+                        314,
+                        199,
+                        351,
+                        206
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "DESCRIPTION OF REACTIVITY",
+            "box": [
+                394,
+                174,
+                507,
+                183
+            ],
+            "linking": [
+                [
+                    57,
+                    56
+                ],
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "DESCRIPTION",
+                    "box": [
+                        394,
+                        174,
+                        449,
+                        182
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        449,
+                        176,
+                        462,
+                        183
+                    ]
+                },
+                {
+                    "text": "REACTIVITY",
+                    "box": [
+                        462,
+                        174,
+                        507,
+                        181
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "WITH HEATING (80C)",
+            "box": [
+                532,
+                199,
+                618,
+                207
+            ],
+            "linking": [
+                [
+                    57,
+                    58
+                ],
+                [
+                    58,
+                    22
+                ],
+                [
+                    58,
+                    23
+                ],
+                [
+                    58,
+                    24
+                ],
+                [
+                    58,
+                    25
+                ],
+                [
+                    58,
+                    26
+                ],
+                [
+                    58,
+                    27
+                ],
+                [
+                    58,
+                    28
+                ],
+                [
+                    58,
+                    29
+                ],
+                [
+                    58,
+                    30
+                ],
+                [
+                    58,
+                    31
+                ],
+                [
+                    58,
+                    32
+                ],
+                [
+                    58,
+                    33
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "WITH",
+                    "box": [
+                        532,
+                        199,
+                        554,
+                        207
+                    ]
+                },
+                {
+                    "text": "HEATING",
+                    "box": [
+                        556,
+                        199,
+                        591,
+                        207
+                    ]
+                },
+                {
+                    "text": "(80C)",
+                    "box": [
+                        593,
+                        199,
+                        618,
+                        207
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "1) WATER or BRINE:",
+            "box": [
+                85,
+                218,
+                163,
+                228
+            ],
+            "linking": [
+                [
+                    9,
+                    59
+                ],
+                [
+                    59,
+                    10
+                ],
+                [
+                    59,
+                    16
+                ],
+                [
+                    59,
+                    22
+                ],
+                [
+                    59,
+                    23
+                ],
+                [
+                    59,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "1)",
+                    "box": [
+                        85,
+                        219,
+                        97,
+                        227
+                    ]
+                },
+                {
+                    "text": "WATER",
+                    "box": [
+                        100,
+                        219,
+                        128,
+                        226
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        128,
+                        219,
+                        136,
+                        226
+                    ]
+                },
+                {
+                    "text": "BRINE:",
+                    "box": [
+                        138,
+                        218,
+                        163,
+                        228
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "2) 5% HCL",
+            "box": [
+                88,
+                244,
+                128,
+                254
+            ],
+            "linking": [
+                [
+                    9,
+                    60
+                ],
+                [
+                    60,
+                    11
+                ],
+                [
+                    60,
+                    17
+                ],
+                [
+                    60,
+                    23
+                ],
+                [
+                    60,
+                    29
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "2)",
+                    "box": [
+                        88,
+                        246,
+                        95,
+                        254
+                    ]
+                },
+                {
+                    "text": "5%",
+                    "box": [
+                        98,
+                        244,
+                        110,
+                        254
+                    ]
+                },
+                {
+                    "text": "HCL",
+                    "box": [
+                        113,
+                        244,
+                        128,
+                        252
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "3) 5% NaOH:",
+            "box": [
+                88,
+                272,
+                138,
+                280
+            ],
+            "linking": [
+                [
+                    9,
+                    61
+                ],
+                [
+                    61,
+                    12
+                ],
+                [
+                    61,
+                    18
+                ],
+                [
+                    61,
+                    24
+                ],
+                [
+                    61,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "3)",
+                    "box": [
+                        88,
+                        272,
+                        96,
+                        280
+                    ]
+                },
+                {
+                    "text": "5%",
+                    "box": [
+                        98,
+                        272,
+                        110,
+                        280
+                    ]
+                },
+                {
+                    "text": "NaOH:",
+                    "box": [
+                        111,
+                        272,
+                        138,
+                        280
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "4) ALCOHOLS:",
+            "box": [
+                88,
+                302,
+                143,
+                311
+            ],
+            "linking": [
+                [
+                    9,
+                    62
+                ],
+                [
+                    62,
+                    13
+                ],
+                [
+                    62,
+                    19
+                ],
+                [
+                    62,
+                    25
+                ],
+                [
+                    62,
+                    31
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "4)",
+                    "box": [
+                        88,
+                        304,
+                        96,
+                        311
+                    ]
+                },
+                {
+                    "text": "ALCOHOLS:",
+                    "box": [
+                        100,
+                        302,
+                        143,
+                        310
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "5) OXYGEN:",
+            "box": [
+                88,
+                331,
+                134,
+                339
+            ],
+            "linking": [
+                [
+                    9,
+                    63
+                ],
+                [
+                    63,
+                    14
+                ],
+                [
+                    63,
+                    20
+                ],
+                [
+                    63,
+                    26
+                ],
+                [
+                    63,
+                    32
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "5)",
+                    "box": [
+                        88,
+                        331,
+                        96,
+                        339
+                    ]
+                },
+                {
+                    "text": "OXYGEN:",
+                    "box": [
+                        96,
+                        331,
+                        134,
+                        338
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "6) LIGHT:",
+            "box": [
+                88,
+                357,
+                125,
+                365
+            ],
+            "linking": [
+                [
+                    9,
+                    64
+                ],
+                [
+                    64,
+                    15
+                ],
+                [
+                    64,
+                    21
+                ],
+                [
+                    64,
+                    27
+                ],
+                [
+                    64,
+                    33
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "6)",
+                    "box": [
+                        88,
+                        357,
+                        98,
+                        365
+                    ]
+                },
+                {
+                    "text": "LIGHT:",
+                    "box": [
+                        98,
+                        357,
+                        125,
+                        365
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "SAFETY COMMENTS (SUGGESTED HANDLING PROCEDURE)",
+            "box": [
+                68,
+                377,
+                292,
+                387
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "SAFETY",
+                    "box": [
+                        68,
+                        380,
+                        100,
+                        387
+                    ]
+                },
+                {
+                    "text": "COMMENTS",
+                    "box": [
+                        100,
+                        379,
+                        145,
+                        387
+                    ]
+                },
+                {
+                    "text": "(SUGGESTED",
+                    "box": [
+                        145,
+                        377,
+                        198,
+                        387
+                    ]
+                },
+                {
+                    "text": "HANDLING",
+                    "box": [
+                        199,
+                        379,
+                        241,
+                        386
+                    ]
+                },
+                {
+                    "text": "PROCEDURE)",
+                    "box": [
+                        241,
+                        377,
+                        292,
+                        385
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "CHEMICAL PURITY",
+            "box": [
+                68,
+                472,
+                140,
+                482
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CHEMICAL",
+                    "box": [
+                        68,
+                        472,
+                        110,
+                        482
+                    ]
+                },
+                {
+                    "text": "PURITY",
+                    "box": [
+                        110,
+                        473,
+                        140,
+                        480
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "ANALYTICAL METHOD(S)",
+            "box": [
+                394,
+                472,
+                489,
+                480
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ANALYTICAL",
+                    "box": [
+                        394,
+                        472,
+                        441,
+                        480
+                    ]
+                },
+                {
+                    "text": "METHOD(S)",
+                    "box": [
+                        444,
+                        472,
+                        489,
+                        479
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "STORAGE RECOMMENDATIONS",
+            "box": [
+                68,
+                510,
+                188,
+                520
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "STORAGE",
+                    "box": [
+                        68,
+                        512,
+                        108,
+                        520
+                    ]
+                },
+                {
+                    "text": "RECOMMENDATIONS",
+                    "box": [
+                        110,
+                        510,
+                        188,
+                        518
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "NORMAL STORAGE",
+            "box": [
+                307,
+                510,
+                382,
+                520
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NORMAL",
+                    "box": [
+                        307,
+                        510,
+                        342,
+                        520
+                    ]
+                },
+                {
+                    "text": "STORAGE",
+                    "box": [
+                        342,
+                        512,
+                        382,
+                        519
+                    ]
+                }
+            ],
+            "id": 69
+        },
+        {
+            "text": "COMPOUND SENSITIVE TO",
+            "box": [
+                70,
+                538,
+                172,
+                548
+            ],
+            "linking": [
+                [
+                    70,
+                    35
+                ],
+                [
+                    70,
+                    36
+                ],
+                [
+                    70,
+                    37
+                ],
+                [
+                    70,
+                    38
+                ],
+                [
+                    70,
+                    39
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        70,
+                        538,
+                        115,
+                        548
+                    ]
+                },
+                {
+                    "text": "SENSITIVE",
+                    "box": [
+                        116,
+                        538,
+                        156,
+                        548
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        159,
+                        538,
+                        172,
+                        546
+                    ]
+                }
+            ],
+            "id": 70
+        },
+        {
+            "text": "X SPECIAL STORAGE Refrigerate in amber bottle at no more than * C",
+            "box": [
+                487,
+                507,
+                695,
+                549
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "X",
+                    "box": [
+                        488,
+                        507,
+                        501,
+                        517
+                    ]
+                },
+                {
+                    "text": "SPECIAL",
+                    "box": [
+                        503,
+                        508,
+                        535,
+                        518
+                    ]
+                },
+                {
+                    "text": "STORAGE",
+                    "box": [
+                        538,
+                        510,
+                        576,
+                        518
+                    ]
+                },
+                {
+                    "text": "Refrigerate",
+                    "box": [
+                        590,
+                        507,
+                        695,
+                        519
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        492,
+                        520,
+                        510,
+                        533
+                    ]
+                },
+                {
+                    "text": "amber",
+                    "box": [
+                        518,
+                        522,
+                        565,
+                        534
+                    ]
+                },
+                {
+                    "text": "bottle",
+                    "box": [
+                        573,
+                        520,
+                        631,
+                        532
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        641,
+                        520,
+                        656,
+                        535
+                    ]
+                },
+                {
+                    "text": "no",
+                    "box": [
+                        666,
+                        522,
+                        686,
+                        532
+                    ]
+                },
+                {
+                    "text": "more",
+                    "box": [
+                        487,
+                        537,
+                        529,
+                        549
+                    ]
+                },
+                {
+                    "text": "than",
+                    "box": [
+                        538,
+                        535,
+                        575,
+                        548
+                    ]
+                },
+                {
+                    "text": "*",
+                    "box": [
+                        585,
+                        533,
+                        600,
+                        546
+                    ]
+                },
+                {
+                    "text": "C",
+                    "box": [
+                        603,
+                        537,
+                        613,
+                        547
+                    ]
+                }
+            ],
+            "id": 71
+        },
+        {
+            "text": "pH- The pH of a 50% concentration of A32 in a 52.6% dioxane/water solution was calculated to be 2.92 at 22°C according to the extra- polation procedures by Dr. P. D. Schickedantz, Lorillard Research Center Accession No. 1662, Reference OR 83- 125.",
+            "box": [
+                93,
+                610,
+                708,
+                671
+            ],
+            "linking": [
+                [
+                    40,
+                    72
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "pH-",
+                    "box": [
+                        96,
+                        613,
+                        134,
+                        626
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        141,
+                        613,
+                        169,
+                        625
+                    ]
+                },
+                {
+                    "text": "pH",
+                    "box": [
+                        178,
+                        611,
+                        200,
+                        624
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        204,
+                        610,
+                        224,
+                        627
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        233,
+                        615,
+                        245,
+                        623
+                    ]
+                },
+                {
+                    "text": "50%",
+                    "box": [
+                        252,
+                        611,
+                        282,
+                        626
+                    ]
+                },
+                {
+                    "text": "concentration",
+                    "box": [
+                        291,
+                        615,
+                        411,
+                        627
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        417,
+                        610,
+                        437,
+                        625
+                    ]
+                },
+                {
+                    "text": "A32",
+                    "box": [
+                        445,
+                        613,
+                        473,
+                        625
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        482,
+                        611,
+                        504,
+                        624
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        508,
+                        613,
+                        518,
+                        625
+                    ]
+                },
+                {
+                    "text": "52.6%",
+                    "box": [
+                        528,
+                        610,
+                        573,
+                        627
+                    ]
+                },
+                {
+                    "text": "dioxane/water",
+                    "box": [
+                        583,
+                        611,
+                        708,
+                        626
+                    ]
+                },
+                {
+                    "text": "solution",
+                    "box": [
+                        96,
+                        630,
+                        171,
+                        640
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        174,
+                        628,
+                        206,
+                        640
+                    ]
+                },
+                {
+                    "text": "calculated",
+                    "box": [
+                        216,
+                        628,
+                        311,
+                        638
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        317,
+                        630,
+                        335,
+                        640
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        344,
+                        628,
+                        362,
+                        640
+                    ]
+                },
+                {
+                    "text": "2.92",
+                    "box": [
+                        374,
+                        628,
+                        411,
+                        640
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        417,
+                        628,
+                        437,
+                        640
+                    ]
+                },
+                {
+                    "text": "22°C",
+                    "box": [
+                        445,
+                        628,
+                        483,
+                        641
+                    ]
+                },
+                {
+                    "text": "according",
+                    "box": [
+                        490,
+                        628,
+                        578,
+                        640
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        585,
+                        626,
+                        605,
+                        639
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        613,
+                        628,
+                        638,
+                        640
+                    ]
+                },
+                {
+                    "text": "extra-",
+                    "box": [
+                        650,
+                        628,
+                        706,
+                        638
+                    ]
+                },
+                {
+                    "text": "polation",
+                    "box": [
+                        93,
+                        641,
+                        171,
+                        654
+                    ]
+                },
+                {
+                    "text": "procedures",
+                    "box": [
+                        176,
+                        645,
+                        274,
+                        655
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        279,
+                        641,
+                        299,
+                        654
+                    ]
+                },
+                {
+                    "text": "Dr.",
+                    "box": [
+                        306,
+                        643,
+                        334,
+                        655
+                    ]
+                },
+                {
+                    "text": "P.",
+                    "box": [
+                        342,
+                        643,
+                        360,
+                        655
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        370,
+                        641,
+                        388,
+                        653
+                    ]
+                },
+                {
+                    "text": "Schickedantz,",
+                    "box": [
+                        399,
+                        643,
+                        520,
+                        653
+                    ]
+                },
+                {
+                    "text": "Lorillard",
+                    "box": [
+                        527,
+                        641,
+                        615,
+                        653
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        621,
+                        641,
+                        697,
+                        653
+                    ]
+                },
+                {
+                    "text": "Center",
+                    "box": [
+                        96,
+                        656,
+                        151,
+                        666
+                    ]
+                },
+                {
+                    "text": "Accession",
+                    "box": [
+                        161,
+                        656,
+                        246,
+                        669
+                    ]
+                },
+                {
+                    "text": "No.",
+                    "box": [
+                        251,
+                        658,
+                        279,
+                        668
+                    ]
+                },
+                {
+                    "text": "1662,",
+                    "box": [
+                        291,
+                        656,
+                        334,
+                        671
+                    ]
+                },
+                {
+                    "text": "Reference",
+                    "box": [
+                        344,
+                        656,
+                        429,
+                        668
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        437,
+                        656,
+                        454,
+                        668
+                    ]
+                },
+                {
+                    "text": "83-",
+                    "box": [
+                        463,
+                        654,
+                        493,
+                        667
+                    ]
+                },
+                {
+                    "text": "125.",
+                    "box": [
+                        493,
+                        654,
+                        526,
+                        667
+                    ]
+                }
+            ],
+            "id": 72
+        },
+        {
+            "text": "Solubility (See SOP for Biological Solutions)",
+            "box": [
+                93,
+                683,
+                508,
+                698
+            ],
+            "linking": [
+                [
+                    40,
+                    73
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Solubility",
+                    "box": [
+                        93,
+                        683,
+                        191,
+                        698
+                    ]
+                },
+                {
+                    "text": "(See",
+                    "box": [
+                        201,
+                        683,
+                        236,
+                        698
+                    ]
+                },
+                {
+                    "text": "SOP",
+                    "box": [
+                        244,
+                        683,
+                        271,
+                        696
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        281,
+                        684,
+                        308,
+                        696
+                    ]
+                },
+                {
+                    "text": "Biological",
+                    "box": [
+                        317,
+                        683,
+                        408,
+                        696
+                    ]
+                },
+                {
+                    "text": "Solutions)",
+                    "box": [
+                        417,
+                        683,
+                        508,
+                        695
+                    ]
+                }
+            ],
+            "id": 73
+        },
+        {
+            "text": "Oral- 5g A32 forms a suspension with stirring in 10 ml 1% Tween 80 at room temperature. Reference OR 72- 151.",
+            "box": [
+                93,
+                709,
+                714,
+                740
+            ],
+            "linking": [
+                [
+                    40,
+                    74
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Oral-",
+                    "box": [
+                        93,
+                        711,
+                        153,
+                        723
+                    ]
+                },
+                {
+                    "text": "5g",
+                    "box": [
+                        161,
+                        713,
+                        178,
+                        725
+                    ]
+                },
+                {
+                    "text": "A32",
+                    "box": [
+                        188,
+                        713,
+                        216,
+                        723
+                    ]
+                },
+                {
+                    "text": "forms",
+                    "box": [
+                        226,
+                        713,
+                        274,
+                        725
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        281,
+                        713,
+                        291,
+                        725
+                    ]
+                },
+                {
+                    "text": "suspension",
+                    "box": [
+                        299,
+                        714,
+                        392,
+                        722
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        397,
+                        713,
+                        439,
+                        723
+                    ]
+                },
+                {
+                    "text": "stirring",
+                    "box": [
+                        447,
+                        713,
+                        520,
+                        725
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        530,
+                        711,
+                        547,
+                        724
+                    ]
+                },
+                {
+                    "text": "10",
+                    "box": [
+                        560,
+                        711,
+                        575,
+                        724
+                    ]
+                },
+                {
+                    "text": "ml",
+                    "box": [
+                        583,
+                        709,
+                        605,
+                        722
+                    ]
+                },
+                {
+                    "text": "1%",
+                    "box": [
+                        615,
+                        711,
+                        633,
+                        723
+                    ]
+                },
+                {
+                    "text": "Tween",
+                    "box": [
+                        640,
+                        709,
+                        690,
+                        724
+                    ]
+                },
+                {
+                    "text": "80",
+                    "box": [
+                        696,
+                        711,
+                        714,
+                        723
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        96,
+                        728,
+                        116,
+                        738
+                    ]
+                },
+                {
+                    "text": "room",
+                    "box": [
+                        121,
+                        728,
+                        161,
+                        740
+                    ]
+                },
+                {
+                    "text": "temperature.",
+                    "box": [
+                        168,
+                        728,
+                        279,
+                        738
+                    ]
+                },
+                {
+                    "text": "Reference",
+                    "box": [
+                        297,
+                        728,
+                        382,
+                        738
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        390,
+                        728,
+                        410,
+                        738
+                    ]
+                },
+                {
+                    "text": "72-",
+                    "box": [
+                        419,
+                        724,
+                        446,
+                        737
+                    ]
+                },
+                {
+                    "text": "151.",
+                    "box": [
+                        449,
+                        726,
+                        482,
+                        739
+                    ]
+                }
+            ],
+            "id": 74
+        },
+        {
+            "text": "Acute Cardiovascular- Mix 2 mg A32 with 0.2 ml 80% propylene glycol and grind lightly. Add 0.8 ml saline solution. A32 is a suspension in this mixture at room temperature. Reference OR 72- 152.",
+            "box": [
+                96,
+                754,
+                724,
+                798
+            ],
+            "linking": [
+                [
+                    40,
+                    75
+                ],
+                [
+                    76,
+                    75
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Acute",
+                    "box": [
+                        96,
+                        756,
+                        144,
+                        766
+                    ]
+                },
+                {
+                    "text": "Cardiovascular-",
+                    "box": [
+                        151,
+                        756,
+                        304,
+                        769
+                    ]
+                },
+                {
+                    "text": "Mix",
+                    "box": [
+                        309,
+                        756,
+                        337,
+                        766
+                    ]
+                },
+                {
+                    "text": "2",
+                    "box": [
+                        346,
+                        754,
+                        354,
+                        767
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        360,
+                        757,
+                        382,
+                        765
+                    ]
+                },
+                {
+                    "text": "A32",
+                    "box": [
+                        389,
+                        754,
+                        416,
+                        766
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        427,
+                        756,
+                        465,
+                        766
+                    ]
+                },
+                {
+                    "text": "0.2",
+                    "box": [
+                        473,
+                        754,
+                        501,
+                        767
+                    ]
+                },
+                {
+                    "text": "ml",
+                    "box": [
+                        508,
+                        754,
+                        526,
+                        766
+                    ]
+                },
+                {
+                    "text": "80%",
+                    "box": [
+                        538,
+                        754,
+                        565,
+                        766
+                    ]
+                },
+                {
+                    "text": "propylene",
+                    "box": [
+                        575,
+                        754,
+                        661,
+                        767
+                    ]
+                },
+                {
+                    "text": "glycol",
+                    "box": [
+                        668,
+                        754,
+                        724,
+                        767
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        96,
+                        769,
+                        124,
+                        779
+                    ]
+                },
+                {
+                    "text": "grind",
+                    "box": [
+                        131,
+                        772,
+                        181,
+                        782
+                    ]
+                },
+                {
+                    "text": "lightly.",
+                    "box": [
+                        188,
+                        771,
+                        259,
+                        784
+                    ]
+                },
+                {
+                    "text": "Add",
+                    "box": [
+                        281,
+                        769,
+                        311,
+                        781
+                    ]
+                },
+                {
+                    "text": "0.8",
+                    "box": [
+                        317,
+                        771,
+                        347,
+                        783
+                    ]
+                },
+                {
+                    "text": "ml",
+                    "box": [
+                        352,
+                        769,
+                        372,
+                        781
+                    ]
+                },
+                {
+                    "text": "saline",
+                    "box": [
+                        379,
+                        769,
+                        437,
+                        781
+                    ]
+                },
+                {
+                    "text": "solution.",
+                    "box": [
+                        444,
+                        769,
+                        527,
+                        782
+                    ]
+                },
+                {
+                    "text": "A32",
+                    "box": [
+                        547,
+                        767,
+                        577,
+                        780
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        585,
+                        767,
+                        605,
+                        780
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        613,
+                        771,
+                        621,
+                        781
+                    ]
+                },
+                {
+                    "text": "suspension",
+                    "box": [
+                        631,
+                        771,
+                        722,
+                        783
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        96,
+                        784,
+                        114,
+                        794
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        125,
+                        784,
+                        162,
+                        794
+                    ]
+                },
+                {
+                    "text": "mixture",
+                    "box": [
+                        166,
+                        784,
+                        236,
+                        797
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        244,
+                        786,
+                        264,
+                        798
+                    ]
+                },
+                {
+                    "text": "room",
+                    "box": [
+                        272,
+                        786,
+                        310,
+                        798
+                    ]
+                },
+                {
+                    "text": "temperature.",
+                    "box": [
+                        319,
+                        786,
+                        425,
+                        796
+                    ]
+                },
+                {
+                    "text": "Reference",
+                    "box": [
+                        447,
+                        784,
+                        532,
+                        796
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        538,
+                        784,
+                        556,
+                        796
+                    ]
+                },
+                {
+                    "text": "72-",
+                    "box": [
+                        568,
+                        782,
+                        595,
+                        795
+                    ]
+                },
+                {
+                    "text": "152.",
+                    "box": [
+                        598,
+                        782,
+                        630,
+                        797
+                    ]
+                }
+            ],
+            "id": 75
+        },
+        {
+            "text": "LORILLARD RESEARCH CENTER",
+            "box": [
+                71,
+                882,
+                195,
+                892
+            ],
+            "linking": [
+                [
+                    76,
+                    75
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        71,
+                        882,
+                        114,
+                        892
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        116,
+                        882,
+                        149,
+                        890
+                    ]
+                },
+                {
+                    "text": "CENTER",
+                    "box": [
+                        153,
+                        882,
+                        195,
+                        889
+                    ]
+                }
+            ],
+            "id": 76
+        },
+        {
+            "text": "Johnson",
+            "box": [
+                95,
+                850,
+                376,
+                879
+            ],
+            "linking": [
+                [
+                    41,
+                    77
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        95,
+                        854,
+                        210,
+                        879
+                    ]
+                },
+                {
+                    "text": "Johnson",
+                    "box": [
+                        213,
+                        850,
+                        376,
+                        878
+                    ]
+                }
+            ],
+            "id": 77
+        },
+        {
+            "text": "FORM ",
+            "box": [
+                666,
+                880,
+                725,
+                892
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "FORM",
+                    "box": [
+                        666,
+                        882,
+                        689,
+                        889
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        689,
+                        882,
+                        697,
+                        890
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        698,
+                        880,
+                        725,
+                        892
+                    ]
+                }
+            ],
+            "id": 78
+        }
+    ]
+}

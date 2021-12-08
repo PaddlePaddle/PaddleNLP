@@ -1,0 +1,2590 @@
+{
+    "form": [
+        {
+            "box": [
+                59,
+                135,
+                106,
+                149
+            ],
+            "text": "MARKET",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        135,
+                        106,
+                        149
+                    ],
+                    "text": "MARKET"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    7
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                59,
+                165,
+                126,
+                179
+            ],
+            "text": "POPULATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        165,
+                        126,
+                        179
+                    ],
+                    "text": "POPULATION"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    23
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                56,
+                194,
+                116,
+                208
+            ],
+            "text": "OPERATOR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        56,
+                        194,
+                        116,
+                        208
+                    ],
+                    "text": "OPERATOR"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    24
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                367,
+                134,
+                406,
+                147
+            ],
+            "text": "BRAND",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        367,
+                        134,
+                        406,
+                        147
+                    ],
+                    "text": "BRAND"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    8
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                367,
+                163,
+                426,
+                177
+            ],
+            "text": "SCHEDULE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        367,
+                        163,
+                        426,
+                        177
+                    ],
+                    "text": "SCHEDULE"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    25
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                367,
+                196,
+                461,
+                210
+            ],
+            "text": "FULL INSPECTION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        367,
+                        196,
+                        461,
+                        210
+                    ],
+                    "text": "FULL INSPECTION"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                367,
+                226,
+                459,
+                237
+            ],
+            "text": "NUMBER VIEWED",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        367,
+                        226,
+                        459,
+                        237
+                    ],
+                    "text": "NUMBER VIEWED"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                119,
+                131,
+                268,
+                146
+            ],
+            "text": "Lakeland Metro Market",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        119,
+                        131,
+                        268,
+                        146
+                    ],
+                    "text": "Lakeland Metro Market"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                427,
+                130,
+                465,
+                144
+            ],
+            "text": "Misty",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        427,
+                        130,
+                        465,
+                        144
+                    ],
+                    "text": "Misty"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                539,
+                194,
+                606,
+                208
+            ],
+            "text": "SPOT CHECK",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        539,
+                        194,
+                        606,
+                        208
+                    ],
+                    "text": "SPOT CHECK"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                324,
+                250,
+                427,
+                267
+            ],
+            "text": "TYPE OF DISPLAY",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        324,
+                        250,
+                        427,
+                        267
+                    ],
+                    "text": "TYPE OF DISPLAY"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                177,
+                286,
+                252,
+                301
+            ],
+            "text": "PERMANENT",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        177,
+                        286,
+                        252,
+                        301
+                    ],
+                    "text": "PERMANENT"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    27
+                ],
+                [
+                    11,
+                    28
+                ],
+                [
+                    11,
+                    15
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                56,
+                351,
+                106,
+                362
+            ],
+            "text": "LOCATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        56,
+                        351,
+                        106,
+                        362
+                    ],
+                    "text": "LOCATION"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    29
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                59,
+                420,
+                181,
+                437
+            ],
+            "text": "DESIGN ON DISPLAY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        420,
+                        181,
+                        437
+                    ],
+                    "text": "DESIGN ON DISPLAY"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    35
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                427,
+                317,
+                444,
+                332
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        427,
+                        317,
+                        444,
+                        332
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    15,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                384,
+                316,
+                425,
+                334
+            ],
+            "text": "ROTARY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        384,
+                        316,
+                        425,
+                        334
+                    ],
+                    "text": "ROTARY"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    15
+                ],
+                [
+                    15,
+                    14
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                246,
+                391,
+                267,
+                404
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        246,
+                        391,
+                        267,
+                        404
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    34,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                216,
+                388,
+                244,
+                406
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        216,
+                        388,
+                        244,
+                        406
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    34,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                57,
+                493,
+                131,
+                508
+            ],
+            "text": "COMMENTS:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        57,
+                        493,
+                        131,
+                        508
+                    ],
+                    "text": "COMMENTS:"
+                }
+            ],
+            "linking": [
+                [
+                    18,
+                    36
+                ],
+                [
+                    18,
+                    37
+                ],
+                [
+                    18,
+                    38
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                59,
+                689,
+                194,
+                706
+            ],
+            "text": "COMMENT ON PLANT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        689,
+                        194,
+                        706
+                    ],
+                    "text": "COMMENT ON PLANT:"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    39
+                ],
+                [
+                    19,
+                    40
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                545,
+                888,
+                627,
+                902
+            ],
+            "text": "INSPECTION BY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        545,
+                        888,
+                        627,
+                        902
+                    ],
+                    "text": "INSPECTION BY"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                496,
+                844,
+                705,
+                915
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        496,
+                        844,
+                        705,
+                        915
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "text": "LAURENCE, CHARLES, FREE & LAWSON, INC. BULLETIN ADVERTISING- INSPECTION REPORT",
+            "box": [
+                165,
+                47,
+                583,
+                92
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "LAURENCE,",
+                    "box": [
+                        165,
+                        49,
+                        270,
+                        71
+                    ]
+                },
+                {
+                    "text": "CHARLES,",
+                    "box": [
+                        275,
+                        49,
+                        369,
+                        71
+                    ]
+                },
+                {
+                    "text": "FREE",
+                    "box": [
+                        377,
+                        47,
+                        424,
+                        74
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        432,
+                        49,
+                        449,
+                        71
+                    ]
+                },
+                {
+                    "text": "LAWSON,",
+                    "box": [
+                        454,
+                        49,
+                        538,
+                        70
+                    ]
+                },
+                {
+                    "text": "INC.",
+                    "box": [
+                        545,
+                        47,
+                        583,
+                        71
+                    ]
+                },
+                {
+                    "text": "BULLETIN",
+                    "box": [
+                        214,
+                        74,
+                        281,
+                        91
+                    ]
+                },
+                {
+                    "text": "ADVERTISING-",
+                    "box": [
+                        286,
+                        74,
+                        389,
+                        92
+                    ]
+                },
+                {
+                    "text": "INSPECTION",
+                    "box": [
+                        390,
+                        75,
+                        475,
+                        92
+                    ]
+                },
+                {
+                    "text": "REPORT",
+                    "box": [
+                        473,
+                        75,
+                        536,
+                        92
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "400.400 ",
+            "box": [
+                154,
+                159,
+                204,
+                176
+            ],
+            "linking": [
+                [
+                    1,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "400.400",
+                    "box": [
+                        154,
+                        159,
+                        183,
+                        176
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        182,
+                        161,
+                        204,
+                        176
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "The Lamar Corp.",
+            "box": [
+                141,
+                186,
+                243,
+                203
+            ],
+            "linking": [
+                [
+                    2,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        141,
+                        186,
+                        162,
+                        200
+                    ]
+                },
+                {
+                    "text": "Lamar",
+                    "box": [
+                        168,
+                        186,
+                        202,
+                        203
+                    ]
+                },
+                {
+                    "text": "Corp.",
+                    "box": [
+                        211,
+                        189,
+                        243,
+                        203
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "2/ 20 & 3/ 20",
+            "box": [
+                433,
+                159,
+                517,
+                177
+            ],
+            "linking": [
+                [
+                    4,
+                    25
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2/",
+                    "box": [
+                        433,
+                        159,
+                        451,
+                        177
+                    ]
+                },
+                {
+                    "text": "20",
+                    "box": [
+                        450,
+                        161,
+                        465,
+                        175
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        471,
+                        162,
+                        479,
+                        176
+                    ]
+                },
+                {
+                    "text": "3/",
+                    "box": [
+                        485,
+                        162,
+                        499,
+                        176
+                    ]
+                },
+                {
+                    "text": "20",
+                    "box": [
+                        499,
+                        163,
+                        517,
+                        176
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "3/ 23/ 91",
+            "box": [
+                589,
+                159,
+                644,
+                177
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "3/",
+                    "box": [
+                        589,
+                        159,
+                        602,
+                        177
+                    ]
+                },
+                {
+                    "text": "23/",
+                    "box": [
+                        603,
+                        162,
+                        624,
+                        176
+                    ]
+                },
+                {
+                    "text": "91",
+                    "box": [
+                        624,
+                        161,
+                        644,
+                        174
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "BULLETIN ☐",
+            "box": [
+                57,
+                313,
+                126,
+                334
+            ],
+            "linking": [
+                [
+                    11,
+                    27
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "BULLETIN",
+                    "box": [
+                        57,
+                        313,
+                        106,
+                        334
+                    ]
+                },
+                {
+                    "text": "☐",
+                    "box": [
+                        109,
+                        316,
+                        126,
+                        333
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "WALL ☐",
+            "box": [
+                180,
+                316,
+                225,
+                334
+            ],
+            "linking": [
+                [
+                    11,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "WALL",
+                    "box": [
+                        180,
+                        316,
+                        207,
+                        334
+                    ]
+                },
+                {
+                    "text": "☐",
+                    "box": [
+                        211,
+                        316,
+                        225,
+                        333
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "See attached list",
+            "box": [
+                141,
+                345,
+                261,
+                362
+            ],
+            "linking": [
+                [
+                    12,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "See",
+                    "box": [
+                        141,
+                        345,
+                        161,
+                        362
+                    ]
+                },
+                {
+                    "text": "attached",
+                    "box": [
+                        169,
+                        349,
+                        225,
+                        360
+                    ]
+                },
+                {
+                    "text": "list",
+                    "box": [
+                        232,
+                        346,
+                        261,
+                        361
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "NO OF ROTARIES",
+            "box": [
+                383,
+                346,
+                468,
+                366
+            ],
+            "linking": [
+                [
+                    30,
+                    31
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NO",
+                    "box": [
+                        383,
+                        351,
+                        400,
+                        365
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        404,
+                        346,
+                        418,
+                        361
+                    ]
+                },
+                {
+                    "text": "ROTARIES",
+                    "box": [
+                        418,
+                        351,
+                        468,
+                        366
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "8 RB",
+            "box": [
+                508,
+                351,
+                542,
+                368
+            ],
+            "linking": [
+                [
+                    30,
+                    31
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "8",
+                    "box": [
+                        508,
+                        351,
+                        519,
+                        364
+                    ]
+                },
+                {
+                    "text": "RB",
+                    "box": [
+                        524,
+                        351,
+                        542,
+                        368
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "218, 499",
+            "box": [
+                539,
+                390,
+                588,
+                408
+            ],
+            "linking": [
+                [
+                    33,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "218,",
+                    "box": [
+                        539,
+                        390,
+                        567,
+                        405
+                    ]
+                },
+                {
+                    "text": "499",
+                    "box": [
+                        568,
+                        390,
+                        588,
+                        408
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "AVERAGE DAILY EFFECTIVE CIRCULATION",
+            "box": [
+                385,
+                383,
+                506,
+                409
+            ],
+            "linking": [
+                [
+                    33,
+                    32
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "AVERAGE",
+                    "box": [
+                        385,
+                        383,
+                        428,
+                        397
+                    ]
+                },
+                {
+                    "text": "DAILY",
+                    "box": [
+                        432,
+                        383,
+                        463,
+                        396
+                    ]
+                },
+                {
+                    "text": "EFFECTIVE",
+                    "box": [
+                        385,
+                        395,
+                        438,
+                        406
+                    ]
+                },
+                {
+                    "text": "CIRCULATION",
+                    "box": [
+                        440,
+                        394,
+                        506,
+                        409
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "DAILY EFFECTIVE CIRCULATION",
+            "box": [
+                56,
+                383,
+                178,
+                413
+            ],
+            "linking": [
+                [
+                    34,
+                    17
+                ],
+                [
+                    34,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DAILY",
+                    "box": [
+                        56,
+                        383,
+                        84,
+                        394
+                    ]
+                },
+                {
+                    "text": "EFFECTIVE",
+                    "box": [
+                        59,
+                        395,
+                        111,
+                        409
+                    ]
+                },
+                {
+                    "text": "CIRCULATION",
+                    "box": [
+                        112,
+                        392,
+                        178,
+                        413
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "(Condition And Rendition of Copy)",
+            "box": [
+                183,
+                419,
+                361,
+                437
+            ],
+            "linking": [
+                [
+                    13,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(Condition",
+                    "box": [
+                        183,
+                        422,
+                        236,
+                        436
+                    ]
+                },
+                {
+                    "text": "And",
+                    "box": [
+                        237,
+                        419,
+                        261,
+                        434
+                    ]
+                },
+                {
+                    "text": "Rendition",
+                    "box": [
+                        263,
+                        423,
+                        313,
+                        437
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        314,
+                        419,
+                        327,
+                        436
+                    ]
+                },
+                {
+                    "text": "Copy)",
+                    "box": [
+                        327,
+                        419,
+                        361,
+                        437
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "(Description of Location or Rotary Plan, Brand Category Competition)",
+            "box": [
+                133,
+                490,
+                490,
+                512
+            ],
+            "linking": [
+                [
+                    18,
+                    36
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(Description",
+                    "box": [
+                        133,
+                        490,
+                        196,
+                        507
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        198,
+                        494,
+                        212,
+                        505
+                    ]
+                },
+                {
+                    "text": "Location",
+                    "box": [
+                        212,
+                        494,
+                        255,
+                        508
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        256,
+                        494,
+                        270,
+                        507
+                    ]
+                },
+                {
+                    "text": "Rotary",
+                    "box": [
+                        272,
+                        493,
+                        306,
+                        511
+                    ]
+                },
+                {
+                    "text": "Plan,",
+                    "box": [
+                        309,
+                        493,
+                        337,
+                        508
+                    ]
+                },
+                {
+                    "text": "Brand",
+                    "box": [
+                        337,
+                        493,
+                        371,
+                        510
+                    ]
+                },
+                {
+                    "text": "Category",
+                    "box": [
+                        370,
+                        493,
+                        420,
+                        511
+                    ]
+                },
+                {
+                    "text": "Competition)",
+                    "box": [
+                        422,
+                        494,
+                        490,
+                        512
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "This is a comparatively easy market to cover. It is less than an hour from Tampa airport. Our bulletins are on every major arterial and in all No quadrants of the area. changes were made. Some minor on- premise blocking and trees were noted, but deemed serious enough for correction. not",
+            "box": [
+                54,
+                511,
+                652,
+                574
+            ],
+            "linking": [
+                [
+                    18,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        54,
+                        513,
+                        83,
+                        530
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        91,
+                        511,
+                        104,
+                        526
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        110,
+                        515,
+                        118,
+                        528
+                    ]
+                },
+                {
+                    "text": "comparatively",
+                    "box": [
+                        126,
+                        517,
+                        220,
+                        528
+                    ]
+                },
+                {
+                    "text": "easy",
+                    "box": [
+                        225,
+                        513,
+                        253,
+                        530
+                    ]
+                },
+                {
+                    "text": "market",
+                    "box": [
+                        257,
+                        514,
+                        300,
+                        532
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        309,
+                        514,
+                        324,
+                        531
+                    ]
+                },
+                {
+                    "text": "cover.",
+                    "box": [
+                        328,
+                        515,
+                        371,
+                        530
+                    ]
+                },
+                {
+                    "text": "It",
+                    "box": [
+                        383,
+                        515,
+                        404,
+                        532
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        406,
+                        517,
+                        420,
+                        534
+                    ]
+                },
+                {
+                    "text": "less",
+                    "box": [
+                        427,
+                        518,
+                        458,
+                        532
+                    ]
+                },
+                {
+                    "text": "than",
+                    "box": [
+                        461,
+                        517,
+                        492,
+                        532
+                    ]
+                },
+                {
+                    "text": "an",
+                    "box": [
+                        494,
+                        515,
+                        511,
+                        532
+                    ]
+                },
+                {
+                    "text": "hour",
+                    "box": [
+                        517,
+                        518,
+                        548,
+                        532
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        553,
+                        517,
+                        581,
+                        531
+                    ]
+                },
+                {
+                    "text": "Tampa",
+                    "box": [
+                        589,
+                        517,
+                        624,
+                        532
+                    ]
+                },
+                {
+                    "text": "airport.",
+                    "box": [
+                        54,
+                        529,
+                        110,
+                        542
+                    ]
+                },
+                {
+                    "text": "Our",
+                    "box": [
+                        122,
+                        529,
+                        151,
+                        540
+                    ]
+                },
+                {
+                    "text": "bulletins",
+                    "box": [
+                        152,
+                        529,
+                        220,
+                        544
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        222,
+                        532,
+                        246,
+                        543
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        249,
+                        534,
+                        270,
+                        542
+                    ]
+                },
+                {
+                    "text": "every",
+                    "box": [
+                        271,
+                        532,
+                        309,
+                        547
+                    ]
+                },
+                {
+                    "text": "major",
+                    "box": [
+                        314,
+                        532,
+                        350,
+                        545
+                    ]
+                },
+                {
+                    "text": "arterial",
+                    "box": [
+                        356,
+                        532,
+                        412,
+                        545
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        420,
+                        532,
+                        445,
+                        542
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        447,
+                        534,
+                        465,
+                        545
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        466,
+                        532,
+                        494,
+                        545
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        56,
+                        543,
+                        74,
+                        554
+                    ]
+                },
+                {
+                    "text": "quadrants",
+                    "box": [
+                        496,
+                        532,
+                        564,
+                        549
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        564,
+                        532,
+                        589,
+                        549
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        589,
+                        534,
+                        617,
+                        549
+                    ]
+                },
+                {
+                    "text": "area.",
+                    "box": [
+                        616,
+                        532,
+                        652,
+                        550
+                    ]
+                },
+                {
+                    "text": "changes",
+                    "box": [
+                        77,
+                        546,
+                        127,
+                        554
+                    ]
+                },
+                {
+                    "text": "were",
+                    "box": [
+                        131,
+                        545,
+                        165,
+                        558
+                    ]
+                },
+                {
+                    "text": "made.",
+                    "box": [
+                        165,
+                        543,
+                        203,
+                        557
+                    ]
+                },
+                {
+                    "text": "Some",
+                    "box": [
+                        216,
+                        543,
+                        250,
+                        558
+                    ]
+                },
+                {
+                    "text": "minor",
+                    "box": [
+                        251,
+                        543,
+                        289,
+                        557
+                    ]
+                },
+                {
+                    "text": "on-",
+                    "box": [
+                        293,
+                        547,
+                        314,
+                        560
+                    ]
+                },
+                {
+                    "text": "premise",
+                    "box": [
+                        314,
+                        546,
+                        364,
+                        560
+                    ]
+                },
+                {
+                    "text": "blocking",
+                    "box": [
+                        370,
+                        545,
+                        429,
+                        560
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        433,
+                        545,
+                        457,
+                        560
+                    ]
+                },
+                {
+                    "text": "trees",
+                    "box": [
+                        462,
+                        547,
+                        504,
+                        561
+                    ]
+                },
+                {
+                    "text": "were",
+                    "box": [
+                        503,
+                        547,
+                        538,
+                        562
+                    ]
+                },
+                {
+                    "text": "noted,",
+                    "box": [
+                        538,
+                        549,
+                        583,
+                        560
+                    ]
+                },
+                {
+                    "text": "but",
+                    "box": [
+                        585,
+                        545,
+                        612,
+                        560
+                    ]
+                },
+                {
+                    "text": "deemed",
+                    "box": [
+                        54,
+                        557,
+                        99,
+                        570
+                    ]
+                },
+                {
+                    "text": "serious",
+                    "box": [
+                        105,
+                        557,
+                        154,
+                        572
+                    ]
+                },
+                {
+                    "text": "enough",
+                    "box": [
+                        161,
+                        560,
+                        204,
+                        571
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        211,
+                        557,
+                        232,
+                        574
+                    ]
+                },
+                {
+                    "text": "correction.",
+                    "box": [
+                        237,
+                        557,
+                        314,
+                        570
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        615,
+                        549,
+                        643,
+                        566
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "The only other tobacco in the market was a standing 6 Panel RJR buy currently showing Camel.",
+            "box": [
+                52,
+                582,
+                652,
+                615
+            ],
+            "linking": [
+                [
+                    18,
+                    38
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        52,
+                        582,
+                        76,
+                        600
+                    ]
+                },
+                {
+                    "text": "only",
+                    "box": [
+                        82,
+                        582,
+                        110,
+                        597
+                    ]
+                },
+                {
+                    "text": "other",
+                    "box": [
+                        116,
+                        584,
+                        150,
+                        599
+                    ]
+                },
+                {
+                    "text": "tobacco",
+                    "box": [
+                        159,
+                        584,
+                        209,
+                        599
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        215,
+                        582,
+                        232,
+                        599
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        237,
+                        584,
+                        259,
+                        599
+                    ]
+                },
+                {
+                    "text": "market",
+                    "box": [
+                        265,
+                        585,
+                        306,
+                        600
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        313,
+                        585,
+                        337,
+                        600
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        344,
+                        588,
+                        352,
+                        599
+                    ]
+                },
+                {
+                    "text": "standing",
+                    "box": [
+                        356,
+                        585,
+                        412,
+                        600
+                    ]
+                },
+                {
+                    "text": "6",
+                    "box": [
+                        418,
+                        585,
+                        432,
+                        600
+                    ]
+                },
+                {
+                    "text": "Panel",
+                    "box": [
+                        433,
+                        584,
+                        467,
+                        601
+                    ]
+                },
+                {
+                    "text": "RJR",
+                    "box": [
+                        475,
+                        585,
+                        497,
+                        603
+                    ]
+                },
+                {
+                    "text": "buy",
+                    "box": [
+                        501,
+                        585,
+                        525,
+                        602
+                    ]
+                },
+                {
+                    "text": "currently",
+                    "box": [
+                        531,
+                        585,
+                        597,
+                        602
+                    ]
+                },
+                {
+                    "text": "showing",
+                    "box": [
+                        602,
+                        585,
+                        652,
+                        606
+                    ]
+                },
+                {
+                    "text": "Camel.",
+                    "box": [
+                        53,
+                        598,
+                        96,
+                        615
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "(Condition, Structures, Painting Ability, Lighting, Cooperation, etc.)",
+            "box": [
+                197,
+                689,
+                535,
+                707
+            ],
+            "linking": [
+                [
+                    19,
+                    39
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(Condition,",
+                    "box": [
+                        197,
+                        690,
+                        253,
+                        707
+                    ]
+                },
+                {
+                    "text": "Structures,",
+                    "box": [
+                        256,
+                        689,
+                        312,
+                        703
+                    ]
+                },
+                {
+                    "text": "Painting",
+                    "box": [
+                        314,
+                        689,
+                        359,
+                        706
+                    ]
+                },
+                {
+                    "text": "Ability,",
+                    "box": [
+                        359,
+                        689,
+                        393,
+                        706
+                    ]
+                },
+                {
+                    "text": "Lighting,",
+                    "box": [
+                        394,
+                        689,
+                        439,
+                        707
+                    ]
+                },
+                {
+                    "text": "Cooperation,",
+                    "box": [
+                        439,
+                        689,
+                        507,
+                        704
+                    ]
+                },
+                {
+                    "text": "etc.)",
+                    "box": [
+                        510,
+                        691,
+                        535,
+                        702
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "The plant is well maintained and covers all parts of the market. Lamar looks like a good citizen here, keeping a good- looking public and carrying lot operation. doing service, a of local advertisers.",
+            "box": [
+                52,
+                708,
+                648,
+                753
+            ],
+            "linking": [
+                [
+                    19,
+                    40
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        53,
+                        708,
+                        77,
+                        723
+                    ]
+                },
+                {
+                    "text": "plant",
+                    "box": [
+                        81,
+                        708,
+                        119,
+                        725
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        122,
+                        709,
+                        140,
+                        722
+                    ]
+                },
+                {
+                    "text": "well",
+                    "box": [
+                        145,
+                        709,
+                        174,
+                        723
+                    ]
+                },
+                {
+                    "text": "maintained",
+                    "box": [
+                        180,
+                        711,
+                        251,
+                        724
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        258,
+                        709,
+                        279,
+                        724
+                    ]
+                },
+                {
+                    "text": "covers",
+                    "box": [
+                        286,
+                        711,
+                        328,
+                        725
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        334,
+                        711,
+                        355,
+                        725
+                    ]
+                },
+                {
+                    "text": "parts",
+                    "box": [
+                        365,
+                        711,
+                        400,
+                        725
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        405,
+                        712,
+                        422,
+                        729
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        426,
+                        712,
+                        446,
+                        726
+                    ]
+                },
+                {
+                    "text": "market.",
+                    "box": [
+                        453,
+                        714,
+                        502,
+                        728
+                    ]
+                },
+                {
+                    "text": "Lamar",
+                    "box": [
+                        517,
+                        711,
+                        552,
+                        726
+                    ]
+                },
+                {
+                    "text": "looks",
+                    "box": [
+                        560,
+                        709,
+                        594,
+                        727
+                    ]
+                },
+                {
+                    "text": "like",
+                    "box": [
+                        602,
+                        711,
+                        629,
+                        726
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        635,
+                        712,
+                        648,
+                        727
+                    ]
+                },
+                {
+                    "text": "good",
+                    "box": [
+                        52,
+                        725,
+                        83,
+                        739
+                    ]
+                },
+                {
+                    "text": "citizen",
+                    "box": [
+                        88,
+                        723,
+                        138,
+                        738
+                    ]
+                },
+                {
+                    "text": "here,",
+                    "box": [
+                        144,
+                        723,
+                        180,
+                        741
+                    ]
+                },
+                {
+                    "text": "keeping",
+                    "box": [
+                        186,
+                        725,
+                        239,
+                        739
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        243,
+                        725,
+                        253,
+                        739
+                    ]
+                },
+                {
+                    "text": "good-",
+                    "box": [
+                        256,
+                        725,
+                        292,
+                        742
+                    ]
+                },
+                {
+                    "text": "looking",
+                    "box": [
+                        293,
+                        726,
+                        342,
+                        741
+                    ]
+                },
+                {
+                    "text": "public",
+                    "box": [
+                        468,
+                        729,
+                        513,
+                        744
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        580,
+                        730,
+                        608,
+                        741
+                    ]
+                },
+                {
+                    "text": "carrying",
+                    "box": [
+                        54,
+                        737,
+                        110,
+                        751
+                    ]
+                },
+                {
+                    "text": "lot",
+                    "box": [
+                        133,
+                        739,
+                        153,
+                        750
+                    ]
+                },
+                {
+                    "text": "operation.",
+                    "box": [
+                        348,
+                        725,
+                        422,
+                        745
+                    ]
+                },
+                {
+                    "text": "doing",
+                    "box": [
+                        426,
+                        725,
+                        465,
+                        745
+                    ]
+                },
+                {
+                    "text": "service,",
+                    "box": [
+                        517,
+                        728,
+                        573,
+                        745
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        113,
+                        742,
+                        127,
+                        750
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        156,
+                        742,
+                        178,
+                        753
+                    ]
+                },
+                {
+                    "text": "local",
+                    "box": [
+                        182,
+                        740,
+                        216,
+                        753
+                    ]
+                },
+                {
+                    "text": "advertisers.",
+                    "box": [
+                        219,
+                        742,
+                        304,
+                        753
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "(FORM NO ",
+            "box": [
+                31,
+                890,
+                100,
+                905
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(FORM",
+                    "box": [
+                        31,
+                        892,
+                        56,
+                        902
+                    ]
+                },
+                {
+                    "text": "NO",
+                    "box": [
+                        56,
+                        890,
+                        71,
+                        904
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        70,
+                        890,
+                        84,
+                        905
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        85,
+                        891,
+                        100,
+                        905
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "970518461 PRODUCED FROM B&W WEB SITE",
+            "box": [
+                0,
+                951,
+                231,
+                985
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "970518461",
+                    "box": [
+                        0,
+                        951,
+                        77,
+                        966
+                    ]
+                },
+                {
+                    "text": "PRODUCED",
+                    "box": [
+                        0,
+                        969,
+                        71,
+                        983
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        80,
+                        968,
+                        119,
+                        985
+                    ]
+                },
+                {
+                    "text": "B&W",
+                    "box": [
+                        124,
+                        969,
+                        151,
+                        982
+                    ]
+                },
+                {
+                    "text": "WEB",
+                    "box": [
+                        158,
+                        966,
+                        187,
+                        983
+                    ]
+                },
+                {
+                    "text": "SITE",
+                    "box": [
+                        196,
+                        968,
+                        231,
+                        981
+                    ]
+                }
+            ],
+            "id": 42
+        }
+    ]
+}

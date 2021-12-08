@@ -1,0 +1,2079 @@
+{
+    "form": [
+        {
+            "box": [
+                279,
+                733,
+                313,
+                751
+            ],
+            "text": "4111",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        279,
+                        733,
+                        313,
+                        751
+                    ],
+                    "text": "4111"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    0
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                427,
+                732,
+                461,
+                747
+            ],
+            "text": "9590",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        427,
+                        732,
+                        461,
+                        747
+                    ],
+                    "text": "9590"
+                }
+            ],
+            "linking": [
+                [
+                    33,
+                    1
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                585,
+                675,
+                683,
+                692
+            ],
+            "text": "00922237",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        585,
+                        675,
+                        683,
+                        692
+                    ],
+                    "text": "00922237"
+                }
+            ],
+            "linking": [
+                [
+                    31,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                518,
+                729,
+                709,
+                771
+            ],
+            "text": "H.J. Minnemeyer",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        518,
+                        729,
+                        709,
+                        771
+                    ],
+                    "text": "H.J. Minnemeyer"
+                }
+            ],
+            "linking": [
+                [
+                    34,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                24,
+                190,
+                83,
+                204
+            ],
+            "text": "QUANTITY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        24,
+                        190,
+                        83,
+                        204
+                    ],
+                    "text": "QUANTITY"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                140,
+                189,
+                174,
+                206
+            ],
+            "text": "CODE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        140,
+                        189,
+                        174,
+                        206
+                    ],
+                    "text": "CODE"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                377,
+                187,
+                451,
+                204
+            ],
+            "text": "DESCRIPTION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        187,
+                        451,
+                        204
+                    ],
+                    "text": "DESCRIPTION"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    26
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                50,
+                28,
+                117,
+                39
+            ],
+            "text": "PURCHASING",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        50,
+                        28,
+                        117,
+                        39
+                    ],
+                    "text": "PURCHASING"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                47,
+                43,
+                117,
+                54
+            ],
+            "text": "STATIONARY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        43,
+                        117,
+                        54
+                    ],
+                    "text": "STATIONARY"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                581,
+                14,
+                609,
+                28
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        581,
+                        14,
+                        609,
+                        28
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                247,
+                130,
+                282,
+                145
+            ],
+            "text": "Attn:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        247,
+                        130,
+                        282,
+                        145
+                    ],
+                    "text": "Attn:"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    23
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                13,
+                61,
+                62,
+                69
+            ],
+            "text": "VENDOR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        13,
+                        61,
+                        62,
+                        69
+                    ],
+                    "text": "VENDOR"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    16
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                42,
+                105,
+                80,
+                116
+            ],
+            "text": "TERMS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        42,
+                        105,
+                        80,
+                        116
+                    ],
+                    "text": "TERMS"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    20
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "text": "PURCHASE REQUISITION",
+            "box": [
+                253,
+                24,
+                423,
+                38
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PURCHASE",
+                    "box": [
+                        253,
+                        24,
+                        331,
+                        38
+                    ]
+                },
+                {
+                    "text": "REQUISITION",
+                    "box": [
+                        332,
+                        25,
+                        423,
+                        38
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "P.O. 1534 REV. 7/75 LT-9-75",
+            "box": [
+                471,
+                10,
+                572,
+                33
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "P.O.",
+                    "box": [
+                        471,
+                        10,
+                        489,
+                        24
+                    ]
+                },
+                {
+                    "text": "1534",
+                    "box": [
+                        493,
+                        11,
+                        517,
+                        22
+                    ]
+                },
+                {
+                    "text": "REV.",
+                    "box": [
+                        520,
+                        13,
+                        545,
+                        21
+                    ]
+                },
+                {
+                    "text": "7/75",
+                    "box": [
+                        545,
+                        11,
+                        570,
+                        22
+                    ]
+                },
+                {
+                    "text": "LT-9-75",
+                    "box": [
+                        534,
+                        25,
+                        572,
+                        33
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "PLEASE INCLUDE ONLY ONE TYPE OF MATERIAL ON THIS REQUISITION ",
+            "box": [
+                161,
+                39,
+                532,
+                67
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "PLEASE",
+                    "box": [
+                        161,
+                        45,
+                        202,
+                        53
+                    ]
+                },
+                {
+                    "text": "INCLUDE",
+                    "box": [
+                        205,
+                        43,
+                        251,
+                        54
+                    ]
+                },
+                {
+                    "text": "ONLY",
+                    "box": [
+                        251,
+                        42,
+                        285,
+                        53
+                    ]
+                },
+                {
+                    "text": "ONE",
+                    "box": [
+                        282,
+                        41,
+                        310,
+                        54
+                    ]
+                },
+                {
+                    "text": "TYPE",
+                    "box": [
+                        313,
+                        41,
+                        340,
+                        54
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        342,
+                        42,
+                        356,
+                        53
+                    ]
+                },
+                {
+                    "text": "MATERIAL",
+                    "box": [
+                        358,
+                        39,
+                        415,
+                        54
+                    ]
+                },
+                {
+                    "text": "ON",
+                    "box": [
+                        416,
+                        41,
+                        433,
+                        52
+                    ]
+                },
+                {
+                    "text": "THIS",
+                    "box": [
+                        436,
+                        39,
+                        461,
+                        50
+                    ]
+                },
+                {
+                    "text": "REQUISITION",
+                    "box": [
+                        461,
+                        42,
+                        532,
+                        50
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        186,
+                        59,
+                        213,
+                        67
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        215,
+                        57,
+                        282,
+                        67
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        282,
+                        59,
+                        355,
+                        67
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        353,
+                        56,
+                        380,
+                        67
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        380,
+                        56,
+                        414,
+                        66
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "Microbiological Associates 5221 River Rd., Bethesda MD 20816",
+            "box": [
+                11,
+                64,
+                493,
+                89
+            ],
+            "linking": [
+                [
+                    11,
+                    16
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Microbiological",
+                    "box": [
+                        11,
+                        68,
+                        127,
+                        89
+                    ]
+                },
+                {
+                    "text": "Associates",
+                    "box": [
+                        131,
+                        71,
+                        223,
+                        88
+                    ]
+                },
+                {
+                    "text": "5221",
+                    "box": [
+                        229,
+                        68,
+                        263,
+                        85
+                    ]
+                },
+                {
+                    "text": "River",
+                    "box": [
+                        267,
+                        70,
+                        308,
+                        85
+                    ]
+                },
+                {
+                    "text": "Rd.,",
+                    "box": [
+                        314,
+                        68,
+                        341,
+                        83
+                    ]
+                },
+                {
+                    "text": "Bethesda",
+                    "box": [
+                        349,
+                        67,
+                        417,
+                        85
+                    ]
+                },
+                {
+                    "text": "MD",
+                    "box": [
+                        425,
+                        67,
+                        442,
+                        84
+                    ]
+                },
+                {
+                    "text": "20816",
+                    "box": [
+                        455,
+                        64,
+                        493,
+                        81
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "ORDER NO.",
+            "box": [
+                578,
+                54,
+                637,
+                66
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ORDER",
+                    "box": [
+                        578,
+                        54,
+                        614,
+                        65
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        617,
+                        56,
+                        637,
+                        66
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "Prev. or Recommended Supplier",
+            "box": [
+                578,
+                85,
+                720,
+                98
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Prev.",
+                    "box": [
+                        578,
+                        88,
+                        602,
+                        98
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        605,
+                        87,
+                        613,
+                        98
+                    ]
+                },
+                {
+                    "text": "Recommended",
+                    "box": [
+                        615,
+                        85,
+                        685,
+                        96
+                    ]
+                },
+                {
+                    "text": "Supplier",
+                    "box": [
+                        684,
+                        85,
+                        720,
+                        96
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "DATE WANTED",
+            "box": [
+                503,
+                116,
+                585,
+                127
+            ],
+            "linking": [
+                [
+                    19,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DATE",
+                    "box": [
+                        503,
+                        117,
+                        535,
+                        127
+                    ]
+                },
+                {
+                    "text": "WANTED",
+                    "box": [
+                        536,
+                        116,
+                        585,
+                        126
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "15 Net F.O.S N/A VIA N/A",
+            "box": [
+                87,
+                96,
+                453,
+                119
+            ],
+            "linking": [
+                [
+                    12,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "15",
+                    "box": [
+                        87,
+                        99,
+                        104,
+                        119
+                    ]
+                },
+                {
+                    "text": "Net",
+                    "box": [
+                        106,
+                        102,
+                        137,
+                        117
+                    ]
+                },
+                {
+                    "text": "F.O.S",
+                    "box": [
+                        198,
+                        105,
+                        233,
+                        119
+                    ]
+                },
+                {
+                    "text": "N/A",
+                    "box": [
+                        270,
+                        99,
+                        297,
+                        116
+                    ]
+                },
+                {
+                    "text": "VIA",
+                    "box": [
+                        373,
+                        102,
+                        395,
+                        116
+                    ]
+                },
+                {
+                    "text": "N/A",
+                    "box": [
+                        426,
+                        96,
+                        453,
+                        114
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "SHIP TO DEPT BRANCH)",
+            "box": [
+                14,
+                117,
+                147,
+                130
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SHIP",
+                    "box": [
+                        14,
+                        117,
+                        39,
+                        130
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        43,
+                        120,
+                        61,
+                        130
+                    ]
+                },
+                {
+                    "text": "DEPT",
+                    "box": [
+                        60,
+                        119,
+                        96,
+                        130
+                    ]
+                },
+                {
+                    "text": "BRANCH)",
+                    "box": [
+                        95,
+                        122,
+                        147,
+                        128
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Lorillard Research Center",
+            "box": [
+                14,
+                130,
+                204,
+                148
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Lorillard",
+                    "box": [
+                        14,
+                        130,
+                        82,
+                        144
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        87,
+                        130,
+                        153,
+                        148
+                    ]
+                },
+                {
+                    "text": "Center",
+                    "box": [
+                        155,
+                        130,
+                        204,
+                        145
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "Dr. Harry Minnemeyer",
+            "box": [
+                291,
+                127,
+                445,
+                147
+            ],
+            "linking": [
+                [
+                    10,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        291,
+                        128,
+                        312,
+                        145
+                    ]
+                },
+                {
+                    "text": "Harry",
+                    "box": [
+                        323,
+                        127,
+                        359,
+                        147
+                    ]
+                },
+                {
+                    "text": "Minnemeyer",
+                    "box": [
+                        365,
+                        127,
+                        445,
+                        144
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "As required",
+            "box": [
+                536,
+                124,
+                622,
+                141
+            ],
+            "linking": [
+                [
+                    19,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "As",
+                    "box": [
+                        536,
+                        124,
+                        553,
+                        141
+                    ]
+                },
+                {
+                    "text": "required",
+                    "box": [
+                        559,
+                        127,
+                        622,
+                        141
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "P. O. Box 21688 Greensboro N. C. 27420",
+            "box": [
+                13,
+                158,
+                318,
+                179
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "P.",
+                    "box": [
+                        13,
+                        162,
+                        28,
+                        179
+                    ]
+                },
+                {
+                    "text": "O.",
+                    "box": [
+                        34,
+                        163,
+                        52,
+                        176
+                    ]
+                },
+                {
+                    "text": "Box",
+                    "box": [
+                        57,
+                        162,
+                        84,
+                        177
+                    ]
+                },
+                {
+                    "text": "21688",
+                    "box": [
+                        87,
+                        158,
+                        137,
+                        178
+                    ]
+                },
+                {
+                    "text": "Greensboro",
+                    "box": [
+                        140,
+                        158,
+                        224,
+                        178
+                    ]
+                },
+                {
+                    "text": "N.",
+                    "box": [
+                        225,
+                        158,
+                        247,
+                        173
+                    ]
+                },
+                {
+                    "text": "C.",
+                    "box": [
+                        251,
+                        158,
+                        268,
+                        175
+                    ]
+                },
+                {
+                    "text": "27420",
+                    "box": [
+                        275,
+                        158,
+                        318,
+                        176
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "This is your authorization to provide the \"1601.013: The Effect of Inhalation of Reference and Test (D3 and D4) Cigarette Smoke on Two Cytogenetic Endpoints in Mice: Chromosome Aberrations and Sister Chromatid Exchange\" test for a fixed price of $19,750 Tests will be performed in accordance with the December 21, 1981 formal agreement between Microbiological Associates and Lorillard. All work is to be coordinated with our Dr. Harry Minnemeyer (919) 373-6603",
+            "box": [
+                103,
+                215,
+                691,
+                403
+            ],
+            "linking": [
+                [
+                    6,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        105,
+                        223,
+                        137,
+                        238
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        142,
+                        222,
+                        162,
+                        240
+                    ]
+                },
+                {
+                    "text": "your",
+                    "box": [
+                        162,
+                        223,
+                        194,
+                        236
+                    ]
+                },
+                {
+                    "text": "authorization",
+                    "box": [
+                        203,
+                        223,
+                        304,
+                        234
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        309,
+                        221,
+                        323,
+                        238
+                    ]
+                },
+                {
+                    "text": "provide",
+                    "box": [
+                        330,
+                        221,
+                        386,
+                        236
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        390,
+                        218,
+                        414,
+                        239
+                    ]
+                },
+                {
+                    "text": "\"1601.013:",
+                    "box": [
+                        420,
+                        219,
+                        495,
+                        236
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        501,
+                        218,
+                        525,
+                        233
+                    ]
+                },
+                {
+                    "text": "Effect",
+                    "box": [
+                        532,
+                        218,
+                        575,
+                        236
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        584,
+                        215,
+                        599,
+                        236
+                    ]
+                },
+                {
+                    "text": "Inhalation",
+                    "box": [
+                        608,
+                        218,
+                        683,
+                        232
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        103,
+                        246,
+                        118,
+                        263
+                    ]
+                },
+                {
+                    "text": "Reference",
+                    "box": [
+                        124,
+                        246,
+                        197,
+                        260
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        203,
+                        246,
+                        227,
+                        260
+                    ]
+                },
+                {
+                    "text": "Test",
+                    "box": [
+                        232,
+                        246,
+                        263,
+                        260
+                    ]
+                },
+                {
+                    "text": "(D3",
+                    "box": [
+                        268,
+                        243,
+                        296,
+                        261
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        300,
+                        244,
+                        321,
+                        261
+                    ]
+                },
+                {
+                    "text": "D4)",
+                    "box": [
+                        330,
+                        243,
+                        352,
+                        261
+                    ]
+                },
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        359,
+                        243,
+                        427,
+                        258
+                    ]
+                },
+                {
+                    "text": "Smoke",
+                    "box": [
+                        432,
+                        242,
+                        475,
+                        260
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        478,
+                        243,
+                        498,
+                        257
+                    ]
+                },
+                {
+                    "text": "Two",
+                    "box": [
+                        500,
+                        243,
+                        525,
+                        257
+                    ]
+                },
+                {
+                    "text": "Cytogenetic",
+                    "box": [
+                        532,
+                        242,
+                        616,
+                        257
+                    ]
+                },
+                {
+                    "text": "Endpoints",
+                    "box": [
+                        620,
+                        242,
+                        691,
+                        257
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        103,
+                        275,
+                        124,
+                        290
+                    ]
+                },
+                {
+                    "text": "Mice:",
+                    "box": [
+                        127,
+                        277,
+                        166,
+                        291
+                    ]
+                },
+                {
+                    "text": "Chromosome",
+                    "box": [
+                        172,
+                        275,
+                        246,
+                        290
+                    ]
+                },
+                {
+                    "text": "Aberrations",
+                    "box": [
+                        254,
+                        275,
+                        338,
+                        290
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        345,
+                        274,
+                        370,
+                        287
+                    ]
+                },
+                {
+                    "text": "Sister",
+                    "box": [
+                        376,
+                        275,
+                        422,
+                        289
+                    ]
+                },
+                {
+                    "text": "Chromatid",
+                    "box": [
+                        427,
+                        274,
+                        497,
+                        289
+                    ]
+                },
+                {
+                    "text": "Exchange\"",
+                    "box": [
+                        503,
+                        274,
+                        571,
+                        288
+                    ]
+                },
+                {
+                    "text": "test",
+                    "box": [
+                        577,
+                        272,
+                        606,
+                        289
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        615,
+                        270,
+                        637,
+                        291
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        642,
+                        274,
+                        653,
+                        289
+                    ]
+                },
+                {
+                    "text": "fixed",
+                    "box": [
+                        106,
+                        300,
+                        144,
+                        315
+                    ]
+                },
+                {
+                    "text": "price",
+                    "box": [
+                        149,
+                        300,
+                        188,
+                        315
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        191,
+                        299,
+                        211,
+                        314
+                    ]
+                },
+                {
+                    "text": "$19,750",
+                    "box": [
+                        221,
+                        296,
+                        278,
+                        316
+                    ]
+                },
+                {
+                    "text": "Tests",
+                    "box": [
+                        292,
+                        297,
+                        330,
+                        312
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        334,
+                        299,
+                        368,
+                        313
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        372,
+                        297,
+                        392,
+                        311
+                    ]
+                },
+                {
+                    "text": "performed",
+                    "box": [
+                        397,
+                        297,
+                        470,
+                        311
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        472,
+                        296,
+                        490,
+                        310
+                    ]
+                },
+                {
+                    "text": "accordance",
+                    "box": [
+                        496,
+                        296,
+                        576,
+                        310
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        574,
+                        296,
+                        609,
+                        310
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        613,
+                        297,
+                        642,
+                        311
+                    ]
+                },
+                {
+                    "text": "December",
+                    "box": [
+                        105,
+                        330,
+                        165,
+                        345
+                    ]
+                },
+                {
+                    "text": "21,",
+                    "box": [
+                        169,
+                        331,
+                        197,
+                        348
+                    ]
+                },
+                {
+                    "text": "1981",
+                    "box": [
+                        203,
+                        327,
+                        235,
+                        345
+                    ]
+                },
+                {
+                    "text": "formal",
+                    "box": [
+                        242,
+                        328,
+                        285,
+                        346
+                    ]
+                },
+                {
+                    "text": "agreement",
+                    "box": [
+                        293,
+                        332,
+                        363,
+                        343
+                    ]
+                },
+                {
+                    "text": "between",
+                    "box": [
+                        366,
+                        328,
+                        423,
+                        343
+                    ]
+                },
+                {
+                    "text": "Microbiological",
+                    "box": [
+                        427,
+                        328,
+                        542,
+                        343
+                    ]
+                },
+                {
+                    "text": "Associates",
+                    "box": [
+                        549,
+                        328,
+                        623,
+                        343
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        630,
+                        327,
+                        652,
+                        341
+                    ]
+                },
+                {
+                    "text": "Lorillard.",
+                    "box": [
+                        105,
+                        355,
+                        179,
+                        369
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        197,
+                        355,
+                        212,
+                        369
+                    ]
+                },
+                {
+                    "text": "work",
+                    "box": [
+                        223,
+                        353,
+                        255,
+                        368
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        265,
+                        353,
+                        279,
+                        367
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        285,
+                        355,
+                        302,
+                        366
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        307,
+                        353,
+                        324,
+                        366
+                    ]
+                },
+                {
+                    "text": "coordinated",
+                    "box": [
+                        330,
+                        353,
+                        415,
+                        366
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        419,
+                        352,
+                        453,
+                        366
+                    ]
+                },
+                {
+                    "text": "our",
+                    "box": [
+                        457,
+                        352,
+                        485,
+                        367
+                    ]
+                },
+                {
+                    "text": "Dr.",
+                    "box": [
+                        486,
+                        352,
+                        508,
+                        366
+                    ]
+                },
+                {
+                    "text": "Harry",
+                    "box": [
+                        517,
+                        351,
+                        556,
+                        366
+                    ]
+                },
+                {
+                    "text": "Minnemeyer",
+                    "box": [
+                        559,
+                        348,
+                        637,
+                        366
+                    ]
+                },
+                {
+                    "text": "(919)",
+                    "box": [
+                        106,
+                        383,
+                        144,
+                        403
+                    ]
+                },
+                {
+                    "text": "373-6603",
+                    "box": [
+                        148,
+                        383,
+                        212,
+                        401
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "UNIT PRICE",
+            "box": [
+                647,
+                184,
+                710,
+                201
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "UNIT",
+                    "box": [
+                        647,
+                        186,
+                        678,
+                        200
+                    ]
+                },
+                {
+                    "text": "PRICE",
+                    "box": [
+                        679,
+                        184,
+                        710,
+                        201
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "FOLLOW UP DATE",
+            "box": [
+                91,
+                654,
+                185,
+                668
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "FOLLOW",
+                    "box": [
+                        91,
+                        655,
+                        137,
+                        668
+                    ]
+                },
+                {
+                    "text": "UP",
+                    "box": [
+                        138,
+                        654,
+                        152,
+                        668
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        154,
+                        654,
+                        185,
+                        668
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "BUDGET NO.",
+            "box": [
+                106,
+                708,
+                172,
+                723
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "BUDGET",
+                    "box": [
+                        106,
+                        708,
+                        152,
+                        723
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        152,
+                        709,
+                        172,
+                        722
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "REQUISITION NO.",
+            "box": [
+                338,
+                654,
+                426,
+                668
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REQUISITION",
+                    "box": [
+                        338,
+                        654,
+                        405,
+                        668
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        406,
+                        655,
+                        426,
+                        666
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "ISSUED BY",
+            "box": [
+                589,
+                652,
+                648,
+                669
+            ],
+            "linking": [
+                [
+                    31,
+                    2
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ISSUED",
+                    "box": [
+                        589,
+                        654,
+                        627,
+                        669
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        630,
+                        652,
+                        648,
+                        667
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "ACCT NO.",
+            "box": [
+                292,
+                708,
+                345,
+                725
+            ],
+            "linking": [
+                [
+                    32,
+                    0
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ACCT",
+                    "box": [
+                        292,
+                        711,
+                        323,
+                        725
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        327,
+                        708,
+                        345,
+                        725
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "DEPT NO.",
+            "box": [
+                412,
+                708,
+                467,
+                725
+            ],
+            "linking": [
+                [
+                    33,
+                    1
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DEPT",
+                    "box": [
+                        412,
+                        708,
+                        446,
+                        725
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        447,
+                        708,
+                        467,
+                        725
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "APPROVED BY",
+            "box": [
+                582,
+                708,
+                656,
+                725
+            ],
+            "linking": [
+                [
+                    34,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "APPROVED",
+                    "box": [
+                        582,
+                        708,
+                        636,
+                        723
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        642,
+                        708,
+                        656,
+                        725
+                    ]
+                }
+            ],
+            "id": 34
+        }
+    ]
+}

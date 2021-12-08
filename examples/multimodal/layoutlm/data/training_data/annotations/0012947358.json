@@ -1,0 +1,4111 @@
+{
+    "form": [
+        {
+            "box": [
+                53,
+                228,
+                74,
+                243
+            ],
+            "text": "VIA:",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        53,
+                        228,
+                        74,
+                        243
+                    ],
+                    "text": "VIA:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    53
+                ],
+                [
+                    0,
+                    54
+                ],
+                [
+                    0,
+                    55
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                422,
+                43,
+                440,
+                56
+            ],
+            "text": "TO:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        422,
+                        43,
+                        440,
+                        56
+                    ],
+                    "text": "TO:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    43
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                405,
+                99,
+                440,
+                112
+            ],
+            "text": "FROM:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        405,
+                        99,
+                        440,
+                        112
+                    ],
+                    "text": "FROM:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    45
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                420,
+                128,
+                437,
+                139
+            ],
+            "text": "Per",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        420,
+                        128,
+                        437,
+                        139
+                    ],
+                    "text": "Per"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    46
+                ],
+                [
+                    3,
+                    47
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                408,
+                183,
+                437,
+                198
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        408,
+                        183,
+                        437,
+                        198
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    48
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                542,
+                177,
+                566,
+                190
+            ],
+            "text": "VIA:",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        542,
+                        177,
+                        566,
+                        190
+                    ],
+                    "text": "VIA:"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    49
+                ],
+                [
+                    5,
+                    50
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                53,
+                270,
+                70,
+                281
+            ],
+            "text": "RE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        53,
+                        270,
+                        70,
+                        281
+                    ],
+                    "text": "RE:"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    56
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                47,
+                309,
+                69,
+                322
+            ],
+            "text": "FOR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        309,
+                        69,
+                        322
+                    ],
+                    "text": "FOR"
+                }
+            ],
+            "linking": [
+                [
+                    7,
+                    58
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                250,
+                267,
+                271,
+                282
+            ],
+            "text": "IN",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        250,
+                        267,
+                        271,
+                        282
+                    ],
+                    "text": "IN"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    17
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                70,
+                412,
+                131,
+                425
+            ],
+            "text": "Document(s)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        70,
+                        412,
+                        131,
+                        425
+                    ],
+                    "text": "Document(s)"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                134,
+                412,
+                172,
+                425
+            ],
+            "text": "Served:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        134,
+                        412,
+                        172,
+                        425
+                    ],
+                    "text": "Served:"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    63
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                71,
+                440,
+                102,
+                451
+            ],
+            "text": "Court:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        71,
+                        440,
+                        102,
+                        451
+                    ],
+                    "text": "Court:"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    64
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                73,
+                684,
+                118,
+                697
+            ],
+            "text": "Remarks",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        73,
+                        684,
+                        118,
+                        697
+                    ],
+                    "text": "Remarks"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                426,
+                781,
+                443,
+                795
+            ],
+            "text": "BY:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        426,
+                        781,
+                        443,
+                        795
+                    ],
+                    "text": "BY:"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    78
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                427,
+                811,
+                444,
+                824
+            ],
+            "text": "Per",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        427,
+                        811,
+                        444,
+                        824
+                    ],
+                    "text": "Per"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    79
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                47,
+                130,
+                67,
+                144
+            ],
+            "text": "",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        130,
+                        67,
+                        144
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                78,
+                230,
+                98,
+                243
+            ],
+            "text": "(X)",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        78,
+                        230,
+                        98,
+                        243
+                    ],
+                    "text": "(X)"
+                }
+            ],
+            "linking": [
+                [
+                    53,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                310,
+                265,
+                381,
+                280
+            ],
+            "text": "FLORIDA",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        310,
+                        265,
+                        381,
+                        280
+                    ],
+                    "text": "FLORIDA"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                568,
+                190,
+                585,
+                203
+            ],
+            "text": "(X)",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        568,
+                        190,
+                        585,
+                        203
+                    ],
+                    "text": "(X)"
+                }
+            ],
+            "linking": [
+                [
+                    50,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                475,
+                166,
+                496,
+                177
+            ],
+            "text": "(city)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        475,
+                        166,
+                        496,
+                        177
+                    ],
+                    "text": "(city)"
+                }
+            ],
+            "linking": [],
+            "id": 19
+        },
+        {
+            "box": [
+                596,
+                165,
+                624,
+                176
+            ],
+            "text": "(State)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        596,
+                        165,
+                        624,
+                        176
+                    ],
+                    "text": "(State)"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                471,
+                82,
+                493,
+                92
+            ],
+            "text": "(City)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        471,
+                        82,
+                        493,
+                        92
+                    ],
+                    "text": "(City)"
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "box": [
+                515,
+                109,
+                561,
+                119
+            ],
+            "text": "(Originating",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        515,
+                        109,
+                        561,
+                        119
+                    ],
+                    "text": "(Originating"
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "box": [
+                564,
+                109,
+                589,
+                119
+            ],
+            "text": "Agent)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        564,
+                        109,
+                        589,
+                        119
+                    ],
+                    "text": "Agent)"
+                }
+            ],
+            "linking": [],
+            "id": 23
+        },
+        {
+            "box": [
+                589,
+                81,
+                617,
+                92
+            ],
+            "text": "(State)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        589,
+                        81,
+                        617,
+                        92
+                    ],
+                    "text": "(State)"
+                }
+            ],
+            "linking": [],
+            "id": 24
+        },
+        {
+            "box": [
+                535,
+                54,
+                546,
+                64
+            ],
+            "text": "(C",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        535,
+                        54,
+                        546,
+                        64
+                    ],
+                    "text": "(C"
+                }
+            ],
+            "linking": [],
+            "id": 25
+        },
+        {
+            "box": [
+                546,
+                54,
+                554,
+                62
+            ],
+            "text": "T.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        546,
+                        54,
+                        554,
+                        62
+                    ],
+                    "text": "T."
+                }
+            ],
+            "linking": [],
+            "id": 26
+        },
+        {
+            "box": [
+                554,
+                54,
+                583,
+                62
+            ],
+            "text": "Office)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        554,
+                        54,
+                        583,
+                        62
+                    ],
+                    "text": "Office)"
+                }
+            ],
+            "linking": [],
+            "id": 27
+        },
+        {
+            "box": [
+                608,
+                317,
+                635,
+                327
+            ],
+            "text": "(Name",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        608,
+                        317,
+                        635,
+                        327
+                    ],
+                    "text": "(Name"
+                }
+            ],
+            "linking": [],
+            "id": 28
+        },
+        {
+            "box": [
+                635,
+                316,
+                659,
+                329
+            ],
+            "text": "State)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        635,
+                        316,
+                        659,
+                        329
+                    ],
+                    "text": "State)"
+                }
+            ],
+            "linking": [],
+            "id": 29
+        },
+        {
+            "box": [
+                434,
+                209,
+                560,
+                332
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        434,
+                        209,
+                        560,
+                        332
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 30
+        },
+        {
+            "box": [
+                553,
+                606,
+                687,
+                743
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        553,
+                        606,
+                        687,
+                        743
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 31
+        },
+        {
+            "box": [
+                535,
+                848,
+                571,
+                859
+            ],
+            "text": "(Address)",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        535,
+                        848,
+                        571,
+                        859
+                    ],
+                    "text": "(Address)"
+                }
+            ],
+            "linking": [],
+            "id": 32
+        },
+        {
+            "box": [
+                60,
+                684,
+                71,
+                697
+            ],
+            "text": "9.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        60,
+                        684,
+                        71,
+                        697
+                    ],
+                    "text": "9."
+                }
+            ],
+            "linking": [],
+            "id": 33
+        },
+        {
+            "box": [
+                59,
+                631,
+                70,
+                644
+            ],
+            "text": "8.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        631,
+                        70,
+                        644
+                    ],
+                    "text": "8."
+                }
+            ],
+            "linking": [],
+            "id": 34
+        },
+        {
+            "box": [
+                59,
+                603,
+                69,
+                614
+            ],
+            "text": "7.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        603,
+                        69,
+                        614
+                    ],
+                    "text": "7."
+                }
+            ],
+            "linking": [],
+            "id": 35
+        },
+        {
+            "box": [
+                56,
+                578,
+                69,
+                589
+            ],
+            "text": "6.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        56,
+                        578,
+                        69,
+                        589
+                    ],
+                    "text": "6."
+                }
+            ],
+            "linking": [],
+            "id": 36
+        },
+        {
+            "box": [
+                59,
+                521,
+                70,
+                535
+            ],
+            "text": "5.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        521,
+                        70,
+                        535
+                    ],
+                    "text": "5."
+                }
+            ],
+            "linking": [],
+            "id": 37
+        },
+        {
+            "box": [
+                54,
+                466,
+                68,
+                477
+            ],
+            "text": "4.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        54,
+                        466,
+                        68,
+                        477
+                    ],
+                    "text": "4."
+                }
+            ],
+            "linking": [],
+            "id": 38
+        },
+        {
+            "box": [
+                57,
+                441,
+                67,
+                454
+            ],
+            "text": "3.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        57,
+                        441,
+                        67,
+                        454
+                    ],
+                    "text": "3."
+                }
+            ],
+            "linking": [],
+            "id": 39
+        },
+        {
+            "box": [
+                57,
+                413,
+                68,
+                424
+            ],
+            "text": "2.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        57,
+                        413,
+                        68,
+                        424
+                    ],
+                    "text": "2."
+                }
+            ],
+            "linking": [],
+            "id": 40
+        },
+        {
+            "box": [
+                57,
+                370,
+                67,
+                383
+            ],
+            "text": "1.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        57,
+                        370,
+                        67,
+                        383
+                    ],
+                    "text": "1."
+                }
+            ],
+            "linking": [],
+            "id": 41
+        },
+        {
+            "text": "C T SYSTEM The Corporation Trust Company C T Corporation System and Associated Companies",
+            "box": [
+                28,
+                32,
+                237,
+                106
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "C",
+                    "box": [
+                        82,
+                        34,
+                        95,
+                        49
+                    ]
+                },
+                {
+                    "text": "T",
+                    "box": [
+                        98,
+                        32,
+                        112,
+                        47
+                    ]
+                },
+                {
+                    "text": "SYSTEM",
+                    "box": [
+                        116,
+                        34,
+                        182,
+                        51
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        28,
+                        54,
+                        49,
+                        68
+                    ]
+                },
+                {
+                    "text": "Corporation",
+                    "box": [
+                        52,
+                        54,
+                        134,
+                        69
+                    ]
+                },
+                {
+                    "text": "Trust",
+                    "box": [
+                        137,
+                        53,
+                        173,
+                        67
+                    ]
+                },
+                {
+                    "text": "Company",
+                    "box": [
+                        176,
+                        54,
+                        237,
+                        69
+                    ]
+                },
+                {
+                    "text": "C",
+                    "box": [
+                        52,
+                        73,
+                        63,
+                        87
+                    ]
+                },
+                {
+                    "text": "T",
+                    "box": [
+                        66,
+                        73,
+                        77,
+                        86
+                    ]
+                },
+                {
+                    "text": "Corporation",
+                    "box": [
+                        80,
+                        73,
+                        160,
+                        90
+                    ]
+                },
+                {
+                    "text": "System",
+                    "box": [
+                        165,
+                        73,
+                        214,
+                        87
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        73,
+                        94,
+                        90,
+                        104
+                    ]
+                },
+                {
+                    "text": "Associated",
+                    "box": [
+                        92,
+                        94,
+                        141,
+                        105
+                    ]
+                },
+                {
+                    "text": "Companies",
+                    "box": [
+                        142,
+                        92,
+                        195,
+                        106
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "The Corporation Trust Company",
+            "box": [
+                440,
+                38,
+                672,
+                54
+            ],
+            "linking": [
+                [
+                    1,
+                    43
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        440,
+                        41,
+                        467,
+                        54
+                    ]
+                },
+                {
+                    "text": "Corporation",
+                    "box": [
+                        471,
+                        39,
+                        559,
+                        53
+                    ]
+                },
+                {
+                    "text": "Trust",
+                    "box": [
+                        561,
+                        38,
+                        603,
+                        52
+                    ]
+                },
+                {
+                    "text": "Company",
+                    "box": [
+                        606,
+                        39,
+                        672,
+                        53
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "New York, New York",
+            "box": [
+                457,
+                64,
+                612,
+                80
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "New",
+                    "box": [
+                        457,
+                        66,
+                        489,
+                        80
+                    ]
+                },
+                {
+                    "text": "York,",
+                    "box": [
+                        494,
+                        66,
+                        532,
+                        80
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        541,
+                        64,
+                        572,
+                        79
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        577,
+                        66,
+                        612,
+                        77
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "C T Corporation System",
+            "box": [
+                458,
+                92,
+                634,
+                107
+            ],
+            "linking": [
+                [
+                    2,
+                    45
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "C",
+                    "box": [
+                        458,
+                        95,
+                        472,
+                        106
+                    ]
+                },
+                {
+                    "text": "T",
+                    "box": [
+                        475,
+                        94,
+                        486,
+                        107
+                    ]
+                },
+                {
+                    "text": "Corporation",
+                    "box": [
+                        489,
+                        94,
+                        577,
+                        107
+                    ]
+                },
+                {
+                    "text": "System",
+                    "box": [
+                        582,
+                        92,
+                        634,
+                        105
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "Phyllis G. Jennings",
+            "box": [
+                458,
+                122,
+                600,
+                137
+            ],
+            "linking": [
+                [
+                    3,
+                    46
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Phyllis",
+                    "box": [
+                        458,
+                        122,
+                        511,
+                        137
+                    ]
+                },
+                {
+                    "text": "G.",
+                    "box": [
+                        515,
+                        123,
+                        533,
+                        137
+                    ]
+                },
+                {
+                    "text": "Jennings",
+                    "box": [
+                        539,
+                        122,
+                        600,
+                        137
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "Jacksonville, Florida",
+            "box": [
+                461,
+                148,
+                615,
+                164
+            ],
+            "linking": [
+                [
+                    3,
+                    47
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Jacksonville,",
+                    "box": [
+                        461,
+                        149,
+                        553,
+                        164
+                    ]
+                },
+                {
+                    "text": "Florida",
+                    "box": [
+                        561,
+                        148,
+                        615,
+                        163
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "1- -27 -69",
+            "box": [
+                454,
+                180,
+                514,
+                195
+            ],
+            "linking": [
+                [
+                    4,
+                    48
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1-",
+                    "box": [
+                        454,
+                        182,
+                        465,
+                        195
+                    ]
+                },
+                {
+                    "text": "-27",
+                    "box": [
+                        462,
+                        180,
+                        487,
+                        194
+                    ]
+                },
+                {
+                    "text": "-69",
+                    "box": [
+                        487,
+                        180,
+                        514,
+                        194
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "() Certified Mail",
+            "box": [
+                568,
+                176,
+                659,
+                189
+            ],
+            "linking": [
+                [
+                    5,
+                    49
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "()",
+                    "box": [
+                        568,
+                        176,
+                        585,
+                        189
+                    ]
+                },
+                {
+                    "text": "Certified",
+                    "box": [
+                        588,
+                        177,
+                        630,
+                        188
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        634,
+                        176,
+                        659,
+                        187
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "Certified Air Mail",
+            "box": [
+                587,
+                189,
+                674,
+                203
+            ],
+            "linking": [
+                [
+                    50,
+                    18
+                ],
+                [
+                    5,
+                    50
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Certified",
+                    "box": [
+                        587,
+                        190,
+                        630,
+                        203
+                    ]
+                },
+                {
+                    "text": "Air",
+                    "box": [
+                        634,
+                        189,
+                        649,
+                        200
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        652,
+                        190,
+                        674,
+                        200
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "Walliam Degenhardt Tax Director The American Tobacco Company 245 Park Avenue New York New York 1001",
+            "box": [
+                81,
+                126,
+                330,
+                186
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Walliam",
+                    "box": [
+                        81,
+                        128,
+                        134,
+                        141
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        137,
+                        128,
+                        152,
+                        139
+                    ]
+                },
+                {
+                    "text": "Degenhardt",
+                    "box": [
+                        162,
+                        127,
+                        240,
+                        140
+                    ]
+                },
+                {
+                    "text": "Tax",
+                    "box": [
+                        244,
+                        126,
+                        268,
+                        140
+                    ]
+                },
+                {
+                    "text": "Director",
+                    "box": [
+                        274,
+                        127,
+                        330,
+                        141
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        82,
+                        144,
+                        104,
+                        155
+                    ]
+                },
+                {
+                    "text": "American",
+                    "box": [
+                        112,
+                        144,
+                        169,
+                        155
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        175,
+                        142,
+                        227,
+                        156
+                    ]
+                },
+                {
+                    "text": "Company",
+                    "box": [
+                        230,
+                        142,
+                        283,
+                        156
+                    ]
+                },
+                {
+                    "text": "245",
+                    "box": [
+                        81,
+                        158,
+                        106,
+                        171
+                    ]
+                },
+                {
+                    "text": "Park",
+                    "box": [
+                        112,
+                        158,
+                        141,
+                        169
+                    ]
+                },
+                {
+                    "text": "Avenue",
+                    "box": [
+                        147,
+                        158,
+                        190,
+                        169
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        82,
+                        173,
+                        106,
+                        186
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        112,
+                        172,
+                        147,
+                        183
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        154,
+                        172,
+                        178,
+                        185
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        184,
+                        170,
+                        213,
+                        184
+                    ]
+                },
+                {
+                    "text": "1001",
+                    "box": [
+                        218,
+                        169,
+                        259,
+                        184
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "Recipienti",
+            "box": [
+                148,
+                186,
+                232,
+                199
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        148,
+                        187,
+                        191,
+                        198
+                    ]
+                },
+                {
+                    "text": "Recipienti",
+                    "box": [
+                        194,
+                        186,
+                        232,
+                        199
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "Certified Mail",
+            "box": [
+                99,
+                229,
+                171,
+                243
+            ],
+            "linking": [
+                [
+                    0,
+                    53
+                ],
+                [
+                    53,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Certified",
+                    "box": [
+                        99,
+                        229,
+                        141,
+                        243
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        144,
+                        230,
+                        171,
+                        241
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "() Messenger",
+            "box": [
+                175,
+                229,
+                247,
+                243
+            ],
+            "linking": [
+                [
+                    0,
+                    54
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "()",
+                    "box": [
+                        175,
+                        229,
+                        193,
+                        243
+                    ]
+                },
+                {
+                    "text": "Messenger",
+                    "box": [
+                        194,
+                        229,
+                        247,
+                        240
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "() Certified Air Mail",
+            "box": [
+                80,
+                246,
+                191,
+                260
+            ],
+            "linking": [
+                [
+                    0,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "()",
+                    "box": [
+                        80,
+                        247,
+                        98,
+                        260
+                    ]
+                },
+                {
+                    "text": "Certified",
+                    "box": [
+                        101,
+                        246,
+                        144,
+                        259
+                    ]
+                },
+                {
+                    "text": "Air",
+                    "box": [
+                        147,
+                        246,
+                        164,
+                        259
+                    ]
+                },
+                {
+                    "text": "Mail",
+                    "box": [
+                        166,
+                        246,
+                        191,
+                        257
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "PROCESS SERVED",
+            "box": [
+                75,
+                267,
+                242,
+                285
+            ],
+            "linking": [
+                [
+                    6,
+                    56
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "PROCESS",
+                    "box": [
+                        75,
+                        267,
+                        159,
+                        285
+                    ]
+                },
+                {
+                    "text": "SERVED",
+                    "box": [
+                        169,
+                        270,
+                        242,
+                        285
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "N. J.",
+            "box": [
+                589,
+                300,
+                631,
+                315
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "N.",
+                    "box": [
+                        589,
+                        302,
+                        607,
+                        315
+                    ]
+                },
+                {
+                    "text": "J.",
+                    "box": [
+                        613,
+                        300,
+                        631,
+                        315
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "THE AMERICAN TOBACCO COMPANY",
+            "box": [
+                88,
+                307,
+                371,
+                322
+            ],
+            "linking": [
+                [
+                    7,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "THE",
+                    "box": [
+                        88,
+                        309,
+                        122,
+                        322
+                    ]
+                },
+                {
+                    "text": "AMERICAN",
+                    "box": [
+                        126,
+                        309,
+                        208,
+                        322
+                    ]
+                },
+                {
+                    "text": "TOBACCO",
+                    "box": [
+                        211,
+                        307,
+                        286,
+                        321
+                    ]
+                },
+                {
+                    "text": "COMPANY",
+                    "box": [
+                        291,
+                        307,
+                        371,
+                        321
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "Name of Company",
+            "box": [
+                261,
+                323,
+                341,
+                331
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Name",
+                    "box": [
+                        261,
+                        323,
+                        286,
+                        331
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        289,
+                        323,
+                        297,
+                        331
+                    ]
+                },
+                {
+                    "text": "Company",
+                    "box": [
+                        300,
+                        323,
+                        341,
+                        331
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "Enclosed are copies of legal proces served upon the statutory agent of the above company as follows:",
+            "box": [
+                77,
+                335,
+                598,
+                354
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Enclosed",
+                    "box": [
+                        77,
+                        341,
+                        119,
+                        354
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        123,
+                        342,
+                        140,
+                        352
+                    ]
+                },
+                {
+                    "text": "copies",
+                    "box": [
+                        142,
+                        342,
+                        173,
+                        353
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        177,
+                        341,
+                        188,
+                        352
+                    ]
+                },
+                {
+                    "text": "legal",
+                    "box": [
+                        191,
+                        339,
+                        218,
+                        353
+                    ]
+                },
+                {
+                    "text": "proces",
+                    "box": [
+                        219,
+                        341,
+                        255,
+                        352
+                    ]
+                },
+                {
+                    "text": "served",
+                    "box": [
+                        258,
+                        341,
+                        296,
+                        351
+                    ]
+                },
+                {
+                    "text": "upon",
+                    "box": [
+                        297,
+                        341,
+                        324,
+                        352
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        327,
+                        339,
+                        345,
+                        350
+                    ]
+                },
+                {
+                    "text": "statutory",
+                    "box": [
+                        348,
+                        338,
+                        393,
+                        351
+                    ]
+                },
+                {
+                    "text": "agent",
+                    "box": [
+                        395,
+                        338,
+                        424,
+                        349
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        426,
+                        338,
+                        439,
+                        349
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        441,
+                        337,
+                        455,
+                        350
+                    ]
+                },
+                {
+                    "text": "above",
+                    "box": [
+                        459,
+                        337,
+                        491,
+                        350
+                    ]
+                },
+                {
+                    "text": "company",
+                    "box": [
+                        494,
+                        338,
+                        539,
+                        348
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        543,
+                        337,
+                        556,
+                        345
+                    ]
+                },
+                {
+                    "text": "follows:",
+                    "box": [
+                        557,
+                        335,
+                        598,
+                        346
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "Title of Action:",
+            "box": [
+                70,
+                369,
+                143,
+                382
+            ],
+            "linking": [
+                [
+                    61,
+                    62
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Title",
+                    "box": [
+                        70,
+                        369,
+                        91,
+                        382
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        94,
+                        370,
+                        105,
+                        381
+                    ]
+                },
+                {
+                    "text": "Action:",
+                    "box": [
+                        109,
+                        369,
+                        143,
+                        382
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "Reuben Sunstein, Plaintiff, v. The American Tobacco Company, a New Jorsey corporation, Defendant.",
+            "box": [
+                147,
+                356,
+                658,
+                397
+            ],
+            "linking": [
+                [
+                    61,
+                    62
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Reuben",
+                    "box": [
+                        147,
+                        367,
+                        200,
+                        381
+                    ]
+                },
+                {
+                    "text": "Sunstein,",
+                    "box": [
+                        204,
+                        366,
+                        268,
+                        379
+                    ]
+                },
+                {
+                    "text": "Plaintiff,",
+                    "box": [
+                        274,
+                        365,
+                        340,
+                        378
+                    ]
+                },
+                {
+                    "text": "v.",
+                    "box": [
+                        348,
+                        367,
+                        363,
+                        377
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        369,
+                        362,
+                        397,
+                        377
+                    ]
+                },
+                {
+                    "text": "American",
+                    "box": [
+                        401,
+                        362,
+                        471,
+                        375
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        475,
+                        360,
+                        532,
+                        371
+                    ]
+                },
+                {
+                    "text": "Company,",
+                    "box": [
+                        539,
+                        360,
+                        606,
+                        374
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        613,
+                        360,
+                        626,
+                        371
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        627,
+                        356,
+                        658,
+                        373
+                    ]
+                },
+                {
+                    "text": "Jorsey",
+                    "box": [
+                        148,
+                        384,
+                        197,
+                        397
+                    ]
+                },
+                {
+                    "text": "corporation,",
+                    "box": [
+                        201,
+                        383,
+                        288,
+                        397
+                    ]
+                },
+                {
+                    "text": "Defendant.",
+                    "box": [
+                        297,
+                        381,
+                        371,
+                        394
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "Summons and Complaint",
+            "box": [
+                186,
+                408,
+                362,
+                425
+            ],
+            "linking": [
+                [
+                    10,
+                    63
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Summons",
+                    "box": [
+                        186,
+                        411,
+                        253,
+                        425
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        256,
+                        409,
+                        283,
+                        422
+                    ]
+                },
+                {
+                    "text": "Complaint",
+                    "box": [
+                        288,
+                        408,
+                        362,
+                        422
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "Circuit Court, Dade County, Florida. No. 69 -1351",
+            "box": [
+                117,
+                430,
+                486,
+                453
+            ],
+            "linking": [
+                [
+                    11,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Circuit",
+                    "box": [
+                        117,
+                        439,
+                        171,
+                        453
+                    ]
+                },
+                {
+                    "text": "Court,",
+                    "box": [
+                        173,
+                        437,
+                        219,
+                        451
+                    ]
+                },
+                {
+                    "text": "Dade",
+                    "box": [
+                        226,
+                        436,
+                        264,
+                        450
+                    ]
+                },
+                {
+                    "text": "County,",
+                    "box": [
+                        268,
+                        434,
+                        320,
+                        452
+                    ]
+                },
+                {
+                    "text": "Florida.",
+                    "box": [
+                        327,
+                        432,
+                        387,
+                        447
+                    ]
+                },
+                {
+                    "text": "No.",
+                    "box": [
+                        398,
+                        433,
+                        425,
+                        444
+                    ]
+                },
+                {
+                    "text": "69",
+                    "box": [
+                        432,
+                        430,
+                        446,
+                        445
+                    ]
+                },
+                {
+                    "text": "-1351",
+                    "box": [
+                        448,
+                        432,
+                        486,
+                        446
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "Nature of Action:",
+            "box": [
+                71,
+                465,
+                158,
+                479
+            ],
+            "linking": [
+                [
+                    65,
+                    67
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Nature",
+                    "box": [
+                        71,
+                        468,
+                        105,
+                        478
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        109,
+                        468,
+                        122,
+                        479
+                    ]
+                },
+                {
+                    "text": "Action:",
+                    "box": [
+                        124,
+                        465,
+                        158,
+                        478
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "For personal injuries resulting after smoking \"Pall Mall\" and \"Lucky",
+            "box": [
+                168,
+                454,
+                667,
+                476
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "For",
+                    "box": [
+                        168,
+                        462,
+                        196,
+                        476
+                    ]
+                },
+                {
+                    "text": "personal",
+                    "box": [
+                        200,
+                        461,
+                        261,
+                        476
+                    ]
+                },
+                {
+                    "text": "injuries",
+                    "box": [
+                        264,
+                        461,
+                        321,
+                        474
+                    ]
+                },
+                {
+                    "text": "resulting",
+                    "box": [
+                        325,
+                        461,
+                        389,
+                        474
+                    ]
+                },
+                {
+                    "text": "after",
+                    "box": [
+                        395,
+                        459,
+                        427,
+                        472
+                    ]
+                },
+                {
+                    "text": "smoking",
+                    "box": [
+                        434,
+                        455,
+                        493,
+                        470
+                    ]
+                },
+                {
+                    "text": "\"Pall",
+                    "box": [
+                        497,
+                        457,
+                        536,
+                        470
+                    ]
+                },
+                {
+                    "text": "Mall\"",
+                    "box": [
+                        539,
+                        454,
+                        581,
+                        469
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        585,
+                        455,
+                        609,
+                        468
+                    ]
+                },
+                {
+                    "text": "\"Lucky",
+                    "box": [
+                        615,
+                        454,
+                        667,
+                        467
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "Strike\" cigarettes manufactured by defendant, wherein plaintiff alleges breach of was- anties, seeks damages in excess of $5, 000 and demands trial by jury.",
+            "box": [
+                63,
+                469,
+                683,
+                510
+            ],
+            "linking": [
+                [
+                    65,
+                    67
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Strike\"",
+                    "box": [
+                        63,
+                        480,
+                        115,
+                        494
+                    ]
+                },
+                {
+                    "text": "cigarettes",
+                    "box": [
+                        119,
+                        482,
+                        190,
+                        493
+                    ]
+                },
+                {
+                    "text": "manufactured",
+                    "box": [
+                        194,
+                        478,
+                        292,
+                        491
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        296,
+                        476,
+                        313,
+                        490
+                    ]
+                },
+                {
+                    "text": "defendant,",
+                    "box": [
+                        318,
+                        476,
+                        389,
+                        487
+                    ]
+                },
+                {
+                    "text": "wherein",
+                    "box": [
+                        397,
+                        473,
+                        456,
+                        484
+                    ]
+                },
+                {
+                    "text": "plaintiff",
+                    "box": [
+                        458,
+                        472,
+                        517,
+                        486
+                    ]
+                },
+                {
+                    "text": "alleges",
+                    "box": [
+                        520,
+                        472,
+                        569,
+                        486
+                    ]
+                },
+                {
+                    "text": "breach",
+                    "box": [
+                        573,
+                        471,
+                        625,
+                        484
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        628,
+                        469,
+                        642,
+                        483
+                    ]
+                },
+                {
+                    "text": "was-",
+                    "box": [
+                        644,
+                        469,
+                        683,
+                        483
+                    ]
+                },
+                {
+                    "text": "anties,",
+                    "box": [
+                        64,
+                        497,
+                        111,
+                        510
+                    ]
+                },
+                {
+                    "text": "seeks",
+                    "box": [
+                        119,
+                        497,
+                        161,
+                        508
+                    ]
+                },
+                {
+                    "text": "damages",
+                    "box": [
+                        165,
+                        496,
+                        226,
+                        509
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        232,
+                        494,
+                        245,
+                        507
+                    ]
+                },
+                {
+                    "text": "excess",
+                    "box": [
+                        250,
+                        493,
+                        297,
+                        506
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        302,
+                        492,
+                        317,
+                        505
+                    ]
+                },
+                {
+                    "text": "$5,",
+                    "box": [
+                        321,
+                        490,
+                        341,
+                        505
+                    ]
+                },
+                {
+                    "text": "000",
+                    "box": [
+                        345,
+                        492,
+                        369,
+                        503
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        374,
+                        490,
+                        399,
+                        501
+                    ]
+                },
+                {
+                    "text": "demands",
+                    "box": [
+                        402,
+                        490,
+                        463,
+                        500
+                    ]
+                },
+                {
+                    "text": "trial",
+                    "box": [
+                        469,
+                        489,
+                        501,
+                        503
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        506,
+                        487,
+                        523,
+                        502
+                    ]
+                },
+                {
+                    "text": "jury.",
+                    "box": [
+                        525,
+                        487,
+                        563,
+                        501
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "On Whom Process was Served:",
+            "box": [
+                71,
+                520,
+                228,
+                535
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "On",
+                    "box": [
+                        71,
+                        524,
+                        88,
+                        534
+                    ]
+                },
+                {
+                    "text": "Whom",
+                    "box": [
+                        91,
+                        521,
+                        122,
+                        535
+                    ]
+                },
+                {
+                    "text": "Process",
+                    "box": [
+                        124,
+                        521,
+                        162,
+                        534
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        165,
+                        522,
+                        186,
+                        533
+                    ]
+                },
+                {
+                    "text": "Served:",
+                    "box": [
+                        189,
+                        520,
+                        228,
+                        535
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "Phyllis G. Jonnings, Asst. Socy,. The Corporation Company, Jacksonville, Florida",
+            "box": [
+                244,
+                510,
+                689,
+                549
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Phyllis",
+                    "box": [
+                        244,
+                        520,
+                        296,
+                        533
+                    ]
+                },
+                {
+                    "text": "G.",
+                    "box": [
+                        300,
+                        518,
+                        317,
+                        531
+                    ]
+                },
+                {
+                    "text": "Jonnings,",
+                    "box": [
+                        325,
+                        517,
+                        392,
+                        532
+                    ]
+                },
+                {
+                    "text": "Asst.",
+                    "box": [
+                        398,
+                        517,
+                        434,
+                        531
+                    ]
+                },
+                {
+                    "text": "Socy,.",
+                    "box": [
+                        443,
+                        517,
+                        488,
+                        532
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        497,
+                        513,
+                        522,
+                        528
+                    ]
+                },
+                {
+                    "text": "Corporation",
+                    "box": [
+                        529,
+                        514,
+                        613,
+                        529
+                    ]
+                },
+                {
+                    "text": "Company,",
+                    "box": [
+                        619,
+                        510,
+                        689,
+                        528
+                    ]
+                },
+                {
+                    "text": "Jacksonville,",
+                    "box": [
+                        244,
+                        535,
+                        338,
+                        549
+                    ]
+                },
+                {
+                    "text": "Florida",
+                    "box": [
+                        344,
+                        534,
+                        403,
+                        545
+                    ]
+                }
+            ],
+            "id": 69
+        },
+        {
+            "text": "Date and Hour of Service",
+            "box": [
+                70,
+                575,
+                204,
+                590
+            ],
+            "linking": [
+                [
+                    70,
+                    74
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Date",
+                    "box": [
+                        70,
+                        577,
+                        95,
+                        588
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        98,
+                        575,
+                        119,
+                        586
+                    ]
+                },
+                {
+                    "text": "Hour",
+                    "box": [
+                        122,
+                        575,
+                        147,
+                        588
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        149,
+                        575,
+                        160,
+                        588
+                    ]
+                },
+                {
+                    "text": "Service",
+                    "box": [
+                        163,
+                        575,
+                        204,
+                        590
+                    ]
+                }
+            ],
+            "id": 70
+        },
+        {
+            "text": "Appearance or Answer Dues",
+            "box": [
+                74,
+                602,
+                215,
+                615
+            ],
+            "linking": [
+                [
+                    71,
+                    75
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Appearance",
+                    "box": [
+                        74,
+                        603,
+                        133,
+                        614
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        135,
+                        603,
+                        146,
+                        613
+                    ]
+                },
+                {
+                    "text": "Answer",
+                    "box": [
+                        149,
+                        602,
+                        187,
+                        615
+                    ]
+                },
+                {
+                    "text": "Dues",
+                    "box": [
+                        190,
+                        602,
+                        215,
+                        615
+                    ]
+                }
+            ],
+            "id": 71
+        },
+        {
+            "text": "Plaintiff's Attorney(s):",
+            "box": [
+                71,
+                628,
+                181,
+                643
+            ],
+            "linking": [
+                [
+                    72,
+                    73
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Plaintiff's",
+                    "box": [
+                        71,
+                        628,
+                        118,
+                        641
+                    ]
+                },
+                {
+                    "text": "Attorney(s):",
+                    "box": [
+                        122,
+                        630,
+                        181,
+                        643
+                    ]
+                }
+            ],
+            "id": 72
+        },
+        {
+            "text": "Max A. Goldfarb 414 Biscayne Building Miami, Florida",
+            "box": [
+                244,
+                624,
+                405,
+                671
+            ],
+            "linking": [
+                [
+                    72,
+                    73
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Max",
+                    "box": [
+                        244,
+                        626,
+                        275,
+                        639
+                    ]
+                },
+                {
+                    "text": "A.",
+                    "box": [
+                        278,
+                        624,
+                        298,
+                        638
+                    ]
+                },
+                {
+                    "text": "Goldfarb",
+                    "box": [
+                        304,
+                        624,
+                        367,
+                        635
+                    ]
+                },
+                {
+                    "text": "414",
+                    "box": [
+                        247,
+                        641,
+                        271,
+                        654
+                    ]
+                },
+                {
+                    "text": "Biscayne",
+                    "box": [
+                        277,
+                        641,
+                        340,
+                        655
+                    ]
+                },
+                {
+                    "text": "Building",
+                    "box": [
+                        346,
+                        640,
+                        405,
+                        654
+                    ]
+                },
+                {
+                    "text": "Miami,",
+                    "box": [
+                        246,
+                        656,
+                        299,
+                        671
+                    ]
+                },
+                {
+                    "text": "Florida",
+                    "box": [
+                        304,
+                        656,
+                        360,
+                        670
+                    ]
+                }
+            ],
+            "id": 73
+        },
+        {
+            "text": "January 27, 1969 9: 00 a. m.",
+            "box": [
+                246,
+                568,
+                478,
+                589
+            ],
+            "linking": [
+                [
+                    70,
+                    74
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "January",
+                    "box": [
+                        246,
+                        574,
+                        302,
+                        589
+                    ]
+                },
+                {
+                    "text": "27,",
+                    "box": [
+                        307,
+                        571,
+                        328,
+                        586
+                    ]
+                },
+                {
+                    "text": "1969",
+                    "box": [
+                        335,
+                        571,
+                        369,
+                        584
+                    ]
+                },
+                {
+                    "text": "9:",
+                    "box": [
+                        406,
+                        570,
+                        420,
+                        583
+                    ]
+                },
+                {
+                    "text": "00",
+                    "box": [
+                        422,
+                        570,
+                        437,
+                        583
+                    ]
+                },
+                {
+                    "text": "a.",
+                    "box": [
+                        441,
+                        568,
+                        455,
+                        582
+                    ]
+                },
+                {
+                    "text": "m.",
+                    "box": [
+                        457,
+                        570,
+                        478,
+                        584
+                    ]
+                }
+            ],
+            "id": 74
+        },
+        {
+            "text": "Within 20 days after service, exclusive of day of service.",
+            "box": [
+                247,
+                592,
+                658,
+                613
+            ],
+            "linking": [
+                [
+                    71,
+                    75
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Within",
+                    "box": [
+                        247,
+                        598,
+                        292,
+                        613
+                    ]
+                },
+                {
+                    "text": "20",
+                    "box": [
+                        297,
+                        598,
+                        314,
+                        611
+                    ]
+                },
+                {
+                    "text": "days",
+                    "box": [
+                        318,
+                        598,
+                        349,
+                        613
+                    ]
+                },
+                {
+                    "text": "after",
+                    "box": [
+                        353,
+                        598,
+                        389,
+                        611
+                    ]
+                },
+                {
+                    "text": "service,",
+                    "box": [
+                        395,
+                        596,
+                        454,
+                        609
+                    ]
+                },
+                {
+                    "text": "exclusive",
+                    "box": [
+                        461,
+                        595,
+                        528,
+                        608
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        532,
+                        594,
+                        546,
+                        607
+                    ]
+                },
+                {
+                    "text": "day",
+                    "box": [
+                        552,
+                        595,
+                        574,
+                        608
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        581,
+                        594,
+                        595,
+                        605
+                    ]
+                },
+                {
+                    "text": "service.",
+                    "box": [
+                        601,
+                        592,
+                        658,
+                        605
+                    ]
+                }
+            ],
+            "id": 75
+        },
+        {
+            "text": "RECEIVED AND FORWARDED ON",
+            "box": [
+                418,
+                751,
+                588,
+                767
+            ],
+            "linking": [
+                [
+                    76,
+                    77
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RECEIVED",
+                    "box": [
+                        418,
+                        753,
+                        471,
+                        766
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        473,
+                        753,
+                        498,
+                        767
+                    ]
+                },
+                {
+                    "text": "FORWARDED",
+                    "box": [
+                        501,
+                        751,
+                        565,
+                        765
+                    ]
+                },
+                {
+                    "text": "ON",
+                    "box": [
+                        568,
+                        753,
+                        588,
+                        766
+                    ]
+                }
+            ],
+            "id": 76
+        },
+        {
+            "text": "1 29/29/ 69 (Date)",
+            "box": [
+                610,
+                746,
+                690,
+                764
+            ],
+            "linking": [
+                [
+                    76,
+                    77
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1",
+                    "box": [
+                        610,
+                        747,
+                        618,
+                        761
+                    ]
+                },
+                {
+                    "text": "29/29/",
+                    "box": [
+                        617,
+                        746,
+                        642,
+                        764
+                    ]
+                },
+                {
+                    "text": "69",
+                    "box": [
+                        640,
+                        746,
+                        664,
+                        764
+                    ]
+                },
+                {
+                    "text": "(Date)",
+                    "box": [
+                        665,
+                        751,
+                        690,
+                        762
+                    ]
+                }
+            ],
+            "id": 77
+        },
+        {
+            "text": "THE CORPORATION TRUST COMPANY",
+            "box": [
+                448,
+                778,
+                659,
+                794
+            ],
+            "linking": [
+                [
+                    13,
+                    78
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "THE",
+                    "box": [
+                        448,
+                        781,
+                        472,
+                        794
+                    ]
+                },
+                {
+                    "text": "CORPORATION",
+                    "box": [
+                        478,
+                        779,
+                        558,
+                        793
+                    ]
+                },
+                {
+                    "text": "TRUST",
+                    "box": [
+                        560,
+                        778,
+                        599,
+                        791
+                    ]
+                },
+                {
+                    "text": "COMPANY",
+                    "box": [
+                        605,
+                        778,
+                        659,
+                        789
+                    ]
+                }
+            ],
+            "id": 78
+        },
+        {
+            "text": "V. Colvellm Asst. Secy. 277 Park Avenue",
+            "box": [
+                448,
+                795,
+                614,
+                851
+            ],
+            "linking": [
+                [
+                    14,
+                    79
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        458,
+                        795,
+                        612,
+                        824
+                    ]
+                },
+                {
+                    "text": "V.",
+                    "box": [
+                        450,
+                        823,
+                        464,
+                        836
+                    ]
+                },
+                {
+                    "text": "Colvellm",
+                    "box": [
+                        469,
+                        823,
+                        532,
+                        834
+                    ]
+                },
+                {
+                    "text": "Asst.",
+                    "box": [
+                        532,
+                        823,
+                        571,
+                        833
+                    ]
+                },
+                {
+                    "text": "Secy.",
+                    "box": [
+                        575,
+                        823,
+                        614,
+                        834
+                    ]
+                },
+                {
+                    "text": "277",
+                    "box": [
+                        448,
+                        838,
+                        473,
+                        851
+                    ]
+                },
+                {
+                    "text": "Park",
+                    "box": [
+                        479,
+                        838,
+                        508,
+                        851
+                    ]
+                },
+                {
+                    "text": "Avenue",
+                    "box": [
+                        514,
+                        837,
+                        557,
+                        850
+                    ]
+                }
+            ],
+            "id": 79
+        },
+        {
+            "text": "New York, New York 10017",
+            "box": [
+                450,
+                856,
+                622,
+                872
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "New",
+                    "box": [
+                        450,
+                        859,
+                        474,
+                        872
+                    ]
+                },
+                {
+                    "text": "York,",
+                    "box": [
+                        478,
+                        856,
+                        516,
+                        871
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        520,
+                        858,
+                        544,
+                        871
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        549,
+                        858,
+                        578,
+                        872
+                    ]
+                },
+                {
+                    "text": "10017",
+                    "box": [
+                        584,
+                        856,
+                        622,
+                        871
+                    ]
+                }
+            ],
+            "id": 80
+        },
+        {
+            "text": "",
+            "box": [
+                574,
+                880,
+                683,
+                893
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        574,
+                        880,
+                        581,
+                        891
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        584,
+                        883,
+                        599,
+                        891
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        613,
+                        883,
+                        633,
+                        893
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        641,
+                        881,
+                        662,
+                        891
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        663,
+                        880,
+                        683,
+                        891
+                    ]
+                }
+            ],
+            "id": 81
+        },
+        {
+            "text": "KINDLY ACKNOWLEDGE RECEIPT BY SIGNING AND RETURNING TO US THE ENCLOSED CARBON COPY OF THIS TRANSMITTAL FORM,",
+            "box": [
+                25,
+                782,
+                377,
+                812
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "KINDLY",
+                    "box": [
+                        25,
+                        788,
+                        64,
+                        798
+                    ]
+                },
+                {
+                    "text": "ACKNOWLEDGE",
+                    "box": [
+                        66,
+                        786,
+                        151,
+                        796
+                    ]
+                },
+                {
+                    "text": "RECEIPT",
+                    "box": [
+                        155,
+                        785,
+                        194,
+                        798
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        200,
+                        786,
+                        211,
+                        797
+                    ]
+                },
+                {
+                    "text": "SIGNING",
+                    "box": [
+                        216,
+                        784,
+                        262,
+                        797
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        270,
+                        785,
+                        292,
+                        796
+                    ]
+                },
+                {
+                    "text": "RETURNING",
+                    "box": [
+                        295,
+                        784,
+                        356,
+                        797
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        359,
+                        782,
+                        377,
+                        796
+                    ]
+                },
+                {
+                    "text": "US",
+                    "box": [
+                        27,
+                        802,
+                        42,
+                        812
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        45,
+                        799,
+                        63,
+                        812
+                    ]
+                },
+                {
+                    "text": "ENCLOSED",
+                    "box": [
+                        68,
+                        799,
+                        125,
+                        810
+                    ]
+                },
+                {
+                    "text": "CARBON",
+                    "box": [
+                        128,
+                        797,
+                        173,
+                        810
+                    ]
+                },
+                {
+                    "text": "COPY",
+                    "box": [
+                        176,
+                        797,
+                        210,
+                        808
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        215,
+                        799,
+                        232,
+                        809
+                    ]
+                },
+                {
+                    "text": "THIS",
+                    "box": [
+                        235,
+                        797,
+                        256,
+                        810
+                    ]
+                },
+                {
+                    "text": "TRANSMITTAL",
+                    "box": [
+                        260,
+                        797,
+                        328,
+                        810
+                    ]
+                },
+                {
+                    "text": "FORM,",
+                    "box": [
+                        332,
+                        797,
+                        364,
+                        808
+                    ]
+                }
+            ],
+            "id": 82
+        }
+    ]
+}

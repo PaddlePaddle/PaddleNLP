@@ -1,0 +1,1183 @@
+{
+    "form": [
+        {
+            "box": [
+                394,
+                145,
+                433,
+                162
+            ],
+            "text": "ITEM:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        394,
+                        145,
+                        433,
+                        162
+                    ],
+                    "text": "ITEM:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    15
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                109,
+                112,
+                151,
+                129
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        109,
+                        112,
+                        151,
+                        129
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    13
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                110,
+                140,
+                159,
+                155
+            ],
+            "text": "BRAND:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        110,
+                        140,
+                        159,
+                        155
+                    ],
+                    "text": "BRAND:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    14
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                109,
+                183,
+                168,
+                198
+            ],
+            "text": "SUMMARY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        109,
+                        183,
+                        168,
+                        198
+                    ],
+                    "text": "SUMMARY"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                175,
+                184,
+                193,
+                195
+            ],
+            "text": "OF",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        175,
+                        184,
+                        193,
+                        195
+                    ],
+                    "text": "OF"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                201,
+                184,
+                267,
+                198
+            ],
+            "text": "PROJECT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        201,
+                        184,
+                        267,
+                        198
+                    ],
+                    "text": "PROJECT:"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    7
+                ],
+                [
+                    5,
+                    6
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                317,
+                186,
+                385,
+                199
+            ],
+            "text": "Attached",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        317,
+                        186,
+                        385,
+                        199
+                    ],
+                    "text": "Attached"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                282,
+                186,
+                310,
+                197
+            ],
+            "text": "See",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        282,
+                        186,
+                        310,
+                        197
+                    ],
+                    "text": "See"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                103,
+                404,
+                173,
+                418
+            ],
+            "text": "FUNDING:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        103,
+                        404,
+                        173,
+                        418
+                    ],
+                    "text": "FUNDING:"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    22
+                ],
+                [
+                    8,
+                    23
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                101,
+                559,
+                196,
+                574
+            ],
+            "text": "SIGNATURES:",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        101,
+                        559,
+                        196,
+                        574
+                    ],
+                    "text": "SIGNATURES:"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    24
+                ],
+                [
+                    9,
+                    25
+                ],
+                [
+                    9,
+                    26
+                ],
+                [
+                    9,
+                    27
+                ],
+                [
+                    9,
+                    28
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                98,
+                824,
+                166,
+                838
+            ],
+            "text": "4514cbta",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        98,
+                        824,
+                        166,
+                        838
+                    ],
+                    "text": "4514cbta"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                545,
+                21,
+                647,
+                117
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        545,
+                        21,
+                        647,
+                        117
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "text": "PROJECT BRIEF",
+            "box": [
+                328,
+                74,
+                437,
+                90
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        328,
+                        74,
+                        388,
+                        89
+                    ]
+                },
+                {
+                    "text": "BRIEF",
+                    "box": [
+                        395,
+                        75,
+                        437,
+                        90
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "June 1, 1990",
+            "box": [
+                194,
+                115,
+                295,
+                130
+            ],
+            "linking": [
+                [
+                    1,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "June",
+                    "box": [
+                        194,
+                        115,
+                        230,
+                        129
+                    ]
+                },
+                {
+                    "text": "1,",
+                    "box": [
+                        235,
+                        115,
+                        252,
+                        129
+                    ]
+                },
+                {
+                    "text": "1990",
+                    "box": [
+                        261,
+                        115,
+                        295,
+                        130
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "General Merchandising Nonspecific",
+            "box": [
+                176,
+                142,
+                352,
+                170
+            ],
+            "linking": [
+                [
+                    2,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "General",
+                    "box": [
+                        176,
+                        142,
+                        235,
+                        157
+                    ]
+                },
+                {
+                    "text": "Merchandising",
+                    "box": [
+                        243,
+                        142,
+                        352,
+                        159
+                    ]
+                },
+                {
+                    "text": "Nonspecific",
+                    "box": [
+                        177,
+                        155,
+                        268,
+                        170
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "Package Fixture Circle-K Convenient Stores",
+            "box": [
+                450,
+                147,
+                653,
+                175
+            ],
+            "linking": [
+                [
+                    0,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Package",
+                    "box": [
+                        451,
+                        147,
+                        508,
+                        162
+                    ]
+                },
+                {
+                    "text": "Fixture",
+                    "box": [
+                        517,
+                        147,
+                        576,
+                        162
+                    ]
+                },
+                {
+                    "text": "Circle-K",
+                    "box": [
+                        582,
+                        148,
+                        653,
+                        163
+                    ]
+                },
+                {
+                    "text": "Convenient",
+                    "box": [
+                        450,
+                        161,
+                        534,
+                        174
+                    ]
+                },
+                {
+                    "text": "Stores",
+                    "box": [
+                        541,
+                        161,
+                        593,
+                        175
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "",
+            "box": [
+                550,
+                216,
+                703,
+                325
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        550,
+                        222,
+                        642,
+                        302
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        575,
+                        216,
+                        703,
+                        325
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "SUPPLIERS BEING CONSIDERED:",
+            "box": [
+                106,
+                251,
+                331,
+                268
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ],
+                [
+                    17,
+                    19
+                ],
+                [
+                    17,
+                    20
+                ],
+                [
+                    17,
+                    21
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SUPPLIERS",
+                    "box": [
+                        106,
+                        251,
+                        183,
+                        265
+                    ]
+                },
+                {
+                    "text": "BEING",
+                    "box": [
+                        191,
+                        253,
+                        234,
+                        267
+                    ]
+                },
+                {
+                    "text": "CONSIDERED:",
+                    "box": [
+                        242,
+                        253,
+                        331,
+                        268
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "Chicago Show",
+            "box": [
+                106,
+                278,
+                210,
+                295
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Chicago",
+                    "box": [
+                        106,
+                        278,
+                        167,
+                        295
+                    ]
+                },
+                {
+                    "text": "Show",
+                    "box": [
+                        175,
+                        281,
+                        210,
+                        294
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "Display Equation",
+            "box": [
+                105,
+                306,
+                241,
+                324
+            ],
+            "linking": [
+                [
+                    17,
+                    19
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Display",
+                    "box": [
+                        105,
+                        306,
+                        168,
+                        321
+                    ]
+                },
+                {
+                    "text": "Equation",
+                    "box": [
+                        173,
+                        307,
+                        241,
+                        324
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "Chicago Display",
+            "box": [
+                106,
+                335,
+                233,
+                352
+            ],
+            "linking": [
+                [
+                    17,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Chicago",
+                    "box": [
+                        106,
+                        335,
+                        165,
+                        349
+                    ]
+                },
+                {
+                    "text": "Display",
+                    "box": [
+                        173,
+                        335,
+                        233,
+                        352
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "Robert Nielson & Associates",
+            "box": [
+                106,
+                360,
+                333,
+                380
+            ],
+            "linking": [
+                [
+                    17,
+                    21
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Robert",
+                    "box": [
+                        106,
+                        360,
+                        156,
+                        377
+                    ]
+                },
+                {
+                    "text": "Nielson",
+                    "box": [
+                        162,
+                        362,
+                        223,
+                        377
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        232,
+                        365,
+                        242,
+                        378
+                    ]
+                },
+                {
+                    "text": "Associates",
+                    "box": [
+                        246,
+                        363,
+                        333,
+                        380
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "1990 Customized Merchandising",
+            "box": [
+                106,
+                430,
+                347,
+                451
+            ],
+            "linking": [
+                [
+                    8,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1990",
+                    "box": [
+                        106,
+                        430,
+                        138,
+                        445
+                    ]
+                },
+                {
+                    "text": "Customized",
+                    "box": [
+                        147,
+                        432,
+                        231,
+                        447
+                    ]
+                },
+                {
+                    "text": "Merchandising",
+                    "box": [
+                        237,
+                        433,
+                        347,
+                        451
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "Services ESPNS",
+            "box": [
+                105,
+                459,
+                231,
+                474
+            ],
+            "linking": [
+                [
+                    8,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Services",
+                    "box": [
+                        105,
+                        459,
+                        172,
+                        474
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        180,
+                        464,
+                        190,
+                        471
+                    ]
+                },
+                {
+                    "text": "ESPNS",
+                    "box": [
+                        197,
+                        461,
+                        231,
+                        474
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "REQUESTING MANAGER",
+            "box": [
+                101,
+                598,
+                254,
+                615
+            ],
+            "linking": [
+                [
+                    9,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REQUESTING",
+                    "box": [
+                        101,
+                        598,
+                        188,
+                        615
+                    ]
+                },
+                {
+                    "text": "MANAGER",
+                    "box": [
+                        193,
+                        599,
+                        254,
+                        614
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "MERCHANDISING MANAGER",
+            "box": [
+                101,
+                640,
+                278,
+                657
+            ],
+            "linking": [
+                [
+                    9,
+                    25
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "MERCHANDISING",
+                    "box": [
+                        101,
+                        640,
+                        210,
+                        657
+                    ]
+                },
+                {
+                    "text": "MANAGER",
+                    "box": [
+                        218,
+                        642,
+                        278,
+                        656
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "GROUP PRODUCT DIRECTOR",
+            "box": [
+                99,
+                682,
+                285,
+                699
+            ],
+            "linking": [
+                [
+                    9,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "GROUP",
+                    "box": [
+                        99,
+                        682,
+                        142,
+                        697
+                    ]
+                },
+                {
+                    "text": "PRODUCT",
+                    "box": [
+                        151,
+                        684,
+                        211,
+                        698
+                    ]
+                },
+                {
+                    "text": "DIRECTOR",
+                    "box": [
+                        218,
+                        684,
+                        285,
+                        699
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "PURCHASING DEPARTMENT",
+            "box": [
+                98,
+                725,
+                275,
+                742
+            ],
+            "linking": [
+                [
+                    9,
+                    27
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PURCHASING",
+                    "box": [
+                        98,
+                        725,
+                        185,
+                        740
+                    ]
+                },
+                {
+                    "text": "DEPARTMENT",
+                    "box": [
+                        190,
+                        728,
+                        275,
+                        742
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "RETURN TO:",
+            "box": [
+                96,
+                768,
+                181,
+                783
+            ],
+            "linking": [
+                [
+                    28,
+                    29
+                ],
+                [
+                    9,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RETURN",
+                    "box": [
+                        96,
+                        768,
+                        149,
+                        781
+                    ]
+                },
+                {
+                    "text": "TO:",
+                    "box": [
+                        156,
+                        770,
+                        181,
+                        783
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "REQUESTING MANAGER",
+            "box": [
+                197,
+                771,
+                351,
+                785
+            ],
+            "linking": [
+                [
+                    28,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "REQUESTING",
+                    "box": [
+                        197,
+                        771,
+                        282,
+                        785
+                    ]
+                },
+                {
+                    "text": "MANAGER",
+                    "box": [
+                        288,
+                        771,
+                        351,
+                        785
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "462231045 PRODUCED FROM B&W WEB SITE",
+            "box": [
+                1,
+                953,
+                232,
+                983
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "462231045",
+                    "box": [
+                        1,
+                        953,
+                        79,
+                        967
+                    ]
+                },
+                {
+                    "text": "PRODUCED",
+                    "box": [
+                        4,
+                        969,
+                        70,
+                        983
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        80,
+                        969,
+                        116,
+                        982
+                    ]
+                },
+                {
+                    "text": "B&W",
+                    "box": [
+                        124,
+                        968,
+                        153,
+                        983
+                    ]
+                },
+                {
+                    "text": "WEB",
+                    "box": [
+                        159,
+                        969,
+                        188,
+                        982
+                    ]
+                },
+                {
+                    "text": "SITE",
+                    "box": [
+                        197,
+                        968,
+                        232,
+                        982
+                    ]
+                }
+            ],
+            "id": 30
+        }
+    ]
+}

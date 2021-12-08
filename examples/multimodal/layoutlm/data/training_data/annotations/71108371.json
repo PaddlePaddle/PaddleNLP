@@ -1,0 +1,3872 @@
+{
+    "form": [
+        {
+            "box": [
+                110,
+                109,
+                185,
+                124
+            ],
+            "text": "Department:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        110,
+                        109,
+                        185,
+                        124
+                    ],
+                    "text": "Department:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    21
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                109,
+                147,
+                158,
+                161
+            ],
+            "text": "System:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        109,
+                        147,
+                        158,
+                        161
+                    ],
+                    "text": "System:"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                112,
+                205,
+                127,
+                220
+            ],
+            "text": "x",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        112,
+                        205,
+                        127,
+                        220
+                    ],
+                    "text": "x"
+                }
+            ],
+            "linking": [
+                [
+                    29,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                207,
+                127,
+                236,
+                138
+            ],
+            "text": "7970",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        207,
+                        127,
+                        236,
+                        138
+                    ],
+                    "text": "7970"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                271,
+                176,
+                289,
+                190
+            ],
+            "text": "x",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        271,
+                        176,
+                        289,
+                        190
+                    ],
+                    "text": "x"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                462,
+                189,
+                476,
+                202
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        462,
+                        189,
+                        476,
+                        202
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                480,
+                122,
+                523,
+                137
+            ],
+            "text": "4/20/98",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        480,
+                        122,
+                        523,
+                        137
+                    ],
+                    "text": "4/20/98"
+                }
+            ],
+            "linking": [
+                [
+                    24,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                482,
+                102,
+                528,
+                117
+            ],
+            "text": "4/17/98",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        482,
+                        102,
+                        528,
+                        117
+                    ],
+                    "text": "4/17/98"
+                }
+            ],
+            "linking": [
+                [
+                    23,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                480,
+                175,
+                536,
+                188
+            ],
+            "text": "Immediate",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        480,
+                        175,
+                        536,
+                        188
+                    ],
+                    "text": "Immediate"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                483,
+                189,
+                510,
+                200
+            ],
+            "text": "High",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        483,
+                        189,
+                        510,
+                        200
+                    ],
+                    "text": "High"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    9
+                ],
+                [
+                    9,
+                    5
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                480,
+                201,
+                523,
+                214
+            ],
+            "text": "Medium",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        480,
+                        201,
+                        523,
+                        214
+                    ],
+                    "text": "Medium"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                482,
+                216,
+                506,
+                227
+            ],
+            "text": "Low",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        482,
+                        216,
+                        506,
+                        227
+                    ],
+                    "text": "Low"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                482,
+                229,
+                511,
+                240
+            ],
+            "text": "Defer",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        482,
+                        229,
+                        511,
+                        240
+                    ],
+                    "text": "Defer"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                511,
+                155,
+                581,
+                169
+            ],
+            "text": "PRIORITY",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        511,
+                        155,
+                        581,
+                        169
+                    ],
+                    "text": "PRIORITY"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    8
+                ],
+                [
+                    13,
+                    9
+                ],
+                [
+                    13,
+                    10
+                ],
+                [
+                    13,
+                    11
+                ],
+                [
+                    13,
+                    12
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                408,
+                712,
+                451,
+                726
+            ],
+            "text": "designed",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        408,
+                        712,
+                        451,
+                        726
+                    ],
+                    "text": "designed"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                99,
+                848,
+                297,
+                855
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        848,
+                        297,
+                        855
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "text": "MIS PROJECT REQUEST PART I - CLIENT REQUEST",
+            "box": [
+                257,
+                13,
+                467,
+                49
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "MIS",
+                    "box": [
+                        267,
+                        15,
+                        301,
+                        30
+                    ]
+                },
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        303,
+                        14,
+                        378,
+                        29
+                    ]
+                },
+                {
+                    "text": "REQUEST",
+                    "box": [
+                        383,
+                        13,
+                        460,
+                        28
+                    ]
+                },
+                {
+                    "text": "PART",
+                    "box": [
+                        257,
+                        35,
+                        303,
+                        49
+                    ]
+                },
+                {
+                    "text": "I",
+                    "box": [
+                        304,
+                        34,
+                        314,
+                        48
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        316,
+                        41,
+                        322,
+                        47
+                    ]
+                },
+                {
+                    "text": "CLIENT",
+                    "box": [
+                        324,
+                        32,
+                        390,
+                        47
+                    ]
+                },
+                {
+                    "text": "REQUEST",
+                    "box": [
+                        392,
+                        32,
+                        467,
+                        46
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "Requested by:",
+            "box": [
+                109,
+                74,
+                193,
+                90
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Requested",
+                    "box": [
+                        109,
+                        75,
+                        170,
+                        90
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        175,
+                        74,
+                        193,
+                        89
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "Karl Hutchison",
+            "box": [
+                200,
+                73,
+                294,
+                88
+            ],
+            "linking": [
+                [
+                    17,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Karl",
+                    "box": [
+                        200,
+                        74,
+                        229,
+                        88
+                    ]
+                },
+                {
+                    "text": "Hutchison",
+                    "box": [
+                        230,
+                        73,
+                        294,
+                        88
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "Project Number:",
+            "box": [
+                384,
+                71,
+                482,
+                85
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Project",
+                    "box": [
+                        384,
+                        71,
+                        426,
+                        85
+                    ]
+                },
+                {
+                    "text": "Number:",
+                    "box": [
+                        429,
+                        71,
+                        482,
+                        84
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "(assigned by MIS)",
+            "box": [
+                485,
+                70,
+                573,
+                85
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(assigned",
+                    "box": [
+                        485,
+                        71,
+                        531,
+                        85
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        532,
+                        71,
+                        545,
+                        82
+                    ]
+                },
+                {
+                    "text": "MIS)",
+                    "box": [
+                        546,
+                        70,
+                        573,
+                        84
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "BD & SS",
+            "box": [
+                196,
+                108,
+                251,
+                122
+            ],
+            "linking": [
+                [
+                    0,
+                    21
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "BD",
+                    "box": [
+                        196,
+                        108,
+                        216,
+                        122
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        219,
+                        108,
+                        230,
+                        122
+                    ]
+                },
+                {
+                    "text": "SS",
+                    "box": [
+                        233,
+                        108,
+                        251,
+                        121
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Phone Number:",
+            "box": [
+                109,
+                127,
+                203,
+                141
+            ],
+            "linking": [
+                [
+                    22,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Phone",
+                    "box": [
+                        109,
+                        128,
+                        147,
+                        141
+                    ]
+                },
+                {
+                    "text": "Number:",
+                    "box": [
+                        149,
+                        127,
+                        203,
+                        141
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "Date Submitted:",
+            "box": [
+                384,
+                103,
+                481,
+                119
+            ],
+            "linking": [
+                [
+                    23,
+                    7
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Date",
+                    "box": [
+                        384,
+                        106,
+                        412,
+                        119
+                    ]
+                },
+                {
+                    "text": "Submitted:",
+                    "box": [
+                        415,
+                        103,
+                        481,
+                        117
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "Date Required:",
+            "box": [
+                384,
+                123,
+                474,
+                137
+            ],
+            "linking": [
+                [
+                    24,
+                    6
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Date",
+                    "box": [
+                        384,
+                        123,
+                        412,
+                        137
+                    ]
+                },
+                {
+                    "text": "Required:",
+                    "box": [
+                        415,
+                        123,
+                        474,
+                        137
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "REQUEST TYPE",
+            "box": [
+                130,
+                162,
+                238,
+                178
+            ],
+            "linking": [
+                [
+                    25,
+                    27
+                ],
+                [
+                    25,
+                    28
+                ],
+                [
+                    25,
+                    29
+                ],
+                [
+                    25,
+                    30
+                ],
+                [
+                    25,
+                    31
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "REQUEST",
+                    "box": [
+                        130,
+                        163,
+                        198,
+                        178
+                    ]
+                },
+                {
+                    "text": "TYPE",
+                    "box": [
+                        200,
+                        162,
+                        238,
+                        175
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "REASON CODE",
+            "box": [
+                307,
+                159,
+                412,
+                173
+            ],
+            "linking": [
+                [
+                    26,
+                    32
+                ],
+                [
+                    26,
+                    33
+                ],
+                [
+                    26,
+                    34
+                ],
+                [
+                    26,
+                    35
+                ],
+                [
+                    26,
+                    36
+                ],
+                [
+                    26,
+                    37
+                ],
+                [
+                    26,
+                    38
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "REASON",
+                    "box": [
+                        307,
+                        159,
+                        364,
+                        173
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        369,
+                        159,
+                        412,
+                        172
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "1. Enhancement",
+            "box": [
+                131,
+                180,
+                217,
+                192
+            ],
+            "linking": [
+                [
+                    25,
+                    27
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "1.",
+                    "box": [
+                        131,
+                        182,
+                        141,
+                        192
+                    ]
+                },
+                {
+                    "text": "Enhancement",
+                    "box": [
+                        147,
+                        180,
+                        217,
+                        191
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "2. Maintenance",
+            "box": [
+                133,
+                194,
+                215,
+                206
+            ],
+            "linking": [
+                [
+                    25,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "2.",
+                    "box": [
+                        133,
+                        196,
+                        143,
+                        206
+                    ]
+                },
+                {
+                    "text": "Maintenance",
+                    "box": [
+                        147,
+                        194,
+                        215,
+                        205
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "3. Special Processing",
+            "box": [
+                135,
+                207,
+                243,
+                221
+            ],
+            "linking": [
+                [
+                    25,
+                    29
+                ],
+                [
+                    29,
+                    2
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "3.",
+                    "box": [
+                        135,
+                        208,
+                        145,
+                        219
+                    ]
+                },
+                {
+                    "text": "Special",
+                    "box": [
+                        151,
+                        207,
+                        187,
+                        221
+                    ]
+                },
+                {
+                    "text": "Processing",
+                    "box": [
+                        189,
+                        207,
+                        243,
+                        221
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "4. Ad Hoc",
+            "box": [
+                133,
+                221,
+                187,
+                234
+            ],
+            "linking": [
+                [
+                    25,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "4.",
+                    "box": [
+                        133,
+                        222,
+                        143,
+                        233
+                    ]
+                },
+                {
+                    "text": "Ad",
+                    "box": [
+                        148,
+                        221,
+                        163,
+                        234
+                    ]
+                },
+                {
+                    "text": "Hoc",
+                    "box": [
+                        166,
+                        221,
+                        187,
+                        232
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "5. Emergency",
+            "box": [
+                131,
+                235,
+                205,
+                249
+            ],
+            "linking": [
+                [
+                    25,
+                    31
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "5.",
+                    "box": [
+                        131,
+                        235,
+                        142,
+                        246
+                    ]
+                },
+                {
+                    "text": "Emergency",
+                    "box": [
+                        148,
+                        235,
+                        205,
+                        249
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "1. Productivity Improvement",
+            "box": [
+                296,
+                177,
+                443,
+                190
+            ],
+            "linking": [
+                [
+                    26,
+                    32
+                ],
+                [
+                    32,
+                    4
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "1.",
+                    "box": [
+                        296,
+                        177,
+                        306,
+                        188
+                    ]
+                },
+                {
+                    "text": "Productivity",
+                    "box": [
+                        310,
+                        177,
+                        373,
+                        190
+                    ]
+                },
+                {
+                    "text": "Improvement",
+                    "box": [
+                        376,
+                        177,
+                        443,
+                        188
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "2. Return On Investment",
+            "box": [
+                295,
+                190,
+                420,
+                204
+            ],
+            "linking": [
+                [
+                    26,
+                    33
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "2.",
+                    "box": [
+                        295,
+                        191,
+                        303,
+                        204
+                    ]
+                },
+                {
+                    "text": "Return",
+                    "box": [
+                        309,
+                        193,
+                        345,
+                        204
+                    ]
+                },
+                {
+                    "text": "On",
+                    "box": [
+                        346,
+                        191,
+                        363,
+                        202
+                    ]
+                },
+                {
+                    "text": "Investment",
+                    "box": [
+                        366,
+                        190,
+                        420,
+                        203
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "3. Customer Impact",
+            "box": [
+                293,
+                204,
+                398,
+                218
+            ],
+            "linking": [
+                [
+                    26,
+                    34
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "3.",
+                    "box": [
+                        293,
+                        205,
+                        304,
+                        218
+                    ]
+                },
+                {
+                    "text": "Customer",
+                    "box": [
+                        309,
+                        205,
+                        359,
+                        215
+                    ]
+                },
+                {
+                    "text": "Impact",
+                    "box": [
+                        360,
+                        204,
+                        398,
+                        217
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "4. Government Requirement",
+            "box": [
+                293,
+                216,
+                440,
+                231
+            ],
+            "linking": [
+                [
+                    26,
+                    35
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "4.",
+                    "box": [
+                        293,
+                        219,
+                        303,
+                        230
+                    ]
+                },
+                {
+                    "text": "Government",
+                    "box": [
+                        309,
+                        218,
+                        372,
+                        231
+                    ]
+                },
+                {
+                    "text": "Requirement",
+                    "box": [
+                        373,
+                        216,
+                        440,
+                        230
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "5. Business Change",
+            "box": [
+                295,
+                232,
+                394,
+                245
+            ],
+            "linking": [
+                [
+                    26,
+                    36
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "5.",
+                    "box": [
+                        295,
+                        232,
+                        305,
+                        245
+                    ]
+                },
+                {
+                    "text": "Business",
+                    "box": [
+                        310,
+                        232,
+                        353,
+                        243
+                    ]
+                },
+                {
+                    "text": "Change",
+                    "box": [
+                        356,
+                        232,
+                        394,
+                        245
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "6. System Error",
+            "box": [
+                295,
+                244,
+                377,
+                259
+            ],
+            "linking": [
+                [
+                    26,
+                    37
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "6.",
+                    "box": [
+                        295,
+                        246,
+                        303,
+                        257
+                    ]
+                },
+                {
+                    "text": "System",
+                    "box": [
+                        309,
+                        246,
+                        345,
+                        259
+                    ]
+                },
+                {
+                    "text": "Error",
+                    "box": [
+                        348,
+                        244,
+                        377,
+                        257
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "7. Procedural Error",
+            "box": [
+                296,
+                258,
+                399,
+                273
+            ],
+            "linking": [
+                [
+                    26,
+                    38
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "7.",
+                    "box": [
+                        296,
+                        260,
+                        304,
+                        273
+                    ]
+                },
+                {
+                    "text": "Procedural",
+                    "box": [
+                        309,
+                        258,
+                        366,
+                        271
+                    ]
+                },
+                {
+                    "text": "Error",
+                    "box": [
+                        367,
+                        258,
+                        399,
+                        269
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "PROBLEM DEFINITION",
+            "box": [
+                110,
+                292,
+                267,
+                307
+            ],
+            "linking": [
+                [
+                    39,
+                    40
+                ],
+                [
+                    39,
+                    42
+                ],
+                [
+                    39,
+                    44
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROBLEM",
+                    "box": [
+                        110,
+                        293,
+                        178,
+                        307
+                    ]
+                },
+                {
+                    "text": "DEFINITION",
+                    "box": [
+                        183,
+                        292,
+                        267,
+                        307
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "Description of Request:",
+            "box": [
+                109,
+                310,
+                226,
+                324
+            ],
+            "linking": [
+                [
+                    40,
+                    41
+                ],
+                [
+                    39,
+                    40
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Description",
+                    "box": [
+                        109,
+                        310,
+                        168,
+                        324
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        169,
+                        310,
+                        182,
+                        323
+                    ]
+                },
+                {
+                    "text": "Request:",
+                    "box": [
+                        183,
+                        311,
+                        226,
+                        322
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "Please run job FRMRXUM2 for GPC, Misty, and Kool against file b:\\common\\khutchi\\r892unm.lst. Please place output in the same directory.",
+            "box": [
+                109,
+                318,
+                606,
+                352
+            ],
+            "linking": [
+                [
+                    40,
+                    41
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Please",
+                    "box": [
+                        110,
+                        325,
+                        141,
+                        338
+                    ]
+                },
+                {
+                    "text": "run",
+                    "box": [
+                        142,
+                        327,
+                        163,
+                        337
+                    ]
+                },
+                {
+                    "text": "job",
+                    "box": [
+                        163,
+                        325,
+                        181,
+                        336
+                    ]
+                },
+                {
+                    "text": "FRMRXUM2",
+                    "box": [
+                        183,
+                        324,
+                        253,
+                        335
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        254,
+                        323,
+                        269,
+                        336
+                    ]
+                },
+                {
+                    "text": "GPC,",
+                    "box": [
+                        272,
+                        321,
+                        300,
+                        335
+                    ]
+                },
+                {
+                    "text": "Misty,",
+                    "box": [
+                        300,
+                        323,
+                        335,
+                        336
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        337,
+                        321,
+                        358,
+                        334
+                    ]
+                },
+                {
+                    "text": "Kool",
+                    "box": [
+                        360,
+                        320,
+                        382,
+                        335
+                    ]
+                },
+                {
+                    "text": "against",
+                    "box": [
+                        385,
+                        321,
+                        421,
+                        334
+                    ]
+                },
+                {
+                    "text": "file",
+                    "box": [
+                        423,
+                        320,
+                        440,
+                        334
+                    ]
+                },
+                {
+                    "text": "b:\\common\\khutchi\\r892unm.lst.",
+                    "box": [
+                        443,
+                        318,
+                        606,
+                        332
+                    ]
+                },
+                {
+                    "text": "Please",
+                    "box": [
+                        109,
+                        339,
+                        141,
+                        350
+                    ]
+                },
+                {
+                    "text": "place",
+                    "box": [
+                        142,
+                        339,
+                        171,
+                        352
+                    ]
+                },
+                {
+                    "text": "output",
+                    "box": [
+                        173,
+                        339,
+                        207,
+                        352
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        207,
+                        339,
+                        218,
+                        349
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        221,
+                        338,
+                        238,
+                        348
+                    ]
+                },
+                {
+                    "text": "same",
+                    "box": [
+                        239,
+                        338,
+                        266,
+                        349
+                    ]
+                },
+                {
+                    "text": "directory.",
+                    "box": [
+                        267,
+                        338,
+                        317,
+                        351
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "Reason for Request:",
+            "box": [
+                110,
+                406,
+                211,
+                421
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ],
+                [
+                    39,
+                    42
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Reason",
+                    "box": [
+                        110,
+                        408,
+                        145,
+                        421
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        147,
+                        406,
+                        165,
+                        419
+                    ]
+                },
+                {
+                    "text": "Request:",
+                    "box": [
+                        168,
+                        408,
+                        211,
+                        419
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "Calculation of 1997 STR volumes for these brands for allocation of Period 2A budgets.",
+            "box": [
+                109,
+                430,
+                536,
+                447
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Calculation",
+                    "box": [
+                        109,
+                        434,
+                        168,
+                        447
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        170,
+                        434,
+                        181,
+                        447
+                    ]
+                },
+                {
+                    "text": "1997",
+                    "box": [
+                        183,
+                        434,
+                        207,
+                        445
+                    ]
+                },
+                {
+                    "text": "STR",
+                    "box": [
+                        208,
+                        433,
+                        233,
+                        446
+                    ]
+                },
+                {
+                    "text": "volumes",
+                    "box": [
+                        235,
+                        433,
+                        276,
+                        446
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        278,
+                        433,
+                        293,
+                        446
+                    ]
+                },
+                {
+                    "text": "these",
+                    "box": [
+                        295,
+                        433,
+                        320,
+                        446
+                    ]
+                },
+                {
+                    "text": "brands",
+                    "box": [
+                        323,
+                        432,
+                        359,
+                        445
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        360,
+                        430,
+                        377,
+                        444
+                    ]
+                },
+                {
+                    "text": "allocation",
+                    "box": [
+                        378,
+                        430,
+                        427,
+                        444
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        429,
+                        430,
+                        440,
+                        443
+                    ]
+                },
+                {
+                    "text": "Period",
+                    "box": [
+                        443,
+                        430,
+                        477,
+                        443
+                    ]
+                },
+                {
+                    "text": "2A",
+                    "box": [
+                        478,
+                        430,
+                        493,
+                        443
+                    ]
+                },
+                {
+                    "text": "budgets.",
+                    "box": [
+                        494,
+                        430,
+                        536,
+                        444
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Request Authorized By:",
+            "box": [
+                110,
+                506,
+                254,
+                523
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ],
+                [
+                    39,
+                    44
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Request",
+                    "box": [
+                        110,
+                        506,
+                        159,
+                        523
+                    ]
+                },
+                {
+                    "text": "Authorized",
+                    "box": [
+                        159,
+                        506,
+                        229,
+                        521
+                    ]
+                },
+                {
+                    "text": "By:",
+                    "box": [
+                        232,
+                        506,
+                        254,
+                        521
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "Karl Hutchison",
+            "box": [
+                309,
+                520,
+                393,
+                537
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Karl",
+                    "box": [
+                        309,
+                        521,
+                        338,
+                        535
+                    ]
+                },
+                {
+                    "text": "Hutchison",
+                    "box": [
+                        339,
+                        520,
+                        393,
+                        537
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "REQUEST TYPE:",
+            "box": [
+                98,
+                588,
+                191,
+                603
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "REQUEST",
+                    "box": [
+                        98,
+                        589,
+                        155,
+                        603
+                    ]
+                },
+                {
+                    "text": "TYPE:",
+                    "box": [
+                        156,
+                        588,
+                        191,
+                        602
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "REASON CODE:",
+            "box": [
+                387,
+                584,
+                476,
+                599
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "REASON",
+                    "box": [
+                        387,
+                        585,
+                        436,
+                        599
+                    ]
+                },
+                {
+                    "text": "CODE:",
+                    "box": [
+                        437,
+                        584,
+                        476,
+                        598
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "REQUEST AUTHORIZED BY",
+            "box": [
+                101,
+                782,
+                267,
+                797
+            ],
+            "linking": [
+                [
+                    48,
+                    79
+                ],
+                [
+                    48,
+                    80
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REQUEST",
+                    "box": [
+                        101,
+                        784,
+                        157,
+                        797
+                    ]
+                },
+                {
+                    "text": "AUTHORIZED",
+                    "box": [
+                        159,
+                        784,
+                        239,
+                        797
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        242,
+                        782,
+                        267,
+                        796
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "1. Enhancement",
+            "box": [
+                98,
+                603,
+                196,
+                616
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "1.",
+                    "box": [
+                        98,
+                        605,
+                        108,
+                        616
+                    ]
+                },
+                {
+                    "text": "Enhancement",
+                    "box": [
+                        119,
+                        603,
+                        196,
+                        614
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "productivity improvement, new",
+            "box": [
+                198,
+                602,
+                347,
+                615
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "productivity",
+                    "box": [
+                        198,
+                        602,
+                        255,
+                        615
+                    ]
+                },
+                {
+                    "text": "improvement,",
+                    "box": [
+                        258,
+                        602,
+                        322,
+                        615
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        325,
+                        602,
+                        347,
+                        612
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "functionality, nice to have feature",
+            "box": [
+                119,
+                615,
+                279,
+                630
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "functionality,",
+                    "box": [
+                        119,
+                        616,
+                        182,
+                        630
+                    ]
+                },
+                {
+                    "text": "nice",
+                    "box": [
+                        184,
+                        616,
+                        205,
+                        627
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        208,
+                        617,
+                        216,
+                        628
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        221,
+                        616,
+                        243,
+                        629
+                    ]
+                },
+                {
+                    "text": "feature",
+                    "box": [
+                        243,
+                        615,
+                        279,
+                        628
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "2. Maintenance-",
+            "box": [
+                98,
+                630,
+                193,
+                644
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "2.",
+                    "box": [
+                        98,
+                        631,
+                        109,
+                        644
+                    ]
+                },
+                {
+                    "text": "Maintenance-",
+                    "box": [
+                        119,
+                        630,
+                        193,
+                        641
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "fix program error new business need",
+            "box": [
+                194,
+                628,
+                371,
+                642
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "fix",
+                    "box": [
+                        194,
+                        631,
+                        208,
+                        641
+                    ]
+                },
+                {
+                    "text": "program",
+                    "box": [
+                        211,
+                        631,
+                        252,
+                        642
+                    ]
+                },
+                {
+                    "text": "error",
+                    "box": [
+                        254,
+                        631,
+                        279,
+                        641
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        281,
+                        631,
+                        302,
+                        641
+                    ]
+                },
+                {
+                    "text": "business",
+                    "box": [
+                        304,
+                        630,
+                        346,
+                        641
+                    ]
+                },
+                {
+                    "text": "need",
+                    "box": [
+                        349,
+                        628,
+                        371,
+                        639
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "3. Special Processing",
+            "box": [
+                98,
+                645,
+                221,
+                658
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "3.",
+                    "box": [
+                        98,
+                        645,
+                        109,
+                        656
+                    ]
+                },
+                {
+                    "text": "Special",
+                    "box": [
+                        117,
+                        645,
+                        156,
+                        658
+                    ]
+                },
+                {
+                    "text": "Processing",
+                    "box": [
+                        158,
+                        645,
+                        221,
+                        656
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "high volume file maintenance or",
+            "box": [
+                222,
+                642,
+                376,
+                656
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "high",
+                    "box": [
+                        222,
+                        642,
+                        244,
+                        656
+                    ]
+                },
+                {
+                    "text": "volume",
+                    "box": [
+                        246,
+                        644,
+                        282,
+                        655
+                    ]
+                },
+                {
+                    "text": "file",
+                    "box": [
+                        284,
+                        644,
+                        301,
+                        655
+                    ]
+                },
+                {
+                    "text": "maintenance",
+                    "box": [
+                        303,
+                        644,
+                        363,
+                        655
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        365,
+                        644,
+                        376,
+                        655
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "data correction which is not part of normal processing",
+            "box": [
+                120,
+                656,
+                376,
+                672
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "data",
+                    "box": [
+                        120,
+                        659,
+                        140,
+                        672
+                    ]
+                },
+                {
+                    "text": "correction",
+                    "box": [
+                        142,
+                        659,
+                        189,
+                        670
+                    ]
+                },
+                {
+                    "text": "which",
+                    "box": [
+                        194,
+                        659,
+                        223,
+                        670
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        223,
+                        658,
+                        234,
+                        671
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        236,
+                        659,
+                        253,
+                        669
+                    ]
+                },
+                {
+                    "text": "part",
+                    "box": [
+                        254,
+                        659,
+                        274,
+                        672
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        275,
+                        658,
+                        288,
+                        671
+                    ]
+                },
+                {
+                    "text": "normal",
+                    "box": [
+                        288,
+                        656,
+                        322,
+                        669
+                    ]
+                },
+                {
+                    "text": "processing",
+                    "box": [
+                        324,
+                        658,
+                        376,
+                        672
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "4. Ad Hoc-",
+            "box": [
+                99,
+                672,
+                167,
+                686
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "4.",
+                    "box": [
+                        99,
+                        672,
+                        109,
+                        686
+                    ]
+                },
+                {
+                    "text": "Ad",
+                    "box": [
+                        120,
+                        672,
+                        135,
+                        685
+                    ]
+                },
+                {
+                    "text": "Hoc-",
+                    "box": [
+                        138,
+                        672,
+                        167,
+                        685
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "reporting requirement which is not part of",
+            "box": [
+                169,
+                672,
+                369,
+                686
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "reporting",
+                    "box": [
+                        169,
+                        673,
+                        212,
+                        686
+                    ]
+                },
+                {
+                    "text": "requirement",
+                    "box": [
+                        215,
+                        673,
+                        272,
+                        686
+                    ]
+                },
+                {
+                    "text": "which",
+                    "box": [
+                        275,
+                        672,
+                        304,
+                        683
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        304,
+                        672,
+                        314,
+                        683
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        316,
+                        672,
+                        333,
+                        683
+                    ]
+                },
+                {
+                    "text": "part",
+                    "box": [
+                        335,
+                        672,
+                        355,
+                        685
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        358,
+                        672,
+                        369,
+                        685
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "normal processing",
+            "box": [
+                120,
+                687,
+                208,
+                700
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "normal",
+                    "box": [
+                        120,
+                        687,
+                        154,
+                        698
+                    ]
+                },
+                {
+                    "text": "processing",
+                    "box": [
+                        156,
+                        687,
+                        208,
+                        700
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "5. Emergency-",
+            "box": [
+                99,
+                701,
+                186,
+                714
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "5.",
+                    "box": [
+                        99,
+                        701,
+                        109,
+                        714
+                    ]
+                },
+                {
+                    "text": "Emergency-",
+                    "box": [
+                        119,
+                        701,
+                        186,
+                        712
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "application or technology failure",
+            "box": [
+                187,
+                700,
+                344,
+                714
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "application",
+                    "box": [
+                        187,
+                        701,
+                        240,
+                        712
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        242,
+                        701,
+                        253,
+                        711
+                    ]
+                },
+                {
+                    "text": "technology",
+                    "box": [
+                        254,
+                        700,
+                        307,
+                        714
+                    ]
+                },
+                {
+                    "text": "failure",
+                    "box": [
+                        310,
+                        700,
+                        344,
+                        713
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "1. Productivity Improvement",
+            "box": [
+                388,
+                599,
+                546,
+                613
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "1.",
+                    "box": [
+                        388,
+                        601,
+                        396,
+                        612
+                    ]
+                },
+                {
+                    "text": "Productivity",
+                    "box": [
+                        408,
+                        599,
+                        469,
+                        613
+                    ]
+                },
+                {
+                    "text": "Improvement",
+                    "box": [
+                        472,
+                        599,
+                        546,
+                        610
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "2. Return on Investment-",
+            "box": [
+                387,
+                612,
+                522,
+                627
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "2.",
+                    "box": [
+                        387,
+                        616,
+                        398,
+                        627
+                    ]
+                },
+                {
+                    "text": "Return",
+                    "box": [
+                        408,
+                        615,
+                        444,
+                        626
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        446,
+                        616,
+                        459,
+                        624
+                    ]
+                },
+                {
+                    "text": "Investment-",
+                    "box": [
+                        461,
+                        612,
+                        522,
+                        625
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "3. Customer Impact",
+            "box": [
+                388,
+                627,
+                502,
+                641
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "3.",
+                    "box": [
+                        388,
+                        630,
+                        398,
+                        640
+                    ]
+                },
+                {
+                    "text": "Customer",
+                    "box": [
+                        409,
+                        627,
+                        456,
+                        641
+                    ]
+                },
+                {
+                    "text": "Impact",
+                    "box": [
+                        459,
+                        627,
+                        502,
+                        640
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "dollar savings",
+            "box": [
+                524,
+                612,
+                592,
+                625
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "dollar",
+                    "box": [
+                        524,
+                        612,
+                        555,
+                        625
+                    ]
+                },
+                {
+                    "text": "savings",
+                    "box": [
+                        556,
+                        613,
+                        592,
+                        623
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "time savings",
+            "box": [
+                547,
+                596,
+                611,
+                610
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "time",
+                    "box": [
+                        547,
+                        598,
+                        571,
+                        609
+                    ]
+                },
+                {
+                    "text": "savings",
+                    "box": [
+                        573,
+                        596,
+                        611,
+                        610
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "requested change affects",
+            "box": [
+                503,
+                624,
+                621,
+                638
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "requested",
+                    "box": [
+                        503,
+                        627,
+                        550,
+                        638
+                    ]
+                },
+                {
+                    "text": "change",
+                    "box": [
+                        550,
+                        627,
+                        585,
+                        638
+                    ]
+                },
+                {
+                    "text": "affects",
+                    "box": [
+                        587,
+                        624,
+                        621,
+                        637
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "B&W's external customers",
+            "box": [
+                408,
+                640,
+                535,
+                654
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "B&W's",
+                    "box": [
+                        408,
+                        640,
+                        442,
+                        654
+                    ]
+                },
+                {
+                    "text": "external",
+                    "box": [
+                        444,
+                        641,
+                        485,
+                        652
+                    ]
+                },
+                {
+                    "text": "customers",
+                    "box": [
+                        486,
+                        641,
+                        535,
+                        652
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "4. Government Requirement",
+            "box": [
+                388,
+                655,
+                546,
+                669
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "4.",
+                    "box": [
+                        388,
+                        656,
+                        398,
+                        667
+                    ]
+                },
+                {
+                    "text": "Government",
+                    "box": [
+                        409,
+                        655,
+                        472,
+                        668
+                    ]
+                },
+                {
+                    "text": "Requirement",
+                    "box": [
+                        472,
+                        655,
+                        546,
+                        669
+                    ]
+                }
+            ],
+            "id": 69
+        },
+        {
+            "text": "required by law",
+            "box": [
+                547,
+                652,
+                622,
+                667
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "required",
+                    "box": [
+                        547,
+                        654,
+                        588,
+                        667
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        589,
+                        652,
+                        602,
+                        667
+                    ]
+                },
+                {
+                    "text": "law",
+                    "box": [
+                        605,
+                        652,
+                        622,
+                        666
+                    ]
+                }
+            ],
+            "id": 70
+        },
+        {
+            "text": "5. Business Change",
+            "box": [
+                388,
+                668,
+                500,
+                683
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "5.",
+                    "box": [
+                        388,
+                        670,
+                        399,
+                        681
+                    ]
+                },
+                {
+                    "text": "Business",
+                    "box": [
+                        409,
+                        669,
+                        452,
+                        683
+                    ]
+                },
+                {
+                    "text": "Change",
+                    "box": [
+                        454,
+                        668,
+                        500,
+                        683
+                    ]
+                }
+            ],
+            "id": 71
+        },
+        {
+            "text": "change in a business",
+            "box": [
+                501,
+                668,
+                600,
+                682
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "change",
+                    "box": [
+                        501,
+                        669,
+                        536,
+                        682
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        536,
+                        669,
+                        547,
+                        679
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        547,
+                        669,
+                        557,
+                        680
+                    ]
+                },
+                {
+                    "text": "business",
+                    "box": [
+                        559,
+                        668,
+                        600,
+                        679
+                    ]
+                }
+            ],
+            "id": 72
+        },
+        {
+            "text": "process, or implement strategic direction",
+            "box": [
+                409,
+                682,
+                604,
+                698
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "process,",
+                    "box": [
+                        409,
+                        684,
+                        447,
+                        698
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        448,
+                        686,
+                        461,
+                        696
+                    ]
+                },
+                {
+                    "text": "implement",
+                    "box": [
+                        461,
+                        682,
+                        511,
+                        696
+                    ]
+                },
+                {
+                    "text": "strategic",
+                    "box": [
+                        514,
+                        683,
+                        555,
+                        696
+                    ]
+                },
+                {
+                    "text": "direction",
+                    "box": [
+                        559,
+                        683,
+                        604,
+                        693
+                    ]
+                }
+            ],
+            "id": 73
+        },
+        {
+            "text": "6. System Error-",
+            "box": [
+                388,
+                697,
+                483,
+                711
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "6.",
+                    "box": [
+                        388,
+                        697,
+                        399,
+                        711
+                    ]
+                },
+                {
+                    "text": "System",
+                    "box": [
+                        409,
+                        698,
+                        444,
+                        709
+                    ]
+                },
+                {
+                    "text": "Error-",
+                    "box": [
+                        447,
+                        697,
+                        483,
+                        710
+                    ]
+                }
+            ],
+            "id": 74
+        },
+        {
+            "text": "System is not functioning as",
+            "box": [
+                486,
+                696,
+                617,
+                711
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "System",
+                    "box": [
+                        486,
+                        697,
+                        518,
+                        711
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        520,
+                        697,
+                        530,
+                        708
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        529,
+                        698,
+                        547,
+                        709
+                    ]
+                },
+                {
+                    "text": "functioning",
+                    "box": [
+                        547,
+                        696,
+                        604,
+                        709
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        606,
+                        697,
+                        617,
+                        707
+                    ]
+                }
+            ],
+            "id": 75
+        },
+        {
+            "text": "7. Procedural Error",
+            "box": [
+                388,
+                725,
+                502,
+                739
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "7.",
+                    "box": [
+                        388,
+                        725,
+                        399,
+                        739
+                    ]
+                },
+                {
+                    "text": "Procedural",
+                    "box": [
+                        409,
+                        726,
+                        466,
+                        739
+                    ]
+                },
+                {
+                    "text": "Error",
+                    "box": [
+                        466,
+                        725,
+                        502,
+                        739
+                    ]
+                }
+            ],
+            "id": 76
+        },
+        {
+            "text": "caused by user, scheduling,",
+            "box": [
+                506,
+                722,
+                634,
+                738
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "caused",
+                    "box": [
+                        506,
+                        725,
+                        538,
+                        736
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        539,
+                        725,
+                        552,
+                        738
+                    ]
+                },
+                {
+                    "text": "user,",
+                    "box": [
+                        554,
+                        725,
+                        578,
+                        736
+                    ]
+                },
+                {
+                    "text": "scheduling,",
+                    "box": [
+                        580,
+                        722,
+                        634,
+                        736
+                    ]
+                }
+            ],
+            "id": 77
+        },
+        {
+            "text": "operations, etc.",
+            "box": [
+                409,
+                740,
+                481,
+                753
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "operations,",
+                    "box": [
+                        409,
+                        740,
+                        461,
+                        753
+                    ]
+                },
+                {
+                    "text": "etc.",
+                    "box": [
+                        464,
+                        742,
+                        481,
+                        752
+                    ]
+                }
+            ],
+            "id": 78
+        },
+        {
+            "text": "MUST BE AUTHORIZED BY THE DEPARTMENT DIRECTOR OR THE",
+            "box": [
+                270,
+                777,
+                627,
+                797
+            ],
+            "linking": [
+                [
+                    48,
+                    79
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "MUST",
+                    "box": [
+                        270,
+                        781,
+                        304,
+                        796
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        304,
+                        784,
+                        319,
+                        797
+                    ]
+                },
+                {
+                    "text": "AUTHORIZED",
+                    "box": [
+                        321,
+                        782,
+                        396,
+                        793
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        399,
+                        781,
+                        416,
+                        792
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        419,
+                        781,
+                        440,
+                        792
+                    ]
+                },
+                {
+                    "text": "DEPARTMENT",
+                    "box": [
+                        443,
+                        779,
+                        521,
+                        792
+                    ]
+                },
+                {
+                    "text": "DIRECTOR",
+                    "box": [
+                        522,
+                        779,
+                        582,
+                        792
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        582,
+                        777,
+                        600,
+                        791
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        603,
+                        777,
+                        627,
+                        790
+                    ]
+                }
+            ],
+            "id": 79
+        },
+        {
+            "text": "DESIGNATED SYSTEM OWNER BEFORE SUBMISSION TO THE MIS CLIENT SYSTEMS MANAGER.",
+            "box": [
+                101,
+                793,
+                621,
+                810
+            ],
+            "linking": [
+                [
+                    48,
+                    80
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "DESIGNATED",
+                    "box": [
+                        101,
+                        797,
+                        176,
+                        810
+                    ]
+                },
+                {
+                    "text": "SYSTEM",
+                    "box": [
+                        176,
+                        797,
+                        223,
+                        808
+                    ]
+                },
+                {
+                    "text": "OWNER",
+                    "box": [
+                        226,
+                        795,
+                        269,
+                        810
+                    ]
+                },
+                {
+                    "text": "BEFORE",
+                    "box": [
+                        272,
+                        797,
+                        315,
+                        808
+                    ]
+                },
+                {
+                    "text": "SUBMISSION",
+                    "box": [
+                        318,
+                        795,
+                        391,
+                        809
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        392,
+                        795,
+                        407,
+                        806
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        409,
+                        795,
+                        433,
+                        808
+                    ]
+                },
+                {
+                    "text": "MIS",
+                    "box": [
+                        433,
+                        795,
+                        458,
+                        808
+                    ]
+                },
+                {
+                    "text": "CLIENT",
+                    "box": [
+                        459,
+                        795,
+                        500,
+                        808
+                    ]
+                },
+                {
+                    "text": "SYSTEMS",
+                    "box": [
+                        503,
+                        793,
+                        555,
+                        806
+                    ]
+                },
+                {
+                    "text": "MANAGER.",
+                    "box": [
+                        557,
+                        793,
+                        621,
+                        804
+                    ]
+                }
+            ],
+            "id": 80
+        },
+        {
+            "text": "12009596 PRODUCED FROM B&W WEB SITE",
+            "box": [
+                0,
+                954,
+                232,
+                982
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "12009596",
+                    "box": [
+                        1,
+                        954,
+                        81,
+                        964
+                    ]
+                },
+                {
+                    "text": "PRODUCED",
+                    "box": [
+                        0,
+                        969,
+                        71,
+                        980
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        80,
+                        969,
+                        118,
+                        982
+                    ]
+                },
+                {
+                    "text": "B&W",
+                    "box": [
+                        123,
+                        969,
+                        152,
+                        982
+                    ]
+                },
+                {
+                    "text": "WEB",
+                    "box": [
+                        159,
+                        968,
+                        186,
+                        982
+                    ]
+                },
+                {
+                    "text": "SITE",
+                    "box": [
+                        196,
+                        968,
+                        232,
+                        982
+                    ]
+                }
+            ],
+            "id": 81
+        }
+    ]
+}

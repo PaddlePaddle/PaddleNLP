@@ -1,0 +1,411 @@
+{
+    "form": [
+        {
+            "box": [
+                60,
+                189,
+                94,
+                204
+            ],
+            "text": "(Name)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        60,
+                        189,
+                        94,
+                        204
+                    ],
+                    "text": "(Name)"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                59,
+                225,
+                86,
+                236
+            ],
+            "text": "(Date)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        225,
+                        86,
+                        236
+                    ],
+                    "text": "(Date)"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                412,
+                190,
+                461,
+                207
+            ],
+            "text": "(Position)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        412,
+                        190,
+                        461,
+                        207
+                    ],
+                    "text": "(Position)"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                218,
+                968,
+                254,
+                982
+            ],
+            "text": "(Name)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        218,
+                        968,
+                        254,
+                        982
+                    ],
+                    "text": "(Name)"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                733,
+                714,
+                750,
+                803
+            ],
+            "text": "85540866",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        733,
+                        714,
+                        750,
+                        803
+                    ],
+                    "text": "85540866"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "text": "MEDIA CONTACT SHEET",
+            "box": [
+                235,
+                82,
+                533,
+                114
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        235,
+                        82,
+                        316,
+                        110
+                    ]
+                },
+                {
+                    "text": "CONTACT",
+                    "box": [
+                        321,
+                        87,
+                        444,
+                        114
+                    ]
+                },
+                {
+                    "text": "SHEET",
+                    "box": [
+                        451,
+                        87,
+                        533,
+                        112
+                    ]
+                }
+            ],
+            "id": 5
+        },
+        {
+            "text": "(Publication or station)",
+            "box": [
+                60,
+                151,
+                187,
+                167
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "(Publication",
+                    "box": [
+                        60,
+                        151,
+                        127,
+                        166
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        130,
+                        155,
+                        144,
+                        166
+                    ]
+                },
+                {
+                    "text": "station)",
+                    "box": [
+                        145,
+                        154,
+                        187,
+                        167
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "Reason for Contact",
+            "box": [
+                54,
+                261,
+                189,
+                278
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Reason",
+                    "box": [
+                        54,
+                        263,
+                        110,
+                        278
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        115,
+                        261,
+                        132,
+                        275
+                    ]
+                },
+                {
+                    "text": "Contact",
+                    "box": [
+                        135,
+                        261,
+                        189,
+                        276
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "Questions/ Responses",
+            "box": [
+                56,
+                422,
+                208,
+                440
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Questions/",
+                    "box": [
+                        56,
+                        422,
+                        127,
+                        439
+                    ]
+                },
+                {
+                    "text": "Responses",
+                    "box": [
+                        134,
+                        423,
+                        208,
+                        440
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "Additional Comments",
+            "box": [
+                54,
+                760,
+                208,
+                781
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Additional",
+                    "box": [
+                        54,
+                        760,
+                        127,
+                        780
+                    ]
+                },
+                {
+                    "text": "Comments",
+                    "box": [
+                        131,
+                        761,
+                        208,
+                        781
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Inquiry handled by:",
+            "box": [
+                54,
+                953,
+                194,
+                973
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Inquiry",
+                    "box": [
+                        54,
+                        953,
+                        107,
+                        973
+                    ]
+                },
+                {
+                    "text": "handled",
+                    "box": [
+                        110,
+                        954,
+                        166,
+                        972
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        170,
+                        953,
+                        194,
+                        971
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "(Location address)",
+            "box": [
+                415,
+                155,
+                518,
+                172
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "(Location",
+                    "box": [
+                        415,
+                        155,
+                        468,
+                        172
+                    ]
+                },
+                {
+                    "text": "address)",
+                    "box": [
+                        471,
+                        156,
+                        518,
+                        169
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "(Phone number)",
+            "box": [
+                413,
+                226,
+                497,
+                241
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "(Phone",
+                    "box": [
+                        413,
+                        226,
+                        452,
+                        241
+                    ]
+                },
+                {
+                    "text": "number)",
+                    "box": [
+                        455,
+                        226,
+                        497,
+                        241
+                    ]
+                }
+            ],
+            "id": 12
+        }
+    ]
+}

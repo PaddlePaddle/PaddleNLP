@@ -1,0 +1,2628 @@
+{
+    "form": [
+        {
+            "box": [
+                94,
+                200,
+                114,
+                214
+            ],
+            "text": "TO:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        94,
+                        200,
+                        114,
+                        214
+                    ],
+                    "text": "TO:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                92,
+                219,
+                128,
+                232
+            ],
+            "text": "FROM:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        92,
+                        219,
+                        128,
+                        232
+                    ],
+                    "text": "FROM:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    17
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                95,
+                236,
+                129,
+                250
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        95,
+                        236,
+                        129,
+                        250
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    18
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                313,
+                200,
+                408,
+                214
+            ],
+            "text": "MANUFACTURER:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        313,
+                        200,
+                        408,
+                        214
+                    ],
+                    "text": "MANUFACTURER:"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    10
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                313,
+                218,
+                356,
+                231
+            ],
+            "text": "BRAND:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        313,
+                        218,
+                        356,
+                        231
+                    ],
+                    "text": "BRAND:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    14
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                278,
+                268,
+                299,
+                282
+            ],
+            "text": "Oct.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        278,
+                        268,
+                        299,
+                        282
+                    ],
+                    "text": "Oct."
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                461,
+                268,
+                485,
+                281
+            ],
+            "text": "Dec.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        461,
+                        268,
+                        485,
+                        281
+                    ],
+                    "text": "Dec."
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                553,
+                268,
+                575,
+                279
+            ],
+            "text": "Jan.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        553,
+                        268,
+                        575,
+                        279
+                    ],
+                    "text": "Jan."
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                369,
+                270,
+                393,
+                281
+            ],
+            "text": "Nov.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        369,
+                        270,
+                        393,
+                        281
+                    ],
+                    "text": "Nov."
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    8
+                ],
+                [
+                    8,
+                    9
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                404,
+                270,
+                414,
+                280
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        404,
+                        270,
+                        414,
+                        280
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    9
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                451,
+                198,
+                476,
+                212
+            ],
+            "text": "B&W",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        451,
+                        198,
+                        476,
+                        212
+                    ],
+                    "text": "B&W"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                680,
+                814,
+                698,
+                917
+            ],
+            "text": "82250337",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        680,
+                        814,
+                        698,
+                        917
+                    ],
+                    "text": "82250337"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "text": "COMPETITIVE PRODUCT INTRODUCTION PROGRESS REPORT",
+            "box": [
+                221,
+                133,
+                505,
+                168
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "COMPETITIVE",
+                    "box": [
+                        221,
+                        137,
+                        317,
+                        154
+                    ]
+                },
+                {
+                    "text": "PRODUCT",
+                    "box": [
+                        321,
+                        137,
+                        392,
+                        150
+                    ]
+                },
+                {
+                    "text": "INTRODUCTION",
+                    "box": [
+                        395,
+                        133,
+                        505,
+                        150
+                    ]
+                },
+                {
+                    "text": "PROGRESS",
+                    "box": [
+                        291,
+                        155,
+                        371,
+                        168
+                    ]
+                },
+                {
+                    "text": "REPORT",
+                    "box": [
+                        374,
+                        152,
+                        435,
+                        167
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "Sam Zolot",
+            "box": [
+                140,
+                201,
+                193,
+                214
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Sam",
+                    "box": [
+                        140,
+                        201,
+                        164,
+                        214
+                    ]
+                },
+                {
+                    "text": "Zolot",
+                    "box": [
+                        166,
+                        201,
+                        193,
+                        214
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "Kool Waterfall",
+            "box": [
+                405,
+                218,
+                472,
+                228
+            ],
+            "linking": [
+                [
+                    4,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Kool",
+                    "box": [
+                        405,
+                        218,
+                        427,
+                        228
+                    ]
+                },
+                {
+                    "text": "Waterfall",
+                    "box": [
+                        429,
+                        218,
+                        472,
+                        228
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "All Packings",
+            "box": [
+                451,
+                235,
+                509,
+                248
+            ],
+            "linking": [
+                [
+                    16,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "All",
+                    "box": [
+                        451,
+                        235,
+                        464,
+                        246
+                    ]
+                },
+                {
+                    "text": "Packings",
+                    "box": [
+                        466,
+                        235,
+                        509,
+                        248
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "TYPE OF PACKINGS:",
+            "box": [
+                314,
+                235,
+                419,
+                248
+            ],
+            "linking": [
+                [
+                    16,
+                    15
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TYPE",
+                    "box": [
+                        314,
+                        236,
+                        342,
+                        247
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        345,
+                        235,
+                        359,
+                        248
+                    ]
+                },
+                {
+                    "text": "PACKINGS:",
+                    "box": [
+                        362,
+                        235,
+                        419,
+                        248
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "D. J. Landro",
+            "box": [
+                140,
+                219,
+                199,
+                230
+            ],
+            "linking": [
+                [
+                    1,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "D.",
+                    "box": [
+                        140,
+                        219,
+                        151,
+                        230
+                    ]
+                },
+                {
+                    "text": "J.",
+                    "box": [
+                        154,
+                        219,
+                        162,
+                        230
+                    ]
+                },
+                {
+                    "text": "Landro",
+                    "box": [
+                        165,
+                        221,
+                        199,
+                        229
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "2- Dec- 97",
+            "box": [
+                138,
+                237,
+                184,
+                247
+            ],
+            "linking": [
+                [
+                    2,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2-",
+                    "box": [
+                        138,
+                        237,
+                        146,
+                        247
+                    ]
+                },
+                {
+                    "text": "Dec-",
+                    "box": [
+                        149,
+                        237,
+                        170,
+                        247
+                    ]
+                },
+                {
+                    "text": "97",
+                    "box": [
+                        173,
+                        237,
+                        184,
+                        247
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "REPORTING PERIODS:",
+            "box": [
+                94,
+                271,
+                213,
+                285
+            ],
+            "linking": [
+                [
+                    19,
+                    5
+                ],
+                [
+                    19,
+                    8
+                ],
+                [
+                    19,
+                    6
+                ],
+                [
+                    19,
+                    7
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "REPORTING",
+                    "box": [
+                        94,
+                        271,
+                        157,
+                        284
+                    ]
+                },
+                {
+                    "text": "PERIODS:",
+                    "box": [
+                        161,
+                        271,
+                        213,
+                        285
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "TEST MARKET GEOGRAPHY:",
+            "box": [
+                95,
+                321,
+                244,
+                335
+            ],
+            "linking": [
+                [
+                    20,
+                    21
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TEST",
+                    "box": [
+                        95,
+                        323,
+                        123,
+                        334
+                    ]
+                },
+                {
+                    "text": "MARKET",
+                    "box": [
+                        126,
+                        321,
+                        171,
+                        335
+                    ]
+                },
+                {
+                    "text": "GEOGRAPHY:",
+                    "box": [
+                        173,
+                        321,
+                        244,
+                        335
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "Divisions 621 and 627 wisconsin",
+            "box": [
+                313,
+                318,
+                543,
+                334
+            ],
+            "linking": [
+                [
+                    20,
+                    21
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Divisions",
+                    "box": [
+                        313,
+                        320,
+                        356,
+                        334
+                    ]
+                },
+                {
+                    "text": "621",
+                    "box": [
+                        359,
+                        321,
+                        377,
+                        332
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        380,
+                        323,
+                        400,
+                        333
+                    ]
+                },
+                {
+                    "text": "627",
+                    "box": [
+                        401,
+                        321,
+                        419,
+                        332
+                    ]
+                },
+                {
+                    "text": "wisconsin",
+                    "box": [
+                        454,
+                        318,
+                        543,
+                        331
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "PRICE POINT:",
+            "box": [
+                92,
+                358,
+                166,
+                371
+            ],
+            "linking": [
+                [
+                    22,
+                    23
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PRICE",
+                    "box": [
+                        92,
+                        358,
+                        127,
+                        371
+                    ]
+                },
+                {
+                    "text": "POINT:",
+                    "box": [
+                        130,
+                        358,
+                        166,
+                        371
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "FULLS $ P/ V $",
+            "box": [
+                180,
+                358,
+                285,
+                369
+            ],
+            "linking": [
+                [
+                    22,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "FULLS",
+                    "box": [
+                        180,
+                        358,
+                        209,
+                        369
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        211,
+                        358,
+                        219,
+                        368
+                    ]
+                },
+                {
+                    "text": "P/",
+                    "box": [
+                        257,
+                        358,
+                        265,
+                        366
+                    ]
+                },
+                {
+                    "text": "V",
+                    "box": [
+                        267,
+                        358,
+                        274,
+                        366
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        277,
+                        358,
+                        285,
+                        368
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "(Indicate Distributor's Cost Per Carton)",
+            "box": [
+                321,
+                355,
+                513,
+                369
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(Indicate",
+                    "box": [
+                        321,
+                        355,
+                        362,
+                        368
+                    ]
+                },
+                {
+                    "text": "Distributor's",
+                    "box": [
+                        366,
+                        355,
+                        427,
+                        369
+                    ]
+                },
+                {
+                    "text": "Cost",
+                    "box": [
+                        432,
+                        355,
+                        456,
+                        368
+                    ]
+                },
+                {
+                    "text": "Per",
+                    "box": [
+                        458,
+                        355,
+                        476,
+                        368
+                    ]
+                },
+                {
+                    "text": "Carton)",
+                    "box": [
+                        479,
+                        355,
+                        513,
+                        366
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "SALES FORCE INVOLVEMENT:",
+            "box": [
+                94,
+                392,
+                254,
+                406
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SALES",
+                    "box": [
+                        94,
+                        395,
+                        130,
+                        406
+                    ]
+                },
+                {
+                    "text": "FORCE",
+                    "box": [
+                        133,
+                        395,
+                        171,
+                        406
+                    ]
+                },
+                {
+                    "text": "INVOLVEMENT:",
+                    "box": [
+                        173,
+                        392,
+                        254,
+                        406
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "They have crew- worked distribution, and it is reported that they may crew- work it again Sales force has been busy promoting old style backs to clean up inventory. All POS is being converted to \"B\" Kool.",
+            "box": [
+                94,
+                413,
+                644,
+                452
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "They",
+                    "box": [
+                        95,
+                        418,
+                        117,
+                        431
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        120,
+                        418,
+                        144,
+                        429
+                    ]
+                },
+                {
+                    "text": "crew-",
+                    "box": [
+                        148,
+                        419,
+                        170,
+                        427
+                    ]
+                },
+                {
+                    "text": "worked",
+                    "box": [
+                        173,
+                        418,
+                        208,
+                        429
+                    ]
+                },
+                {
+                    "text": "distribution,",
+                    "box": [
+                        212,
+                        418,
+                        266,
+                        429
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        270,
+                        418,
+                        288,
+                        428
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        289,
+                        415,
+                        297,
+                        426
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        299,
+                        416,
+                        309,
+                        427
+                    ]
+                },
+                {
+                    "text": "reported",
+                    "box": [
+                        310,
+                        418,
+                        349,
+                        429
+                    ]
+                },
+                {
+                    "text": "that",
+                    "box": [
+                        352,
+                        416,
+                        372,
+                        427
+                    ]
+                },
+                {
+                    "text": "they",
+                    "box": [
+                        374,
+                        416,
+                        394,
+                        427
+                    ]
+                },
+                {
+                    "text": "may",
+                    "box": [
+                        397,
+                        416,
+                        418,
+                        427
+                    ]
+                },
+                {
+                    "text": "crew-",
+                    "box": [
+                        420,
+                        416,
+                        442,
+                        426
+                    ]
+                },
+                {
+                    "text": "work",
+                    "box": [
+                        446,
+                        416,
+                        470,
+                        426
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        472,
+                        415,
+                        479,
+                        426
+                    ]
+                },
+                {
+                    "text": "again",
+                    "box": [
+                        480,
+                        415,
+                        508,
+                        428
+                    ]
+                },
+                {
+                    "text": "Sales",
+                    "box": [
+                        515,
+                        415,
+                        543,
+                        426
+                    ]
+                },
+                {
+                    "text": "force",
+                    "box": [
+                        546,
+                        415,
+                        571,
+                        426
+                    ]
+                },
+                {
+                    "text": "has",
+                    "box": [
+                        573,
+                        413,
+                        590,
+                        426
+                    ]
+                },
+                {
+                    "text": "been",
+                    "box": [
+                        592,
+                        413,
+                        616,
+                        423
+                    ]
+                },
+                {
+                    "text": "busy",
+                    "box": [
+                        620,
+                        413,
+                        644,
+                        426
+                    ]
+                },
+                {
+                    "text": "promoting",
+                    "box": [
+                        94,
+                        440,
+                        141,
+                        451
+                    ]
+                },
+                {
+                    "text": "old",
+                    "box": [
+                        144,
+                        439,
+                        161,
+                        452
+                    ]
+                },
+                {
+                    "text": "style",
+                    "box": [
+                        163,
+                        440,
+                        184,
+                        451
+                    ]
+                },
+                {
+                    "text": "backs",
+                    "box": [
+                        189,
+                        439,
+                        216,
+                        450
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        219,
+                        440,
+                        229,
+                        448
+                    ]
+                },
+                {
+                    "text": "clean",
+                    "box": [
+                        232,
+                        437,
+                        257,
+                        450
+                    ]
+                },
+                {
+                    "text": "up",
+                    "box": [
+                        260,
+                        440,
+                        271,
+                        450
+                    ]
+                },
+                {
+                    "text": "inventory.",
+                    "box": [
+                        274,
+                        437,
+                        320,
+                        451
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        327,
+                        436,
+                        340,
+                        449
+                    ]
+                },
+                {
+                    "text": "POS",
+                    "box": [
+                        341,
+                        436,
+                        363,
+                        449
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        367,
+                        437,
+                        377,
+                        447
+                    ]
+                },
+                {
+                    "text": "being",
+                    "box": [
+                        380,
+                        437,
+                        404,
+                        451
+                    ]
+                },
+                {
+                    "text": "converted",
+                    "box": [
+                        406,
+                        437,
+                        455,
+                        448
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        457,
+                        437,
+                        468,
+                        447
+                    ]
+                },
+                {
+                    "text": "\"B\"",
+                    "box": [
+                        471,
+                        436,
+                        485,
+                        446
+                    ]
+                },
+                {
+                    "text": "Kool.",
+                    "box": [
+                        487,
+                        437,
+                        511,
+                        447
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "DISTRIBUTORS ACCEPTANCE INTRO TERMS INTRO DEALS INVOLVEMENT:",
+            "box": [
+                94,
+                500,
+                493,
+                515
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DISTRIBUTORS",
+                    "box": [
+                        94,
+                        501,
+                        175,
+                        515
+                    ]
+                },
+                {
+                    "text": "ACCEPTANCE",
+                    "box": [
+                        183,
+                        501,
+                        257,
+                        515
+                    ]
+                },
+                {
+                    "text": "INTRO",
+                    "box": [
+                        261,
+                        501,
+                        295,
+                        514
+                    ]
+                },
+                {
+                    "text": "TERMS",
+                    "box": [
+                        297,
+                        501,
+                        335,
+                        514
+                    ]
+                },
+                {
+                    "text": "INTRO",
+                    "box": [
+                        338,
+                        500,
+                        370,
+                        514
+                    ]
+                },
+                {
+                    "text": "DEALS",
+                    "box": [
+                        373,
+                        500,
+                        408,
+                        514
+                    ]
+                },
+                {
+                    "text": "INVOLVEMENT:",
+                    "box": [
+                        412,
+                        500,
+                        493,
+                        514
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "All accounts have the new packaging. It was not a problem obtaining new distribution. All accounts appear to have 100% distribution of new packings.",
+            "box": [
+                94,
+                522,
+                606,
+                559
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "All",
+                    "box": [
+                        95,
+                        525,
+                        109,
+                        536
+                    ]
+                },
+                {
+                    "text": "accounts",
+                    "box": [
+                        110,
+                        525,
+                        153,
+                        536
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        156,
+                        525,
+                        180,
+                        536
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        183,
+                        524,
+                        198,
+                        535
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        200,
+                        525,
+                        221,
+                        535
+                    ]
+                },
+                {
+                    "text": "packaging.",
+                    "box": [
+                        223,
+                        524,
+                        275,
+                        538
+                    ]
+                },
+                {
+                    "text": "It",
+                    "box": [
+                        279,
+                        524,
+                        287,
+                        534
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        289,
+                        525,
+                        310,
+                        535
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        313,
+                        524,
+                        328,
+                        534
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        330,
+                        525,
+                        337,
+                        535
+                    ]
+                },
+                {
+                    "text": "problem",
+                    "box": [
+                        338,
+                        524,
+                        377,
+                        535
+                    ]
+                },
+                {
+                    "text": "obtaining",
+                    "box": [
+                        380,
+                        522,
+                        423,
+                        535
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        426,
+                        525,
+                        446,
+                        533
+                    ]
+                },
+                {
+                    "text": "distribution.",
+                    "box": [
+                        448,
+                        522,
+                        505,
+                        535
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        510,
+                        522,
+                        523,
+                        533
+                    ]
+                },
+                {
+                    "text": "accounts",
+                    "box": [
+                        525,
+                        522,
+                        568,
+                        533
+                    ]
+                },
+                {
+                    "text": "appear",
+                    "box": [
+                        571,
+                        522,
+                        606,
+                        535
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        94,
+                        547,
+                        102,
+                        558
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        106,
+                        546,
+                        130,
+                        557
+                    ]
+                },
+                {
+                    "text": "100%",
+                    "box": [
+                        133,
+                        546,
+                        160,
+                        559
+                    ]
+                },
+                {
+                    "text": "distribution",
+                    "box": [
+                        162,
+                        545,
+                        216,
+                        559
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        219,
+                        545,
+                        230,
+                        556
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        230,
+                        546,
+                        250,
+                        556
+                    ]
+                },
+                {
+                    "text": "packings.",
+                    "box": [
+                        253,
+                        546,
+                        296,
+                        557
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "CHAINS ACCEPTANCE/ MERCHANDISING:",
+            "box": [
+                92,
+                609,
+                317,
+                623
+            ],
+            "linking": [
+                [
+                    29,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CHAINS",
+                    "box": [
+                        92,
+                        610,
+                        135,
+                        623
+                    ]
+                },
+                {
+                    "text": "ACCEPTANCE/",
+                    "box": [
+                        144,
+                        609,
+                        219,
+                        622
+                    ]
+                },
+                {
+                    "text": "MERCHANDISING:",
+                    "box": [
+                        223,
+                        610,
+                        317,
+                        623
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "This has not been a problem. New packaging is just following on the old \"packaging\".",
+            "box": [
+                95,
+                628,
+                516,
+                647
+            ],
+            "linking": [
+                [
+                    29,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        95,
+                        633,
+                        115,
+                        646
+                    ]
+                },
+                {
+                    "text": "has",
+                    "box": [
+                        119,
+                        631,
+                        136,
+                        645
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        138,
+                        634,
+                        153,
+                        645
+                    ]
+                },
+                {
+                    "text": "been",
+                    "box": [
+                        156,
+                        633,
+                        180,
+                        644
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        183,
+                        634,
+                        190,
+                        642
+                    ]
+                },
+                {
+                    "text": "problem.",
+                    "box": [
+                        193,
+                        633,
+                        234,
+                        647
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        240,
+                        633,
+                        262,
+                        643
+                    ]
+                },
+                {
+                    "text": "packaging",
+                    "box": [
+                        265,
+                        633,
+                        314,
+                        646
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        314,
+                        633,
+                        324,
+                        644
+                    ]
+                },
+                {
+                    "text": "just",
+                    "box": [
+                        327,
+                        631,
+                        345,
+                        644
+                    ]
+                },
+                {
+                    "text": "following",
+                    "box": [
+                        348,
+                        630,
+                        390,
+                        644
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        392,
+                        633,
+                        405,
+                        643
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        406,
+                        630,
+                        419,
+                        641
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        422,
+                        630,
+                        437,
+                        641
+                    ]
+                },
+                {
+                    "text": "old",
+                    "box": [
+                        440,
+                        628,
+                        454,
+                        641
+                    ]
+                },
+                {
+                    "text": "\"packaging\".",
+                    "box": [
+                        457,
+                        630,
+                        516,
+                        644
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "INDEPENDENTS ACCEPTANCE/ MERCHANDISING:",
+            "box": [
+                92,
+                716,
+                359,
+                731
+            ],
+            "linking": [
+                [
+                    31,
+                    32
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "INDEPENDENTS",
+                    "box": [
+                        92,
+                        718,
+                        179,
+                        731
+                    ]
+                },
+                {
+                    "text": "ACCEPTANCE/",
+                    "box": [
+                        187,
+                        718,
+                        261,
+                        729
+                    ]
+                },
+                {
+                    "text": "MERCHANDISING:",
+                    "box": [
+                        265,
+                        716,
+                        359,
+                        729
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "Very well received. The packs are peing consolidated and promoted in select retail locations at 40 off $4 00 off cartons.",
+            "box": [
+                94,
+                737,
+                587,
+                774
+            ],
+            "linking": [
+                [
+                    31,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Very",
+                    "box": [
+                        94,
+                        740,
+                        116,
+                        753
+                    ]
+                },
+                {
+                    "text": "well",
+                    "box": [
+                        119,
+                        740,
+                        139,
+                        753
+                    ]
+                },
+                {
+                    "text": "received.",
+                    "box": [
+                        141,
+                        740,
+                        183,
+                        754
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        191,
+                        740,
+                        209,
+                        753
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        212,
+                        740,
+                        227,
+                        750
+                    ]
+                },
+                {
+                    "text": "packs",
+                    "box": [
+                        230,
+                        740,
+                        258,
+                        751
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        261,
+                        742,
+                        276,
+                        750
+                    ]
+                },
+                {
+                    "text": "peing",
+                    "box": [
+                        281,
+                        740,
+                        306,
+                        753
+                    ]
+                },
+                {
+                    "text": "consolidated",
+                    "box": [
+                        309,
+                        737,
+                        369,
+                        751
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        373,
+                        739,
+                        390,
+                        750
+                    ]
+                },
+                {
+                    "text": "promoted",
+                    "box": [
+                        394,
+                        739,
+                        439,
+                        750
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        441,
+                        737,
+                        449,
+                        748
+                    ]
+                },
+                {
+                    "text": "select",
+                    "box": [
+                        453,
+                        739,
+                        480,
+                        750
+                    ]
+                },
+                {
+                    "text": "retail",
+                    "box": [
+                        483,
+                        737,
+                        507,
+                        750
+                    ]
+                },
+                {
+                    "text": "locations",
+                    "box": [
+                        510,
+                        739,
+                        552,
+                        749
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        556,
+                        739,
+                        564,
+                        749
+                    ]
+                },
+                {
+                    "text": "40",
+                    "box": [
+                        570,
+                        737,
+                        587,
+                        748
+                    ]
+                },
+                {
+                    "text": "off",
+                    "box": [
+                        94,
+                        763,
+                        108,
+                        773
+                    ]
+                },
+                {
+                    "text": "$4",
+                    "box": [
+                        110,
+                        763,
+                        121,
+                        774
+                    ]
+                },
+                {
+                    "text": "00",
+                    "box": [
+                        124,
+                        763,
+                        138,
+                        774
+                    ]
+                },
+                {
+                    "text": "off",
+                    "box": [
+                        140,
+                        763,
+                        153,
+                        774
+                    ]
+                },
+                {
+                    "text": "cartons.",
+                    "box": [
+                        155,
+                        763,
+                        193,
+                        774
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "ADVERTISING EFFECTIVENESS OF P. O. S.:",
+            "box": [
+                94,
+                824,
+                321,
+                839
+            ],
+            "linking": [
+                [
+                    33,
+                    34
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ADVERTISING",
+                    "box": [
+                        94,
+                        824,
+                        168,
+                        839
+                    ]
+                },
+                {
+                    "text": "EFFECTIVENESS",
+                    "box": [
+                        177,
+                        824,
+                        265,
+                        839
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        268,
+                        825,
+                        282,
+                        838
+                    ]
+                },
+                {
+                    "text": "P.",
+                    "box": [
+                        286,
+                        825,
+                        294,
+                        836
+                    ]
+                },
+                {
+                    "text": "O.",
+                    "box": [
+                        297,
+                        824,
+                        305,
+                        837
+                    ]
+                },
+                {
+                    "text": "S.:",
+                    "box": [
+                        307,
+                        824,
+                        321,
+                        837
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "The theme \"B\" Kool has replaced all previous POS. They have effectively replaced all old POS. New door signage, hour signs, poster mats, and clocks have the new design. \"B\" Kool also appears on billboards in llinois.",
+            "box": [
+                94,
+                844,
+                610,
+                904
+            ],
+            "linking": [
+                [
+                    33,
+                    34
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        95,
+                        848,
+                        113,
+                        861
+                    ]
+                },
+                {
+                    "text": "theme",
+                    "box": [
+                        117,
+                        848,
+                        145,
+                        859
+                    ]
+                },
+                {
+                    "text": "\"B\"",
+                    "box": [
+                        148,
+                        846,
+                        165,
+                        857
+                    ]
+                },
+                {
+                    "text": "Kool",
+                    "box": [
+                        168,
+                        846,
+                        189,
+                        857
+                    ]
+                },
+                {
+                    "text": "has",
+                    "box": [
+                        191,
+                        846,
+                        208,
+                        859
+                    ]
+                },
+                {
+                    "text": "replaced",
+                    "box": [
+                        212,
+                        848,
+                        253,
+                        859
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        256,
+                        846,
+                        269,
+                        857
+                    ]
+                },
+                {
+                    "text": "previous",
+                    "box": [
+                        270,
+                        848,
+                        312,
+                        859
+                    ]
+                },
+                {
+                    "text": "POS.",
+                    "box": [
+                        314,
+                        846,
+                        339,
+                        859
+                    ]
+                },
+                {
+                    "text": "They",
+                    "box": [
+                        345,
+                        845,
+                        367,
+                        859
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        372,
+                        846,
+                        394,
+                        859
+                    ]
+                },
+                {
+                    "text": "effectively",
+                    "box": [
+                        397,
+                        845,
+                        442,
+                        858
+                    ]
+                },
+                {
+                    "text": "replaced",
+                    "box": [
+                        448,
+                        844,
+                        490,
+                        858
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        493,
+                        845,
+                        504,
+                        856
+                    ]
+                },
+                {
+                    "text": "old",
+                    "box": [
+                        507,
+                        845,
+                        521,
+                        856
+                    ]
+                },
+                {
+                    "text": "POS.",
+                    "box": [
+                        525,
+                        845,
+                        549,
+                        856
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        557,
+                        845,
+                        575,
+                        856
+                    ]
+                },
+                {
+                    "text": "door",
+                    "box": [
+                        96,
+                        867,
+                        117,
+                        881
+                    ]
+                },
+                {
+                    "text": "signage,",
+                    "box": [
+                        119,
+                        867,
+                        160,
+                        882
+                    ]
+                },
+                {
+                    "text": "hour",
+                    "box": [
+                        163,
+                        867,
+                        184,
+                        881
+                    ]
+                },
+                {
+                    "text": "signs,",
+                    "box": [
+                        189,
+                        867,
+                        217,
+                        881
+                    ]
+                },
+                {
+                    "text": "poster",
+                    "box": [
+                        219,
+                        867,
+                        250,
+                        881
+                    ]
+                },
+                {
+                    "text": "mats,",
+                    "box": [
+                        253,
+                        867,
+                        278,
+                        880
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        281,
+                        870,
+                        301,
+                        878
+                    ]
+                },
+                {
+                    "text": "clocks",
+                    "box": [
+                        303,
+                        867,
+                        331,
+                        880
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        335,
+                        867,
+                        359,
+                        880
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        362,
+                        867,
+                        377,
+                        878
+                    ]
+                },
+                {
+                    "text": "new",
+                    "box": [
+                        378,
+                        867,
+                        399,
+                        878
+                    ]
+                },
+                {
+                    "text": "design.",
+                    "box": [
+                        402,
+                        866,
+                        436,
+                        880
+                    ]
+                },
+                {
+                    "text": "\"B\"",
+                    "box": [
+                        441,
+                        866,
+                        456,
+                        877
+                    ]
+                },
+                {
+                    "text": "Kool",
+                    "box": [
+                        459,
+                        866,
+                        483,
+                        880
+                    ]
+                },
+                {
+                    "text": "also",
+                    "box": [
+                        485,
+                        865,
+                        505,
+                        879
+                    ]
+                },
+                {
+                    "text": "appears",
+                    "box": [
+                        507,
+                        866,
+                        546,
+                        879
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        550,
+                        867,
+                        561,
+                        878
+                    ]
+                },
+                {
+                    "text": "billboards",
+                    "box": [
+                        564,
+                        866,
+                        610,
+                        879
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        94,
+                        892,
+                        105,
+                        902
+                    ]
+                },
+                {
+                    "text": "llinois.",
+                    "box": [
+                        108,
+                        891,
+                        140,
+                        904
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "PAGE 1 OF 2",
+            "box": [
+                330,
+                950,
+                397,
+                963
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "PAGE",
+                    "box": [
+                        330,
+                        950,
+                        361,
+                        963
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        365,
+                        951,
+                        371,
+                        961
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        373,
+                        950,
+                        387,
+                        961
+                    ]
+                },
+                {
+                    "text": "2",
+                    "box": [
+                        391,
+                        951,
+                        397,
+                        961
+                    ]
+                }
+            ],
+            "id": 35
+        }
+    ]
+}

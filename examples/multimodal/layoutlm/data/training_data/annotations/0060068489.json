@@ -1,0 +1,2992 @@
+{
+    "form": [
+        {
+            "box": [
+                554,
+                181,
+                590,
+                193
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        554,
+                        181,
+                        590,
+                        193
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    3
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                534,
+                201,
+                613,
+                210
+            ],
+            "text": "DESCRIPTION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        534,
+                        201,
+                        613,
+                        210
+                    ],
+                    "text": "DESCRIPTION"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    30
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                307,
+                198,
+                352,
+                211
+            ],
+            "text": "MEDIUM",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        307,
+                        198,
+                        352,
+                        211
+                    ],
+                    "text": "MEDIUM"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    4
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                606,
+                178,
+                667,
+                191
+            ],
+            "text": "3/17/82",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        606,
+                        178,
+                        667,
+                        191
+                    ],
+                    "text": "3/17/82"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                299,
+                219,
+                362,
+                234
+            ],
+            "text": "Outdoor",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        299,
+                        219,
+                        362,
+                        234
+                    ],
+                    "text": "Outdoor"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                25,
+                177,
+                74,
+                190
+            ],
+            "text": "AGENCY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        25,
+                        177,
+                        74,
+                        190
+                    ],
+                    "text": "AGENCY"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    29
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                69,
+                198,
+                112,
+                208
+            ],
+            "text": "BRAND",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        69,
+                        198,
+                        112,
+                        208
+                    ],
+                    "text": "BRAND"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    31
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                416,
+                178,
+                434,
+                193
+            ],
+            "text": "NO.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        416,
+                        178,
+                        434,
+                        193
+                    ],
+                    "text": "NO."
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                223,
+                289,
+                269,
+                302
+            ],
+            "text": "April",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        223,
+                        289,
+                        269,
+                        302
+                    ],
+                    "text": "April"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    8
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                407,
+                293,
+                446,
+                305
+            ],
+            "text": "THRU",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        407,
+                        293,
+                        446,
+                        305
+                    ],
+                    "text": "THRU"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    9
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                534,
+                287,
+                570,
+                302
+            ],
+            "text": "July",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        534,
+                        287,
+                        570,
+                        302
+                    ],
+                    "text": "July"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                100,
+                382,
+                137,
+                395
+            ],
+            "text": "SPACE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        100,
+                        382,
+                        137,
+                        395
+                    ],
+                    "text": "SPACE"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                99,
+                488,
+                184,
+                501
+            ],
+            "text": "CONTINGENCY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        488,
+                        184,
+                        501
+                    ],
+                    "text": "CONTINGENCY"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                21,
+                344,
+                70,
+                357
+            ],
+            "text": "1,680",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        21,
+                        344,
+                        70,
+                        357
+                    ],
+                    "text": "1,680"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                391,
+                513,
+                461,
+                523
+            ],
+            "text": "2.000.00",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        391,
+                        513,
+                        461,
+                        523
+                    ],
+                    "text": "2.000.00"
+                }
+            ],
+            "linking": [
+                [
+                    44,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                292,
+                591,
+                332,
+                606
+            ],
+            "text": "TOTAL",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        292,
+                        591,
+                        332,
+                        606
+                    ],
+                    "text": "TOTAL"
+                }
+            ],
+            "linking": [
+                [
+                    15,
+                    36
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                569,
+                594,
+                638,
+                607
+            ],
+            "text": "APPROVALS",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        569,
+                        594,
+                        638,
+                        607
+                    ],
+                    "text": "APPROVALS"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    17
+                ],
+                [
+                    16,
+                    18
+                ],
+                [
+                    16,
+                    19
+                ],
+                [
+                    16,
+                    20
+                ],
+                [
+                    16,
+                    21
+                ],
+                [
+                    16,
+                    22
+                ],
+                [
+                    16,
+                    23
+                ],
+                [
+                    16,
+                    40
+                ],
+                [
+                    16,
+                    41
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                506,
+                624,
+                542,
+                637
+            ],
+            "text": "Agency",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        624,
+                        542,
+                        637
+                    ],
+                    "text": "Agency"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                506,
+                648,
+                546,
+                658
+            ],
+            "text": "Product",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        648,
+                        546,
+                        658
+                    ],
+                    "text": "Product"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                504,
+                674,
+                537,
+                686
+            ],
+            "text": "Media",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        504,
+                        674,
+                        537,
+                        686
+                    ],
+                    "text": "Media"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                506,
+                699,
+                536,
+                711
+            ],
+            "text": "Sales",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        699,
+                        536,
+                        711
+                    ],
+                    "text": "Sales"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                506,
+                725,
+                555,
+                737
+            ],
+            "text": "Marketing",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        725,
+                        555,
+                        737
+                    ],
+                    "text": "Marketing"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                507,
+                750,
+                555,
+                762
+            ],
+            "text": "Executive",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        507,
+                        750,
+                        555,
+                        762
+                    ],
+                    "text": "Executive"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    22
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                506,
+                775,
+                563,
+                787
+            ],
+            "text": "Accounting",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        775,
+                        563,
+                        787
+                    ],
+                    "text": "Accounting"
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    23
+                ]
+            ],
+            "id": 23
+        },
+        {
+            "box": [
+                25,
+                645,
+                83,
+                660
+            ],
+            "text": "REMARKS:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        25,
+                        645,
+                        83,
+                        660
+                    ],
+                    "text": "REMARKS:"
+                }
+            ],
+            "linking": [
+                [
+                    24,
+                    37
+                ],
+                [
+                    24,
+                    38
+                ],
+                [
+                    24,
+                    39
+                ]
+            ],
+            "id": 24
+        },
+        {
+            "text": "ADVERTISING AND SELLING AUTHORIZATION",
+            "box": [
+                418,
+                78,
+                706,
+                97
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "ADVERTISING",
+                    "box": [
+                        418,
+                        78,
+                        502,
+                        96
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        507,
+                        79,
+                        537,
+                        95
+                    ]
+                },
+                {
+                    "text": "SELLING",
+                    "box": [
+                        539,
+                        81,
+                        597,
+                        96
+                    ]
+                },
+                {
+                    "text": "AUTHORIZATION",
+                    "box": [
+                        600,
+                        79,
+                        706,
+                        97
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "NYO 09 (10-81)",
+            "box": [
+                636,
+                67,
+                704,
+                77
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "NYO",
+                    "box": [
+                        636,
+                        67,
+                        658,
+                        77
+                    ]
+                },
+                {
+                    "text": "09",
+                    "box": [
+                        662,
+                        67,
+                        674,
+                        76
+                    ]
+                },
+                {
+                    "text": "(10-81)",
+                    "box": [
+                        674,
+                        67,
+                        704,
+                        77
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "The American Tobacco Company DIVISION OF AMERICAN BRANDS INC. 265 PARK AVENUE, NEW YORK, NEW YORK 00267",
+            "box": [
+                25,
+                55,
+                305,
+                110
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        25,
+                        55,
+                        59,
+                        89
+                    ]
+                },
+                {
+                    "text": "American",
+                    "box": [
+                        58,
+                        60,
+                        149,
+                        88
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        148,
+                        60,
+                        221,
+                        88
+                    ]
+                },
+                {
+                    "text": "Company",
+                    "box": [
+                        223,
+                        60,
+                        305,
+                        91
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        25,
+                        90,
+                        31,
+                        97
+                    ]
+                },
+                {
+                    "text": "DIVISION",
+                    "box": [
+                        34,
+                        91,
+                        71,
+                        97
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        73,
+                        90,
+                        86,
+                        96
+                    ]
+                },
+                {
+                    "text": "AMERICAN",
+                    "box": [
+                        87,
+                        88,
+                        133,
+                        97
+                    ]
+                },
+                {
+                    "text": "BRANDS",
+                    "box": [
+                        133,
+                        88,
+                        173,
+                        98
+                    ]
+                },
+                {
+                    "text": "INC.",
+                    "box": [
+                        172,
+                        88,
+                        193,
+                        97
+                    ]
+                },
+                {
+                    "text": "265",
+                    "box": [
+                        25,
+                        100,
+                        43,
+                        107
+                    ]
+                },
+                {
+                    "text": "PARK",
+                    "box": [
+                        43,
+                        100,
+                        71,
+                        110
+                    ]
+                },
+                {
+                    "text": "AVENUE,",
+                    "box": [
+                        73,
+                        100,
+                        115,
+                        110
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        117,
+                        102,
+                        141,
+                        109
+                    ]
+                },
+                {
+                    "text": "YORK,",
+                    "box": [
+                        141,
+                        102,
+                        172,
+                        109
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        174,
+                        102,
+                        196,
+                        109
+                    ]
+                },
+                {
+                    "text": "YORK",
+                    "box": [
+                        198,
+                        102,
+                        228,
+                        109
+                    ]
+                },
+                {
+                    "text": "00267",
+                    "box": [
+                        229,
+                        100,
+                        257,
+                        109
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "DO NOT MAKE ANY COMMITMENT OR AUTHORIZE ANY EXPENDITURE OF ANY KIND FOR. ACCOUNT OF THIS COMPANY UNTIL EXECUTIVE APPROVAL HAS BEEN OBTAINED HEREON.",
+            "box": [
+                94,
+                132,
+                638,
+                157
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "DO",
+                    "box": [
+                        97,
+                        132,
+                        113,
+                        142
+                    ]
+                },
+                {
+                    "text": "NOT",
+                    "box": [
+                        118,
+                        132,
+                        143,
+                        144
+                    ]
+                },
+                {
+                    "text": "MAKE",
+                    "box": [
+                        150,
+                        132,
+                        184,
+                        144
+                    ]
+                },
+                {
+                    "text": "ANY",
+                    "box": [
+                        190,
+                        133,
+                        215,
+                        143
+                    ]
+                },
+                {
+                    "text": "COMMITMENT",
+                    "box": [
+                        222,
+                        132,
+                        298,
+                        142
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        304,
+                        132,
+                        322,
+                        145
+                    ]
+                },
+                {
+                    "text": "AUTHORIZE",
+                    "box": [
+                        329,
+                        132,
+                        396,
+                        145
+                    ]
+                },
+                {
+                    "text": "ANY",
+                    "box": [
+                        401,
+                        135,
+                        425,
+                        145
+                    ]
+                },
+                {
+                    "text": "EXPENDITURE",
+                    "box": [
+                        433,
+                        132,
+                        518,
+                        145
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        522,
+                        135,
+                        543,
+                        145
+                    ]
+                },
+                {
+                    "text": "ANY",
+                    "box": [
+                        546,
+                        133,
+                        573,
+                        145
+                    ]
+                },
+                {
+                    "text": "KIND",
+                    "box": [
+                        578,
+                        133,
+                        606,
+                        146
+                    ]
+                },
+                {
+                    "text": "FOR.",
+                    "box": [
+                        608,
+                        135,
+                        638,
+                        145
+                    ]
+                },
+                {
+                    "text": "ACCOUNT",
+                    "box": [
+                        94,
+                        144,
+                        151,
+                        154
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        156,
+                        144,
+                        175,
+                        153
+                    ]
+                },
+                {
+                    "text": "THIS",
+                    "box": [
+                        180,
+                        144,
+                        205,
+                        156
+                    ]
+                },
+                {
+                    "text": "COMPANY",
+                    "box": [
+                        208,
+                        142,
+                        265,
+                        154
+                    ]
+                },
+                {
+                    "text": "UNTIL",
+                    "box": [
+                        269,
+                        145,
+                        306,
+                        154
+                    ]
+                },
+                {
+                    "text": "EXECUTIVE",
+                    "box": [
+                        311,
+                        144,
+                        380,
+                        156
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        383,
+                        147,
+                        449,
+                        156
+                    ]
+                },
+                {
+                    "text": "HAS",
+                    "box": [
+                        449,
+                        147,
+                        476,
+                        156
+                    ]
+                },
+                {
+                    "text": "BEEN",
+                    "box": [
+                        479,
+                        147,
+                        515,
+                        156
+                    ]
+                },
+                {
+                    "text": "OBTAINED",
+                    "box": [
+                        518,
+                        145,
+                        578,
+                        157
+                    ]
+                },
+                {
+                    "text": "HEREON.",
+                    "box": [
+                        581,
+                        144,
+                        636,
+                        157
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "corporate Media Department",
+            "box": [
+                123,
+                175,
+                345,
+                190
+            ],
+            "linking": [
+                [
+                    5,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "corporate",
+                    "box": [
+                        123,
+                        175,
+                        204,
+                        188
+                    ]
+                },
+                {
+                    "text": "Media",
+                    "box": [
+                        207,
+                        177,
+                        250,
+                        190
+                    ]
+                },
+                {
+                    "text": "Department",
+                    "box": [
+                        257,
+                        177,
+                        345,
+                        189
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "30 sheet Posters (White Background)",
+            "box": [
+                512,
+                220,
+                663,
+                249
+            ],
+            "linking": [
+                [
+                    1,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "30",
+                    "box": [
+                        512,
+                        222,
+                        531,
+                        235
+                    ]
+                },
+                {
+                    "text": "sheet",
+                    "box": [
+                        533,
+                        220,
+                        581,
+                        232
+                    ]
+                },
+                {
+                    "text": "Posters",
+                    "box": [
+                        585,
+                        220,
+                        649,
+                        233
+                    ]
+                },
+                {
+                    "text": "(White",
+                    "box": [
+                        512,
+                        235,
+                        563,
+                        248
+                    ]
+                },
+                {
+                    "text": "Background)",
+                    "box": [
+                        566,
+                        237,
+                        663,
+                        249
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "LUCKY STRIKE LOW Tar Filters Box- 100%",
+            "box": [
+                13,
+                216,
+                187,
+                246
+            ],
+            "linking": [
+                [
+                    6,
+                    31
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "LUCKY",
+                    "box": [
+                        13,
+                        216,
+                        59,
+                        232
+                    ]
+                },
+                {
+                    "text": "STRIKE",
+                    "box": [
+                        64,
+                        216,
+                        121,
+                        231
+                    ]
+                },
+                {
+                    "text": "LOW",
+                    "box": [
+                        123,
+                        217,
+                        156,
+                        232
+                    ]
+                },
+                {
+                    "text": "Tar",
+                    "box": [
+                        156,
+                        219,
+                        184,
+                        231
+                    ]
+                },
+                {
+                    "text": "Filters",
+                    "box": [
+                        33,
+                        231,
+                        94,
+                        246
+                    ]
+                },
+                {
+                    "text": "Box-",
+                    "box": [
+                        99,
+                        234,
+                        144,
+                        246
+                    ]
+                },
+                {
+                    "text": "100%",
+                    "box": [
+                        148,
+                        231,
+                        187,
+                        246
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "PERIOD. FROM",
+            "box": [
+                69,
+                290,
+                155,
+                305
+            ],
+            "linking": [
+                [
+                    32,
+                    8
+                ],
+                [
+                    32,
+                    9
+                ],
+                [
+                    32,
+                    10
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PERIOD.",
+                    "box": [
+                        69,
+                        290,
+                        121,
+                        305
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        124,
+                        292,
+                        155,
+                        304
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "ENTER ESTIMATES OF AMOUNTS TO BE EXPENDED BY MONTHS UNDER \"REMARKS\" OR ON ATTACHMENT. MAXIMUM EXPENDITURES AUTHORIZED",
+            "box": [
+                175,
+                307,
+                683,
+                332
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "ENTER",
+                    "box": [
+                        175,
+                        307,
+                        211,
+                        320
+                    ]
+                },
+                {
+                    "text": "ESTIMATES",
+                    "box": [
+                        211,
+                        307,
+                        265,
+                        317
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        266,
+                        308,
+                        281,
+                        317
+                    ]
+                },
+                {
+                    "text": "AMOUNTS",
+                    "box": [
+                        284,
+                        308,
+                        330,
+                        318
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        332,
+                        308,
+                        347,
+                        317
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        349,
+                        308,
+                        364,
+                        318
+                    ]
+                },
+                {
+                    "text": "EXPENDED",
+                    "box": [
+                        368,
+                        310,
+                        420,
+                        319
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        422,
+                        308,
+                        435,
+                        318
+                    ]
+                },
+                {
+                    "text": "MONTHS",
+                    "box": [
+                        439,
+                        308,
+                        479,
+                        318
+                    ]
+                },
+                {
+                    "text": "UNDER",
+                    "box": [
+                        482,
+                        308,
+                        515,
+                        318
+                    ]
+                },
+                {
+                    "text": "\"REMARKS\"",
+                    "box": [
+                        518,
+                        308,
+                        576,
+                        318
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        576,
+                        308,
+                        594,
+                        318
+                    ]
+                },
+                {
+                    "text": "ON",
+                    "box": [
+                        597,
+                        311,
+                        609,
+                        318
+                    ]
+                },
+                {
+                    "text": "ATTACHMENT.",
+                    "box": [
+                        614,
+                        310,
+                        683,
+                        320
+                    ]
+                },
+                {
+                    "text": "MAXIMUM",
+                    "box": [
+                        301,
+                        320,
+                        361,
+                        332
+                    ]
+                },
+                {
+                    "text": "EXPENDITURES",
+                    "box": [
+                        362,
+                        319,
+                        450,
+                        331
+                    ]
+                },
+                {
+                    "text": "AUTHORIZED",
+                    "box": [
+                        451,
+                        320,
+                        533,
+                        332
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "1,600 posters plus 5% overrun (80) $ 16.00 each",
+            "box": [
+                516,
+                356,
+                674,
+                401
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "1,600",
+                    "box": [
+                        516,
+                        356,
+                        561,
+                        372
+                    ]
+                },
+                {
+                    "text": "posters",
+                    "box": [
+                        569,
+                        356,
+                        633,
+                        374
+                    ]
+                },
+                {
+                    "text": "plus",
+                    "box": [
+                        632,
+                        359,
+                        674,
+                        371
+                    ]
+                },
+                {
+                    "text": "5%",
+                    "box": [
+                        516,
+                        374,
+                        540,
+                        384
+                    ]
+                },
+                {
+                    "text": "overrun",
+                    "box": [
+                        543,
+                        376,
+                        604,
+                        386
+                    ]
+                },
+                {
+                    "text": "(80)",
+                    "box": [
+                        615,
+                        373,
+                        645,
+                        386
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        651,
+                        371,
+                        667,
+                        386
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        518,
+                        388,
+                        527,
+                        401
+                    ]
+                },
+                {
+                    "text": "16.00",
+                    "box": [
+                        528,
+                        386,
+                        571,
+                        401
+                    ]
+                },
+                {
+                    "text": "each",
+                    "box": [
+                        578,
+                        388,
+                        612,
+                        401
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "$ 26,880,00",
+            "box": [
+                376,
+                355,
+                463,
+                370
+            ],
+            "linking": [
+                [
+                    49,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$",
+                    "box": [
+                        376,
+                        355,
+                        385,
+                        370
+                    ]
+                },
+                {
+                    "text": "26,880,00",
+                    "box": [
+                        385,
+                        358,
+                        463,
+                        368
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "$ 28,880.00",
+            "box": [
+                352,
+                584,
+                462,
+                600
+            ],
+            "linking": [
+                [
+                    15,
+                    36
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$",
+                    "box": [
+                        352,
+                        585,
+                        365,
+                        600
+                    ]
+                },
+                {
+                    "text": "28,880.00",
+                    "box": [
+                        383,
+                        584,
+                        462,
+                        599
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "For posting in Cincinnati, Covington and Tampa/St. Petersburg.",
+            "box": [
+                93,
+                668,
+                434,
+                695
+            ],
+            "linking": [
+                [
+                    24,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "For",
+                    "box": [
+                        94,
+                        669,
+                        122,
+                        682
+                    ]
+                },
+                {
+                    "text": "posting",
+                    "box": [
+                        132,
+                        669,
+                        190,
+                        681
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        196,
+                        669,
+                        215,
+                        679
+                    ]
+                },
+                {
+                    "text": "Cincinnati,",
+                    "box": [
+                        222,
+                        668,
+                        316,
+                        683
+                    ]
+                },
+                {
+                    "text": "Covington",
+                    "box": [
+                        323,
+                        671,
+                        401,
+                        681
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        404,
+                        674,
+                        434,
+                        683
+                    ]
+                },
+                {
+                    "text": "Tampa/St.",
+                    "box": [
+                        93,
+                        683,
+                        171,
+                        695
+                    ]
+                },
+                {
+                    "text": "Petersburg.",
+                    "box": [
+                        178,
+                        683,
+                        272,
+                        695
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Posters are captioned for identification, \"LUCKY STRIKES AGAIN (printed in red) with the word \"New\" printed in a snipe effect in the upper left corner. These posters have a white background and will be further identified as such in order to differentiate from a second design which will have a solid red background with white lettering.",
+            "box": [
+                93,
+                705,
+                494,
+                816
+            ],
+            "linking": [
+                [
+                    24,
+                    38
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Posters",
+                    "box": [
+                        93,
+                        705,
+                        157,
+                        718
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        163,
+                        708,
+                        193,
+                        717
+                    ]
+                },
+                {
+                    "text": "captioned",
+                    "box": [
+                        195,
+                        705,
+                        276,
+                        718
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        280,
+                        708,
+                        311,
+                        717
+                    ]
+                },
+                {
+                    "text": "identification,",
+                    "box": [
+                        313,
+                        707,
+                        440,
+                        719
+                    ]
+                },
+                {
+                    "text": "\"LUCKY",
+                    "box": [
+                        97,
+                        719,
+                        148,
+                        731
+                    ]
+                },
+                {
+                    "text": "STRIKES",
+                    "box": [
+                        151,
+                        717,
+                        215,
+                        732
+                    ]
+                },
+                {
+                    "text": "AGAIN",
+                    "box": [
+                        217,
+                        719,
+                        272,
+                        731
+                    ]
+                },
+                {
+                    "text": "(printed",
+                    "box": [
+                        281,
+                        717,
+                        351,
+                        733
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        358,
+                        720,
+                        376,
+                        732
+                    ]
+                },
+                {
+                    "text": "red)",
+                    "box": [
+                        380,
+                        720,
+                        416,
+                        732
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        424,
+                        722,
+                        461,
+                        732
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        464,
+                        722,
+                        494,
+                        734
+                    ]
+                },
+                {
+                    "text": "word",
+                    "box": [
+                        96,
+                        732,
+                        135,
+                        744
+                    ]
+                },
+                {
+                    "text": "\"New\"",
+                    "box": [
+                        138,
+                        732,
+                        186,
+                        745
+                    ]
+                },
+                {
+                    "text": "printed",
+                    "box": [
+                        189,
+                        734,
+                        252,
+                        746
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        254,
+                        735,
+                        275,
+                        745
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        278,
+                        737,
+                        290,
+                        746
+                    ]
+                },
+                {
+                    "text": "snipe",
+                    "box": [
+                        296,
+                        734,
+                        341,
+                        747
+                    ]
+                },
+                {
+                    "text": "effect",
+                    "box": [
+                        349,
+                        734,
+                        403,
+                        746
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        407,
+                        737,
+                        425,
+                        747
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        433,
+                        735,
+                        463,
+                        747
+                    ]
+                },
+                {
+                    "text": "upper",
+                    "box": [
+                        96,
+                        747,
+                        141,
+                        757
+                    ]
+                },
+                {
+                    "text": "left",
+                    "box": [
+                        144,
+                        746,
+                        181,
+                        758
+                    ]
+                },
+                {
+                    "text": "corner.",
+                    "box": [
+                        187,
+                        749,
+                        247,
+                        759
+                    ]
+                },
+                {
+                    "text": "These",
+                    "box": [
+                        260,
+                        747,
+                        308,
+                        759
+                    ]
+                },
+                {
+                    "text": "posters",
+                    "box": [
+                        311,
+                        749,
+                        377,
+                        761
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        380,
+                        749,
+                        419,
+                        761
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        422,
+                        750,
+                        434,
+                        760
+                    ]
+                },
+                {
+                    "text": "white",
+                    "box": [
+                        442,
+                        749,
+                        485,
+                        761
+                    ]
+                },
+                {
+                    "text": "background",
+                    "box": [
+                        96,
+                        759,
+                        181,
+                        772
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        187,
+                        763,
+                        215,
+                        772
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        220,
+                        760,
+                        256,
+                        772
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        260,
+                        759,
+                        282,
+                        772
+                    ]
+                },
+                {
+                    "text": "further",
+                    "box": [
+                        287,
+                        762,
+                        350,
+                        774
+                    ]
+                },
+                {
+                    "text": "identified",
+                    "box": [
+                        355,
+                        762,
+                        442,
+                        774
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        446,
+                        763,
+                        470,
+                        773
+                    ]
+                },
+                {
+                    "text": "such",
+                    "box": [
+                        94,
+                        775,
+                        133,
+                        785
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        139,
+                        774,
+                        157,
+                        786
+                    ]
+                },
+                {
+                    "text": "order",
+                    "box": [
+                        163,
+                        777,
+                        203,
+                        786
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        213,
+                        777,
+                        231,
+                        786
+                    ]
+                },
+                {
+                    "text": "differentiate",
+                    "box": [
+                        237,
+                        775,
+                        351,
+                        785
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        356,
+                        777,
+                        393,
+                        787
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        397,
+                        777,
+                        407,
+                        787
+                    ]
+                },
+                {
+                    "text": "second",
+                    "box": [
+                        413,
+                        777,
+                        468,
+                        787
+                    ]
+                },
+                {
+                    "text": "design",
+                    "box": [
+                        93,
+                        786,
+                        148,
+                        801
+                    ]
+                },
+                {
+                    "text": "which",
+                    "box": [
+                        151,
+                        789,
+                        199,
+                        799
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        204,
+                        789,
+                        241,
+                        799
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        247,
+                        789,
+                        284,
+                        801
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        290,
+                        790,
+                        297,
+                        800
+                    ]
+                },
+                {
+                    "text": "solid",
+                    "box": [
+                        304,
+                        790,
+                        350,
+                        799
+                    ]
+                },
+                {
+                    "text": "red",
+                    "box": [
+                        356,
+                        790,
+                        386,
+                        799
+                    ]
+                },
+                {
+                    "text": "background",
+                    "box": [
+                        388,
+                        787,
+                        476,
+                        800
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        96,
+                        801,
+                        132,
+                        813
+                    ]
+                },
+                {
+                    "text": "white",
+                    "box": [
+                        136,
+                        801,
+                        182,
+                        816
+                    ]
+                },
+                {
+                    "text": "lettering.",
+                    "box": [
+                        189,
+                        802,
+                        271,
+                        815
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Posters are printed six colors (four color process and two impressions of red) on white 70# outdoor poster paper.",
+            "box": [
+                93,
+                823,
+                468,
+                864
+            ],
+            "linking": [
+                [
+                    24,
+                    39
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Posters",
+                    "box": [
+                        93,
+                        823,
+                        156,
+                        836
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        160,
+                        825,
+                        191,
+                        837
+                    ]
+                },
+                {
+                    "text": "printed",
+                    "box": [
+                        195,
+                        825,
+                        259,
+                        837
+                    ]
+                },
+                {
+                    "text": "six",
+                    "box": [
+                        263,
+                        825,
+                        293,
+                        837
+                    ]
+                },
+                {
+                    "text": "colors",
+                    "box": [
+                        298,
+                        826,
+                        350,
+                        836
+                    ]
+                },
+                {
+                    "text": "(four",
+                    "box": [
+                        359,
+                        825,
+                        399,
+                        838
+                    ]
+                },
+                {
+                    "text": "color",
+                    "box": [
+                        407,
+                        826,
+                        450,
+                        836
+                    ]
+                },
+                {
+                    "text": "process",
+                    "box": [
+                        93,
+                        837,
+                        156,
+                        849
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        162,
+                        840,
+                        190,
+                        849
+                    ]
+                },
+                {
+                    "text": "two",
+                    "box": [
+                        195,
+                        837,
+                        223,
+                        849
+                    ]
+                },
+                {
+                    "text": "impressions",
+                    "box": [
+                        229,
+                        837,
+                        325,
+                        850
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        328,
+                        840,
+                        352,
+                        850
+                    ]
+                },
+                {
+                    "text": "red)",
+                    "box": [
+                        355,
+                        838,
+                        389,
+                        848
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        398,
+                        840,
+                        416,
+                        850
+                    ]
+                },
+                {
+                    "text": "white",
+                    "box": [
+                        419,
+                        838,
+                        468,
+                        850
+                    ]
+                },
+                {
+                    "text": "70#",
+                    "box": [
+                        93,
+                        849,
+                        123,
+                        864
+                    ]
+                },
+                {
+                    "text": "outdoor",
+                    "box": [
+                        126,
+                        852,
+                        189,
+                        864
+                    ]
+                },
+                {
+                    "text": "poster",
+                    "box": [
+                        195,
+                        853,
+                        246,
+                        862
+                    ]
+                },
+                {
+                    "text": "paper.",
+                    "box": [
+                        251,
+                        853,
+                        305,
+                        863
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "Budget Allocation",
+            "box": [
+                509,
+                826,
+                596,
+                839
+            ],
+            "linking": [
+                [
+                    40,
+                    43
+                ],
+                [
+                    16,
+                    40
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Budget",
+                    "box": [
+                        509,
+                        826,
+                        540,
+                        839
+                    ]
+                },
+                {
+                    "text": "Allocation",
+                    "box": [
+                        542,
+                        826,
+                        596,
+                        838
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "Authorization No.",
+            "box": [
+                506,
+                852,
+                593,
+                866
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ],
+                [
+                    16,
+                    41
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Authorization",
+                    "box": [
+                        506,
+                        853,
+                        575,
+                        866
+                    ]
+                },
+                {
+                    "text": "No.",
+                    "box": [
+                        575,
+                        852,
+                        593,
+                        865
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "M- 49",
+            "box": [
+                618,
+                850,
+                656,
+                863
+            ],
+            "linking": [
+                [
+                    41,
+                    42
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "M-",
+                    "box": [
+                        618,
+                        850,
+                        634,
+                        863
+                    ]
+                },
+                {
+                    "text": "49",
+                    "box": [
+                        635,
+                        850,
+                        656,
+                        863
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "L- 3a",
+            "box": [
+                617,
+                825,
+                655,
+                838
+            ],
+            "linking": [
+                [
+                    40,
+                    43
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "L-",
+                    "box": [
+                        617,
+                        825,
+                        636,
+                        838
+                    ]
+                },
+                {
+                    "text": "3a",
+                    "box": [
+                        636,
+                        826,
+                        655,
+                        838
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Estimated Freight Charges",
+            "box": [
+                94,
+                512,
+                312,
+                525
+            ],
+            "linking": [
+                [
+                    44,
+                    14
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Estimated",
+                    "box": [
+                        94,
+                        512,
+                        178,
+                        524
+                    ]
+                },
+                {
+                    "text": "Freight",
+                    "box": [
+                        178,
+                        513,
+                        239,
+                        525
+                    ]
+                },
+                {
+                    "text": "Charges",
+                    "box": [
+                        243,
+                        515,
+                        312,
+                        525
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "DISPLAY MATERIAL",
+            "box": [
+                100,
+                460,
+                215,
+                473
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DISPLAY",
+                    "box": [
+                        100,
+                        461,
+                        149,
+                        473
+                    ]
+                },
+                {
+                    "text": "MATERIAL",
+                    "box": [
+                        154,
+                        460,
+                        215,
+                        473
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "MECHANICAL PRODUCTION",
+            "box": [
+                97,
+                436,
+                259,
+                449
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "MECHANICAL",
+                    "box": [
+                        97,
+                        436,
+                        175,
+                        449
+                    ]
+                },
+                {
+                    "text": "PRODUCTION",
+                    "box": [
+                        180,
+                        436,
+                        259,
+                        448
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "ART WORK",
+            "box": [
+                100,
+                409,
+                164,
+                422
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ART",
+                    "box": [
+                        100,
+                        410,
+                        127,
+                        420
+                    ]
+                },
+                {
+                    "text": "WORK",
+                    "box": [
+                        130,
+                        409,
+                        164,
+                        422
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "AIR TIME",
+            "box": [
+                102,
+                332,
+                157,
+                347
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "AIR",
+                    "box": [
+                        102,
+                        332,
+                        121,
+                        347
+                    ]
+                },
+                {
+                    "text": "TIME",
+                    "box": [
+                        129,
+                        334,
+                        157,
+                        344
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "30 Sheet Posters ",
+            "box": [
+                96,
+                346,
+                261,
+                371
+            ],
+            "linking": [
+                [
+                    49,
+                    35
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "30",
+                    "box": [
+                        105,
+                        346,
+                        126,
+                        358
+                    ]
+                },
+                {
+                    "text": "Sheet",
+                    "box": [
+                        129,
+                        346,
+                        177,
+                        356
+                    ]
+                },
+                {
+                    "text": "Posters",
+                    "box": [
+                        183,
+                        346,
+                        243,
+                        356
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        96,
+                        358,
+                        261,
+                        371
+                    ]
+                }
+            ],
+            "id": 49
+        }
+    ]
+}

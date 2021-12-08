@@ -1,0 +1,595 @@
+{
+    "form": [
+        {
+            "box": [
+                91,
+                158,
+                134,
+                179
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        91,
+                        158,
+                        134,
+                        179
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                89,
+                187,
+                160,
+                207
+            ],
+            "text": "SUBJECT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        89,
+                        187,
+                        160,
+                        207
+                    ],
+                    "text": "SUBJECT:"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                89,
+                240,
+                148,
+                260
+            ],
+            "text": "WRITER:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        89,
+                        240,
+                        148,
+                        260
+                    ],
+                    "text": "WRITER:"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                87,
+                286,
+                178,
+                306
+            ],
+            "text": "APPROVALS:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        87,
+                        286,
+                        178,
+                        306
+                    ],
+                    "text": "APPROVALS:"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    11
+                ],
+                [
+                    3,
+                    12
+                ],
+                [
+                    3,
+                    13
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                87,
+                508,
+                143,
+                528
+            ],
+            "text": "Other:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        87,
+                        508,
+                        143,
+                        528
+                    ],
+                    "text": "Other:"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                439,
+                426,
+                470,
+                447
+            ],
+            "text": "YES",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        439,
+                        426,
+                        470,
+                        447
+                    ],
+                    "text": "YES"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                570,
+                433,
+                590,
+                450
+            ],
+            "text": "NO",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        570,
+                        433,
+                        590,
+                        450
+                    ],
+                    "text": "NO"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                602,
+                323,
+                644,
+                341
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        602,
+                        323,
+                        644,
+                        341
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "text": "PUBLIC COMMUNICATIONS APPROVAL SHEET The Tobacco Institute",
+            "box": [
+                218,
+                91,
+                525,
+                140
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PUBLIC",
+                    "box": [
+                        218,
+                        91,
+                        271,
+                        109
+                    ]
+                },
+                {
+                    "text": "COMMUNICATIONS",
+                    "box": [
+                        278,
+                        91,
+                        398,
+                        111
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        404,
+                        94,
+                        472,
+                        111
+                    ]
+                },
+                {
+                    "text": "SHEET",
+                    "box": [
+                        480,
+                        96,
+                        525,
+                        113
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        278,
+                        120,
+                        305,
+                        135
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        309,
+                        122,
+                        372,
+                        137
+                    ]
+                },
+                {
+                    "text": "Institute",
+                    "box": [
+                        376,
+                        123,
+                        457,
+                        140
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "Attachment A",
+            "box": [
+                539,
+                53,
+                641,
+                75
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Attachment",
+                    "box": [
+                        539,
+                        53,
+                        624,
+                        75
+                    ]
+                },
+                {
+                    "text": "A",
+                    "box": [
+                        628,
+                        53,
+                        641,
+                        75
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "NAME OR INITIALS",
+            "box": [
+                415,
+                314,
+                556,
+                338
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NAME",
+                    "box": [
+                        415,
+                        314,
+                        456,
+                        338
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        459,
+                        318,
+                        480,
+                        335
+                    ]
+                },
+                {
+                    "text": "INITIALS",
+                    "box": [
+                        486,
+                        318,
+                        556,
+                        336
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "Division Head",
+            "box": [
+                88,
+                342,
+                198,
+                361
+            ],
+            "linking": [
+                [
+                    3,
+                    11
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Division",
+                    "box": [
+                        88,
+                        342,
+                        156,
+                        359
+                    ]
+                },
+                {
+                    "text": "Head",
+                    "box": [
+                        163,
+                        344,
+                        198,
+                        361
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Bill Kloepfer",
+            "box": [
+                87,
+                367,
+                200,
+                388
+            ],
+            "linking": [
+                [
+                    3,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Bill",
+                    "box": [
+                        87,
+                        367,
+                        122,
+                        384
+                    ]
+                },
+                {
+                    "text": "Kloepfer",
+                    "box": [
+                        130,
+                        370,
+                        200,
+                        388
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "Sam Chilcote",
+            "box": [
+                88,
+                397,
+                191,
+                415
+            ],
+            "linking": [
+                [
+                    3,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Sam",
+                    "box": [
+                        88,
+                        399,
+                        116,
+                        414
+                    ]
+                },
+                {
+                    "text": "Chilcote",
+                    "box": [
+                        123,
+                        397,
+                        191,
+                        415
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "Legal Approval Recommended/ Required:",
+            "box": [
+                88,
+                425,
+                394,
+                447
+            ],
+            "linking": [
+                [
+                    14,
+                    5
+                ],
+                [
+                    14,
+                    6
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Legal",
+                    "box": [
+                        88,
+                        425,
+                        133,
+                        442
+                    ]
+                },
+                {
+                    "text": "Approval",
+                    "box": [
+                        138,
+                        425,
+                        205,
+                        443
+                    ]
+                },
+                {
+                    "text": "Recommended/",
+                    "box": [
+                        214,
+                        426,
+                        319,
+                        446
+                    ]
+                },
+                {
+                    "text": "Required:",
+                    "box": [
+                        320,
+                        429,
+                        394,
+                        447
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "SH &B",
+            "box": [
+                88,
+                448,
+                123,
+                468
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "SH",
+                    "box": [
+                        88,
+                        448,
+                        105,
+                        466
+                    ]
+                },
+                {
+                    "text": "&B",
+                    "box": [
+                        105,
+                        453,
+                        123,
+                        468
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "C& B",
+            "box": [
+                87,
+                479,
+                118,
+                496
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "C&",
+                    "box": [
+                        87,
+                        479,
+                        104,
+                        496
+                    ]
+                },
+                {
+                    "text": "B",
+                    "box": [
+                        103,
+                        482,
+                        118,
+                        495
+                    ]
+                }
+            ],
+            "id": 16
+        }
+    ]
+}

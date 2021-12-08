@@ -1,0 +1,2035 @@
+{
+    "form": [
+        {
+            "box": [
+                531,
+                108,
+                571,
+                124
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        531,
+                        108,
+                        571,
+                        124
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    24
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                59,
+                180,
+                75,
+                193
+            ],
+            "text": "A.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        59,
+                        180,
+                        75,
+                        193
+                    ],
+                    "text": "A."
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                513,
+                183,
+                532,
+                198
+            ],
+            "text": "N-",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        513,
+                        183,
+                        532,
+                        198
+                    ],
+                    "text": "N-"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                529,
+                183,
+                562,
+                198
+            ],
+            "text": "306",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        529,
+                        183,
+                        562,
+                        198
+                    ],
+                    "text": "306"
+                }
+            ],
+            "linking": [
+                [
+                    29,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                51,
+                500,
+                67,
+                515
+            ],
+            "text": "B.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        51,
+                        500,
+                        67,
+                        515
+                    ],
+                    "text": "B."
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                95,
+                500,
+                181,
+                515
+            ],
+            "text": "MARKETING",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        95,
+                        500,
+                        181,
+                        515
+                    ],
+                    "text": "MARKETING"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                96,
+                519,
+                133,
+                530
+            ],
+            "text": "SIZE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        96,
+                        519,
+                        133,
+                        530
+                    ],
+                    "text": "SIZE"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                143,
+                519,
+                160,
+                531
+            ],
+            "text": "OF",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        143,
+                        519,
+                        160,
+                        531
+                    ],
+                    "text": "OF"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                168,
+                517,
+                224,
+                533
+            ],
+            "text": "TARGET",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        168,
+                        517,
+                        224,
+                        533
+                    ],
+                    "text": "TARGET"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                231,
+                519,
+                290,
+                534
+            ],
+            "text": "MARKET",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        231,
+                        519,
+                        290,
+                        534
+                    ],
+                    "text": "MARKET"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                99,
+                531,
+                124,
+                548
+            ],
+            "text": "(BY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        531,
+                        124,
+                        548
+                    ],
+                    "text": "(BY"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                132,
+                533,
+                180,
+                546
+            ],
+            "text": "BRAND",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        132,
+                        533,
+                        180,
+                        546
+                    ],
+                    "text": "BRAND"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                186,
+                536,
+                205,
+                548
+            ],
+            "text": "OR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        186,
+                        536,
+                        205,
+                        548
+                    ],
+                    "text": "OR"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                215,
+                536,
+                287,
+                551
+            ],
+            "text": "COMPANY)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        215,
+                        536,
+                        287,
+                        551
+                    ],
+                    "text": "COMPANY)"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                686,
+                560,
+                737,
+                573
+            ],
+            "text": "UNITS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        686,
+                        560,
+                        737,
+                        573
+                    ],
+                    "text": "UNITS"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                689,
+                572,
+                738,
+                588
+            ],
+            "text": "UNITS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        689,
+                        572,
+                        738,
+                        588
+                    ],
+                    "text": "UNITS"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                689,
+                591,
+                738,
+                604
+            ],
+            "text": "UNITS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        689,
+                        591,
+                        738,
+                        604
+                    ],
+                    "text": "UNITS"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                687,
+                606,
+                739,
+                619
+            ],
+            "text": "UNITS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        687,
+                        606,
+                        739,
+                        619
+                    ],
+                    "text": "UNITS"
+                }
+            ],
+            "linking": [],
+            "id": 17
+        },
+        {
+            "box": [
+                94,
+                623,
+                170,
+                638
+            ],
+            "text": "COMMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        94,
+                        623,
+                        170,
+                        638
+                    ],
+                    "text": "COMMENTS"
+                }
+            ],
+            "linking": [],
+            "id": 18
+        },
+        {
+            "box": [
+                376,
+                705,
+                405,
+                722
+            ],
+            "text": "1st",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        376,
+                        705,
+                        405,
+                        722
+                    ],
+                    "text": "1st"
+                }
+            ],
+            "linking": [
+                [
+                    48,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                412,
+                707,
+                447,
+                723
+            ],
+            "text": "Qtr.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        412,
+                        707,
+                        447,
+                        723
+                    ],
+                    "text": "Qtr."
+                }
+            ],
+            "linking": [
+                [
+                    48,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                469,
+                707,
+                488,
+                722
+            ],
+            "text": "79",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        469,
+                        707,
+                        488,
+                        722
+                    ],
+                    "text": "79"
+                }
+            ],
+            "linking": [
+                [
+                    48,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                674,
+                841,
+                694,
+                936
+            ],
+            "text": "01408099",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        674,
+                        841,
+                        694,
+                        936
+                    ],
+                    "text": "01408099"
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "text": "PROJECT STATUS REPORT CONFIDENTIAL",
+            "box": [
+                270,
+                72,
+                488,
+                140
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        291,
+                        72,
+                        358,
+                        89
+                    ]
+                },
+                {
+                    "text": "STATUS",
+                    "box": [
+                        366,
+                        75,
+                        423,
+                        90
+                    ]
+                },
+                {
+                    "text": "REPORT",
+                    "box": [
+                        430,
+                        74,
+                        487,
+                        91
+                    ]
+                },
+                {
+                    "text": "CONFIDENTIAL",
+                    "box": [
+                        270,
+                        116,
+                        488,
+                        140
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "March 1, 1978",
+            "box": [
+                587,
+                104,
+                707,
+                123
+            ],
+            "linking": [
+                [
+                    0,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "March",
+                    "box": [
+                        587,
+                        104,
+                        636,
+                        121
+                    ]
+                },
+                {
+                    "text": "1,",
+                    "box": [
+                        643,
+                        104,
+                        659,
+                        123
+                    ]
+                },
+                {
+                    "text": "1978",
+                    "box": [
+                        671,
+                        107,
+                        707,
+                        122
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "REVISION #",
+            "box": [
+                529,
+                139,
+                622,
+                156
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REVISION",
+                    "box": [
+                        529,
+                        139,
+                        603,
+                        156
+                    ]
+                },
+                {
+                    "text": "#",
+                    "box": [
+                        611,
+                        140,
+                        622,
+                        156
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "SECTIONS REVISED",
+            "box": [
+                529,
+                171,
+                678,
+                188
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SECTIONS",
+                    "box": [
+                        529,
+                        171,
+                        605,
+                        187
+                    ]
+                },
+                {
+                    "text": "REVISED",
+                    "box": [
+                        612,
+                        172,
+                        678,
+                        188
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "PROJECT NAME",
+            "box": [
+                91,
+                183,
+                201,
+                200
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        91,
+                        183,
+                        157,
+                        199
+                    ]
+                },
+                {
+                    "text": "NAME",
+                    "box": [
+                        164,
+                        183,
+                        201,
+                        200
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "True 100's (R&M)",
+            "box": [
+                214,
+                178,
+                358,
+                198
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "True",
+                    "box": [
+                        214,
+                        178,
+                        253,
+                        197
+                    ]
+                },
+                {
+                    "text": "100's",
+                    "box": [
+                        261,
+                        179,
+                        308,
+                        194
+                    ]
+                },
+                {
+                    "text": "(R&M)",
+                    "box": [
+                        317,
+                        179,
+                        358,
+                        198
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "PROJECT #",
+            "box": [
+                401,
+                187,
+                484,
+                207
+            ],
+            "linking": [
+                [
+                    29,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        401,
+                        187,
+                        467,
+                        204
+                    ]
+                },
+                {
+                    "text": "#",
+                    "box": [
+                        473,
+                        187,
+                        484,
+                        207
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "TOTAL BUDGET",
+            "box": [
+                397,
+                203,
+                514,
+                219
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TOTAL",
+                    "box": [
+                        397,
+                        203,
+                        449,
+                        219
+                    ]
+                },
+                {
+                    "text": "BUDGET",
+                    "box": [
+                        455,
+                        206,
+                        514,
+                        219
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "PROJECT LEADER",
+            "box": [
+                91,
+                199,
+                220,
+                216
+            ],
+            "linking": [
+                [
+                    31,
+                    33
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        91,
+                        199,
+                        155,
+                        216
+                    ]
+                },
+                {
+                    "text": "LEADER",
+                    "box": [
+                        164,
+                        199,
+                        220,
+                        214
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "GENERAL PROJECT DESCRIPTION",
+            "box": [
+                88,
+                214,
+                337,
+                233
+            ],
+            "linking": [
+                [
+                    32,
+                    34
+                ],
+                [
+                    32,
+                    36
+                ],
+                [
+                    32,
+                    35
+                ],
+                [
+                    32,
+                    37
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "GENERAL",
+                    "box": [
+                        88,
+                        214,
+                        159,
+                        230
+                    ]
+                },
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        163,
+                        215,
+                        229,
+                        231
+                    ]
+                },
+                {
+                    "text": "DESCRIPTION",
+                    "box": [
+                        237,
+                        218,
+                        337,
+                        233
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "Williams/ Giordano",
+            "box": [
+                225,
+                199,
+                383,
+                218
+            ],
+            "linking": [
+                [
+                    31,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Williams/",
+                    "box": [
+                        225,
+                        199,
+                        307,
+                        218
+                    ]
+                },
+                {
+                    "text": "Giordano",
+                    "box": [
+                        303,
+                        202,
+                        383,
+                        218
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "True 100's, Regular and Menthol tar",
+            "box": [
+                341,
+                217,
+                662,
+                241
+            ],
+            "linking": [
+                [
+                    32,
+                    34
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "True",
+                    "box": [
+                        341,
+                        221,
+                        380,
+                        230
+                    ]
+                },
+                {
+                    "text": "100's,",
+                    "box": [
+                        389,
+                        217,
+                        442,
+                        237
+                    ]
+                },
+                {
+                    "text": "Regular",
+                    "box": [
+                        449,
+                        219,
+                        515,
+                        238
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        523,
+                        221,
+                        554,
+                        241
+                    ]
+                },
+                {
+                    "text": "Menthol",
+                    "box": [
+                        557,
+                        219,
+                        625,
+                        239
+                    ]
+                },
+                {
+                    "text": "tar",
+                    "box": [
+                        634,
+                        223,
+                        662,
+                        239
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "reduction to the range of 8- 10mg tar. Variations to be: 1) Same taste",
+            "box": [
+                88,
+                233,
+                724,
+                254
+            ],
+            "linking": [
+                [
+                    32,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "reduction",
+                    "box": [
+                        88,
+                        233,
+                        172,
+                        246
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        178,
+                        234,
+                        199,
+                        251
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        207,
+                        234,
+                        231,
+                        249
+                    ]
+                },
+                {
+                    "text": "range",
+                    "box": [
+                        242,
+                        234,
+                        286,
+                        250
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        294,
+                        235,
+                        317,
+                        250
+                    ]
+                },
+                {
+                    "text": "8-",
+                    "box": [
+                        325,
+                        235,
+                        344,
+                        251
+                    ]
+                },
+                {
+                    "text": "10mg",
+                    "box": [
+                        341,
+                        237,
+                        386,
+                        250
+                    ]
+                },
+                {
+                    "text": "tar.",
+                    "box": [
+                        397,
+                        237,
+                        432,
+                        249
+                    ]
+                },
+                {
+                    "text": "Variations",
+                    "box": [
+                        451,
+                        238,
+                        547,
+                        251
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        551,
+                        237,
+                        568,
+                        252
+                    ]
+                },
+                {
+                    "text": "be:",
+                    "box": [
+                        579,
+                        238,
+                        607,
+                        250
+                    ]
+                },
+                {
+                    "text": "1)",
+                    "box": [
+                        614,
+                        235,
+                        631,
+                        250
+                    ]
+                },
+                {
+                    "text": "Same",
+                    "box": [
+                        631,
+                        239,
+                        671,
+                        254
+                    ]
+                },
+                {
+                    "text": "taste",
+                    "box": [
+                        680,
+                        239,
+                        724,
+                        252
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "characteristics as current True 100's product and, 2) Taste characterist-",
+            "box": [
+                95,
+                249,
+                752,
+                269
+            ],
+            "linking": [
+                [
+                    32,
+                    36
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "characteristics",
+                    "box": [
+                        95,
+                        249,
+                        231,
+                        262
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        241,
+                        250,
+                        264,
+                        265
+                    ]
+                },
+                {
+                    "text": "current",
+                    "box": [
+                        269,
+                        251,
+                        333,
+                        266
+                    ]
+                },
+                {
+                    "text": "True",
+                    "box": [
+                        341,
+                        250,
+                        380,
+                        263
+                    ]
+                },
+                {
+                    "text": "100's",
+                    "box": [
+                        388,
+                        251,
+                        437,
+                        263
+                    ]
+                },
+                {
+                    "text": "product",
+                    "box": [
+                        441,
+                        253,
+                        508,
+                        268
+                    ]
+                },
+                {
+                    "text": "and,",
+                    "box": [
+                        515,
+                        254,
+                        548,
+                        269
+                    ]
+                },
+                {
+                    "text": "2)",
+                    "box": [
+                        559,
+                        251,
+                        580,
+                        267
+                    ]
+                },
+                {
+                    "text": "Taste",
+                    "box": [
+                        588,
+                        253,
+                        635,
+                        269
+                    ]
+                },
+                {
+                    "text": "characterist-",
+                    "box": [
+                        640,
+                        257,
+                        752,
+                        269
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "ics similar to True King Size, 5mg. tar product.",
+            "box": [
+                96,
+                262,
+                532,
+                282
+            ],
+            "linking": [
+                [
+                    32,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "ics",
+                    "box": [
+                        96,
+                        263,
+                        124,
+                        278
+                    ]
+                },
+                {
+                    "text": "similar",
+                    "box": [
+                        132,
+                        262,
+                        196,
+                        278
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        207,
+                        263,
+                        224,
+                        278
+                    ]
+                },
+                {
+                    "text": "True",
+                    "box": [
+                        231,
+                        263,
+                        268,
+                        279
+                    ]
+                },
+                {
+                    "text": "King",
+                    "box": [
+                        278,
+                        265,
+                        315,
+                        278
+                    ]
+                },
+                {
+                    "text": "Size,",
+                    "box": [
+                        324,
+                        266,
+                        368,
+                        281
+                    ]
+                },
+                {
+                    "text": "5mg.",
+                    "box": [
+                        380,
+                        265,
+                        413,
+                        282
+                    ]
+                },
+                {
+                    "text": "tar",
+                    "box": [
+                        425,
+                        267,
+                        453,
+                        280
+                    ]
+                },
+                {
+                    "text": "product.",
+                    "box": [
+                        460,
+                        269,
+                        532,
+                        282
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "REVISED TARGET DATE",
+            "box": [
+                445,
+                372,
+                547,
+                404
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REVISED",
+                    "box": [
+                        445,
+                        372,
+                        509,
+                        387
+                    ]
+                },
+                {
+                    "text": "TARGET",
+                    "box": [
+                        445,
+                        388,
+                        502,
+                        403
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        507,
+                        389,
+                        547,
+                        404
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "ESTIMATED TARGET DATE- ORIGINAL COMMENTS",
+            "box": [
+                96,
+                365,
+                244,
+                411
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATED",
+                    "box": [
+                        100,
+                        365,
+                        186,
+                        380
+                    ]
+                },
+                {
+                    "text": "TARGET",
+                    "box": [
+                        191,
+                        365,
+                        244,
+                        381
+                    ]
+                },
+                {
+                    "text": "DATE-",
+                    "box": [
+                        98,
+                        380,
+                        157,
+                        396
+                    ]
+                },
+                {
+                    "text": "ORIGINAL",
+                    "box": [
+                        162,
+                        381,
+                        238,
+                        400
+                    ]
+                },
+                {
+                    "text": "COMMENTS",
+                    "box": [
+                        96,
+                        398,
+                        171,
+                        411
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "YEAR ONE",
+            "box": [
+                324,
+                520,
+                364,
+                551
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "YEAR",
+                    "box": [
+                        325,
+                        520,
+                        364,
+                        536
+                    ]
+                },
+                {
+                    "text": "ONE",
+                    "box": [
+                        324,
+                        539,
+                        355,
+                        551
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "YEAR ",
+            "box": [
+                405,
+                521,
+                443,
+                552
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "YEAR",
+                    "box": [
+                        406,
+                        521,
+                        443,
+                        536
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        405,
+                        537,
+                        434,
+                        552
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "YEAR THREE",
+            "box": [
+                467,
+                521,
+                518,
+                556
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "YEAR",
+                    "box": [
+                        469,
+                        521,
+                        510,
+                        537
+                    ]
+                },
+                {
+                    "text": "THREE",
+                    "box": [
+                        467,
+                        540,
+                        518,
+                        556
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "YEAR FOUR",
+            "box": [
+                552,
+                525,
+                592,
+                558
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "YEAR",
+                    "box": [
+                        553,
+                        525,
+                        592,
+                        538
+                    ]
+                },
+                {
+                    "text": "FOUR",
+                    "box": [
+                        552,
+                        543,
+                        592,
+                        558
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "YEAR FIVE",
+            "box": [
+                623,
+                528,
+                667,
+                558
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "YEAR",
+                    "box": [
+                        626,
+                        528,
+                        667,
+                        541
+                    ]
+                },
+                {
+                    "text": "FIVE",
+                    "box": [
+                        623,
+                        541,
+                        663,
+                        558
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "SALES OBJECTIVE",
+            "box": [
+                94,
+                594,
+                233,
+                610
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SALES",
+                    "box": [
+                        94,
+                        594,
+                        145,
+                        607
+                    ]
+                },
+                {
+                    "text": "OBJECTIVE",
+                    "box": [
+                        150,
+                        594,
+                        233,
+                        610
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "ESTIMATED PAYBACK PERIOD",
+            "box": [
+                96,
+                608,
+                316,
+                628
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATED",
+                    "box": [
+                        96,
+                        608,
+                        176,
+                        623
+                    ]
+                },
+                {
+                    "text": "PAYBACK",
+                    "box": [
+                        184,
+                        611,
+                        252,
+                        626
+                    ]
+                },
+                {
+                    "text": "PERIOD",
+                    "box": [
+                        261,
+                        611,
+                        316,
+                        628
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "In- home placement",
+            "box": [
+                94,
+                702,
+                251,
+                722
+            ],
+            "linking": [
+                [
+                    49,
+                    47
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "In-",
+                    "box": [
+                        94,
+                        705,
+                        121,
+                        716
+                    ]
+                },
+                {
+                    "text": "home",
+                    "box": [
+                        119,
+                        705,
+                        159,
+                        718
+                    ]
+                },
+                {
+                    "text": "placement",
+                    "box": [
+                        167,
+                        702,
+                        251,
+                        722
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "ORIGINAL COMPLETION DATE",
+            "box": [
+                376,
+                674,
+                518,
+                708
+            ],
+            "linking": [
+                [
+                    48,
+                    19
+                ],
+                [
+                    48,
+                    20
+                ],
+                [
+                    48,
+                    21
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "ORIGINAL",
+                    "box": [
+                        394,
+                        674,
+                        469,
+                        691
+                    ]
+                },
+                {
+                    "text": "COMPLETION",
+                    "box": [
+                        376,
+                        690,
+                        472,
+                        706
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        475,
+                        691,
+                        518,
+                        708
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "MAJOR MKT. AND MKT. RESEARCH STEPS",
+            "box": [
+                91,
+                667,
+                267,
+                701
+            ],
+            "linking": [
+                [
+                    49,
+                    47
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "MAJOR",
+                    "box": [
+                        91,
+                        667,
+                        143,
+                        683
+                    ]
+                },
+                {
+                    "text": "MKT.",
+                    "box": [
+                        147,
+                        668,
+                        186,
+                        685
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        194,
+                        671,
+                        223,
+                        687
+                    ]
+                },
+                {
+                    "text": "MKT.",
+                    "box": [
+                        230,
+                        671,
+                        267,
+                        688
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        94,
+                        686,
+                        169,
+                        701
+                    ]
+                },
+                {
+                    "text": "STEPS",
+                    "box": [
+                        175,
+                        687,
+                        223,
+                        700
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "* REVISED COMPLETION DATE",
+            "box": [
+                603,
+                680,
+                741,
+                717
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "*",
+                    "box": [
+                        606,
+                        680,
+                        615,
+                        691
+                    ]
+                },
+                {
+                    "text": "REVISED",
+                    "box": [
+                        632,
+                        680,
+                        699,
+                        697
+                    ]
+                },
+                {
+                    "text": "COMPLETION",
+                    "box": [
+                        603,
+                        695,
+                        697,
+                        715
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        706,
+                        697,
+                        741,
+                        717
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "* EXPLANATION OF CHANGE",
+            "box": [
+                92,
+                805,
+                235,
+                837
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "*",
+                    "box": [
+                        92,
+                        805,
+                        103,
+                        816
+                    ]
+                },
+                {
+                    "text": "EXPLANATION",
+                    "box": [
+                        111,
+                        805,
+                        211,
+                        818
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        219,
+                        807,
+                        235,
+                        823
+                    ]
+                },
+                {
+                    "text": "CHANGE",
+                    "box": [
+                        108,
+                        821,
+                        165,
+                        837
+                    ]
+                }
+            ],
+            "id": 51
+        }
+    ]
+}

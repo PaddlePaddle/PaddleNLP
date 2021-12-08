@@ -1,0 +1,2411 @@
+{
+    "form": [
+        {
+            "box": [
+                10,
+                166,
+                48,
+                179
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        10,
+                        166,
+                        48,
+                        179
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                144,
+                165,
+                224,
+                179
+            ],
+            "text": "DEPARTMENT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        144,
+                        165,
+                        224,
+                        179
+                    ],
+                    "text": "DEPARTMENT:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    14
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                455,
+                208,
+                486,
+                221
+            ],
+            "text": "Type",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        455,
+                        208,
+                        486,
+                        221
+                    ],
+                    "text": "Type"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    3
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                503,
+                205,
+                560,
+                222
+            ],
+            "text": "EQPR",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        205,
+                        560,
+                        222
+                    ],
+                    "text": "EQPR"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                24,
+                32,
+                91,
+                102
+            ],
+            "text": "B&W",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        24,
+                        32,
+                        91,
+                        102
+                    ],
+                    "text": "B&W"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                589,
+                32,
+                664,
+                102
+            ],
+            "text": "QUALITY",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        589,
+                        32,
+                        664,
+                        102
+                    ],
+                    "text": "QUALITY"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                216,
+                648,
+                289,
+                661
+            ],
+            "text": "Implement:",
+            "label": "header",
+            "words": [
+                {
+                    "box": [
+                        216,
+                        648,
+                        289,
+                        661
+                    ],
+                    "text": "Implement:"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    34
+                ],
+                [
+                    6,
+                    35
+                ],
+                [
+                    6,
+                    36
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                493,
+                647,
+                524,
+                661
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        493,
+                        647,
+                        524,
+                        661
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                633,
+                771,
+                655,
+                893
+            ],
+            "text": "632120763",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        633,
+                        771,
+                        655,
+                        893
+                    ],
+                    "text": "632120763"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "text": "QUALITY IMPROVEMENT SUGGESTION OUR MISSION IS SUPERIOR CONSUMER SATISFACTION",
+            "box": [
+                120,
+                45,
+                567,
+                94
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "QUALITY",
+                    "box": [
+                        142,
+                        46,
+                        237,
+                        66
+                    ]
+                },
+                {
+                    "text": "IMPROVEMENT",
+                    "box": [
+                        242,
+                        45,
+                        400,
+                        66
+                    ]
+                },
+                {
+                    "text": "SUGGESTION",
+                    "box": [
+                        405,
+                        45,
+                        542,
+                        67
+                    ]
+                },
+                {
+                    "text": "OUR",
+                    "box": [
+                        120,
+                        80,
+                        158,
+                        94
+                    ]
+                },
+                {
+                    "text": "MISSION",
+                    "box": [
+                        162,
+                        78,
+                        232,
+                        92
+                    ]
+                },
+                {
+                    "text": "IS",
+                    "box": [
+                        236,
+                        77,
+                        254,
+                        92
+                    ]
+                },
+                {
+                    "text": "SUPERIOR",
+                    "box": [
+                        257,
+                        78,
+                        341,
+                        92
+                    ]
+                },
+                {
+                    "text": "CONSUMER",
+                    "box": [
+                        342,
+                        77,
+                        438,
+                        94
+                    ]
+                },
+                {
+                    "text": "SATISFACTION",
+                    "box": [
+                        441,
+                        77,
+                        567,
+                        92
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Highest Quality. Teamwork, Do Right Things Right The First Time",
+            "box": [
+                124,
+                94,
+                563,
+                109
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Highest",
+                    "box": [
+                        124,
+                        95,
+                        176,
+                        109
+                    ]
+                },
+                {
+                    "text": "Quality.",
+                    "box": [
+                        180,
+                        94,
+                        232,
+                        109
+                    ]
+                },
+                {
+                    "text": "Teamwork,",
+                    "box": [
+                        235,
+                        94,
+                        313,
+                        108
+                    ]
+                },
+                {
+                    "text": "Do",
+                    "box": [
+                        316,
+                        94,
+                        336,
+                        108
+                    ]
+                },
+                {
+                    "text": "Right",
+                    "box": [
+                        337,
+                        94,
+                        375,
+                        109
+                    ]
+                },
+                {
+                    "text": "Things",
+                    "box": [
+                        377,
+                        94,
+                        423,
+                        108
+                    ]
+                },
+                {
+                    "text": "Right",
+                    "box": [
+                        425,
+                        94,
+                        460,
+                        108
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        462,
+                        94,
+                        490,
+                        108
+                    ]
+                },
+                {
+                    "text": "First",
+                    "box": [
+                        493,
+                        94,
+                        525,
+                        108
+                    ]
+                },
+                {
+                    "text": "Time",
+                    "box": [
+                        527,
+                        94,
+                        563,
+                        108
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "RESEARCH & DEVELOPMENT",
+            "box": [
+                228,
+                119,
+                458,
+                137
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        228,
+                        119,
+                        316,
+                        136
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        320,
+                        119,
+                        334,
+                        137
+                    ]
+                },
+                {
+                    "text": "DEVELOPMENT",
+                    "box": [
+                        338,
+                        119,
+                        458,
+                        136
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "Quality Coord Only",
+            "box": [
+                497,
+                149,
+                628,
+                163
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Quality",
+                    "box": [
+                        497,
+                        149,
+                        547,
+                        163
+                    ]
+                },
+                {
+                    "text": "Coord",
+                    "box": [
+                        553,
+                        149,
+                        594,
+                        163
+                    ]
+                },
+                {
+                    "text": "Only",
+                    "box": [
+                        596,
+                        151,
+                        628,
+                        162
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "June 21, 1993",
+            "box": [
+                53,
+                165,
+                146,
+                179
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "June",
+                    "box": [
+                        53,
+                        165,
+                        85,
+                        179
+                    ]
+                },
+                {
+                    "text": "21,",
+                    "box": [
+                        89,
+                        165,
+                        111,
+                        178
+                    ]
+                },
+                {
+                    "text": "1993",
+                    "box": [
+                        119,
+                        165,
+                        146,
+                        178
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "R&D Library",
+            "box": [
+                250,
+                163,
+                329,
+                180
+            ],
+            "linking": [
+                [
+                    1,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "R&D",
+                    "box": [
+                        250,
+                        163,
+                        277,
+                        177
+                    ]
+                },
+                {
+                    "text": "Library",
+                    "box": [
+                        279,
+                        163,
+                        329,
+                        180
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "Carol S. Lincoln",
+            "box": [
+                144,
+                191,
+                260,
+                207
+            ],
+            "linking": [
+                [
+                    17,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Carol",
+                    "box": [
+                        144,
+                        194,
+                        182,
+                        205
+                    ]
+                },
+                {
+                    "text": "S.",
+                    "box": [
+                        187,
+                        191,
+                        201,
+                        205
+                    ]
+                },
+                {
+                    "text": "Lincoln",
+                    "box": [
+                        208,
+                        193,
+                        260,
+                        207
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "407- 64- 3484",
+            "box": [
+                147,
+                219,
+                225,
+                235
+            ],
+            "linking": [
+                [
+                    18,
+                    16
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "407-",
+                    "box": [
+                        147,
+                        219,
+                        174,
+                        234
+                    ]
+                },
+                {
+                    "text": "64-",
+                    "box": [
+                        173,
+                        219,
+                        195,
+                        233
+                    ]
+                },
+                {
+                    "text": "3484",
+                    "box": [
+                        194,
+                        221,
+                        225,
+                        235
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "SUBMITTED BY:",
+            "box": [
+                11,
+                194,
+                102,
+                207
+            ],
+            "linking": [
+                [
+                    17,
+                    15
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SUBMITTED",
+                    "box": [
+                        11,
+                        194,
+                        75,
+                        207
+                    ]
+                },
+                {
+                    "text": "BY:",
+                    "box": [
+                        80,
+                        194,
+                        102,
+                        205
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "SUBMITTER'S SS#:",
+            "box": [
+                11,
+                223,
+                123,
+                234
+            ],
+            "linking": [
+                [
+                    18,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SUBMITTER'S",
+                    "box": [
+                        11,
+                        223,
+                        89,
+                        234
+                    ]
+                },
+                {
+                    "text": "SS#:",
+                    "box": [
+                        94,
+                        223,
+                        123,
+                        233
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "Date Rec'd",
+            "box": [
+                455,
+                179,
+                528,
+                192
+            ],
+            "linking": [
+                [
+                    19,
+                    23
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Date",
+                    "box": [
+                        455,
+                        180,
+                        486,
+                        191
+                    ]
+                },
+                {
+                    "text": "Rec'd",
+                    "box": [
+                        490,
+                        179,
+                        528,
+                        192
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "QIP Log #1",
+            "box": [
+                454,
+                193,
+                529,
+                206
+            ],
+            "linking": [
+                [
+                    20,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "QIP",
+                    "box": [
+                        454,
+                        193,
+                        478,
+                        206
+                    ]
+                },
+                {
+                    "text": "Log",
+                    "box": [
+                        483,
+                        193,
+                        507,
+                        206
+                    ]
+                },
+                {
+                    "text": "#1",
+                    "box": [
+                        511,
+                        193,
+                        529,
+                        206
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "Status (1993)",
+            "box": [
+                454,
+                221,
+                548,
+                235
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Status",
+                    "box": [
+                        454,
+                        221,
+                        499,
+                        234
+                    ]
+                },
+                {
+                    "text": "(1993)",
+                    "box": [
+                        506,
+                        222,
+                        548,
+                        235
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Keywords (1993)",
+            "box": [
+                455,
+                236,
+                562,
+                250
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Keywords",
+                    "box": [
+                        455,
+                        236,
+                        515,
+                        249
+                    ]
+                },
+                {
+                    "text": "(1993)",
+                    "box": [
+                        520,
+                        236,
+                        562,
+                        250
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "6/ 21/ 93",
+            "box": [
+                546,
+                168,
+                616,
+                197
+            ],
+            "linking": [
+                [
+                    19,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "6/",
+                    "box": [
+                        546,
+                        168,
+                        570,
+                        197
+                    ]
+                },
+                {
+                    "text": "21/",
+                    "box": [
+                        564,
+                        168,
+                        596,
+                        195
+                    ]
+                },
+                {
+                    "text": "93",
+                    "box": [
+                        595,
+                        170,
+                        616,
+                        192
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "93- 0301",
+            "box": [
+                541,
+                190,
+                627,
+                210
+            ],
+            "linking": [
+                [
+                    20,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "93-",
+                    "box": [
+                        541,
+                        190,
+                        576,
+                        210
+                    ]
+                },
+                {
+                    "text": "0301",
+                    "box": [
+                        577,
+                        191,
+                        627,
+                        209
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "SUGGESTION: (Describe Current Situation and Idea)",
+            "box": [
+                11,
+                278,
+                358,
+                295
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SUGGESTION:",
+                    "box": [
+                        11,
+                        279,
+                        88,
+                        292
+                    ]
+                },
+                {
+                    "text": "(Describe",
+                    "box": [
+                        95,
+                        281,
+                        161,
+                        295
+                    ]
+                },
+                {
+                    "text": "Current",
+                    "box": [
+                        166,
+                        279,
+                        216,
+                        293
+                    ]
+                },
+                {
+                    "text": "Situation",
+                    "box": [
+                        222,
+                        279,
+                        289,
+                        292
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        293,
+                        279,
+                        315,
+                        292
+                    ]
+                },
+                {
+                    "text": "Idea)",
+                    "box": [
+                        320,
+                        278,
+                        358,
+                        292
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "The current system of managing records is too complex. The trend seems to be increasingly specific, when we should be getting more general. Right now, people must work to understand the system. We must spend too much time adninistering the system, labeling and cleaning our files. Complying is a real burden, both for the individual and for the records coordinators.",
+            "box": [
+                32,
+                306,
+                684,
+                430
+            ],
+            "linking": [
+                [
+                    25,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        54,
+                        306,
+                        76,
+                        320
+                    ]
+                },
+                {
+                    "text": "current",
+                    "box": [
+                        82,
+                        309,
+                        132,
+                        322
+                    ]
+                },
+                {
+                    "text": "system",
+                    "box": [
+                        137,
+                        309,
+                        184,
+                        320
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        187,
+                        307,
+                        204,
+                        322
+                    ]
+                },
+                {
+                    "text": "managing",
+                    "box": [
+                        208,
+                        309,
+                        267,
+                        323
+                    ]
+                },
+                {
+                    "text": "records",
+                    "box": [
+                        272,
+                        309,
+                        324,
+                        322
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        328,
+                        307,
+                        343,
+                        320
+                    ]
+                },
+                {
+                    "text": "too",
+                    "box": [
+                        348,
+                        307,
+                        372,
+                        320
+                    ]
+                },
+                {
+                    "text": "complex.",
+                    "box": [
+                        376,
+                        309,
+                        432,
+                        322
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        446,
+                        307,
+                        470,
+                        321
+                    ]
+                },
+                {
+                    "text": "trend",
+                    "box": [
+                        475,
+                        306,
+                        510,
+                        321
+                    ]
+                },
+                {
+                    "text": "seems",
+                    "box": [
+                        517,
+                        309,
+                        552,
+                        322
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        557,
+                        307,
+                        575,
+                        320
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        578,
+                        307,
+                        593,
+                        321
+                    ]
+                },
+                {
+                    "text": "increasingly",
+                    "box": [
+                        599,
+                        307,
+                        684,
+                        322
+                    ]
+                },
+                {
+                    "text": "specific,",
+                    "box": [
+                        34,
+                        332,
+                        97,
+                        346
+                    ]
+                },
+                {
+                    "text": "when",
+                    "box": [
+                        102,
+                        334,
+                        133,
+                        347
+                    ]
+                },
+                {
+                    "text": "we",
+                    "box": [
+                        138,
+                        334,
+                        156,
+                        347
+                    ]
+                },
+                {
+                    "text": "should",
+                    "box": [
+                        161,
+                        332,
+                        206,
+                        345
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        208,
+                        332,
+                        225,
+                        347
+                    ]
+                },
+                {
+                    "text": "getting",
+                    "box": [
+                        229,
+                        334,
+                        282,
+                        349
+                    ]
+                },
+                {
+                    "text": "more",
+                    "box": [
+                        285,
+                        335,
+                        316,
+                        348
+                    ]
+                },
+                {
+                    "text": "general.",
+                    "box": [
+                        320,
+                        335,
+                        377,
+                        349
+                    ]
+                },
+                {
+                    "text": "Right",
+                    "box": [
+                        388,
+                        332,
+                        429,
+                        349
+                    ]
+                },
+                {
+                    "text": "now,",
+                    "box": [
+                        432,
+                        334,
+                        460,
+                        348
+                    ]
+                },
+                {
+                    "text": "people",
+                    "box": [
+                        465,
+                        335,
+                        512,
+                        349
+                    ]
+                },
+                {
+                    "text": "must",
+                    "box": [
+                        515,
+                        335,
+                        547,
+                        346
+                    ]
+                },
+                {
+                    "text": "work",
+                    "box": [
+                        550,
+                        335,
+                        582,
+                        348
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        585,
+                        332,
+                        600,
+                        347
+                    ]
+                },
+                {
+                    "text": "understand",
+                    "box": [
+                        606,
+                        334,
+                        679,
+                        348
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        35,
+                        360,
+                        57,
+                        374
+                    ]
+                },
+                {
+                    "text": "system.",
+                    "box": [
+                        61,
+                        360,
+                        110,
+                        375
+                    ]
+                },
+                {
+                    "text": "We",
+                    "box": [
+                        122,
+                        360,
+                        140,
+                        374
+                    ]
+                },
+                {
+                    "text": "must",
+                    "box": [
+                        144,
+                        362,
+                        175,
+                        376
+                    ]
+                },
+                {
+                    "text": "spend",
+                    "box": [
+                        180,
+                        362,
+                        219,
+                        377
+                    ]
+                },
+                {
+                    "text": "too",
+                    "box": [
+                        222,
+                        362,
+                        246,
+                        376
+                    ]
+                },
+                {
+                    "text": "much",
+                    "box": [
+                        250,
+                        362,
+                        282,
+                        376
+                    ]
+                },
+                {
+                    "text": "time",
+                    "box": [
+                        286,
+                        360,
+                        314,
+                        375
+                    ]
+                },
+                {
+                    "text": "adninistering",
+                    "box": [
+                        320,
+                        362,
+                        412,
+                        379
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        418,
+                        360,
+                        440,
+                        375
+                    ]
+                },
+                {
+                    "text": "system,",
+                    "box": [
+                        443,
+                        362,
+                        496,
+                        375
+                    ]
+                },
+                {
+                    "text": "labeling",
+                    "box": [
+                        503,
+                        360,
+                        566,
+                        377
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        571,
+                        362,
+                        595,
+                        376
+                    ]
+                },
+                {
+                    "text": "cleaning",
+                    "box": [
+                        599,
+                        362,
+                        658,
+                        376
+                    ]
+                },
+                {
+                    "text": "our",
+                    "box": [
+                        32,
+                        391,
+                        59,
+                        402
+                    ]
+                },
+                {
+                    "text": "files.",
+                    "box": [
+                        61,
+                        388,
+                        103,
+                        402
+                    ]
+                },
+                {
+                    "text": "Complying",
+                    "box": [
+                        116,
+                        388,
+                        183,
+                        405
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        189,
+                        390,
+                        203,
+                        404
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        208,
+                        390,
+                        218,
+                        407
+                    ]
+                },
+                {
+                    "text": "real",
+                    "box": [
+                        222,
+                        391,
+                        251,
+                        404
+                    ]
+                },
+                {
+                    "text": "burden,",
+                    "box": [
+                        257,
+                        390,
+                        307,
+                        405
+                    ]
+                },
+                {
+                    "text": "both",
+                    "box": [
+                        313,
+                        390,
+                        342,
+                        405
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        348,
+                        391,
+                        372,
+                        405
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        376,
+                        391,
+                        398,
+                        405
+                    ]
+                },
+                {
+                    "text": "individual",
+                    "box": [
+                        404,
+                        390,
+                        474,
+                        405
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        480,
+                        391,
+                        502,
+                        404
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        510,
+                        390,
+                        531,
+                        404
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        538,
+                        388,
+                        562,
+                        402
+                    ]
+                },
+                {
+                    "text": "records",
+                    "box": [
+                        566,
+                        390,
+                        616,
+                        404
+                    ]
+                },
+                {
+                    "text": "coordinators.",
+                    "box": [
+                        32,
+                        416,
+                        124,
+                        430
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "Describe Possible Solutions And Benefits",
+            "box": [
+                11,
+                476,
+                301,
+                491
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ],
+                [
+                    27,
+                    29
+                ],
+                [
+                    27,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Describe",
+                    "box": [
+                        11,
+                        476,
+                        70,
+                        491
+                    ]
+                },
+                {
+                    "text": "Possible",
+                    "box": [
+                        74,
+                        476,
+                        133,
+                        490
+                    ]
+                },
+                {
+                    "text": "Solutions",
+                    "box": [
+                        137,
+                        476,
+                        204,
+                        490
+                    ]
+                },
+                {
+                    "text": "And",
+                    "box": [
+                        208,
+                        478,
+                        232,
+                        491
+                    ]
+                },
+                {
+                    "text": "Benefits",
+                    "box": [
+                        237,
+                        478,
+                        301,
+                        489
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "1. Drop the category specifications altogether.",
+            "box": [
+                32,
+                500,
+                362,
+                519
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1.",
+                    "box": [
+                        32,
+                        500,
+                        46,
+                        515
+                    ]
+                },
+                {
+                    "text": "Drop",
+                    "box": [
+                        54,
+                        503,
+                        85,
+                        517
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        88,
+                        501,
+                        113,
+                        518
+                    ]
+                },
+                {
+                    "text": "category",
+                    "box": [
+                        116,
+                        503,
+                        176,
+                        518
+                    ]
+                },
+                {
+                    "text": "specifications",
+                    "box": [
+                        179,
+                        504,
+                        278,
+                        519
+                    ]
+                },
+                {
+                    "text": "altogether.",
+                    "box": [
+                        284,
+                        501,
+                        362,
+                        516
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "2. Use moregeneral categories.",
+            "box": [
+                31,
+                528,
+                259,
+                546
+            ],
+            "linking": [
+                [
+                    27,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2.",
+                    "box": [
+                        31,
+                        529,
+                        46,
+                        543
+                    ]
+                },
+                {
+                    "text": "Use",
+                    "box": [
+                        53,
+                        528,
+                        78,
+                        545
+                    ]
+                },
+                {
+                    "text": "moregeneral",
+                    "box": [
+                        81,
+                        529,
+                        159,
+                        544
+                    ]
+                },
+                {
+                    "text": "categories.",
+                    "box": [
+                        179,
+                        531,
+                        259,
+                        546
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "hote: I have passed this to Scott Appleton for the task force to use in streamlining the records management program.",
+            "box": [
+                32,
+                549,
+                654,
+                601
+            ],
+            "linking": [
+                [
+                    27,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "hote:",
+                    "box": [
+                        32,
+                        553,
+                        71,
+                        574
+                    ]
+                },
+                {
+                    "text": "I",
+                    "box": [
+                        77,
+                        552,
+                        94,
+                        572
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        99,
+                        553,
+                        135,
+                        574
+                    ]
+                },
+                {
+                    "text": "passed",
+                    "box": [
+                        152,
+                        554,
+                        208,
+                        581
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        216,
+                        554,
+                        248,
+                        578
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        257,
+                        554,
+                        272,
+                        574
+                    ]
+                },
+                {
+                    "text": "Scott",
+                    "box": [
+                        281,
+                        549,
+                        322,
+                        574
+                    ]
+                },
+                {
+                    "text": "Appleton",
+                    "box": [
+                        327,
+                        549,
+                        404,
+                        577
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        412,
+                        554,
+                        436,
+                        581
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        440,
+                        556,
+                        468,
+                        574
+                    ]
+                },
+                {
+                    "text": "task",
+                    "box": [
+                        478,
+                        554,
+                        524,
+                        575
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        585,
+                        550,
+                        600,
+                        575
+                    ]
+                },
+                {
+                    "text": "use",
+                    "box": [
+                        613,
+                        557,
+                        654,
+                        575
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        43,
+                        575,
+                        65,
+                        588
+                    ]
+                },
+                {
+                    "text": "streamlining",
+                    "box": [
+                        71,
+                        575,
+                        156,
+                        597
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        168,
+                        575,
+                        197,
+                        589
+                    ]
+                },
+                {
+                    "text": "records",
+                    "box": [
+                        204,
+                        575,
+                        267,
+                        592
+                    ]
+                },
+                {
+                    "text": "management",
+                    "box": [
+                        274,
+                        575,
+                        387,
+                        597
+                    ]
+                },
+                {
+                    "text": "force",
+                    "box": [
+                        529,
+                        550,
+                        581,
+                        588
+                    ]
+                },
+                {
+                    "text": "program.",
+                    "box": [
+                        394,
+                        577,
+                        475,
+                        601
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "PROFIT IMPROVEMENT:",
+            "box": [
+                11,
+                591,
+                145,
+                605
+            ],
+            "linking": [
+                [
+                    31,
+                    32
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROFIT",
+                    "box": [
+                        11,
+                        591,
+                        57,
+                        604
+                    ]
+                },
+                {
+                    "text": "IMPROVEMENT:",
+                    "box": [
+                        61,
+                        591,
+                        145,
+                        605
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "(If Applicable)",
+            "box": [
+                152,
+                591,
+                261,
+                606
+            ],
+            "linking": [
+                [
+                    31,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(If",
+                    "box": [
+                        152,
+                        592,
+                        176,
+                        605
+                    ]
+                },
+                {
+                    "text": "Applicable)",
+                    "box": [
+                        180,
+                        591,
+                        261,
+                        606
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "RESPOND HERE",
+            "box": [
+                11,
+                647,
+                99,
+                662
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RESPOND",
+                    "box": [
+                        11,
+                        647,
+                        63,
+                        662
+                    ]
+                },
+                {
+                    "text": "HERE",
+                    "box": [
+                        67,
+                        647,
+                        99,
+                        661
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "☐ Yes",
+            "box": [
+                304,
+                644,
+                346,
+                664
+            ],
+            "linking": [
+                [
+                    6,
+                    34
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "☐",
+                    "box": [
+                        304,
+                        644,
+                        324,
+                        664
+                    ]
+                },
+                {
+                    "text": "Yes",
+                    "box": [
+                        321,
+                        647,
+                        346,
+                        660
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "☐ No",
+            "box": [
+                362,
+                644,
+                397,
+                664
+            ],
+            "linking": [
+                [
+                    6,
+                    35
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "☐",
+                    "box": [
+                        362,
+                        644,
+                        380,
+                        664
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        380,
+                        648,
+                        397,
+                        659
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "☐ Pending",
+            "box": [
+                409,
+                642,
+                480,
+                663
+            ],
+            "linking": [
+                [
+                    6,
+                    36
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "☐",
+                    "box": [
+                        409,
+                        642,
+                        430,
+                        663
+                    ]
+                },
+                {
+                    "text": "Pending",
+                    "box": [
+                        430,
+                        647,
+                        480,
+                        660
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "Approval Signature/ Date",
+            "box": [
+                54,
+                874,
+                222,
+                891
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Approval",
+                    "box": [
+                        54,
+                        874,
+                        113,
+                        891
+                    ]
+                },
+                {
+                    "text": "Signature/",
+                    "box": [
+                        120,
+                        876,
+                        190,
+                        890
+                    ]
+                },
+                {
+                    "text": "Date",
+                    "box": [
+                        190,
+                        876,
+                        222,
+                        890
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Responder/ Date",
+            "box": [
+                420,
+                874,
+                526,
+                888
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Responder/",
+                    "box": [
+                        420,
+                        874,
+                        494,
+                        888
+                    ]
+                },
+                {
+                    "text": "Date",
+                    "box": [
+                        492,
+                        876,
+                        526,
+                        887
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Sign & Print Names) (See Instructions On Back)",
+            "box": [
+                263,
+                876,
+                416,
+                903
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Sign",
+                    "box": [
+                        263,
+                        877,
+                        290,
+                        888
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        292,
+                        876,
+                        300,
+                        887
+                    ]
+                },
+                {
+                    "text": "Print",
+                    "box": [
+                        303,
+                        876,
+                        330,
+                        889
+                    ]
+                },
+                {
+                    "text": "Names)",
+                    "box": [
+                        334,
+                        877,
+                        365,
+                        888
+                    ]
+                },
+                {
+                    "text": "(See",
+                    "box": [
+                        282,
+                        891,
+                        304,
+                        902
+                    ]
+                },
+                {
+                    "text": "Instructions",
+                    "box": [
+                        307,
+                        892,
+                        368,
+                        903
+                    ]
+                },
+                {
+                    "text": "On",
+                    "box": [
+                        373,
+                        891,
+                        386,
+                        902
+                    ]
+                },
+                {
+                    "text": "Back)",
+                    "box": [
+                        388,
+                        890,
+                        416,
+                        903
+                    ]
+                }
+            ],
+            "id": 39
+        }
+    ]
+}

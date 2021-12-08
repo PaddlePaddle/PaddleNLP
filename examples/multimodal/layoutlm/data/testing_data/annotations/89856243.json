@@ -1,0 +1,3770 @@
+{
+    "form": [
+        {
+            "box": [
+                100,
+                42,
+                148,
+                99
+            ],
+            "text": "file",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        100,
+                        42,
+                        148,
+                        99
+                    ],
+                    "text": "file"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                104,
+                116,
+                157,
+                130
+            ],
+            "text": "PRODUCT",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        104,
+                        116,
+                        157,
+                        130
+                    ],
+                    "text": "PRODUCT"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    3
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                559,
+                24,
+                589,
+                38
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        559,
+                        24,
+                        589,
+                        38
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    23
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                199,
+                116,
+                249,
+                127
+            ],
+            "text": "Triumph",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        199,
+                        116,
+                        249,
+                        127
+                    ],
+                    "text": "Triumph"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                260,
+                654,
+                280,
+                667
+            ],
+            "text": "yes",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        260,
+                        654,
+                        280,
+                        667
+                    ],
+                    "text": "yes"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                259,
+                671,
+                282,
+                683
+            ],
+            "text": "yes",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        259,
+                        671,
+                        282,
+                        683
+                    ],
+                    "text": "yes"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                314,
+                657,
+                333,
+                667
+            ],
+            "text": "no",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        314,
+                        657,
+                        333,
+                        667
+                    ],
+                    "text": "no"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                314,
+                670,
+                333,
+                682
+            ],
+            "text": "no",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        314,
+                        670,
+                        333,
+                        682
+                    ],
+                    "text": "no"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                106,
+                725,
+                165,
+                738
+            ],
+            "text": "Approved",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        106,
+                        725,
+                        165,
+                        738
+                    ],
+                    "text": "Approved"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                170,
+                727,
+                190,
+                740
+            ],
+            "text": "by:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        170,
+                        727,
+                        190,
+                        740
+                    ],
+                    "text": "by:"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                470,
+                665,
+                532,
+                678
+            ],
+            "text": "Incidence",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        470,
+                        665,
+                        532,
+                        678
+                    ],
+                    "text": "Incidence"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    11
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                645,
+                670,
+                657,
+                679
+            ],
+            "text": "-",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        645,
+                        670,
+                        657,
+                        679
+                    ],
+                    "text": "-"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                613,
+                726,
+                623,
+                736
+            ],
+            "text": "4",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        613,
+                        726,
+                        623,
+                        736
+                    ],
+                    "text": "4"
+                }
+            ],
+            "linking": [
+                [
+                    42,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                617,
+                752,
+                630,
+                763
+            ],
+            "text": "1",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        617,
+                        752,
+                        630,
+                        763
+                    ],
+                    "text": "1"
+                }
+            ],
+            "linking": [
+                [
+                    43,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                471,
+                780,
+                521,
+                795
+            ],
+            "text": "Topline",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        471,
+                        780,
+                        521,
+                        795
+                    ],
+                    "text": "Topline"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    46
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                469,
+                825,
+                505,
+                838
+            ],
+            "text": "Final",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        469,
+                        825,
+                        505,
+                        838
+                    ],
+                    "text": "Final"
+                }
+            ],
+            "linking": [
+                [
+                    15,
+                    47
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                606,
+                869,
+                691,
+                886
+            ],
+            "text": "89856243",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        606,
+                        869,
+                        691,
+                        886
+                    ],
+                    "text": "89856243"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                106,
+                768,
+                170,
+                785
+            ],
+            "text": "Marketing",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        106,
+                        768,
+                        170,
+                        785
+                    ],
+                    "text": "Marketing"
+                }
+            ],
+            "linking": [],
+            "id": 17
+        },
+        {
+            "box": [
+                175,
+                771,
+                231,
+                784
+            ],
+            "text": "Research",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        175,
+                        771,
+                        231,
+                        784
+                    ],
+                    "text": "Research"
+                }
+            ],
+            "linking": [],
+            "id": 18
+        },
+        {
+            "box": [
+                239,
+                767,
+                293,
+                782
+            ],
+            "text": "Director",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        239,
+                        767,
+                        293,
+                        782
+                    ],
+                    "text": "Director"
+                }
+            ],
+            "linking": [],
+            "id": 19
+        },
+        {
+            "box": [
+                157,
+                719,
+                323,
+                799
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        157,
+                        719,
+                        323,
+                        799
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                185,
+                750,
+                257,
+                822
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        185,
+                        750,
+                        257,
+                        822
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "box": [
+                243,
+                802,
+                380,
+                856
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        243,
+                        802,
+                        380,
+                        856
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "text": "October 17, 1979",
+            "box": [
+                607,
+                21,
+                719,
+                40
+            ],
+            "linking": [
+                [
+                    2,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "October",
+                    "box": [
+                        607,
+                        21,
+                        657,
+                        39
+                    ]
+                },
+                {
+                    "text": "17,",
+                    "box": [
+                        664,
+                        21,
+                        684,
+                        40
+                    ]
+                },
+                {
+                    "text": "1979",
+                    "box": [
+                        688,
+                        23,
+                        719,
+                        36
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "MARKETING RESEARCH RPROJECT APPROVAL",
+            "box": [
+                314,
+                36,
+                558,
+                55
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "MARKETING",
+                    "box": [
+                        314,
+                        40,
+                        379,
+                        55
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        385,
+                        39,
+                        446,
+                        53
+                    ]
+                },
+                {
+                    "text": "RPROJECT",
+                    "box": [
+                        452,
+                        36,
+                        496,
+                        51
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        504,
+                        40,
+                        558,
+                        50
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "(To be filled out by Marketing Research Department)",
+            "box": [
+                261,
+                52,
+                616,
+                71
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(To",
+                    "box": [
+                        261,
+                        55,
+                        279,
+                        69
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        284,
+                        55,
+                        303,
+                        69
+                    ]
+                },
+                {
+                    "text": "filled",
+                    "box": [
+                        307,
+                        54,
+                        347,
+                        69
+                    ]
+                },
+                {
+                    "text": "out",
+                    "box": [
+                        358,
+                        55,
+                        378,
+                        70
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        385,
+                        55,
+                        397,
+                        68
+                    ]
+                },
+                {
+                    "text": "Marketing",
+                    "box": [
+                        407,
+                        52,
+                        465,
+                        71
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        475,
+                        53,
+                        531,
+                        68
+                    ]
+                },
+                {
+                    "text": "Department)",
+                    "box": [
+                        541,
+                        52,
+                        616,
+                        67
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "PROJECT TITLE",
+            "box": [
+                323,
+                99,
+                380,
+                124
+            ],
+            "linking": [
+                [
+                    26,
+                    27
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        323,
+                        99,
+                        380,
+                        111
+                    ]
+                },
+                {
+                    "text": "TITLE",
+                    "box": [
+                        329,
+                        111,
+                        368,
+                        124
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "Triumph Disaster Check Study",
+            "box": [
+                399,
+                111,
+                594,
+                126
+            ],
+            "linking": [
+                [
+                    26,
+                    27
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Triumph",
+                    "box": [
+                        399,
+                        111,
+                        450,
+                        126
+                    ]
+                },
+                {
+                    "text": "Disaster",
+                    "box": [
+                        457,
+                        111,
+                        510,
+                        124
+                    ]
+                },
+                {
+                    "text": "Check",
+                    "box": [
+                        519,
+                        111,
+                        553,
+                        124
+                    ]
+                },
+                {
+                    "text": "Study",
+                    "box": [
+                        559,
+                        111,
+                        594,
+                        126
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "5546/ 1979",
+            "box": [
+                671,
+                109,
+                734,
+                127
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "5546/",
+                    "box": [
+                        671,
+                        109,
+                        704,
+                        127
+                    ]
+                },
+                {
+                    "text": "1979",
+                    "box": [
+                        706,
+                        109,
+                        734,
+                        124
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "Research Design (N, Cells, Elegibility, Design, Key Danner Breaks, Methodololy, Cities)",
+            "box": [
+                104,
+                152,
+                711,
+                172
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        104,
+                        160,
+                        160,
+                        172
+                    ]
+                },
+                {
+                    "text": "Design",
+                    "box": [
+                        166,
+                        153,
+                        208,
+                        170
+                    ]
+                },
+                {
+                    "text": "(N,",
+                    "box": [
+                        217,
+                        155,
+                        238,
+                        169
+                    ]
+                },
+                {
+                    "text": "Cells,",
+                    "box": [
+                        244,
+                        153,
+                        286,
+                        170
+                    ]
+                },
+                {
+                    "text": "Elegibility,",
+                    "box": [
+                        293,
+                        154,
+                        377,
+                        172
+                    ]
+                },
+                {
+                    "text": "Design,",
+                    "box": [
+                        384,
+                        153,
+                        436,
+                        170
+                    ]
+                },
+                {
+                    "text": "Key",
+                    "box": [
+                        442,
+                        155,
+                        465,
+                        168
+                    ]
+                },
+                {
+                    "text": "Danner",
+                    "box": [
+                        470,
+                        152,
+                        509,
+                        169
+                    ]
+                },
+                {
+                    "text": "Breaks,",
+                    "box": [
+                        518,
+                        155,
+                        570,
+                        166
+                    ]
+                },
+                {
+                    "text": "Methodololy,",
+                    "box": [
+                        573,
+                        153,
+                        658,
+                        166
+                    ]
+                },
+                {
+                    "text": "Cities)",
+                    "box": [
+                        664,
+                        152,
+                        711,
+                        166
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "Contact respondents from Buffalo and Kansas City who had previously participated in a steak knife offer This will consist of one cell of approximately 175 respondents who are Triumph most often smokers /triers This study is intended to provide us with any negatives associated with Triumph Banner points will include Triumph most often smokers (we anticipate approximately 25 most of ten people Switchers away from Triumph (N approximately 45). It should be noted that an action standard of at least 50% be obtained in acting upon any product negatives associated with these groups see research limitations below for additional action standard.",
+            "box": [
+                106,
+                207,
+                720,
+                320
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Contact",
+                    "box": [
+                        145,
+                        210,
+                        193,
+                        221
+                    ]
+                },
+                {
+                    "text": "respondents",
+                    "box": [
+                        202,
+                        209,
+                        280,
+                        219
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        285,
+                        208,
+                        317,
+                        220
+                    ]
+                },
+                {
+                    "text": "Buffalo",
+                    "box": [
+                        320,
+                        209,
+                        371,
+                        221
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        378,
+                        209,
+                        400,
+                        219
+                    ]
+                },
+                {
+                    "text": "Kansas",
+                    "box": [
+                        405,
+                        207,
+                        447,
+                        221
+                    ]
+                },
+                {
+                    "text": "City",
+                    "box": [
+                        452,
+                        207,
+                        483,
+                        221
+                    ]
+                },
+                {
+                    "text": "who",
+                    "box": [
+                        488,
+                        208,
+                        510,
+                        219
+                    ]
+                },
+                {
+                    "text": "had",
+                    "box": [
+                        518,
+                        207,
+                        540,
+                        219
+                    ]
+                },
+                {
+                    "text": "previously",
+                    "box": [
+                        544,
+                        210,
+                        616,
+                        220
+                    ]
+                },
+                {
+                    "text": "participated",
+                    "box": [
+                        622,
+                        208,
+                        705,
+                        220
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        110,
+                        225,
+                        128,
+                        235
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        129,
+                        226,
+                        141,
+                        235
+                    ]
+                },
+                {
+                    "text": "steak",
+                    "box": [
+                        143,
+                        222,
+                        183,
+                        233
+                    ]
+                },
+                {
+                    "text": "knife",
+                    "box": [
+                        188,
+                        222,
+                        224,
+                        232
+                    ]
+                },
+                {
+                    "text": "offer",
+                    "box": [
+                        230,
+                        220,
+                        273,
+                        232
+                    ]
+                },
+                {
+                    "text": "This",
+                    "box": [
+                        285,
+                        221,
+                        316,
+                        233
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        322,
+                        221,
+                        353,
+                        234
+                    ]
+                },
+                {
+                    "text": "consist",
+                    "box": [
+                        357,
+                        225,
+                        408,
+                        234
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        414,
+                        224,
+                        428,
+                        235
+                    ]
+                },
+                {
+                    "text": "one",
+                    "box": [
+                        435,
+                        222,
+                        454,
+                        233
+                    ]
+                },
+                {
+                    "text": "cell",
+                    "box": [
+                        463,
+                        222,
+                        489,
+                        236
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        496,
+                        222,
+                        511,
+                        233
+                    ]
+                },
+                {
+                    "text": "approximately",
+                    "box": [
+                        520,
+                        224,
+                        608,
+                        234
+                    ]
+                },
+                {
+                    "text": "175",
+                    "box": [
+                        616,
+                        224,
+                        637,
+                        232
+                    ]
+                },
+                {
+                    "text": "respondents",
+                    "box": [
+                        644,
+                        222,
+                        718,
+                        233
+                    ]
+                },
+                {
+                    "text": "who",
+                    "box": [
+                        110,
+                        238,
+                        132,
+                        249
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        138,
+                        239,
+                        163,
+                        248
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        167,
+                        239,
+                        218,
+                        248
+                    ]
+                },
+                {
+                    "text": "most",
+                    "box": [
+                        222,
+                        238,
+                        250,
+                        249
+                    ]
+                },
+                {
+                    "text": "often",
+                    "box": [
+                        257,
+                        237,
+                        293,
+                        247
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        300,
+                        236,
+                        355,
+                        249
+                    ]
+                },
+                {
+                    "text": "/triers",
+                    "box": [
+                        358,
+                        239,
+                        404,
+                        249
+                    ]
+                },
+                {
+                    "text": "This",
+                    "box": [
+                        420,
+                        236,
+                        448,
+                        247
+                    ]
+                },
+                {
+                    "text": "study",
+                    "box": [
+                        455,
+                        238,
+                        487,
+                        248
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        497,
+                        237,
+                        511,
+                        248
+                    ]
+                },
+                {
+                    "text": "intended",
+                    "box": [
+                        519,
+                        239,
+                        573,
+                        247
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        578,
+                        237,
+                        593,
+                        249
+                    ]
+                },
+                {
+                    "text": "provide",
+                    "box": [
+                        599,
+                        238,
+                        649,
+                        248
+                    ]
+                },
+                {
+                    "text": "us",
+                    "box": [
+                        654,
+                        237,
+                        672,
+                        247
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        676,
+                        237,
+                        705,
+                        247
+                    ]
+                },
+                {
+                    "text": "any",
+                    "box": [
+                        112,
+                        252,
+                        134,
+                        264
+                    ]
+                },
+                {
+                    "text": "negatives",
+                    "box": [
+                        137,
+                        251,
+                        203,
+                        262
+                    ]
+                },
+                {
+                    "text": "associated",
+                    "box": [
+                        209,
+                        253,
+                        279,
+                        261
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        285,
+                        251,
+                        315,
+                        262
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        319,
+                        251,
+                        376,
+                        262
+                    ]
+                },
+                {
+                    "text": "Banner",
+                    "box": [
+                        392,
+                        251,
+                        434,
+                        261
+                    ]
+                },
+                {
+                    "text": "points",
+                    "box": [
+                        438,
+                        251,
+                        481,
+                        264
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        486,
+                        251,
+                        518,
+                        263
+                    ]
+                },
+                {
+                    "text": "include",
+                    "box": [
+                        524,
+                        251,
+                        575,
+                        262
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        577,
+                        249,
+                        631,
+                        261
+                    ]
+                },
+                {
+                    "text": "most",
+                    "box": [
+                        632,
+                        250,
+                        667,
+                        261
+                    ]
+                },
+                {
+                    "text": "often",
+                    "box": [
+                        669,
+                        250,
+                        703,
+                        261
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        106,
+                        264,
+                        159,
+                        277
+                    ]
+                },
+                {
+                    "text": "(we",
+                    "box": [
+                        167,
+                        265,
+                        188,
+                        275
+                    ]
+                },
+                {
+                    "text": "anticipate",
+                    "box": [
+                        194,
+                        265,
+                        264,
+                        275
+                    ]
+                },
+                {
+                    "text": "approximately",
+                    "box": [
+                        273,
+                        265,
+                        362,
+                        278
+                    ]
+                },
+                {
+                    "text": "25",
+                    "box": [
+                        370,
+                        264,
+                        388,
+                        276
+                    ]
+                },
+                {
+                    "text": "most",
+                    "box": [
+                        390,
+                        265,
+                        418,
+                        274
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        425,
+                        265,
+                        438,
+                        275
+                    ]
+                },
+                {
+                    "text": "ten",
+                    "box": [
+                        443,
+                        265,
+                        462,
+                        276
+                    ]
+                },
+                {
+                    "text": "people",
+                    "box": [
+                        469,
+                        267,
+                        523,
+                        277
+                    ]
+                },
+                {
+                    "text": "Switchers",
+                    "box": [
+                        530,
+                        267,
+                        594,
+                        278
+                    ]
+                },
+                {
+                    "text": "away",
+                    "box": [
+                        599,
+                        267,
+                        630,
+                        275
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        637,
+                        263,
+                        667,
+                        274
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        672,
+                        262,
+                        720,
+                        277
+                    ]
+                },
+                {
+                    "text": "(N",
+                    "box": [
+                        110,
+                        279,
+                        132,
+                        291
+                    ]
+                },
+                {
+                    "text": "approximately",
+                    "box": [
+                        131,
+                        281,
+                        224,
+                        291
+                    ]
+                },
+                {
+                    "text": "45).",
+                    "box": [
+                        229,
+                        276,
+                        258,
+                        290
+                    ]
+                },
+                {
+                    "text": "It",
+                    "box": [
+                        270,
+                        279,
+                        289,
+                        290
+                    ]
+                },
+                {
+                    "text": "should",
+                    "box": [
+                        294,
+                        278,
+                        335,
+                        291
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        341,
+                        279,
+                        355,
+                        291
+                    ]
+                },
+                {
+                    "text": "noted",
+                    "box": [
+                        363,
+                        279,
+                        400,
+                        291
+                    ]
+                },
+                {
+                    "text": "that",
+                    "box": [
+                        403,
+                        279,
+                        435,
+                        291
+                    ]
+                },
+                {
+                    "text": "an",
+                    "box": [
+                        441,
+                        279,
+                        456,
+                        291
+                    ]
+                },
+                {
+                    "text": "action",
+                    "box": [
+                        461,
+                        281,
+                        503,
+                        291
+                    ]
+                },
+                {
+                    "text": "standard",
+                    "box": [
+                        510,
+                        278,
+                        567,
+                        291
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        574,
+                        279,
+                        588,
+                        289
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        593,
+                        280,
+                        606,
+                        291
+                    ]
+                },
+                {
+                    "text": "least",
+                    "box": [
+                        615,
+                        276,
+                        650,
+                        287
+                    ]
+                },
+                {
+                    "text": "50%",
+                    "box": [
+                        656,
+                        278,
+                        677,
+                        290
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        684,
+                        279,
+                        698,
+                        291
+                    ]
+                },
+                {
+                    "text": "obtained",
+                    "box": [
+                        111,
+                        291,
+                        168,
+                        305
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        173,
+                        294,
+                        191,
+                        305
+                    ]
+                },
+                {
+                    "text": "acting",
+                    "box": [
+                        197,
+                        292,
+                        239,
+                        304
+                    ]
+                },
+                {
+                    "text": "upon",
+                    "box": [
+                        246,
+                        291,
+                        276,
+                        304
+                    ]
+                },
+                {
+                    "text": "any",
+                    "box": [
+                        279,
+                        293,
+                        300,
+                        304
+                    ]
+                },
+                {
+                    "text": "product",
+                    "box": [
+                        308,
+                        294,
+                        354,
+                        305
+                    ]
+                },
+                {
+                    "text": "negatives",
+                    "box": [
+                        361,
+                        294,
+                        428,
+                        305
+                    ]
+                },
+                {
+                    "text": "associated",
+                    "box": [
+                        433,
+                        293,
+                        503,
+                        305
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        510,
+                        292,
+                        540,
+                        304
+                    ]
+                },
+                {
+                    "text": "these",
+                    "box": [
+                        545,
+                        293,
+                        580,
+                        305
+                    ]
+                },
+                {
+                    "text": "groups",
+                    "box": [
+                        586,
+                        292,
+                        643,
+                        304
+                    ]
+                },
+                {
+                    "text": "see",
+                    "box": [
+                        641,
+                        294,
+                        666,
+                        303
+                    ]
+                },
+                {
+                    "text": "research",
+                    "box": [
+                        108,
+                        308,
+                        170,
+                        317
+                    ]
+                },
+                {
+                    "text": "limitations",
+                    "box": [
+                        173,
+                        307,
+                        252,
+                        320
+                    ]
+                },
+                {
+                    "text": "below",
+                    "box": [
+                        257,
+                        306,
+                        296,
+                        318
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        298,
+                        307,
+                        321,
+                        317
+                    ]
+                },
+                {
+                    "text": "additional",
+                    "box": [
+                        328,
+                        307,
+                        400,
+                        318
+                    ]
+                },
+                {
+                    "text": "action",
+                    "box": [
+                        407,
+                        307,
+                        447,
+                        319
+                    ]
+                },
+                {
+                    "text": "standard.",
+                    "box": [
+                        454,
+                        306,
+                        516,
+                        317
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "(See attached memo",
+            "box": [
+                363,
+                345,
+                496,
+                361
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(See",
+                    "box": [
+                        363,
+                        345,
+                        392,
+                        360
+                    ]
+                },
+                {
+                    "text": "attached",
+                    "box": [
+                        399,
+                        348,
+                        457,
+                        361
+                    ]
+                },
+                {
+                    "text": "memo",
+                    "box": [
+                        461,
+                        348,
+                        496,
+                        360
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "Key Criteria for Analysis",
+            "box": [
+                101,
+                441,
+                282,
+                454
+            ],
+            "linking": [
+                [
+                    32,
+                    33
+                ],
+                [
+                    32,
+                    34
+                ],
+                [
+                    32,
+                    35
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Key",
+                    "box": [
+                        101,
+                        441,
+                        127,
+                        454
+                    ]
+                },
+                {
+                    "text": "Criteria",
+                    "box": [
+                        130,
+                        441,
+                        189,
+                        453
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        196,
+                        441,
+                        216,
+                        453
+                    ]
+                },
+                {
+                    "text": "Analysis",
+                    "box": [
+                        221,
+                        441,
+                        282,
+                        453
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "-Triumph switchers asked why no longer smoking Triumph",
+            "box": [
+                150,
+                458,
+                539,
+                476
+            ],
+            "linking": [
+                [
+                    32,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "-Triumph",
+                    "box": [
+                        150,
+                        458,
+                        217,
+                        473
+                    ]
+                },
+                {
+                    "text": "switchers",
+                    "box": [
+                        222,
+                        463,
+                        285,
+                        474
+                    ]
+                },
+                {
+                    "text": "asked",
+                    "box": [
+                        294,
+                        461,
+                        328,
+                        473
+                    ]
+                },
+                {
+                    "text": "why",
+                    "box": [
+                        335,
+                        461,
+                        356,
+                        473
+                    ]
+                },
+                {
+                    "text": "no",
+                    "box": [
+                        365,
+                        465,
+                        378,
+                        474
+                    ]
+                },
+                {
+                    "text": "longer",
+                    "box": [
+                        384,
+                        459,
+                        426,
+                        476
+                    ]
+                },
+                {
+                    "text": "smoking",
+                    "box": [
+                        434,
+                        463,
+                        481,
+                        476
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        489,
+                        463,
+                        539,
+                        476
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "-Present smokers of Triumph asked reasons for switching to Triumph",
+            "box": [
+                153,
+                476,
+                618,
+                491
+            ],
+            "linking": [
+                [
+                    32,
+                    34
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "-Present",
+                    "box": [
+                        153,
+                        477,
+                        218,
+                        487
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        221,
+                        476,
+                        274,
+                        487
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        279,
+                        476,
+                        294,
+                        486
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        301,
+                        476,
+                        351,
+                        488
+                    ]
+                },
+                {
+                    "text": "asked",
+                    "box": [
+                        356,
+                        476,
+                        392,
+                        488
+                    ]
+                },
+                {
+                    "text": "reasons",
+                    "box": [
+                        400,
+                        479,
+                        447,
+                        489
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        454,
+                        477,
+                        475,
+                        491
+                    ]
+                },
+                {
+                    "text": "switching",
+                    "box": [
+                        483,
+                        477,
+                        545,
+                        491
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        552,
+                        479,
+                        566,
+                        491
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        573,
+                        479,
+                        618,
+                        491
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "-Mentions of \"harshness\"",
+            "box": [
+                154,
+                486,
+                336,
+                501
+            ],
+            "linking": [
+                [
+                    32,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "-Mentions",
+                    "box": [
+                        154,
+                        491,
+                        224,
+                        501
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        238,
+                        488,
+                        252,
+                        499
+                    ]
+                },
+                {
+                    "text": "\"harshness\"",
+                    "box": [
+                        258,
+                        486,
+                        336,
+                        501
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "Research Limitations",
+            "box": [
+                102,
+                513,
+                243,
+                531
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ],
+                [
+                    36,
+                    38
+                ],
+                [
+                    36,
+                    39
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        102,
+                        517,
+                        158,
+                        528
+                    ]
+                },
+                {
+                    "text": "Limitations",
+                    "box": [
+                        165,
+                        513,
+                        243,
+                        531
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "Due to sample size and experience we feel 25 respondents will presently be Triumph smokers. An action standard of 75% should be utilized for judgments on product negatives only among this group",
+            "box": [
+                104,
+                531,
+                725,
+                573
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Due",
+                    "box": [
+                        138,
+                        531,
+                        163,
+                        542
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        167,
+                        533,
+                        181,
+                        542
+                    ]
+                },
+                {
+                    "text": "sample",
+                    "box": [
+                        187,
+                        533,
+                        229,
+                        542
+                    ]
+                },
+                {
+                    "text": "size",
+                    "box": [
+                        235,
+                        532,
+                        264,
+                        543
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        272,
+                        532,
+                        294,
+                        543
+                    ]
+                },
+                {
+                    "text": "experience",
+                    "box": [
+                        300,
+                        532,
+                        370,
+                        545
+                    ]
+                },
+                {
+                    "text": "we",
+                    "box": [
+                        374,
+                        531,
+                        387,
+                        543
+                    ]
+                },
+                {
+                    "text": "feel",
+                    "box": [
+                        398,
+                        532,
+                        427,
+                        545
+                    ]
+                },
+                {
+                    "text": "25",
+                    "box": [
+                        432,
+                        531,
+                        445,
+                        545
+                    ]
+                },
+                {
+                    "text": "respondents",
+                    "box": [
+                        455,
+                        533,
+                        530,
+                        545
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        537,
+                        533,
+                        560,
+                        543
+                    ]
+                },
+                {
+                    "text": "presently",
+                    "box": [
+                        573,
+                        534,
+                        637,
+                        547
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        643,
+                        533,
+                        654,
+                        548
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        664,
+                        531,
+                        711,
+                        545
+                    ]
+                },
+                {
+                    "text": "smokers.",
+                    "box": [
+                        104,
+                        544,
+                        159,
+                        555
+                    ]
+                },
+                {
+                    "text": "An",
+                    "box": [
+                        172,
+                        546,
+                        191,
+                        557
+                    ]
+                },
+                {
+                    "text": "action",
+                    "box": [
+                        192,
+                        546,
+                        236,
+                        558
+                    ]
+                },
+                {
+                    "text": "standard",
+                    "box": [
+                        239,
+                        545,
+                        302,
+                        558
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        304,
+                        547,
+                        322,
+                        556
+                    ]
+                },
+                {
+                    "text": "75%",
+                    "box": [
+                        324,
+                        546,
+                        350,
+                        559
+                    ]
+                },
+                {
+                    "text": "should",
+                    "box": [
+                        355,
+                        546,
+                        400,
+                        559
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        404,
+                        547,
+                        418,
+                        558
+                    ]
+                },
+                {
+                    "text": "utilized",
+                    "box": [
+                        422,
+                        547,
+                        480,
+                        559
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        487,
+                        547,
+                        510,
+                        558
+                    ]
+                },
+                {
+                    "text": "judgments",
+                    "box": [
+                        518,
+                        550,
+                        581,
+                        560
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        586,
+                        552,
+                        600,
+                        561
+                    ]
+                },
+                {
+                    "text": "product",
+                    "box": [
+                        606,
+                        550,
+                        658,
+                        561
+                    ]
+                },
+                {
+                    "text": "negatives",
+                    "box": [
+                        662,
+                        548,
+                        725,
+                        561
+                    ]
+                },
+                {
+                    "text": "only",
+                    "box": [
+                        104,
+                        559,
+                        134,
+                        569
+                    ]
+                },
+                {
+                    "text": "among",
+                    "box": [
+                        138,
+                        558,
+                        177,
+                        568
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        182,
+                        559,
+                        210,
+                        568
+                    ]
+                },
+                {
+                    "text": "group",
+                    "box": [
+                        215,
+                        561,
+                        260,
+                        573
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "If 75% of Triumph smokers mention harshness we could consider it a 50- 75% problem If of Triumph smokers mention \"harshness\" we could it a look consider possible problem at other areas).",
+            "box": [
+                100,
+                572,
+                704,
+                613
+            ],
+            "linking": [
+                [
+                    36,
+                    38
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "If",
+                    "box": [
+                        137,
+                        572,
+                        155,
+                        583
+                    ]
+                },
+                {
+                    "text": "75%",
+                    "box": [
+                        159,
+                        572,
+                        180,
+                        582
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        186,
+                        572,
+                        201,
+                        585
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        207,
+                        572,
+                        258,
+                        585
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        264,
+                        573,
+                        311,
+                        586
+                    ]
+                },
+                {
+                    "text": "mention",
+                    "box": [
+                        324,
+                        574,
+                        371,
+                        586
+                    ]
+                },
+                {
+                    "text": "harshness",
+                    "box": [
+                        374,
+                        572,
+                        454,
+                        585
+                    ]
+                },
+                {
+                    "text": "we",
+                    "box": [
+                        460,
+                        577,
+                        473,
+                        585
+                    ]
+                },
+                {
+                    "text": "could",
+                    "box": [
+                        480,
+                        576,
+                        519,
+                        585
+                    ]
+                },
+                {
+                    "text": "consider",
+                    "box": [
+                        522,
+                        575,
+                        581,
+                        586
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        586,
+                        575,
+                        599,
+                        586
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        607,
+                        578,
+                        617,
+                        587
+                    ]
+                },
+                {
+                    "text": "50-",
+                    "box": [
+                        100,
+                        584,
+                        122,
+                        596
+                    ]
+                },
+                {
+                    "text": "75%",
+                    "box": [
+                        124,
+                        581,
+                        147,
+                        594
+                    ]
+                },
+                {
+                    "text": "problem",
+                    "box": [
+                        616,
+                        572,
+                        671,
+                        589
+                    ]
+                },
+                {
+                    "text": "If",
+                    "box": [
+                        692,
+                        576,
+                        704,
+                        588
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        152,
+                        587,
+                        167,
+                        598
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        172,
+                        586,
+                        223,
+                        598
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        228,
+                        587,
+                        279,
+                        599
+                    ]
+                },
+                {
+                    "text": "mention",
+                    "box": [
+                        283,
+                        589,
+                        336,
+                        598
+                    ]
+                },
+                {
+                    "text": "\"harshness\"",
+                    "box": [
+                        341,
+                        588,
+                        420,
+                        599
+                    ]
+                },
+                {
+                    "text": "we",
+                    "box": [
+                        425,
+                        588,
+                        440,
+                        602
+                    ]
+                },
+                {
+                    "text": "could",
+                    "box": [
+                        445,
+                        587,
+                        480,
+                        600
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        551,
+                        590,
+                        566,
+                        601
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        570,
+                        591,
+                        579,
+                        601
+                    ]
+                },
+                {
+                    "text": "look",
+                    "box": [
+                        105,
+                        597,
+                        139,
+                        608
+                    ]
+                },
+                {
+                    "text": "consider",
+                    "box": [
+                        488,
+                        591,
+                        546,
+                        603
+                    ]
+                },
+                {
+                    "text": "possible",
+                    "box": [
+                        586,
+                        590,
+                        641,
+                        603
+                    ]
+                },
+                {
+                    "text": "problem",
+                    "box": [
+                        648,
+                        591,
+                        698,
+                        604
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        144,
+                        599,
+                        159,
+                        609
+                    ]
+                },
+                {
+                    "text": "other",
+                    "box": [
+                        163,
+                        599,
+                        200,
+                        610
+                    ]
+                },
+                {
+                    "text": "areas).",
+                    "box": [
+                        206,
+                        599,
+                        256,
+                        613
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "If below 50% of Triumph smokers mention \"harshness\" we could consider it at a problem",
+            "box": [
+                139,
+                610,
+                744,
+                628
+            ],
+            "linking": [
+                [
+                    36,
+                    39
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "If",
+                    "box": [
+                        139,
+                        613,
+                        154,
+                        625
+                    ]
+                },
+                {
+                    "text": "below",
+                    "box": [
+                        159,
+                        613,
+                        196,
+                        625
+                    ]
+                },
+                {
+                    "text": "50%",
+                    "box": [
+                        202,
+                        613,
+                        224,
+                        625
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        229,
+                        615,
+                        246,
+                        624
+                    ]
+                },
+                {
+                    "text": "Triumph",
+                    "box": [
+                        249,
+                        616,
+                        299,
+                        628
+                    ]
+                },
+                {
+                    "text": "smokers",
+                    "box": [
+                        306,
+                        616,
+                        359,
+                        625
+                    ]
+                },
+                {
+                    "text": "mention",
+                    "box": [
+                        362,
+                        616,
+                        414,
+                        624
+                    ]
+                },
+                {
+                    "text": "\"harshness\"",
+                    "box": [
+                        422,
+                        611,
+                        497,
+                        624
+                    ]
+                },
+                {
+                    "text": "we",
+                    "box": [
+                        502,
+                        615,
+                        517,
+                        624
+                    ]
+                },
+                {
+                    "text": "could",
+                    "box": [
+                        524,
+                        612,
+                        560,
+                        624
+                    ]
+                },
+                {
+                    "text": "consider",
+                    "box": [
+                        566,
+                        612,
+                        620,
+                        620
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        628,
+                        610,
+                        642,
+                        622
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        651,
+                        611,
+                        668,
+                        623
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        678,
+                        611,
+                        687,
+                        623
+                    ]
+                },
+                {
+                    "text": "problem",
+                    "box": [
+                        692,
+                        611,
+                        744,
+                        623
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "Research Firm",
+            "box": [
+                470,
+                637,
+                559,
+                652
+            ],
+            "linking": [
+                [
+                    40,
+                    44
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        470,
+                        640,
+                        526,
+                        652
+                    ]
+                },
+                {
+                    "text": "Firm",
+                    "box": [
+                        533,
+                        637,
+                        559,
+                        651
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "Lenght Int",
+            "box": [
+                471,
+                696,
+                542,
+                708
+            ],
+            "linking": [
+                [
+                    41,
+                    45
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Lenght",
+                    "box": [
+                        471,
+                        697,
+                        510,
+                        708
+                    ]
+                },
+                {
+                    "text": "Int",
+                    "box": [
+                        520,
+                        696,
+                        542,
+                        707
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "# Open ",
+            "box": [
+                469,
+                724,
+                551,
+                737
+            ],
+            "linking": [
+                [
+                    42,
+                    12
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "#",
+                    "box": [
+                        469,
+                        725,
+                        478,
+                        736
+                    ]
+                },
+                {
+                    "text": "Open",
+                    "box": [
+                        485,
+                        725,
+                        516,
+                        737
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        520,
+                        724,
+                        551,
+                        735
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "# Reports",
+            "box": [
+                469,
+                752,
+                533,
+                766
+            ],
+            "linking": [
+                [
+                    43,
+                    13
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "#",
+                    "box": [
+                        469,
+                        752,
+                        477,
+                        763
+                    ]
+                },
+                {
+                    "text": "Reports",
+                    "box": [
+                        486,
+                        753,
+                        533,
+                        766
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "The Data Group. Inc",
+            "box": [
+                588,
+                637,
+                719,
+                654
+            ],
+            "linking": [
+                [
+                    40,
+                    44
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        588,
+                        637,
+                        609,
+                        651
+                    ]
+                },
+                {
+                    "text": "Data",
+                    "box": [
+                        615,
+                        640,
+                        643,
+                        652
+                    ]
+                },
+                {
+                    "text": "Group.",
+                    "box": [
+                        650,
+                        638,
+                        690,
+                        653
+                    ]
+                },
+                {
+                    "text": "Inc",
+                    "box": [
+                        699,
+                        639,
+                        719,
+                        654
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "10 minutes",
+            "box": [
+                608,
+                695,
+                680,
+                708
+            ],
+            "linking": [
+                [
+                    41,
+                    45
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "10",
+                    "box": [
+                        608,
+                        696,
+                        623,
+                        708
+                    ]
+                },
+                {
+                    "text": "minutes",
+                    "box": [
+                        628,
+                        695,
+                        680,
+                        707
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "2 wks from start of fid.",
+            "box": [
+                588,
+                778,
+                754,
+                794
+            ],
+            "linking": [
+                [
+                    14,
+                    46
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "2",
+                    "box": [
+                        588,
+                        779,
+                        596,
+                        794
+                    ]
+                },
+                {
+                    "text": "wks",
+                    "box": [
+                        601,
+                        780,
+                        623,
+                        793
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        631,
+                        780,
+                        660,
+                        793
+                    ]
+                },
+                {
+                    "text": "start",
+                    "box": [
+                        665,
+                        780,
+                        699,
+                        794
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        707,
+                        780,
+                        718,
+                        793
+                    ]
+                },
+                {
+                    "text": "fid.",
+                    "box": [
+                        728,
+                        778,
+                        754,
+                        793
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "4 wks from start of fld",
+            "box": [
+                588,
+                824,
+                756,
+                839
+            ],
+            "linking": [
+                [
+                    15,
+                    47
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "4",
+                    "box": [
+                        588,
+                        828,
+                        601,
+                        839
+                    ]
+                },
+                {
+                    "text": "wks",
+                    "box": [
+                        605,
+                        827,
+                        624,
+                        839
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        631,
+                        827,
+                        661,
+                        839
+                    ]
+                },
+                {
+                    "text": "start",
+                    "box": [
+                        665,
+                        824,
+                        701,
+                        839
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        707,
+                        826,
+                        720,
+                        839
+                    ]
+                },
+                {
+                    "text": "fld",
+                    "box": [
+                        728,
+                        824,
+                        756,
+                        837
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "Group Product Manager",
+            "box": [
+                106,
+                855,
+                254,
+                870
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Group",
+                    "box": [
+                        106,
+                        858,
+                        145,
+                        870
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        148,
+                        855,
+                        198,
+                        868
+                    ]
+                },
+                {
+                    "text": "Manager",
+                    "box": [
+                        204,
+                        855,
+                        254,
+                        867
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "Product Manager",
+            "box": [
+                107,
+                812,
+                212,
+                826
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Product",
+                    "box": [
+                        107,
+                        812,
+                        154,
+                        826
+                    ]
+                },
+                {
+                    "text": "Manager",
+                    "box": [
+                        161,
+                        813,
+                        212,
+                        826
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "Prepared by:",
+            "box": [
+                106,
+                696,
+                191,
+                713
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Prepared",
+                    "box": [
+                        106,
+                        699,
+                        163,
+                        709
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        169,
+                        696,
+                        191,
+                        713
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "Cost Estimate + - 10% Contingency Final Report Inc.",
+            "box": [
+                101,
+                641,
+                238,
+                683
+            ],
+            "linking": [
+                [
+                    51,
+                    53
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cost",
+                    "box": [
+                        101,
+                        641,
+                        132,
+                        654
+                    ]
+                },
+                {
+                    "text": "Estimate",
+                    "box": [
+                        138,
+                        643,
+                        199,
+                        652
+                    ]
+                },
+                {
+                    "text": "+",
+                    "box": [
+                        104,
+                        657,
+                        117,
+                        666
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        117,
+                        659,
+                        129,
+                        668
+                    ]
+                },
+                {
+                    "text": "10%",
+                    "box": [
+                        135,
+                        656,
+                        156,
+                        668
+                    ]
+                },
+                {
+                    "text": "Contingency",
+                    "box": [
+                        162,
+                        655,
+                        238,
+                        666
+                    ]
+                },
+                {
+                    "text": "Final",
+                    "box": [
+                        107,
+                        670,
+                        142,
+                        683
+                    ]
+                },
+                {
+                    "text": "Report",
+                    "box": [
+                        148,
+                        671,
+                        192,
+                        682
+                    ]
+                },
+                {
+                    "text": "Inc.",
+                    "box": [
+                        195,
+                        669,
+                        224,
+                        683
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "Scott R. Benson ",
+            "box": [
+                237,
+                686,
+                385,
+                711
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Scott",
+                    "box": [
+                        237,
+                        698,
+                        272,
+                        711
+                    ]
+                },
+                {
+                    "text": "R.",
+                    "box": [
+                        279,
+                        698,
+                        294,
+                        709
+                    ]
+                },
+                {
+                    "text": "Benson",
+                    "box": [
+                        300,
+                        697,
+                        345,
+                        711
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        359,
+                        686,
+                        385,
+                        709
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "$ 2.250",
+            "box": [
+                243,
+                640,
+                290,
+                653
+            ],
+            "linking": [
+                [
+                    51,
+                    53
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$",
+                    "box": [
+                        243,
+                        641,
+                        253,
+                        653
+                    ]
+                },
+                {
+                    "text": "2.250",
+                    "box": [
+                        253,
+                        640,
+                        290,
+                        652
+                    ]
+                }
+            ],
+            "id": 53
+        }
+    ]
+}

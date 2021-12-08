@@ -1,0 +1,1545 @@
+{
+    "form": [
+        {
+            "box": [
+                92,
+                197,
+                162,
+                215
+            ],
+            "text": "AUTHORS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        92,
+                        197,
+                        162,
+                        215
+                    ],
+                    "text": "AUTHORS"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                92,
+                225,
+                137,
+                239
+            ],
+            "text": "TITLE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        92,
+                        225,
+                        137,
+                        239
+                    ],
+                    "text": "TITLE"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    14
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                391,
+                310,
+                535,
+                330
+            ],
+            "text": "RECOMMENDATION:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        391,
+                        310,
+                        535,
+                        330
+                    ],
+                    "text": "RECOMMENDATION:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    5
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                209,
+                169,
+                236,
+                182
+            ],
+            "text": "533",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        209,
+                        169,
+                        236,
+                        182
+                    ],
+                    "text": "533"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                508,
+                172,
+                537,
+                186
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        508,
+                        172,
+                        537,
+                        186
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    12
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                549,
+                310,
+                562,
+                324
+            ],
+            "text": "x",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        549,
+                        310,
+                        562,
+                        324
+                    ],
+                    "text": "x"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                240,
+                339,
+                268,
+                353
+            ],
+            "text": "NOT",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        240,
+                        339,
+                        268,
+                        353
+                    ],
+                    "text": "NOT"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                272,
+                339,
+                340,
+                352
+            ],
+            "text": "APPROVE",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        272,
+                        339,
+                        340,
+                        352
+                    ],
+                    "text": "APPROVE"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                656,
+                742,
+                680,
+                836
+            ],
+            "text": "00070353",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        656,
+                        742,
+                        680,
+                        836
+                    ],
+                    "text": "00070353"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "text": "Manuscript Review Form",
+            "box": [
+                96,
+                67,
+                253,
+                84
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Manuscript",
+                    "box": [
+                        96,
+                        67,
+                        163,
+                        84
+                    ]
+                },
+                {
+                    "text": "Review",
+                    "box": [
+                        169,
+                        68,
+                        212,
+                        83
+                    ]
+                },
+                {
+                    "text": "Form",
+                    "box": [
+                        218,
+                        68,
+                        253,
+                        83
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "TOBACCO SCIENCE",
+            "box": [
+                334,
+                126,
+                458,
+                144
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "TOBACCO",
+                    "box": [
+                        334,
+                        126,
+                        397,
+                        143
+                    ]
+                },
+                {
+                    "text": "SCIENCE",
+                    "box": [
+                        404,
+                        127,
+                        458,
+                        144
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "Registration No",
+            "box": [
+                94,
+                169,
+                191,
+                186
+            ],
+            "linking": [
+                [
+                    11,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Registration",
+                    "box": [
+                        94,
+                        169,
+                        168,
+                        186
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        170,
+                        169,
+                        191,
+                        183
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "March 18, 1968",
+            "box": [
+                543,
+                173,
+                649,
+                188
+            ],
+            "linking": [
+                [
+                    4,
+                    12
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "March",
+                    "box": [
+                        543,
+                        173,
+                        584,
+                        186
+                    ]
+                },
+                {
+                    "text": "18,",
+                    "box": [
+                        589,
+                        173,
+                        611,
+                        188
+                    ]
+                },
+                {
+                    "text": "1968",
+                    "box": [
+                        620,
+                        173,
+                        649,
+                        188
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "Andrew G. Kallianos, Richard K. Means, James D. Mold",
+            "box": [
+                208,
+                197,
+                598,
+                215
+            ],
+            "linking": [
+                [
+                    0,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Andrew",
+                    "box": [
+                        208,
+                        197,
+                        255,
+                        212
+                    ]
+                },
+                {
+                    "text": "G.",
+                    "box": [
+                        260,
+                        198,
+                        277,
+                        211
+                    ]
+                },
+                {
+                    "text": "Kallianos,",
+                    "box": [
+                        282,
+                        197,
+                        357,
+                        214
+                    ]
+                },
+                {
+                    "text": "Richard",
+                    "box": [
+                        365,
+                        198,
+                        419,
+                        212
+                    ]
+                },
+                {
+                    "text": "K.",
+                    "box": [
+                        425,
+                        200,
+                        442,
+                        213
+                    ]
+                },
+                {
+                    "text": "Means,",
+                    "box": [
+                        447,
+                        201,
+                        490,
+                        215
+                    ]
+                },
+                {
+                    "text": "James",
+                    "box": [
+                        500,
+                        201,
+                        539,
+                        214
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        542,
+                        201,
+                        559,
+                        214
+                    ]
+                },
+                {
+                    "text": "Mold",
+                    "box": [
+                        564,
+                        201,
+                        598,
+                        214
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "\"Effect of Nitrates in Tobacco on the Catechol Yield in Cigarette Smoke\"",
+            "box": [
+                209,
+                223,
+                620,
+                270
+            ],
+            "linking": [
+                [
+                    1,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "\"Effect",
+                    "box": [
+                        209,
+                        223,
+                        262,
+                        238
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        268,
+                        223,
+                        285,
+                        238
+                    ]
+                },
+                {
+                    "text": "Nitrates",
+                    "box": [
+                        291,
+                        225,
+                        351,
+                        240
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        358,
+                        225,
+                        376,
+                        239
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        380,
+                        226,
+                        433,
+                        240
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        439,
+                        226,
+                        454,
+                        240
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        461,
+                        226,
+                        485,
+                        240
+                    ]
+                },
+                {
+                    "text": "Catechol",
+                    "box": [
+                        492,
+                        225,
+                        552,
+                        242
+                    ]
+                },
+                {
+                    "text": "Yield",
+                    "box": [
+                        557,
+                        226,
+                        598,
+                        241
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        603,
+                        228,
+                        620,
+                        243
+                    ]
+                },
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        218,
+                        253,
+                        286,
+                        268
+                    ]
+                },
+                {
+                    "text": "Smoke\"",
+                    "box": [
+                        291,
+                        253,
+                        338,
+                        270
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "REVIEW COMPLETED",
+            "box": [
+                92,
+                310,
+                245,
+                324
+            ],
+            "linking": [
+                [
+                    15,
+                    17
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REVIEW",
+                    "box": [
+                        92,
+                        310,
+                        152,
+                        324
+                    ]
+                },
+                {
+                    "text": "COMPLETED",
+                    "box": [
+                        158,
+                        310,
+                        245,
+                        324
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "PRESENT FORM:",
+            "box": [
+                91,
+                338,
+                209,
+                355
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PRESENT",
+                    "box": [
+                        91,
+                        338,
+                        158,
+                        355
+                    ]
+                },
+                {
+                    "text": "FORM:",
+                    "box": [
+                        163,
+                        339,
+                        209,
+                        354
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "3/ 29/ 68",
+            "box": [
+                274,
+                304,
+                339,
+                321
+            ],
+            "linking": [
+                [
+                    15,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "3/",
+                    "box": [
+                        274,
+                        304,
+                        294,
+                        318
+                    ]
+                },
+                {
+                    "text": "29/",
+                    "box": [
+                        293,
+                        306,
+                        321,
+                        321
+                    ]
+                },
+                {
+                    "text": "68",
+                    "box": [
+                        321,
+                        304,
+                        339,
+                        321
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "APPROVE IN ITS",
+            "box": [
+                570,
+                313,
+                686,
+                330
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "APPROVE",
+                    "box": [
+                        570,
+                        313,
+                        637,
+                        330
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        640,
+                        314,
+                        657,
+                        328
+                    ]
+                },
+                {
+                    "text": "ITS",
+                    "box": [
+                        659,
+                        316,
+                        686,
+                        327
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "(Give reasons below):",
+            "box": [
+                345,
+                338,
+                476,
+                357
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "(Give",
+                    "box": [
+                        345,
+                        338,
+                        379,
+                        355
+                    ]
+                },
+                {
+                    "text": "reasons",
+                    "box": [
+                        381,
+                        344,
+                        426,
+                        357
+                    ]
+                },
+                {
+                    "text": "below):",
+                    "box": [
+                        430,
+                        342,
+                        476,
+                        356
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "APPROVE TENTATIVELY",
+            "box": [
+                507,
+                341,
+                683,
+                358
+            ],
+            "linking": [
+                [
+                    19,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "APPROVE",
+                    "box": [
+                        507,
+                        344,
+                        574,
+                        357
+                    ]
+                },
+                {
+                    "text": "TENTATIVELY",
+                    "box": [
+                        577,
+                        341,
+                        683,
+                        358
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "SUBJECT TO THE FOLLOWING SUGGESTED REVISIONS: (itemize below):",
+            "box": [
+                92,
+                365,
+                579,
+                387
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SUBJECT",
+                    "box": [
+                        92,
+                        365,
+                        155,
+                        382
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        158,
+                        365,
+                        179,
+                        382
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        182,
+                        367,
+                        214,
+                        382
+                    ]
+                },
+                {
+                    "text": "FOLLOWING",
+                    "box": [
+                        215,
+                        369,
+                        300,
+                        384
+                    ]
+                },
+                {
+                    "text": "SUGGESTED",
+                    "box": [
+                        302,
+                        367,
+                        390,
+                        387
+                    ]
+                },
+                {
+                    "text": "REVISIONS:",
+                    "box": [
+                        392,
+                        366,
+                        476,
+                        384
+                    ]
+                },
+                {
+                    "text": "(itemize",
+                    "box": [
+                        482,
+                        370,
+                        531,
+                        385
+                    ]
+                },
+                {
+                    "text": "below):",
+                    "box": [
+                        532,
+                        369,
+                        579,
+                        384
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Page 4 - Last line should be Mass spectrometric instead of Mass spectroscopic.",
+            "box": [
+                91,
+                416,
+                616,
+                461
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Page 4",
+                    "box": [
+                        91,
+                        416,
+                        144,
+                        434
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        151,
+                        418,
+                        164,
+                        429
+                    ]
+                },
+                {
+                    "text": "Last",
+                    "box": [
+                        170,
+                        418,
+                        206,
+                        435
+                    ]
+                },
+                {
+                    "text": "line",
+                    "box": [
+                        215,
+                        418,
+                        251,
+                        432
+                    ]
+                },
+                {
+                    "text": "should",
+                    "box": [
+                        258,
+                        419,
+                        312,
+                        433
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        320,
+                        419,
+                        342,
+                        433
+                    ]
+                },
+                {
+                    "text": "Mass",
+                    "box": [
+                        348,
+                        420,
+                        386,
+                        433
+                    ]
+                },
+                {
+                    "text": "spectrometric",
+                    "box": [
+                        392,
+                        422,
+                        515,
+                        435
+                    ]
+                },
+                {
+                    "text": "instead",
+                    "box": [
+                        528,
+                        419,
+                        588,
+                        434
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        596,
+                        419,
+                        616,
+                        436
+                    ]
+                },
+                {
+                    "text": "Mass",
+                    "box": [
+                        170,
+                        443,
+                        206,
+                        460
+                    ]
+                },
+                {
+                    "text": "spectroscopic.",
+                    "box": [
+                        214,
+                        446,
+                        337,
+                        461
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "NOTE- Execute in triplicate using additionall sheets if more space is required. Retain the third copy for your file Return the original (signed) and the first carbon (unsigned) along with the manuscript to this office The unsigned copy and the manuscript will be for returned to the author his consideration.",
+            "box": [
+                88,
+                845,
+                685,
+                901
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "NOTE-",
+                    "box": [
+                        89,
+                        845,
+                        142,
+                        860
+                    ]
+                },
+                {
+                    "text": "Execute",
+                    "box": [
+                        142,
+                        848,
+                        188,
+                        862
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        194,
+                        849,
+                        207,
+                        859
+                    ]
+                },
+                {
+                    "text": "triplicate",
+                    "box": [
+                        212,
+                        846,
+                        265,
+                        861
+                    ]
+                },
+                {
+                    "text": "using",
+                    "box": [
+                        270,
+                        846,
+                        305,
+                        861
+                    ]
+                },
+                {
+                    "text": "additionall",
+                    "box": [
+                        309,
+                        846,
+                        369,
+                        860
+                    ]
+                },
+                {
+                    "text": "sheets",
+                    "box": [
+                        372,
+                        846,
+                        410,
+                        861
+                    ]
+                },
+                {
+                    "text": "if",
+                    "box": [
+                        413,
+                        845,
+                        424,
+                        862
+                    ]
+                },
+                {
+                    "text": "more",
+                    "box": [
+                        430,
+                        849,
+                        458,
+                        862
+                    ]
+                },
+                {
+                    "text": "space",
+                    "box": [
+                        465,
+                        849,
+                        497,
+                        863
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        503,
+                        851,
+                        516,
+                        862
+                    ]
+                },
+                {
+                    "text": "required.",
+                    "box": [
+                        520,
+                        848,
+                        573,
+                        863
+                    ]
+                },
+                {
+                    "text": "Retain",
+                    "box": [
+                        580,
+                        849,
+                        619,
+                        863
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        623,
+                        851,
+                        644,
+                        864
+                    ]
+                },
+                {
+                    "text": "third",
+                    "box": [
+                        651,
+                        851,
+                        685,
+                        864
+                    ]
+                },
+                {
+                    "text": "copy",
+                    "box": [
+                        89,
+                        862,
+                        117,
+                        873
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        122,
+                        862,
+                        142,
+                        873
+                    ]
+                },
+                {
+                    "text": "your",
+                    "box": [
+                        141,
+                        862,
+                        173,
+                        875
+                    ]
+                },
+                {
+                    "text": "file",
+                    "box": [
+                        175,
+                        863,
+                        196,
+                        873
+                    ]
+                },
+                {
+                    "text": "Return",
+                    "box": [
+                        201,
+                        860,
+                        243,
+                        874
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        247,
+                        862,
+                        267,
+                        876
+                    ]
+                },
+                {
+                    "text": "original",
+                    "box": [
+                        270,
+                        862,
+                        319,
+                        873
+                    ]
+                },
+                {
+                    "text": "(signed)",
+                    "box": [
+                        323,
+                        860,
+                        370,
+                        875
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        376,
+                        860,
+                        404,
+                        875
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        408,
+                        863,
+                        428,
+                        877
+                    ]
+                },
+                {
+                    "text": "first",
+                    "box": [
+                        434,
+                        863,
+                        461,
+                        876
+                    ]
+                },
+                {
+                    "text": "carbon",
+                    "box": [
+                        464,
+                        863,
+                        507,
+                        877
+                    ]
+                },
+                {
+                    "text": "(unsigned)",
+                    "box": [
+                        515,
+                        862,
+                        578,
+                        877
+                    ]
+                },
+                {
+                    "text": "along",
+                    "box": [
+                        587,
+                        862,
+                        621,
+                        877
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        627,
+                        863,
+                        654,
+                        877
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        659,
+                        865,
+                        684,
+                        878
+                    ]
+                },
+                {
+                    "text": "manuscript",
+                    "box": [
+                        91,
+                        874,
+                        157,
+                        884
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        162,
+                        876,
+                        176,
+                        887
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        180,
+                        873,
+                        204,
+                        887
+                    ]
+                },
+                {
+                    "text": "office",
+                    "box": [
+                        209,
+                        874,
+                        241,
+                        888
+                    ]
+                },
+                {
+                    "text": "The",
+                    "box": [
+                        249,
+                        877,
+                        274,
+                        890
+                    ]
+                },
+                {
+                    "text": "unsigned",
+                    "box": [
+                        277,
+                        873,
+                        333,
+                        886
+                    ]
+                },
+                {
+                    "text": "copy",
+                    "box": [
+                        338,
+                        877,
+                        366,
+                        888
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        372,
+                        876,
+                        397,
+                        889
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        399,
+                        876,
+                        419,
+                        889
+                    ]
+                },
+                {
+                    "text": "manuscript",
+                    "box": [
+                        420,
+                        877,
+                        490,
+                        888
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        494,
+                        878,
+                        521,
+                        889
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        522,
+                        877,
+                        539,
+                        890
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        88,
+                        885,
+                        109,
+                        896
+                    ]
+                },
+                {
+                    "text": "returned",
+                    "box": [
+                        542,
+                        877,
+                        594,
+                        891
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        598,
+                        878,
+                        613,
+                        891
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        617,
+                        877,
+                        637,
+                        891
+                    ]
+                },
+                {
+                    "text": "author",
+                    "box": [
+                        642,
+                        877,
+                        684,
+                        891
+                    ]
+                },
+                {
+                    "text": "his",
+                    "box": [
+                        113,
+                        885,
+                        133,
+                        898
+                    ]
+                },
+                {
+                    "text": "consideration.",
+                    "box": [
+                        135,
+                        887,
+                        217,
+                        901
+                    ]
+                }
+            ],
+            "id": 23
+        }
+    ]
+}

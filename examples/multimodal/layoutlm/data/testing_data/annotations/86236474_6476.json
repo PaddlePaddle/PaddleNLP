@@ -1,0 +1,1529 @@
+{
+    "form": [
+        {
+            "box": [
+                47,
+                102,
+                74,
+                120
+            ],
+            "text": "TO:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        102,
+                        74,
+                        120
+                    ],
+                    "text": "TO:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    4
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                47,
+                141,
+                96,
+                159
+            ],
+            "text": "FROM:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        47,
+                        141,
+                        96,
+                        159
+                    ],
+                    "text": "FROM:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    5
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                683,
+                800,
+                707,
+                912
+            ],
+            "text": "8623474",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        683,
+                        800,
+                        707,
+                        912
+                    ],
+                    "text": "8623474"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                616,
+                138,
+                638,
+                155
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        616,
+                        138,
+                        638,
+                        155
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "text": "Mrs. K. A. Sparrow",
+            "box": [
+                124,
+                102,
+                244,
+                122
+            ],
+            "linking": [
+                [
+                    0,
+                    4
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Mrs.",
+                    "box": [
+                        124,
+                        102,
+                        158,
+                        116
+                    ]
+                },
+                {
+                    "text": "K.",
+                    "box": [
+                        158,
+                        103,
+                        172,
+                        120
+                    ]
+                },
+                {
+                    "text": "A.",
+                    "box": [
+                        172,
+                        103,
+                        189,
+                        118
+                    ]
+                },
+                {
+                    "text": "Sparrow",
+                    "box": [
+                        190,
+                        102,
+                        244,
+                        122
+                    ]
+                }
+            ],
+            "id": 4
+        },
+        {
+            "text": "R. G. Ryan",
+            "box": [
+                126,
+                138,
+                196,
+                158
+            ],
+            "linking": [
+                [
+                    1,
+                    5
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "R.",
+                    "box": [
+                        126,
+                        138,
+                        141,
+                        155
+                    ]
+                },
+                {
+                    "text": "G.",
+                    "box": [
+                        141,
+                        140,
+                        155,
+                        157
+                    ]
+                },
+                {
+                    "text": "Ryan",
+                    "box": [
+                        158,
+                        138,
+                        196,
+                        158
+                    ]
+                }
+            ],
+            "id": 5
+        },
+        {
+            "text": "JUNE7",
+            "box": [
+                511,
+                140,
+                560,
+                155
+            ],
+            "linking": [
+                [
+                    9,
+                    6
+                ],
+                [
+                    6,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "JUNE7",
+                    "box": [
+                        511,
+                        140,
+                        560,
+                        155
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "AUG.2",
+            "box": [
+                510,
+                156,
+                562,
+                174
+            ],
+            "linking": [
+                [
+                    9,
+                    7
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "AUG.2",
+                    "box": [
+                        510,
+                        156,
+                        562,
+                        174
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "OCT.7",
+            "box": [
+                511,
+                175,
+                561,
+                192
+            ],
+            "linking": [
+                [
+                    9,
+                    8
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "OCT.7",
+                    "box": [
+                        511,
+                        175,
+                        561,
+                        192
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "SUBMISSION DATE:",
+            "box": [
+                518,
+                101,
+                655,
+                121
+            ],
+            "linking": [
+                [
+                    9,
+                    6
+                ],
+                [
+                    9,
+                    7
+                ],
+                [
+                    9,
+                    8
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "SUBMISSION",
+                    "box": [
+                        518,
+                        101,
+                        609,
+                        121
+                    ]
+                },
+                {
+                    "text": "DATE:",
+                    "box": [
+                        613,
+                        101,
+                        655,
+                        121
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "NEWPORT LIGHTS HEAVY UP PROGRESS REPORT",
+            "box": [
+                169,
+                211,
+                545,
+                234
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "NEWPORT",
+                    "box": [
+                        169,
+                        212,
+                        249,
+                        232
+                    ]
+                },
+                {
+                    "text": "LIGHTS",
+                    "box": [
+                        250,
+                        214,
+                        306,
+                        234
+                    ]
+                },
+                {
+                    "text": "HEAVY",
+                    "box": [
+                        310,
+                        214,
+                        362,
+                        232
+                    ]
+                },
+                {
+                    "text": "UP",
+                    "box": [
+                        365,
+                        214,
+                        387,
+                        231
+                    ]
+                },
+                {
+                    "text": "PROGRESS",
+                    "box": [
+                        391,
+                        212,
+                        473,
+                        230
+                    ]
+                },
+                {
+                    "text": "REPORT",
+                    "box": [
+                        478,
+                        211,
+                        545,
+                        229
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "EFFECTIVENESS OF DISTRIBUTION ALLOWANCE:",
+            "box": [
+                46,
+                267,
+                416,
+                289
+            ],
+            "linking": [
+                [
+                    11,
+                    12
+                ],
+                [
+                    11,
+                    14
+                ],
+                [
+                    11,
+                    16
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "EFFECTIVENESS",
+                    "box": [
+                        46,
+                        268,
+                        174,
+                        289
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        179,
+                        268,
+                        200,
+                        288
+                    ]
+                },
+                {
+                    "text": "DISTRIBUTION",
+                    "box": [
+                        204,
+                        268,
+                        313,
+                        286
+                    ]
+                },
+                {
+                    "text": "ALLOWANCE:",
+                    "box": [
+                        317,
+                        267,
+                        416,
+                        285
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "DIRECT ACCOUNT/ WHOLESALERS:",
+            "box": [
+                45,
+                307,
+                287,
+                327
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ],
+                [
+                    11,
+                    12
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DIRECT",
+                    "box": [
+                        45,
+                        307,
+                        99,
+                        327
+                    ]
+                },
+                {
+                    "text": "ACCOUNT/",
+                    "box": [
+                        103,
+                        307,
+                        177,
+                        325
+                    ]
+                },
+                {
+                    "text": "WHOLESALERS:",
+                    "box": [
+                        177,
+                        307,
+                        287,
+                        325
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "Distribution allowance was very effective in accomplishing our objectives. All accounts have purchased introductory products.",
+            "box": [
+                49,
+                327,
+                599,
+                364
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Distribution",
+                    "box": [
+                        49,
+                        330,
+                        123,
+                        345
+                    ]
+                },
+                {
+                    "text": "allowance",
+                    "box": [
+                        126,
+                        330,
+                        189,
+                        343
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        193,
+                        331,
+                        220,
+                        345
+                    ]
+                },
+                {
+                    "text": "very",
+                    "box": [
+                        223,
+                        330,
+                        250,
+                        345
+                    ]
+                },
+                {
+                    "text": "effective",
+                    "box": [
+                        253,
+                        330,
+                        305,
+                        347
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        309,
+                        328,
+                        320,
+                        343
+                    ]
+                },
+                {
+                    "text": "accomplishing",
+                    "box": [
+                        323,
+                        330,
+                        418,
+                        345
+                    ]
+                },
+                {
+                    "text": "our",
+                    "box": [
+                        420,
+                        328,
+                        441,
+                        343
+                    ]
+                },
+                {
+                    "text": "objectives.",
+                    "box": [
+                        444,
+                        328,
+                        514,
+                        343
+                    ]
+                },
+                {
+                    "text": "All",
+                    "box": [
+                        518,
+                        327,
+                        536,
+                        344
+                    ]
+                },
+                {
+                    "text": "accounts",
+                    "box": [
+                        539,
+                        327,
+                        599,
+                        344
+                    ]
+                },
+                {
+                    "text": "have",
+                    "box": [
+                        49,
+                        348,
+                        80,
+                        362
+                    ]
+                },
+                {
+                    "text": "purchased",
+                    "box": [
+                        84,
+                        349,
+                        152,
+                        364
+                    ]
+                },
+                {
+                    "text": "introductory",
+                    "box": [
+                        155,
+                        349,
+                        233,
+                        364
+                    ]
+                },
+                {
+                    "text": "products.",
+                    "box": [
+                        236,
+                        349,
+                        297,
+                        364
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "DIRECT ACCOUNT CHAINS:",
+            "box": [
+                47,
+                437,
+                236,
+                454
+            ],
+            "linking": [
+                [
+                    14,
+                    15
+                ],
+                [
+                    11,
+                    14
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DIRECT",
+                    "box": [
+                        47,
+                        437,
+                        101,
+                        454
+                    ]
+                },
+                {
+                    "text": "ACCOUNT",
+                    "box": [
+                        99,
+                        437,
+                        174,
+                        454
+                    ]
+                },
+                {
+                    "text": "CHAINS:",
+                    "box": [
+                        176,
+                        437,
+                        236,
+                        452
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "Eagle Foods is the only Void.",
+            "box": [
+                47,
+                457,
+                235,
+                477
+            ],
+            "linking": [
+                [
+                    14,
+                    15
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Eagle",
+                    "box": [
+                        47,
+                        457,
+                        85,
+                        477
+                    ]
+                },
+                {
+                    "text": "Foods",
+                    "box": [
+                        88,
+                        458,
+                        130,
+                        473
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        134,
+                        459,
+                        145,
+                        473
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        148,
+                        458,
+                        168,
+                        473
+                    ]
+                },
+                {
+                    "text": "only",
+                    "box": [
+                        172,
+                        458,
+                        199,
+                        473
+                    ]
+                },
+                {
+                    "text": "Void.",
+                    "box": [
+                        203,
+                        457,
+                        235,
+                        475
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "NON- DIRECT ACCOUNT CHAINS:",
+            "box": [
+                47,
+                552,
+                280,
+                570
+            ],
+            "linking": [
+                [
+                    16,
+                    17
+                ],
+                [
+                    11,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "NON-",
+                    "box": [
+                        47,
+                        552,
+                        92,
+                        570
+                    ]
+                },
+                {
+                    "text": "DIRECT",
+                    "box": [
+                        94,
+                        552,
+                        144,
+                        569
+                    ]
+                },
+                {
+                    "text": "ACCOUNT",
+                    "box": [
+                        147,
+                        553,
+                        220,
+                        567
+                    ]
+                },
+                {
+                    "text": "CHAINS:",
+                    "box": [
+                        221,
+                        552,
+                        280,
+                        567
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "Reception from these accounts is most positive with a solid incentitive to purchase.",
+            "box": [
+                47,
+                571,
+                575,
+                590
+            ],
+            "linking": [
+                [
+                    16,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Reception",
+                    "box": [
+                        47,
+                        573,
+                        113,
+                        588
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        116,
+                        573,
+                        147,
+                        587
+                    ]
+                },
+                {
+                    "text": "these",
+                    "box": [
+                        151,
+                        571,
+                        186,
+                        588
+                    ]
+                },
+                {
+                    "text": "accounts",
+                    "box": [
+                        190,
+                        571,
+                        247,
+                        588
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        250,
+                        573,
+                        261,
+                        586
+                    ]
+                },
+                {
+                    "text": "most",
+                    "box": [
+                        265,
+                        573,
+                        297,
+                        587
+                    ]
+                },
+                {
+                    "text": "positive",
+                    "box": [
+                        299,
+                        573,
+                        349,
+                        590
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        351,
+                        571,
+                        379,
+                        588
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        381,
+                        574,
+                        391,
+                        587
+                    ]
+                },
+                {
+                    "text": "solid",
+                    "box": [
+                        394,
+                        573,
+                        425,
+                        586
+                    ]
+                },
+                {
+                    "text": "incentitive",
+                    "box": [
+                        429,
+                        571,
+                        490,
+                        586
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        494,
+                        573,
+                        507,
+                        586
+                    ]
+                },
+                {
+                    "text": "purchase.",
+                    "box": [
+                        511,
+                        573,
+                        575,
+                        590
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "EFFECTIVENESS OF THE RETAIL (1 00 OFF CARTON) DISTRIBUTION ALLOWANCE:",
+            "box": [
+                46,
+                662,
+                243,
+                721
+            ],
+            "linking": [
+                [
+                    18,
+                    19
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "EFFECTIVENESS",
+                    "box": [
+                        46,
+                        662,
+                        161,
+                        682
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        166,
+                        663,
+                        183,
+                        680
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        189,
+                        663,
+                        220,
+                        683
+                    ]
+                },
+                {
+                    "text": "RETAIL",
+                    "box": [
+                        46,
+                        683,
+                        93,
+                        703
+                    ]
+                },
+                {
+                    "text": "(1",
+                    "box": [
+                        99,
+                        684,
+                        110,
+                        699
+                    ]
+                },
+                {
+                    "text": "00",
+                    "box": [
+                        113,
+                        686,
+                        133,
+                        700
+                    ]
+                },
+                {
+                    "text": "OFF",
+                    "box": [
+                        135,
+                        683,
+                        162,
+                        703
+                    ]
+                },
+                {
+                    "text": "CARTON)",
+                    "box": [
+                        168,
+                        686,
+                        234,
+                        701
+                    ]
+                },
+                {
+                    "text": "DISTRIBUTION",
+                    "box": [
+                        47,
+                        701,
+                        146,
+                        721
+                    ]
+                },
+                {
+                    "text": "ALLOWANCE:",
+                    "box": [
+                        149,
+                        704,
+                        243,
+                        721
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "Has been most helpful in acquiring desireable distribution when needed by Sales Reps.",
+            "box": [
+                279,
+                701,
+                647,
+                739
+            ],
+            "linking": [
+                [
+                    18,
+                    19
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Has",
+                    "box": [
+                        279,
+                        703,
+                        304,
+                        720
+                    ]
+                },
+                {
+                    "text": "been",
+                    "box": [
+                        307,
+                        703,
+                        341,
+                        720
+                    ]
+                },
+                {
+                    "text": "most",
+                    "box": [
+                        345,
+                        705,
+                        376,
+                        719
+                    ]
+                },
+                {
+                    "text": "helpful",
+                    "box": [
+                        378,
+                        703,
+                        421,
+                        720
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        425,
+                        703,
+                        438,
+                        717
+                    ]
+                },
+                {
+                    "text": "acquiring",
+                    "box": [
+                        441,
+                        705,
+                        500,
+                        720
+                    ]
+                },
+                {
+                    "text": "desireable",
+                    "box": [
+                        504,
+                        704,
+                        571,
+                        719
+                    ]
+                },
+                {
+                    "text": "distribution",
+                    "box": [
+                        574,
+                        701,
+                        647,
+                        719
+                    ]
+                },
+                {
+                    "text": "when",
+                    "box": [
+                        279,
+                        722,
+                        314,
+                        737
+                    ]
+                },
+                {
+                    "text": "needed",
+                    "box": [
+                        317,
+                        723,
+                        364,
+                        738
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        369,
+                        721,
+                        386,
+                        738
+                    ]
+                },
+                {
+                    "text": "Sales",
+                    "box": [
+                        390,
+                        722,
+                        425,
+                        737
+                    ]
+                },
+                {
+                    "text": "Reps.",
+                    "box": [
+                        427,
+                        721,
+                        463,
+                        739
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "PROMOTIONAL ACTIVITY",
+            "box": [
+                47,
+                795,
+                234,
+                816
+            ],
+            "linking": [
+                [
+                    20,
+                    21
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROMOTIONAL",
+                    "box": [
+                        47,
+                        796,
+                        159,
+                        814
+                    ]
+                },
+                {
+                    "text": "ACTIVITY",
+                    "box": [
+                        163,
+                        795,
+                        234,
+                        816
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "40c OFF PACK- GENERAL MARKET:",
+            "box": [
+                46,
+                834,
+                181,
+                871
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ],
+                [
+                    20,
+                    21
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "40c",
+                    "box": [
+                        46,
+                        835,
+                        75,
+                        848
+                    ]
+                },
+                {
+                    "text": "OFF",
+                    "box": [
+                        73,
+                        834,
+                        104,
+                        851
+                    ]
+                },
+                {
+                    "text": "PACK-",
+                    "box": [
+                        106,
+                        835,
+                        160,
+                        850
+                    ]
+                },
+                {
+                    "text": "GENERAL",
+                    "box": [
+                        47,
+                        852,
+                        114,
+                        870
+                    ]
+                },
+                {
+                    "text": "MARKET:",
+                    "box": [
+                        115,
+                        853,
+                        181,
+                        871
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "The 40c off promotions continue to be well received at the retail stores and by consumers, as well.",
+            "box": [
+                203,
+                852,
+                605,
+                888
+            ],
+            "linking": [
+                [
+                    21,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        203,
+                        852,
+                        228,
+                        867
+                    ]
+                },
+                {
+                    "text": "40c",
+                    "box": [
+                        230,
+                        855,
+                        254,
+                        869
+                    ]
+                },
+                {
+                    "text": "off",
+                    "box": [
+                        256,
+                        853,
+                        274,
+                        868
+                    ]
+                },
+                {
+                    "text": "promotions",
+                    "box": [
+                        277,
+                        855,
+                        350,
+                        870
+                    ]
+                },
+                {
+                    "text": "continue",
+                    "box": [
+                        353,
+                        853,
+                        407,
+                        868
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        411,
+                        853,
+                        424,
+                        868
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        427,
+                        855,
+                        442,
+                        869
+                    ]
+                },
+                {
+                    "text": "well",
+                    "box": [
+                        447,
+                        852,
+                        472,
+                        869
+                    ]
+                },
+                {
+                    "text": "received",
+                    "box": [
+                        476,
+                        852,
+                        530,
+                        867
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        532,
+                        855,
+                        546,
+                        868
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        549,
+                        853,
+                        569,
+                        867
+                    ]
+                },
+                {
+                    "text": "retail",
+                    "box": [
+                        573,
+                        853,
+                        605,
+                        868
+                    ]
+                },
+                {
+                    "text": "stores",
+                    "box": [
+                        203,
+                        872,
+                        242,
+                        887
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        246,
+                        873,
+                        270,
+                        888
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        274,
+                        873,
+                        291,
+                        888
+                    ]
+                },
+                {
+                    "text": "consumers,",
+                    "box": [
+                        293,
+                        874,
+                        368,
+                        888
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        373,
+                        874,
+                        386,
+                        887
+                    ]
+                },
+                {
+                    "text": "well.",
+                    "box": [
+                        390,
+                        873,
+                        418,
+                        887
+                    ]
+                }
+            ],
+            "id": 22
+        }
+    ]
+}

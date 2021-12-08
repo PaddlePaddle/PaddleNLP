@@ -1,0 +1,1593 @@
+{
+    "form": [
+        {
+            "box": [
+                105,
+                331,
+                146,
+                346
+            ],
+            "text": "Name:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        105,
+                        331,
+                        146,
+                        346
+                    ],
+                    "text": "Name:"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                102,
+                376,
+                170,
+                389
+            ],
+            "text": "Institution:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        102,
+                        376,
+                        170,
+                        389
+                    ],
+                    "text": "Institution:"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                103,
+                406,
+                157,
+                420
+            ],
+            "text": "Address:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        103,
+                        406,
+                        157,
+                        420
+                    ],
+                    "text": "Address:"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                184,
+                420,
+                215,
+                434
+            ],
+            "text": "Street",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        184,
+                        420,
+                        215,
+                        434
+                    ],
+                    "text": "Street"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                186,
+                468,
+                210,
+                479
+            ],
+            "text": "City",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        186,
+                        468,
+                        210,
+                        479
+                    ],
+                    "text": "City"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                304,
+                465,
+                331,
+                478
+            ],
+            "text": "State",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        304,
+                        465,
+                        331,
+                        478
+                    ],
+                    "text": "State"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                184,
+                344,
+                206,
+                359
+            ],
+            "text": "First",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        184,
+                        344,
+                        206,
+                        359
+                    ],
+                    "text": "First"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                302,
+                344,
+                338,
+                358
+            ],
+            "text": "Middle",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        302,
+                        344,
+                        338,
+                        358
+                    ],
+                    "text": "Middle"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                420,
+                344,
+                444,
+                355
+            ],
+            "text": "Last",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        420,
+                        344,
+                        444,
+                        355
+                    ],
+                    "text": "Last"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                503,
+                464,
+                546,
+                474
+            ],
+            "text": "Country",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        464,
+                        546,
+                        474
+                    ],
+                    "text": "Country"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                109,
+                497,
+                175,
+                511
+            ],
+            "text": "Telephone:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        109,
+                        497,
+                        175,
+                        511
+                    ],
+                    "text": "Telephone:"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                506,
+                661,
+                553,
+                675
+            ],
+            "text": "TOTAL",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        506,
+                        661,
+                        553,
+                        675
+                    ],
+                    "text": "TOTAL"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                324,
+                617,
+                345,
+                631
+            ],
+            "text": "10)",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        324,
+                        617,
+                        345,
+                        631
+                    ],
+                    "text": "10)"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                645,
+                791,
+                663,
+                869
+            ],
+            "text": "87682908",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        645,
+                        791,
+                        663,
+                        869
+                    ],
+                    "text": "87682908"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "text": "46th Tobacco Chemists' Research Conference",
+            "box": [
+                203,
+                135,
+                397,
+                174
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "46th",
+                    "box": [
+                        203,
+                        137,
+                        241,
+                        155
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        244,
+                        135,
+                        315,
+                        152
+                    ]
+                },
+                {
+                    "text": "Chemists'",
+                    "box": [
+                        316,
+                        135,
+                        397,
+                        153
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        204,
+                        154,
+                        277,
+                        174
+                    ]
+                },
+                {
+                    "text": "Conference",
+                    "box": [
+                        279,
+                        156,
+                        368,
+                        174
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "TH 46 TCRC REGISTRATION FORM",
+            "box": [
+                201,
+                251,
+                524,
+                280
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "TH",
+                    "box": [
+                        226,
+                        257,
+                        244,
+                        268
+                    ]
+                },
+                {
+                    "text": "46",
+                    "box": [
+                        201,
+                        256,
+                        225,
+                        280
+                    ]
+                },
+                {
+                    "text": "TCRC",
+                    "box": [
+                        253,
+                        257,
+                        305,
+                        277
+                    ]
+                },
+                {
+                    "text": "REGISTRATION",
+                    "box": [
+                        314,
+                        251,
+                        462,
+                        276
+                    ]
+                },
+                {
+                    "text": "FORM",
+                    "box": [
+                        471,
+                        251,
+                        524,
+                        275
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "Please type or print",
+            "box": [
+                105,
+                299,
+                218,
+                317
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Please",
+                    "box": [
+                        105,
+                        299,
+                        141,
+                        317
+                    ]
+                },
+                {
+                    "text": "type",
+                    "box": [
+                        145,
+                        302,
+                        169,
+                        316
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        173,
+                        302,
+                        186,
+                        315
+                    ]
+                },
+                {
+                    "text": "print",
+                    "box": [
+                        189,
+                        300,
+                        218,
+                        317
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "P. O. Box #",
+            "box": [
+                304,
+                420,
+                354,
+                435
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "P.",
+                    "box": [
+                        304,
+                        422,
+                        314,
+                        435
+                    ]
+                },
+                {
+                    "text": "O.",
+                    "box": [
+                        314,
+                        423,
+                        327,
+                        434
+                    ]
+                },
+                {
+                    "text": "Box",
+                    "box": [
+                        327,
+                        422,
+                        345,
+                        433
+                    ]
+                },
+                {
+                    "text": "#",
+                    "box": [
+                        346,
+                        420,
+                        354,
+                        430
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "ZIP Code",
+            "box": [
+                384,
+                464,
+                435,
+                477
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ZIP",
+                    "box": [
+                        384,
+                        464,
+                        404,
+                        477
+                    ]
+                },
+                {
+                    "text": "Code",
+                    "box": [
+                        408,
+                        465,
+                        435,
+                        476
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "Area Code:",
+            "box": [
+                299,
+                496,
+                365,
+                509
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Area",
+                    "box": [
+                        299,
+                        496,
+                        327,
+                        509
+                    ]
+                },
+                {
+                    "text": "Code:",
+                    "box": [
+                        331,
+                        496,
+                        365,
+                        506
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "Name of spouse participating in the guest programs",
+            "box": [
+                109,
+                524,
+                410,
+                544
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Name",
+                    "box": [
+                        109,
+                        528,
+                        145,
+                        541
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        148,
+                        528,
+                        162,
+                        542
+                    ]
+                },
+                {
+                    "text": "spouse",
+                    "box": [
+                        165,
+                        528,
+                        203,
+                        542
+                    ]
+                },
+                {
+                    "text": "participating",
+                    "box": [
+                        205,
+                        527,
+                        276,
+                        544
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        279,
+                        525,
+                        293,
+                        539
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        297,
+                        525,
+                        315,
+                        538
+                    ]
+                },
+                {
+                    "text": "guest",
+                    "box": [
+                        317,
+                        525,
+                        349,
+                        542
+                    ]
+                },
+                {
+                    "text": "programs",
+                    "box": [
+                        353,
+                        524,
+                        410,
+                        538
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "Monday (Y/ N)",
+            "box": [
+                320,
+                554,
+                392,
+                571
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Monday",
+                    "box": [
+                        320,
+                        557,
+                        359,
+                        570
+                    ]
+                },
+                {
+                    "text": "(Y/",
+                    "box": [
+                        362,
+                        554,
+                        382,
+                        571
+                    ]
+                },
+                {
+                    "text": "N)",
+                    "box": [
+                        378,
+                        556,
+                        392,
+                        569
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "Tuesday (Y/ N)",
+            "box": [
+                441,
+                554,
+                512,
+                567
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tuesday",
+                    "box": [
+                        441,
+                        554,
+                        482,
+                        567
+                    ]
+                },
+                {
+                    "text": "(Y/",
+                    "box": [
+                        482,
+                        554,
+                        500,
+                        565
+                    ]
+                },
+                {
+                    "text": "N)",
+                    "box": [
+                        499,
+                        556,
+                        512,
+                        567
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "$ 170.00",
+            "box": [
+                504,
+                599,
+                557,
+                614
+            ],
+            "linking": [
+                [
+                    28,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$",
+                    "box": [
+                        504,
+                        599,
+                        515,
+                        614
+                    ]
+                },
+                {
+                    "text": "170.00",
+                    "box": [
+                        518,
+                        599,
+                        557,
+                        613
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "$ $185.00",
+            "box": [
+                506,
+                616,
+                558,
+                630
+            ],
+            "linking": [
+                [
+                    29,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "$",
+                    "box": [
+                        506,
+                        616,
+                        517,
+                        630
+                    ]
+                },
+                {
+                    "text": "$185.00",
+                    "box": [
+                        520,
+                        616,
+                        558,
+                        630
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "Send this registration form, along with payment to address noted below in attached envelope. Enclose a cheque or international money order payable in Canadian funds to the 46th Tobacco Chemists Research Conference.",
+            "box": [
+                110,
+                721,
+                629,
+                771
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Send",
+                    "box": [
+                        110,
+                        729,
+                        144,
+                        742
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        148,
+                        728,
+                        169,
+                        742
+                    ]
+                },
+                {
+                    "text": "registration",
+                    "box": [
+                        176,
+                        728,
+                        244,
+                        743
+                    ]
+                },
+                {
+                    "text": "form,",
+                    "box": [
+                        244,
+                        725,
+                        276,
+                        740
+                    ]
+                },
+                {
+                    "text": "along",
+                    "box": [
+                        282,
+                        728,
+                        318,
+                        741
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        323,
+                        725,
+                        351,
+                        740
+                    ]
+                },
+                {
+                    "text": "payment",
+                    "box": [
+                        352,
+                        726,
+                        408,
+                        740
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        409,
+                        726,
+                        426,
+                        736
+                    ]
+                },
+                {
+                    "text": "address",
+                    "box": [
+                        432,
+                        722,
+                        475,
+                        739
+                    ]
+                },
+                {
+                    "text": "noted",
+                    "box": [
+                        480,
+                        723,
+                        515,
+                        736
+                    ]
+                },
+                {
+                    "text": "below",
+                    "box": [
+                        520,
+                        721,
+                        556,
+                        736
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        560,
+                        723,
+                        573,
+                        734
+                    ]
+                },
+                {
+                    "text": "attached",
+                    "box": [
+                        580,
+                        721,
+                        629,
+                        735
+                    ]
+                },
+                {
+                    "text": "envelope.",
+                    "box": [
+                        113,
+                        742,
+                        169,
+                        756
+                    ]
+                },
+                {
+                    "text": "Enclose",
+                    "box": [
+                        173,
+                        743,
+                        219,
+                        754
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        219,
+                        744,
+                        230,
+                        755
+                    ]
+                },
+                {
+                    "text": "cheque",
+                    "box": [
+                        230,
+                        742,
+                        272,
+                        757
+                    ]
+                },
+                {
+                    "text": "or",
+                    "box": [
+                        275,
+                        743,
+                        290,
+                        754
+                    ]
+                },
+                {
+                    "text": "international",
+                    "box": [
+                        291,
+                        740,
+                        364,
+                        753
+                    ]
+                },
+                {
+                    "text": "money",
+                    "box": [
+                        366,
+                        743,
+                        404,
+                        754
+                    ]
+                },
+                {
+                    "text": "order",
+                    "box": [
+                        406,
+                        739,
+                        441,
+                        752
+                    ]
+                },
+                {
+                    "text": "payable",
+                    "box": [
+                        439,
+                        737,
+                        488,
+                        754
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        487,
+                        739,
+                        501,
+                        750
+                    ]
+                },
+                {
+                    "text": "Canadian",
+                    "box": [
+                        503,
+                        735,
+                        559,
+                        752
+                    ]
+                },
+                {
+                    "text": "funds",
+                    "box": [
+                        561,
+                        737,
+                        592,
+                        751
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        592,
+                        737,
+                        606,
+                        750
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        609,
+                        735,
+                        629,
+                        749
+                    ]
+                },
+                {
+                    "text": "46th",
+                    "box": [
+                        116,
+                        757,
+                        143,
+                        770
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        144,
+                        757,
+                        191,
+                        770
+                    ]
+                },
+                {
+                    "text": "Chemists",
+                    "box": [
+                        197,
+                        756,
+                        250,
+                        769
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        254,
+                        758,
+                        308,
+                        771
+                    ]
+                },
+                {
+                    "text": "Conference.",
+                    "box": [
+                        310,
+                        756,
+                        383,
+                        770
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "Ms. Susan Mathison Canadian Tobacco Manufacturers Council 701- 99 Bank Street Ottawa, Ontario, Canada K1P 6B9 (613) 238- 2799",
+            "box": [
+                310,
+                784,
+                563,
+                862
+            ],
+            "linking": [
+                [
+                    27,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Ms.",
+                    "box": [
+                        311,
+                        785,
+                        332,
+                        798
+                    ]
+                },
+                {
+                    "text": "Susan",
+                    "box": [
+                        337,
+                        786,
+                        371,
+                        797
+                    ]
+                },
+                {
+                    "text": "Mathison",
+                    "box": [
+                        373,
+                        784,
+                        429,
+                        797
+                    ]
+                },
+                {
+                    "text": "Canadian",
+                    "box": [
+                        310,
+                        799,
+                        369,
+                        813
+                    ]
+                },
+                {
+                    "text": "Tobacco",
+                    "box": [
+                        372,
+                        799,
+                        419,
+                        812
+                    ]
+                },
+                {
+                    "text": "Manufacturers",
+                    "box": [
+                        422,
+                        799,
+                        510,
+                        812
+                    ]
+                },
+                {
+                    "text": "Council",
+                    "box": [
+                        514,
+                        797,
+                        563,
+                        810
+                    ]
+                },
+                {
+                    "text": "701-",
+                    "box": [
+                        310,
+                        813,
+                        338,
+                        830
+                    ]
+                },
+                {
+                    "text": "99",
+                    "box": [
+                        335,
+                        814,
+                        350,
+                        828
+                    ]
+                },
+                {
+                    "text": "Bank",
+                    "box": [
+                        352,
+                        814,
+                        386,
+                        828
+                    ]
+                },
+                {
+                    "text": "Street",
+                    "box": [
+                        387,
+                        814,
+                        422,
+                        827
+                    ]
+                },
+                {
+                    "text": "Ottawa,",
+                    "box": [
+                        314,
+                        832,
+                        359,
+                        843
+                    ]
+                },
+                {
+                    "text": "Ontario,",
+                    "box": [
+                        362,
+                        831,
+                        411,
+                        844
+                    ]
+                },
+                {
+                    "text": "Canada",
+                    "box": [
+                        415,
+                        830,
+                        458,
+                        843
+                    ]
+                },
+                {
+                    "text": "K1P",
+                    "box": [
+                        461,
+                        828,
+                        485,
+                        842
+                    ]
+                },
+                {
+                    "text": "6B9",
+                    "box": [
+                        490,
+                        827,
+                        515,
+                        840
+                    ]
+                },
+                {
+                    "text": "(613)",
+                    "box": [
+                        311,
+                        845,
+                        345,
+                        862
+                    ]
+                },
+                {
+                    "text": "238-",
+                    "box": [
+                        348,
+                        846,
+                        372,
+                        859
+                    ]
+                },
+                {
+                    "text": "2799",
+                    "box": [
+                        372,
+                        845,
+                        406,
+                        858
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "Mail to:",
+            "box": [
+                232,
+                785,
+                281,
+                800
+            ],
+            "linking": [
+                [
+                    27,
+                    26
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Mail",
+                    "box": [
+                        232,
+                        785,
+                        261,
+                        800
+                    ]
+                },
+                {
+                    "text": "to:",
+                    "box": [
+                        261,
+                        785,
+                        281,
+                        800
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "Advance Registration Fee: (prior to August 10)",
+            "box": [
+                109,
+                602,
+                391,
+                619
+            ],
+            "linking": [
+                [
+                    28,
+                    23
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Advance",
+                    "box": [
+                        109,
+                        606,
+                        163,
+                        619
+                    ]
+                },
+                {
+                    "text": "Registration",
+                    "box": [
+                        162,
+                        605,
+                        236,
+                        619
+                    ]
+                },
+                {
+                    "text": "Fee:",
+                    "box": [
+                        235,
+                        602,
+                        266,
+                        619
+                    ]
+                },
+                {
+                    "text": "(prior",
+                    "box": [
+                        272,
+                        603,
+                        308,
+                        618
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        307,
+                        603,
+                        324,
+                        616
+                    ]
+                },
+                {
+                    "text": "August",
+                    "box": [
+                        327,
+                        602,
+                        370,
+                        619
+                    ]
+                },
+                {
+                    "text": "10)",
+                    "box": [
+                        370,
+                        602,
+                        391,
+                        617
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "Late Registration Fee: (after August",
+            "box": [
+                110,
+                619,
+                323,
+                635
+            ],
+            "linking": [
+                [
+                    29,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Late",
+                    "box": [
+                        110,
+                        623,
+                        139,
+                        634
+                    ]
+                },
+                {
+                    "text": "Registration",
+                    "box": [
+                        141,
+                        620,
+                        212,
+                        635
+                    ]
+                },
+                {
+                    "text": "Fee:",
+                    "box": [
+                        215,
+                        619,
+                        240,
+                        634
+                    ]
+                },
+                {
+                    "text": "(after",
+                    "box": [
+                        243,
+                        620,
+                        278,
+                        634
+                    ]
+                },
+                {
+                    "text": "August",
+                    "box": [
+                        281,
+                        619,
+                        323,
+                        633
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "Extra banquet tickets @ $ 40.00",
+            "box": [
+                176,
+                634,
+                364,
+                651
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Extra",
+                    "box": [
+                        176,
+                        635,
+                        208,
+                        648
+                    ]
+                },
+                {
+                    "text": "banquet",
+                    "box": [
+                        211,
+                        635,
+                        260,
+                        649
+                    ]
+                },
+                {
+                    "text": "tickets",
+                    "box": [
+                        261,
+                        635,
+                        303,
+                        649
+                    ]
+                },
+                {
+                    "text": "@",
+                    "box": [
+                        306,
+                        634,
+                        319,
+                        651
+                    ]
+                },
+                {
+                    "text": "$",
+                    "box": [
+                        320,
+                        634,
+                        330,
+                        648
+                    ]
+                },
+                {
+                    "text": "40.00",
+                    "box": [
+                        330,
+                        634,
+                        364,
+                        648
+                    ]
+                }
+            ],
+            "id": 30
+        }
+    ]
+}

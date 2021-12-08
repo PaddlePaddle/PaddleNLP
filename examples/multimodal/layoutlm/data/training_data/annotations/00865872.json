@@ -1,0 +1,1953 @@
+{
+    "form": [
+        {
+            "box": [
+                166,
+                182,
+                202,
+                196
+            ],
+            "text": "B164",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        166,
+                        182,
+                        202,
+                        196
+                    ],
+                    "text": "B164"
+                }
+            ],
+            "linking": [
+                [
+                    25,
+                    0
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                99,
+                225,
+                112,
+                236
+            ],
+            "text": "pH",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        225,
+                        112,
+                        236
+                    ],
+                    "text": "pH"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    29
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                135,
+                408,
+                218,
+                423
+            ],
+            "text": "Reference:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        135,
+                        408,
+                        218,
+                        423
+                    ],
+                    "text": "Reference:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    31
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                120,
+                390,
+                140,
+                403
+            ],
+            "text": "ORAL",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        120,
+                        390,
+                        140,
+                        403
+                    ],
+                    "text": "ORAL"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                103,
+                370,
+                142,
+                378
+            ],
+            "text": "SOLUBILITY",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        103,
+                        370,
+                        142,
+                        378
+                    ],
+                    "text": "SOLUBILITY"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    30
+                ],
+                [
+                    4,
+                    32
+                ],
+                [
+                    4,
+                    3
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                119,
+                508,
+                210,
+                517
+            ],
+            "text": "ACUTE CADCOVASCULAR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        119,
+                        508,
+                        210,
+                        517
+                    ],
+                    "text": "ACUTE CADCOVASCULAR"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    33
+                ],
+                [
+                    5,
+                    35
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                135,
+                559,
+                219,
+                571
+            ],
+            "text": "Reference:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        135,
+                        559,
+                        219,
+                        571
+                    ],
+                    "text": "Reference:"
+                }
+            ],
+            "linking": [
+                [
+                    6,
+                    34
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                634,
+                702,
+                653,
+                792
+            ],
+            "text": "00865872",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        634,
+                        702,
+                        653,
+                        792
+                    ],
+                    "text": "00865872"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                96,
+                770,
+                139,
+                779
+            ],
+            "text": "COMPOUND",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        96,
+                        770,
+                        139,
+                        779
+                    ],
+                    "text": "COMPOUND"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    14
+                ],
+                [
+                    8,
+                    13
+                ],
+                [
+                    8,
+                    12
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                179,
+                770,
+                187,
+                781
+            ],
+            "text": "TO",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        179,
+                        770,
+                        187,
+                        781
+                    ],
+                    "text": "TO"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                140,
+                771,
+                176,
+                779
+            ],
+            "text": "SENSITIVE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        140,
+                        771,
+                        176,
+                        779
+                    ],
+                    "text": "SENSITIVE"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    15
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                96,
+                920,
+                137,
+                929
+            ],
+            "text": "SIGNATURE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        96,
+                        920,
+                        137,
+                        929
+                    ],
+                    "text": "SIGNATURE:"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    21
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                259,
+                793,
+                296,
+                804
+            ],
+            "text": "[] OTHER",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        259,
+                        793,
+                        296,
+                        804
+                    ],
+                    "text": "[] OTHER"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                198,
+                795,
+                246,
+                803
+            ],
+            "text": "[MOISTURE]",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        198,
+                        795,
+                        246,
+                        803
+                    ],
+                    "text": "[MOISTURE]"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                158,
+                793,
+                185,
+                805
+            ],
+            "text": "[] HEAT",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        158,
+                        793,
+                        185,
+                        805
+                    ],
+                    "text": "[] HEAT"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                118,
+                793,
+                143,
+                805
+            ],
+            "text": "[] Air",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        118,
+                        793,
+                        143,
+                        805
+                    ],
+                    "text": "[] Air"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    15
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                96,
+                822,
+                124,
+                831
+            ],
+            "text": "SAFETY",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        96,
+                        822,
+                        124,
+                        831
+                    ],
+                    "text": "SAFETY"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                211,
+                824,
+                250,
+                832
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        211,
+                        824,
+                        250,
+                        832
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 17
+        },
+        {
+            "box": [
+                251,
+                824,
+                300,
+                831
+            ],
+            "text": "PROCEDURE",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        251,
+                        824,
+                        300,
+                        831
+                    ],
+                    "text": "PROCEDURE"
+                }
+            ],
+            "linking": [],
+            "id": 18
+        },
+        {
+            "box": [
+                164,
+                824,
+                212,
+                832
+            ],
+            "text": "(SUGGESTED",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        164,
+                        824,
+                        212,
+                        832
+                    ],
+                    "text": "(SUGGESTED"
+                }
+            ],
+            "linking": [],
+            "id": 19
+        },
+        {
+            "box": [
+                126,
+                822,
+                162,
+                831
+            ],
+            "text": "COMMENT:",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        126,
+                        822,
+                        162,
+                        831
+                    ],
+                    "text": "COMMENT:"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                135,
+                921,
+                315,
+                944
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        135,
+                        921,
+                        315,
+                        944
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                499,
+                922,
+                518,
+                932
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        499,
+                        922,
+                        518,
+                        932
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    23
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                531,
+                924,
+                619,
+                948
+            ],
+            "text": "8/22/83",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        531,
+                        924,
+                        619,
+                        948
+                    ],
+                    "text": "8/22/83"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    23
+                ]
+            ],
+            "id": 23
+        },
+        {
+            "text": "COMPOUND PHYSICAL PARAMETERS",
+            "box": [
+                246,
+                141,
+                537,
+                159
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        246,
+                        141,
+                        346,
+                        159
+                    ]
+                },
+                {
+                    "text": "PHYSICAL",
+                    "box": [
+                        351,
+                        142,
+                        430,
+                        159
+                    ]
+                },
+                {
+                    "text": "PARAMETERS",
+                    "box": [
+                        436,
+                        141,
+                        537,
+                        158
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "LRC FILE NUMBER",
+            "box": [
+                98,
+                172,
+                164,
+                181
+            ],
+            "linking": [
+                [
+                    25,
+                    0
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LRC FILE",
+                    "box": [
+                        98,
+                        172,
+                        130,
+                        181
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        129,
+                        173,
+                        164,
+                        180
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "LOT NUMBER",
+            "box": [
+                501,
+                172,
+                553,
+                183
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LOT",
+                    "box": [
+                        501,
+                        172,
+                        518,
+                        183
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        519,
+                        172,
+                        553,
+                        183
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "PHYSICAL STATE",
+            "box": [
+                98,
+                198,
+                157,
+                209
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PHYSICAL",
+                    "box": [
+                        98,
+                        199,
+                        134,
+                        209
+                    ]
+                },
+                {
+                    "text": "STATE",
+                    "box": [
+                        134,
+                        198,
+                        157,
+                        209
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "Brownish- gray powder",
+            "box": [
+                169,
+                211,
+                337,
+                228
+            ],
+            "linking": [
+                [
+                    27,
+                    28
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Brownish-",
+                    "box": [
+                        169,
+                        211,
+                        243,
+                        228
+                    ]
+                },
+                {
+                    "text": "gray",
+                    "box": [
+                        244,
+                        211,
+                        278,
+                        228
+                    ]
+                },
+                {
+                    "text": "powder",
+                    "box": [
+                        284,
+                        211,
+                        337,
+                        226
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "The pH of a 50% concentration of B164 in water was calculated to be 4.82 at 25°C according to the extrapolation procedures by Dr. P. D. Schickedantz, Lorillard Research Center Accession Number 1662.",
+            "box": [
+                131,
+                267,
+                653,
+                323
+            ],
+            "linking": [
+                [
+                    1,
+                    29
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        133,
+                        270,
+                        159,
+                        282
+                    ]
+                },
+                {
+                    "text": "pH",
+                    "box": [
+                        165,
+                        271,
+                        186,
+                        282
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        194,
+                        270,
+                        209,
+                        281
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        217,
+                        271,
+                        229,
+                        282
+                    ]
+                },
+                {
+                    "text": "50%",
+                    "box": [
+                        235,
+                        270,
+                        259,
+                        282
+                    ]
+                },
+                {
+                    "text": "concentration",
+                    "box": [
+                        268,
+                        271,
+                        378,
+                        283
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        385,
+                        267,
+                        399,
+                        280
+                    ]
+                },
+                {
+                    "text": "B164",
+                    "box": [
+                        411,
+                        267,
+                        444,
+                        280
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        453,
+                        267,
+                        468,
+                        279
+                    ]
+                },
+                {
+                    "text": "water",
+                    "box": [
+                        476,
+                        267,
+                        518,
+                        280
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        133,
+                        284,
+                        159,
+                        297
+                    ]
+                },
+                {
+                    "text": "calculated",
+                    "box": [
+                        167,
+                        284,
+                        253,
+                        297
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        261,
+                        282,
+                        278,
+                        295
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        283,
+                        284,
+                        305,
+                        293
+                    ]
+                },
+                {
+                    "text": "4.82",
+                    "box": [
+                        309,
+                        281,
+                        344,
+                        294
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        350,
+                        284,
+                        369,
+                        294
+                    ]
+                },
+                {
+                    "text": "25°C",
+                    "box": [
+                        378,
+                        282,
+                        415,
+                        294
+                    ]
+                },
+                {
+                    "text": "according",
+                    "box": [
+                        133,
+                        297,
+                        209,
+                        308
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        215,
+                        295,
+                        236,
+                        308
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        243,
+                        296,
+                        267,
+                        308
+                    ]
+                },
+                {
+                    "text": "extrapolation",
+                    "box": [
+                        275,
+                        296,
+                        385,
+                        308
+                    ]
+                },
+                {
+                    "text": "procedures",
+                    "box": [
+                        391,
+                        297,
+                        477,
+                        306
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        485,
+                        295,
+                        503,
+                        308
+                    ]
+                },
+                {
+                    "text": "Dr.",
+                    "box": [
+                        508,
+                        295,
+                        533,
+                        306
+                    ]
+                },
+                {
+                    "text": "P.",
+                    "box": [
+                        543,
+                        296,
+                        557,
+                        306
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        569,
+                        294,
+                        581,
+                        305
+                    ]
+                },
+                {
+                    "text": "Schickedantz,",
+                    "box": [
+                        131,
+                        311,
+                        241,
+                        323
+                    ]
+                },
+                {
+                    "text": "Lorillard",
+                    "box": [
+                        249,
+                        311,
+                        327,
+                        320
+                    ]
+                },
+                {
+                    "text": "Research",
+                    "box": [
+                        335,
+                        311,
+                        402,
+                        321
+                    ]
+                },
+                {
+                    "text": "Center",
+                    "box": [
+                        411,
+                        309,
+                        461,
+                        319
+                    ]
+                },
+                {
+                    "text": "Accession",
+                    "box": [
+                        469,
+                        306,
+                        545,
+                        320
+                    ]
+                },
+                {
+                    "text": "Number",
+                    "box": [
+                        554,
+                        308,
+                        601,
+                        318
+                    ]
+                },
+                {
+                    "text": "1662.",
+                    "box": [
+                        608,
+                        305,
+                        653,
+                        320
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "(See SOP FOX Biological Solutions)",
+            "box": [
+                152,
+                377,
+                435,
+                395
+            ],
+            "linking": [
+                [
+                    4,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(See",
+                    "box": [
+                        152,
+                        377,
+                        185,
+                        393
+                    ]
+                },
+                {
+                    "text": "SOP",
+                    "box": [
+                        191,
+                        380,
+                        219,
+                        393
+                    ]
+                },
+                {
+                    "text": "FOX",
+                    "box": [
+                        226,
+                        380,
+                        250,
+                        392
+                    ]
+                },
+                {
+                    "text": "Biological",
+                    "box": [
+                        258,
+                        380,
+                        341,
+                        395
+                    ]
+                },
+                {
+                    "text": "Solutions)",
+                    "box": [
+                        349,
+                        377,
+                        435,
+                        393
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "BC20- 48",
+            "box": [
+                226,
+                405,
+                286,
+                421
+            ],
+            "linking": [
+                [
+                    2,
+                    31
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "BC20-",
+                    "box": [
+                        226,
+                        405,
+                        267,
+                        421
+                    ]
+                },
+                {
+                    "text": "48",
+                    "box": [
+                        269,
+                        405,
+                        286,
+                        417
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "B164 forms a suspension in corn oil at 0.5g/ 1.5 ml Triple dosing is required",
+            "box": [
+                130,
+                430,
+                563,
+                475
+            ],
+            "linking": [
+                [
+                    4,
+                    32
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "B164",
+                    "box": [
+                        130,
+                        433,
+                        166,
+                        448
+                    ]
+                },
+                {
+                    "text": "forms",
+                    "box": [
+                        176,
+                        433,
+                        219,
+                        446
+                    ]
+                },
+                {
+                    "text": "a",
+                    "box": [
+                        226,
+                        433,
+                        237,
+                        445
+                    ]
+                },
+                {
+                    "text": "suspension",
+                    "box": [
+                        242,
+                        432,
+                        326,
+                        447
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        336,
+                        433,
+                        352,
+                        445
+                    ]
+                },
+                {
+                    "text": "corn",
+                    "box": [
+                        360,
+                        433,
+                        393,
+                        446
+                    ]
+                },
+                {
+                    "text": "oil",
+                    "box": [
+                        400,
+                        432,
+                        427,
+                        445
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        432,
+                        430,
+                        451,
+                        447
+                    ]
+                },
+                {
+                    "text": "0.5g/",
+                    "box": [
+                        456,
+                        430,
+                        509,
+                        446
+                    ]
+                },
+                {
+                    "text": "1.5",
+                    "box": [
+                        512,
+                        430,
+                        535,
+                        447
+                    ]
+                },
+                {
+                    "text": "ml",
+                    "box": [
+                        543,
+                        434,
+                        563,
+                        445
+                    ]
+                },
+                {
+                    "text": "Triple",
+                    "box": [
+                        134,
+                        457,
+                        183,
+                        473
+                    ]
+                },
+                {
+                    "text": "dosing",
+                    "box": [
+                        191,
+                        461,
+                        242,
+                        474
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        251,
+                        460,
+                        268,
+                        473
+                    ]
+                },
+                {
+                    "text": "required",
+                    "box": [
+                        275,
+                        460,
+                        343,
+                        475
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "(See SOP for Determination of Solubility of Materials for Acute Cardiovascular and Respiratory Effects Study Beagle Dogs)",
+            "box": [
+                130,
+                516,
+                683,
+                546
+            ],
+            "linking": [
+                [
+                    5,
+                    33
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(See",
+                    "box": [
+                        135,
+                        519,
+                        170,
+                        532
+                    ]
+                },
+                {
+                    "text": "SOP",
+                    "box": [
+                        176,
+                        519,
+                        203,
+                        531
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        211,
+                        517,
+                        236,
+                        532
+                    ]
+                },
+                {
+                    "text": "Determination",
+                    "box": [
+                        242,
+                        517,
+                        354,
+                        532
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        360,
+                        520,
+                        376,
+                        531
+                    ]
+                },
+                {
+                    "text": "Solubility",
+                    "box": [
+                        385,
+                        516,
+                        468,
+                        532
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        477,
+                        517,
+                        493,
+                        529
+                    ]
+                },
+                {
+                    "text": "Materials",
+                    "box": [
+                        504,
+                        516,
+                        579,
+                        529
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        587,
+                        516,
+                        612,
+                        528
+                    ]
+                },
+                {
+                    "text": "Acute",
+                    "box": [
+                        130,
+                        533,
+                        181,
+                        544
+                    ]
+                },
+                {
+                    "text": "Cardiovascular",
+                    "box": [
+                        187,
+                        533,
+                        301,
+                        546
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        311,
+                        533,
+                        334,
+                        542
+                    ]
+                },
+                {
+                    "text": "Respiratory",
+                    "box": [
+                        342,
+                        532,
+                        434,
+                        545
+                    ]
+                },
+                {
+                    "text": "Effects",
+                    "box": [
+                        440,
+                        532,
+                        504,
+                        543
+                    ]
+                },
+                {
+                    "text": "Study",
+                    "box": [
+                        511,
+                        529,
+                        554,
+                        542
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        561,
+                        532,
+                        580,
+                        541
+                    ]
+                },
+                {
+                    "text": "Beagle",
+                    "box": [
+                        586,
+                        528,
+                        642,
+                        543
+                    ]
+                },
+                {
+                    "text": "Dogs)",
+                    "box": [
+                        646,
+                        528,
+                        683,
+                        543
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "BC20- 48",
+            "box": [
+                222,
+                559,
+                286,
+                574
+            ],
+            "linking": [
+                [
+                    6,
+                    34
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "BC20-",
+                    "box": [
+                        222,
+                        559,
+                        265,
+                        574
+                    ]
+                },
+                {
+                    "text": "48",
+                    "box": [
+                        269,
+                        561,
+                        286,
+                        572
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "B164 is insoluble according to this procedure",
+            "box": [
+                131,
+                584,
+                509,
+                603
+            ],
+            "linking": [
+                [
+                    5,
+                    35
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "B164",
+                    "box": [
+                        131,
+                        588,
+                        168,
+                        600
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        176,
+                        588,
+                        193,
+                        600
+                    ]
+                },
+                {
+                    "text": "insoluble",
+                    "box": [
+                        202,
+                        588,
+                        276,
+                        601
+                    ]
+                },
+                {
+                    "text": "according",
+                    "box": [
+                        285,
+                        590,
+                        360,
+                        602
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        366,
+                        588,
+                        385,
+                        601
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        393,
+                        584,
+                        428,
+                        601
+                    ]
+                },
+                {
+                    "text": "procedure",
+                    "box": [
+                        434,
+                        587,
+                        509,
+                        603
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "STORAGE RECOMMENDATIONS",
+            "box": [
+                98,
+                663,
+                207,
+                672
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "STORAGE",
+                    "box": [
+                        98,
+                        663,
+                        133,
+                        672
+                    ]
+                },
+                {
+                    "text": "RECOMMENDATIONS",
+                    "box": [
+                        132,
+                        663,
+                        207,
+                        671
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "Refrigerate in amber glass bottle at no more than 8°C",
+            "box": [
+                134,
+                679,
+                588,
+                698
+            ],
+            "linking": [
+                [
+                    36,
+                    37
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Refrigerate",
+                    "box": [
+                        134,
+                        682,
+                        232,
+                        698
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        237,
+                        686,
+                        254,
+                        697
+                    ]
+                },
+                {
+                    "text": "amber",
+                    "box": [
+                        261,
+                        683,
+                        304,
+                        696
+                    ]
+                },
+                {
+                    "text": "glass",
+                    "box": [
+                        311,
+                        680,
+                        354,
+                        697
+                    ]
+                },
+                {
+                    "text": "bottle",
+                    "box": [
+                        361,
+                        683,
+                        410,
+                        695
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        421,
+                        680,
+                        437,
+                        696
+                    ]
+                },
+                {
+                    "text": "no",
+                    "box": [
+                        445,
+                        682,
+                        462,
+                        695
+                    ]
+                },
+                {
+                    "text": "more",
+                    "box": [
+                        469,
+                        682,
+                        504,
+                        695
+                    ]
+                },
+                {
+                    "text": "than",
+                    "box": [
+                        521,
+                        680,
+                        553,
+                        693
+                    ]
+                },
+                {
+                    "text": "8°C",
+                    "box": [
+                        563,
+                        679,
+                        588,
+                        694
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "LORILLARD RESEARCH CENTER",
+            "box": [
+                94,
+                945,
+                203,
+                958
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        94,
+                        945,
+                        133,
+                        957
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        135,
+                        947,
+                        171,
+                        956
+                    ]
+                },
+                {
+                    "text": "CENTER",
+                    "box": [
+                        172,
+                        949,
+                        203,
+                        958
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "FORM 1921",
+            "box": [
+                644,
+                949,
+                696,
+                961
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "FORM",
+                    "box": [
+                        644,
+                        950,
+                        666,
+                        959
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        666,
+                        949,
+                        676,
+                        960
+                    ]
+                },
+                {
+                    "text": "1921",
+                    "box": [
+                        674,
+                        950,
+                        696,
+                        961
+                    ]
+                }
+            ],
+            "id": 39
+        }
+    ]
+}

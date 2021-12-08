@@ -1,0 +1,3561 @@
+{
+    "form": [
+        {
+            "box": [
+                99,
+                196,
+                114,
+                206
+            ],
+            "text": "TO:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        99,
+                        196,
+                        114,
+                        206
+                    ],
+                    "text": "TO:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    18
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                156,
+                242,
+                184,
+                253
+            ],
+            "text": "ATTN:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        156,
+                        242,
+                        184,
+                        253
+                    ],
+                    "text": "ATTN:"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    19
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                496,
+                191,
+                523,
+                202
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        496,
+                        191,
+                        523,
+                        202
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    20
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                464,
+                223,
+                523,
+                234
+            ],
+            "text": "ADVERTISER:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        464,
+                        223,
+                        523,
+                        234
+                    ],
+                    "text": "ADVERTISER:"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    5
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                475,
+                256,
+                522,
+                267
+            ],
+            "text": "PRODUCT:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        475,
+                        256,
+                        522,
+                        267
+                    ],
+                    "text": "PRODUCT:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    6
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                536,
+                223,
+                590,
+                233
+            ],
+            "text": "LORILLARD",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        536,
+                        223,
+                        590,
+                        233
+                    ],
+                    "text": "LORILLARD"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                538,
+                256,
+                585,
+                267
+            ],
+            "text": "NEWPORT",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        538,
+                        256,
+                        585,
+                        267
+                    ],
+                    "text": "NEWPORT"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    6
+                ]
+            ],
+            "id": 6
+        },
+        {
+            "box": [
+                96,
+                376,
+                120,
+                387
+            ],
+            "text": "AD#:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        96,
+                        376,
+                        120,
+                        387
+                    ],
+                    "text": "AD#:"
+                }
+            ],
+            "linking": [
+                [
+                    7,
+                    22
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                229,
+                374,
+                272,
+                385
+            ],
+            "text": "CAPTION:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        229,
+                        374,
+                        272,
+                        385
+                    ],
+                    "text": "CAPTION:"
+                }
+            ],
+            "linking": [
+                [
+                    8,
+                    23
+                ]
+            ],
+            "id": 8
+        },
+        {
+            "box": [
+                377,
+                373,
+                411,
+                384
+            ],
+            "text": "SPACE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        373,
+                        411,
+                        384
+                    ],
+                    "text": "SPACE:"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    11
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                524,
+                373,
+                552,
+                384
+            ],
+            "text": "DATE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        524,
+                        373,
+                        552,
+                        384
+                    ],
+                    "text": "DATE:"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    24
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                377,
+                404,
+                402,
+                415
+            ],
+            "text": "P5CE",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        377,
+                        404,
+                        402,
+                        415
+                    ],
+                    "text": "P5CE"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                98,
+                453,
+                112,
+                463
+            ],
+            "text": "PO",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        98,
+                        453,
+                        112,
+                        463
+                    ],
+                    "text": "PO"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                115,
+                453,
+                144,
+                463
+            ],
+            "text": "#77219",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        115,
+                        453,
+                        144,
+                        463
+                    ],
+                    "text": "#77219"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                447,
+                827,
+                475,
+                837
+            ],
+            "text": "ATTN:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        447,
+                        827,
+                        475,
+                        837
+                    ],
+                    "text": "ATTN:"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                677,
+                792,
+                695,
+                865
+            ],
+            "text": "93106788",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        677,
+                        792,
+                        695,
+                        865
+                    ],
+                    "text": "93106788"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                582,
+                617,
+                617,
+                630
+            ],
+            "text": "Cigarette",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        582,
+                        617,
+                        617,
+                        630
+                    ],
+                    "text": "Cigarette"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "text": "LORILLARD MEDIA SERVICES ONE PARK AVENUE, NEW YORK, NY 10016- 5896 MAGAZINE INSERTION ORDER",
+            "box": [
+                208,
+                81,
+                555,
+                143
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        277,
+                        82,
+                        357,
+                        95
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        362,
+                        81,
+                        408,
+                        94
+                    ]
+                },
+                {
+                    "text": "SERVICES",
+                    "box": [
+                        412,
+                        82,
+                        485,
+                        95
+                    ]
+                },
+                {
+                    "text": "ONE",
+                    "box": [
+                        208,
+                        99,
+                        239,
+                        113
+                    ]
+                },
+                {
+                    "text": "PARK",
+                    "box": [
+                        244,
+                        99,
+                        283,
+                        112
+                    ]
+                },
+                {
+                    "text": "AVENUE,",
+                    "box": [
+                        286,
+                        99,
+                        349,
+                        112
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        355,
+                        98,
+                        390,
+                        111
+                    ]
+                },
+                {
+                    "text": "YORK,",
+                    "box": [
+                        394,
+                        98,
+                        439,
+                        111
+                    ]
+                },
+                {
+                    "text": "NY",
+                    "box": [
+                        444,
+                        98,
+                        462,
+                        111
+                    ]
+                },
+                {
+                    "text": "10016-",
+                    "box": [
+                        469,
+                        98,
+                        519,
+                        111
+                    ]
+                },
+                {
+                    "text": "5896",
+                    "box": [
+                        521,
+                        98,
+                        555,
+                        111
+                    ]
+                },
+                {
+                    "text": "MAGAZINE",
+                    "box": [
+                        274,
+                        130,
+                        349,
+                        143
+                    ]
+                },
+                {
+                    "text": "INSERTION",
+                    "box": [
+                        355,
+                        128,
+                        433,
+                        141
+                    ]
+                },
+                {
+                    "text": "ORDER",
+                    "box": [
+                        437,
+                        128,
+                        489,
+                        141
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "ESSENCE 1500 BROADWAY NEW YORK, NY 10036",
+            "box": [
+                156,
+                196,
+                259,
+                236
+            ],
+            "linking": [
+                [
+                    0,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "ESSENCE",
+                    "box": [
+                        158,
+                        196,
+                        204,
+                        204
+                    ]
+                },
+                {
+                    "text": "1500",
+                    "box": [
+                        156,
+                        211,
+                        178,
+                        219
+                    ]
+                },
+                {
+                    "text": "BROADWAY",
+                    "box": [
+                        182,
+                        209,
+                        236,
+                        220
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        156,
+                        225,
+                        178,
+                        236
+                    ]
+                },
+                {
+                    "text": "YORK,",
+                    "box": [
+                        182,
+                        226,
+                        211,
+                        236
+                    ]
+                },
+                {
+                    "text": "NY",
+                    "box": [
+                        215,
+                        226,
+                        228,
+                        236
+                    ]
+                },
+                {
+                    "text": "10036",
+                    "box": [
+                        232,
+                        226,
+                        259,
+                        236
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "JOYCE WINSTON",
+            "box": [
+                191,
+                242,
+                273,
+                252
+            ],
+            "linking": [
+                [
+                    1,
+                    19
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "JOYCE",
+                    "box": [
+                        191,
+                        242,
+                        223,
+                        252
+                    ]
+                },
+                {
+                    "text": "WINSTON",
+                    "box": [
+                        226,
+                        242,
+                        273,
+                        252
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "MARCH 17, 1995",
+            "box": [
+                538,
+                193,
+                616,
+                201
+            ],
+            "linking": [
+                [
+                    2,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "MARCH",
+                    "box": [
+                        538,
+                        193,
+                        572,
+                        201
+                    ]
+                },
+                {
+                    "text": "17,",
+                    "box": [
+                        575,
+                        193,
+                        589,
+                        201
+                    ]
+                },
+                {
+                    "text": "1995",
+                    "box": [
+                        592,
+                        193,
+                        616,
+                        201
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "THIS ADVERTISEMENT COMPLIES WITH THE FTC REQUIREMENT FOR A WARNING STATEMENT AND TAR AND NICOTINE LINE WHICH MUST APPEAR IN ALL CIGARETTE ADVERTISING CHECK MATERIAL YOU RECEIVE AGAINST THE PROOF TO BE SURE IT IS CORRECT, UNDER NO CIRCUMSTANCES ARE TO YOU RUN SUBSTITUTE MATERIALS, ALTERIOR OR OMIT ANY COPY WITHOUT PRIOR APPROVAL FROM LORILLARD MEDIA SERVICES.",
+            "box": [
+                96,
+                302,
+                659,
+                354
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "THIS",
+                    "box": [
+                        98,
+                        306,
+                        119,
+                        314
+                    ]
+                },
+                {
+                    "text": "ADVERTISEMENT",
+                    "box": [
+                        122,
+                        304,
+                        197,
+                        314
+                    ]
+                },
+                {
+                    "text": "COMPLIES",
+                    "box": [
+                        198,
+                        304,
+                        244,
+                        312
+                    ]
+                },
+                {
+                    "text": "WITH",
+                    "box": [
+                        247,
+                        303,
+                        269,
+                        313
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        271,
+                        303,
+                        289,
+                        313
+                    ]
+                },
+                {
+                    "text": "FTC",
+                    "box": [
+                        292,
+                        303,
+                        309,
+                        314
+                    ]
+                },
+                {
+                    "text": "REQUIREMENT",
+                    "box": [
+                        311,
+                        303,
+                        377,
+                        313
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        378,
+                        303,
+                        398,
+                        313
+                    ]
+                },
+                {
+                    "text": "A",
+                    "box": [
+                        399,
+                        303,
+                        406,
+                        313
+                    ]
+                },
+                {
+                    "text": "WARNING",
+                    "box": [
+                        406,
+                        303,
+                        449,
+                        313
+                    ]
+                },
+                {
+                    "text": "STATEMENT",
+                    "box": [
+                        451,
+                        303,
+                        503,
+                        311
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        506,
+                        302,
+                        528,
+                        313
+                    ]
+                },
+                {
+                    "text": "TAR",
+                    "box": [
+                        529,
+                        303,
+                        551,
+                        314
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        552,
+                        302,
+                        573,
+                        313
+                    ]
+                },
+                {
+                    "text": "NICOTINE",
+                    "box": [
+                        574,
+                        302,
+                        617,
+                        313
+                    ]
+                },
+                {
+                    "text": "LINE",
+                    "box": [
+                        619,
+                        302,
+                        641,
+                        312
+                    ]
+                },
+                {
+                    "text": "WHICH",
+                    "box": [
+                        98,
+                        316,
+                        130,
+                        327
+                    ]
+                },
+                {
+                    "text": "MUST",
+                    "box": [
+                        131,
+                        316,
+                        156,
+                        327
+                    ]
+                },
+                {
+                    "text": "APPEAR",
+                    "box": [
+                        159,
+                        318,
+                        195,
+                        326
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        196,
+                        318,
+                        207,
+                        326
+                    ]
+                },
+                {
+                    "text": "ALL",
+                    "box": [
+                        208,
+                        317,
+                        225,
+                        328
+                    ]
+                },
+                {
+                    "text": "CIGARETTE",
+                    "box": [
+                        226,
+                        316,
+                        276,
+                        327
+                    ]
+                },
+                {
+                    "text": "ADVERTISING",
+                    "box": [
+                        278,
+                        317,
+                        339,
+                        325
+                    ]
+                },
+                {
+                    "text": "CHECK",
+                    "box": [
+                        344,
+                        316,
+                        378,
+                        327
+                    ]
+                },
+                {
+                    "text": "MATERIAL",
+                    "box": [
+                        378,
+                        316,
+                        423,
+                        324
+                    ]
+                },
+                {
+                    "text": "YOU",
+                    "box": [
+                        423,
+                        316,
+                        445,
+                        326
+                    ]
+                },
+                {
+                    "text": "RECEIVE",
+                    "box": [
+                        446,
+                        314,
+                        484,
+                        324
+                    ]
+                },
+                {
+                    "text": "AGAINST",
+                    "box": [
+                        485,
+                        316,
+                        526,
+                        326
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        527,
+                        316,
+                        545,
+                        324
+                    ]
+                },
+                {
+                    "text": "PROOF",
+                    "box": [
+                        546,
+                        314,
+                        578,
+                        324
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        580,
+                        314,
+                        594,
+                        325
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        594,
+                        314,
+                        608,
+                        325
+                    ]
+                },
+                {
+                    "text": "SURE",
+                    "box": [
+                        609,
+                        314,
+                        634,
+                        325
+                    ]
+                },
+                {
+                    "text": "IT",
+                    "box": [
+                        634,
+                        314,
+                        644,
+                        324
+                    ]
+                },
+                {
+                    "text": "IS",
+                    "box": [
+                        645,
+                        314,
+                        653,
+                        324
+                    ]
+                },
+                {
+                    "text": "CORRECT,",
+                    "box": [
+                        98,
+                        330,
+                        144,
+                        340
+                    ]
+                },
+                {
+                    "text": "UNDER",
+                    "box": [
+                        149,
+                        330,
+                        183,
+                        340
+                    ]
+                },
+                {
+                    "text": "NO",
+                    "box": [
+                        183,
+                        330,
+                        197,
+                        338
+                    ]
+                },
+                {
+                    "text": "CIRCUMSTANCES",
+                    "box": [
+                        198,
+                        330,
+                        279,
+                        340
+                    ]
+                },
+                {
+                    "text": "ARE",
+                    "box": [
+                        279,
+                        328,
+                        299,
+                        339
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        299,
+                        330,
+                        313,
+                        338
+                    ]
+                },
+                {
+                    "text": "YOU",
+                    "box": [
+                        313,
+                        328,
+                        334,
+                        339
+                    ]
+                },
+                {
+                    "text": "RUN",
+                    "box": [
+                        335,
+                        328,
+                        356,
+                        338
+                    ]
+                },
+                {
+                    "text": "SUBSTITUTE",
+                    "box": [
+                        356,
+                        327,
+                        415,
+                        338
+                    ]
+                },
+                {
+                    "text": "MATERIALS,",
+                    "box": [
+                        415,
+                        327,
+                        468,
+                        338
+                    ]
+                },
+                {
+                    "text": "ALTERIOR",
+                    "box": [
+                        469,
+                        328,
+                        497,
+                        338
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        497,
+                        327,
+                        514,
+                        337
+                    ]
+                },
+                {
+                    "text": "OMIT",
+                    "box": [
+                        514,
+                        327,
+                        538,
+                        338
+                    ]
+                },
+                {
+                    "text": "ANY",
+                    "box": [
+                        538,
+                        327,
+                        559,
+                        338
+                    ]
+                },
+                {
+                    "text": "COPY",
+                    "box": [
+                        559,
+                        327,
+                        587,
+                        337
+                    ]
+                },
+                {
+                    "text": "WITHOUT",
+                    "box": [
+                        587,
+                        327,
+                        629,
+                        337
+                    ]
+                },
+                {
+                    "text": "PRIOR",
+                    "box": [
+                        628,
+                        327,
+                        659,
+                        337
+                    ]
+                },
+                {
+                    "text": "APPROVAL",
+                    "box": [
+                        96,
+                        341,
+                        146,
+                        354
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        147,
+                        342,
+                        174,
+                        353
+                    ]
+                },
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        175,
+                        342,
+                        228,
+                        352
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        228,
+                        339,
+                        259,
+                        352
+                    ]
+                },
+                {
+                    "text": "SERVICES.",
+                    "box": [
+                        260,
+                        341,
+                        306,
+                        351
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "NPT- 533- 7",
+            "box": [
+                98,
+                405,
+                155,
+                418
+            ],
+            "linking": [
+                [
+                    7,
+                    22
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "NPT-",
+                    "box": [
+                        98,
+                        406,
+                        125,
+                        416
+                    ]
+                },
+                {
+                    "text": "533-",
+                    "box": [
+                        124,
+                        406,
+                        148,
+                        417
+                    ]
+                },
+                {
+                    "text": "7",
+                    "box": [
+                        149,
+                        405,
+                        155,
+                        418
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "FOUNTAIN COUPLE",
+            "box": [
+                229,
+                402,
+                324,
+                417
+            ],
+            "linking": [
+                [
+                    8,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "FOUNTAIN",
+                    "box": [
+                        229,
+                        405,
+                        279,
+                        415
+                    ]
+                },
+                {
+                    "text": "COUPLE",
+                    "box": [
+                        282,
+                        402,
+                        324,
+                        417
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "JUNE 1995",
+            "box": [
+                525,
+                404,
+                576,
+                415
+            ],
+            "linking": [
+                [
+                    10,
+                    24
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "JUNE",
+                    "box": [
+                        525,
+                        404,
+                        552,
+                        415
+                    ]
+                },
+                {
+                    "text": "1995",
+                    "box": [
+                        552,
+                        404,
+                        576,
+                        412
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "IF UNABLE TO INSERT ON THE DATE ORDERED KINDLY NOTIFY US AT ONCE AND WAIT FOR NEW INSERTION DATE. NO CREDIT CAN BE ALLOWED SHOULD THIS ADVERTISEMENT APPEAR INCORRECTLY OR ON A DATE OTHER THAN THAT AUTHORIZED.",
+            "box": [
+                96,
+                478,
+                648,
+                504
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "IF",
+                    "box": [
+                        96,
+                        480,
+                        104,
+                        491
+                    ]
+                },
+                {
+                    "text": "UNABLE",
+                    "box": [
+                        108,
+                        482,
+                        143,
+                        492
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        145,
+                        480,
+                        158,
+                        491
+                    ]
+                },
+                {
+                    "text": "INSERT",
+                    "box": [
+                        161,
+                        480,
+                        193,
+                        491
+                    ]
+                },
+                {
+                    "text": "ON",
+                    "box": [
+                        194,
+                        479,
+                        209,
+                        490
+                    ]
+                },
+                {
+                    "text": "THE",
+                    "box": [
+                        211,
+                        480,
+                        229,
+                        490
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        232,
+                        479,
+                        256,
+                        492
+                    ]
+                },
+                {
+                    "text": "ORDERED",
+                    "box": [
+                        257,
+                        479,
+                        302,
+                        489
+                    ]
+                },
+                {
+                    "text": "KINDLY",
+                    "box": [
+                        304,
+                        479,
+                        338,
+                        490
+                    ]
+                },
+                {
+                    "text": "NOTIFY",
+                    "box": [
+                        339,
+                        480,
+                        371,
+                        490
+                    ]
+                },
+                {
+                    "text": "US",
+                    "box": [
+                        373,
+                        478,
+                        386,
+                        491
+                    ]
+                },
+                {
+                    "text": "AT",
+                    "box": [
+                        388,
+                        478,
+                        399,
+                        491
+                    ]
+                },
+                {
+                    "text": "ONCE",
+                    "box": [
+                        401,
+                        479,
+                        429,
+                        490
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        430,
+                        478,
+                        448,
+                        491
+                    ]
+                },
+                {
+                    "text": "WAIT",
+                    "box": [
+                        451,
+                        478,
+                        472,
+                        491
+                    ]
+                },
+                {
+                    "text": "FOR",
+                    "box": [
+                        475,
+                        479,
+                        493,
+                        489
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        496,
+                        479,
+                        518,
+                        489
+                    ]
+                },
+                {
+                    "text": "INSERTION",
+                    "box": [
+                        518,
+                        478,
+                        567,
+                        489
+                    ]
+                },
+                {
+                    "text": "DATE.",
+                    "box": [
+                        570,
+                        478,
+                        597,
+                        489
+                    ]
+                },
+                {
+                    "text": "NO",
+                    "box": [
+                        599,
+                        478,
+                        613,
+                        488
+                    ]
+                },
+                {
+                    "text": "CREDIT",
+                    "box": [
+                        616,
+                        478,
+                        648,
+                        488
+                    ]
+                },
+                {
+                    "text": "CAN",
+                    "box": [
+                        98,
+                        494,
+                        118,
+                        502
+                    ]
+                },
+                {
+                    "text": "BE",
+                    "box": [
+                        119,
+                        493,
+                        132,
+                        503
+                    ]
+                },
+                {
+                    "text": "ALLOWED",
+                    "box": [
+                        133,
+                        493,
+                        178,
+                        504
+                    ]
+                },
+                {
+                    "text": "SHOULD",
+                    "box": [
+                        179,
+                        493,
+                        217,
+                        503
+                    ]
+                },
+                {
+                    "text": "THIS",
+                    "box": [
+                        218,
+                        493,
+                        242,
+                        501
+                    ]
+                },
+                {
+                    "text": "ADVERTISEMENT",
+                    "box": [
+                        242,
+                        493,
+                        317,
+                        504
+                    ]
+                },
+                {
+                    "text": "APPEAR",
+                    "box": [
+                        317,
+                        493,
+                        355,
+                        503
+                    ]
+                },
+                {
+                    "text": "INCORRECTLY",
+                    "box": [
+                        355,
+                        492,
+                        419,
+                        503
+                    ]
+                },
+                {
+                    "text": "OR",
+                    "box": [
+                        419,
+                        492,
+                        433,
+                        502
+                    ]
+                },
+                {
+                    "text": "ON",
+                    "box": [
+                        436,
+                        492,
+                        450,
+                        502
+                    ]
+                },
+                {
+                    "text": "A",
+                    "box": [
+                        450,
+                        493,
+                        460,
+                        501
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        461,
+                        490,
+                        483,
+                        503
+                    ]
+                },
+                {
+                    "text": "OTHER",
+                    "box": [
+                        485,
+                        492,
+                        517,
+                        502
+                    ]
+                },
+                {
+                    "text": "THAN",
+                    "box": [
+                        518,
+                        490,
+                        543,
+                        501
+                    ]
+                },
+                {
+                    "text": "THAT",
+                    "box": [
+                        545,
+                        490,
+                        570,
+                        500
+                    ]
+                },
+                {
+                    "text": "AUTHORIZED.",
+                    "box": [
+                        570,
+                        492,
+                        629,
+                        500
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "POSITION URGENTLY REQUESTED:",
+            "box": [
+                96,
+                518,
+                249,
+                529
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "POSITION",
+                    "box": [
+                        96,
+                        518,
+                        139,
+                        528
+                    ]
+                },
+                {
+                    "text": "URGENTLY",
+                    "box": [
+                        142,
+                        518,
+                        189,
+                        528
+                    ]
+                },
+                {
+                    "text": "REQUESTED:",
+                    "box": [
+                        193,
+                        518,
+                        249,
+                        529
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "FAR FORWARD, OPPOSITE FULL EDITORIAL",
+            "box": [
+                96,
+                549,
+                305,
+                560
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "FAR",
+                    "box": [
+                        96,
+                        550,
+                        116,
+                        560
+                    ]
+                },
+                {
+                    "text": "FORWARD,",
+                    "box": [
+                        119,
+                        550,
+                        171,
+                        560
+                    ]
+                },
+                {
+                    "text": "OPPOSITE",
+                    "box": [
+                        173,
+                        550,
+                        223,
+                        560
+                    ]
+                },
+                {
+                    "text": "FULL",
+                    "box": [
+                        226,
+                        550,
+                        250,
+                        558
+                    ]
+                },
+                {
+                    "text": "EDITORIAL",
+                    "box": [
+                        253,
+                        549,
+                        305,
+                        559
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "- No coupon ad on backing page.",
+            "box": [
+                96,
+                581,
+                240,
+                592
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        96,
+                        582,
+                        104,
+                        592
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        108,
+                        581,
+                        119,
+                        592
+                    ]
+                },
+                {
+                    "text": "coupon",
+                    "box": [
+                        122,
+                        582,
+                        153,
+                        592
+                    ]
+                },
+                {
+                    "text": "ad",
+                    "box": [
+                        154,
+                        582,
+                        167,
+                        592
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        166,
+                        582,
+                        179,
+                        592
+                    ]
+                },
+                {
+                    "text": "backing",
+                    "box": [
+                        180,
+                        582,
+                        212,
+                        592
+                    ]
+                },
+                {
+                    "text": "page.",
+                    "box": [
+                        215,
+                        584,
+                        240,
+                        592
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "- Maintain at least six page separation from bompetitive ads.",
+            "box": [
+                253,
+                580,
+                499,
+                593
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        253,
+                        584,
+                        261,
+                        590
+                    ]
+                },
+                {
+                    "text": "Maintain",
+                    "box": [
+                        263,
+                        580,
+                        298,
+                        593
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        300,
+                        581,
+                        308,
+                        591
+                    ]
+                },
+                {
+                    "text": "least",
+                    "box": [
+                        309,
+                        580,
+                        331,
+                        593
+                    ]
+                },
+                {
+                    "text": "six",
+                    "box": [
+                        331,
+                        581,
+                        344,
+                        591
+                    ]
+                },
+                {
+                    "text": "page",
+                    "box": [
+                        345,
+                        582,
+                        366,
+                        592
+                    ]
+                },
+                {
+                    "text": "separation",
+                    "box": [
+                        369,
+                        581,
+                        411,
+                        591
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        413,
+                        581,
+                        431,
+                        591
+                    ]
+                },
+                {
+                    "text": "bompetitive",
+                    "box": [
+                        434,
+                        580,
+                        479,
+                        591
+                    ]
+                },
+                {
+                    "text": "ads.",
+                    "box": [
+                        482,
+                        581,
+                        499,
+                        589
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "- No aditional/ advertising matter to cigarette within 6 pages of our ad.",
+            "box": [
+                96,
+                595,
+                430,
+                608
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        96,
+                        599,
+                        104,
+                        606
+                    ]
+                },
+                {
+                    "text": "No",
+                    "box": [
+                        108,
+                        599,
+                        119,
+                        607
+                    ]
+                },
+                {
+                    "text": "aditional/",
+                    "box": [
+                        122,
+                        598,
+                        157,
+                        606
+                    ]
+                },
+                {
+                    "text": "advertising",
+                    "box": [
+                        156,
+                        598,
+                        201,
+                        606
+                    ]
+                },
+                {
+                    "text": "matter",
+                    "box": [
+                        204,
+                        598,
+                        231,
+                        608
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        230,
+                        598,
+                        276,
+                        606
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        277,
+                        598,
+                        287,
+                        608
+                    ]
+                },
+                {
+                    "text": "cigarette",
+                    "box": [
+                        288,
+                        598,
+                        329,
+                        608
+                    ]
+                },
+                {
+                    "text": "within",
+                    "box": [
+                        330,
+                        596,
+                        352,
+                        607
+                    ]
+                },
+                {
+                    "text": "6",
+                    "box": [
+                        353,
+                        596,
+                        361,
+                        606
+                    ]
+                },
+                {
+                    "text": "pages",
+                    "box": [
+                        362,
+                        596,
+                        389,
+                        607
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        390,
+                        595,
+                        400,
+                        608
+                    ]
+                },
+                {
+                    "text": "our",
+                    "box": [
+                        401,
+                        595,
+                        415,
+                        608
+                    ]
+                },
+                {
+                    "text": "ad.",
+                    "box": [
+                        415,
+                        598,
+                        430,
+                        606
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "COPY INSTRUCTIONS:",
+            "box": [
+                96,
+                613,
+                194,
+                624
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "COPY",
+                    "box": [
+                        96,
+                        613,
+                        123,
+                        624
+                    ]
+                },
+                {
+                    "text": "INSTRUCTIONS:",
+                    "box": [
+                        124,
+                        613,
+                        194,
+                        623
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "5 COLOR PROOF ATTACHED, FILM FROM COLLIER WITH \"D\" WARNING",
+            "box": [
+                96,
+                642,
+                430,
+                657
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "5",
+                    "box": [
+                        96,
+                        645,
+                        103,
+                        655
+                    ]
+                },
+                {
+                    "text": "COLOR",
+                    "box": [
+                        106,
+                        645,
+                        141,
+                        655
+                    ]
+                },
+                {
+                    "text": "PROOF",
+                    "box": [
+                        144,
+                        645,
+                        179,
+                        655
+                    ]
+                },
+                {
+                    "text": "ATTACHED,",
+                    "box": [
+                        180,
+                        644,
+                        234,
+                        657
+                    ]
+                },
+                {
+                    "text": "FILM",
+                    "box": [
+                        237,
+                        644,
+                        259,
+                        657
+                    ]
+                },
+                {
+                    "text": "FROM",
+                    "box": [
+                        264,
+                        642,
+                        292,
+                        655
+                    ]
+                },
+                {
+                    "text": "COLLIER",
+                    "box": [
+                        295,
+                        645,
+                        338,
+                        655
+                    ]
+                },
+                {
+                    "text": "WITH",
+                    "box": [
+                        338,
+                        644,
+                        365,
+                        655
+                    ]
+                },
+                {
+                    "text": "\"D\"",
+                    "box": [
+                        366,
+                        644,
+                        380,
+                        652
+                    ]
+                },
+                {
+                    "text": "WARNING",
+                    "box": [
+                        383,
+                        644,
+                        430,
+                        654
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "SURGEON GENERALS WARNING",
+            "box": [
+                461,
+                619,
+                578,
+                631
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SURGEON",
+                    "box": [
+                        461,
+                        620,
+                        495,
+                        631
+                    ]
+                },
+                {
+                    "text": "GENERALS",
+                    "box": [
+                        499,
+                        619,
+                        540,
+                        630
+                    ]
+                },
+                {
+                    "text": "WARNING",
+                    "box": [
+                        542,
+                        619,
+                        578,
+                        630
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "Smoke contains carbon Monoxide",
+            "box": [
+                459,
+                630,
+                600,
+                641
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Smoke",
+                    "box": [
+                        459,
+                        631,
+                        486,
+                        641
+                    ]
+                },
+                {
+                    "text": "contains",
+                    "box": [
+                        490,
+                        631,
+                        525,
+                        641
+                    ]
+                },
+                {
+                    "text": "carbon",
+                    "box": [
+                        528,
+                        630,
+                        559,
+                        641
+                    ]
+                },
+                {
+                    "text": "Monoxide",
+                    "box": [
+                        561,
+                        630,
+                        600,
+                        638
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "IMPORTANT INSTRUCTIONS:",
+            "box": [
+                96,
+                676,
+                220,
+                687
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "IMPORTANT",
+                    "box": [
+                        96,
+                        676,
+                        148,
+                        687
+                    ]
+                },
+                {
+                    "text": "INSTRUCTIONS:",
+                    "box": [
+                        149,
+                        676,
+                        220,
+                        687
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "A. Check material carefully against proof to make sure it corresponds in every respect",
+            "box": [
+                96,
+                703,
+                269,
+                736
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "A.",
+                    "box": [
+                        96,
+                        704,
+                        104,
+                        715
+                    ]
+                },
+                {
+                    "text": "Check",
+                    "box": [
+                        113,
+                        705,
+                        141,
+                        713
+                    ]
+                },
+                {
+                    "text": "material",
+                    "box": [
+                        142,
+                        705,
+                        177,
+                        712
+                    ]
+                },
+                {
+                    "text": "carefully",
+                    "box": [
+                        177,
+                        703,
+                        212,
+                        716
+                    ]
+                },
+                {
+                    "text": "against",
+                    "box": [
+                        215,
+                        704,
+                        244,
+                        714
+                    ]
+                },
+                {
+                    "text": "proof",
+                    "box": [
+                        247,
+                        703,
+                        269,
+                        716
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        115,
+                        716,
+                        125,
+                        724
+                    ]
+                },
+                {
+                    "text": "make",
+                    "box": [
+                        126,
+                        715,
+                        150,
+                        725
+                    ]
+                },
+                {
+                    "text": "sure",
+                    "box": [
+                        149,
+                        716,
+                        169,
+                        726
+                    ]
+                },
+                {
+                    "text": "it",
+                    "box": [
+                        170,
+                        716,
+                        177,
+                        724
+                    ]
+                },
+                {
+                    "text": "corresponds",
+                    "box": [
+                        179,
+                        716,
+                        231,
+                        723
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        232,
+                        714,
+                        242,
+                        724
+                    ]
+                },
+                {
+                    "text": "every",
+                    "box": [
+                        243,
+                        716,
+                        265,
+                        726
+                    ]
+                },
+                {
+                    "text": "respect",
+                    "box": [
+                        116,
+                        726,
+                        148,
+                        736
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "B. Please inspect repro material immediately. They should produce good printing results. Advise us promptly if Hor satisfactory",
+            "box": [
+                95,
+                744,
+                292,
+                778
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "B.",
+                    "box": [
+                        95,
+                        744,
+                        105,
+                        754
+                    ]
+                },
+                {
+                    "text": "Please",
+                    "box": [
+                        116,
+                        744,
+                        144,
+                        754
+                    ]
+                },
+                {
+                    "text": "inspect",
+                    "box": [
+                        145,
+                        744,
+                        177,
+                        752
+                    ]
+                },
+                {
+                    "text": "repro",
+                    "box": [
+                        179,
+                        744,
+                        201,
+                        755
+                    ]
+                },
+                {
+                    "text": "material",
+                    "box": [
+                        203,
+                        744,
+                        237,
+                        752
+                    ]
+                },
+                {
+                    "text": "immediately.",
+                    "box": [
+                        237,
+                        744,
+                        289,
+                        754
+                    ]
+                },
+                {
+                    "text": "They",
+                    "box": [
+                        115,
+                        756,
+                        136,
+                        764
+                    ]
+                },
+                {
+                    "text": "should",
+                    "box": [
+                        138,
+                        756,
+                        169,
+                        766
+                    ]
+                },
+                {
+                    "text": "produce",
+                    "box": [
+                        169,
+                        754,
+                        204,
+                        765
+                    ]
+                },
+                {
+                    "text": "good",
+                    "box": [
+                        205,
+                        756,
+                        227,
+                        767
+                    ]
+                },
+                {
+                    "text": "printing",
+                    "box": [
+                        229,
+                        756,
+                        261,
+                        766
+                    ]
+                },
+                {
+                    "text": "results.",
+                    "box": [
+                        263,
+                        756,
+                        292,
+                        764
+                    ]
+                },
+                {
+                    "text": "Advise",
+                    "box": [
+                        115,
+                        767,
+                        143,
+                        777
+                    ]
+                },
+                {
+                    "text": "us",
+                    "box": [
+                        145,
+                        767,
+                        155,
+                        777
+                    ]
+                },
+                {
+                    "text": "promptly",
+                    "box": [
+                        156,
+                        765,
+                        195,
+                        776
+                    ]
+                },
+                {
+                    "text": "if",
+                    "box": [
+                        196,
+                        767,
+                        203,
+                        777
+                    ]
+                },
+                {
+                    "text": "Hor",
+                    "box": [
+                        204,
+                        768,
+                        219,
+                        775
+                    ]
+                },
+                {
+                    "text": "satisfactory",
+                    "box": [
+                        219,
+                        767,
+                        268,
+                        778
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "C. Poor printing will not be paid for.",
+            "box": [
+                95,
+                786,
+                250,
+                798
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "C.",
+                    "box": [
+                        95,
+                        789,
+                        105,
+                        797
+                    ]
+                },
+                {
+                    "text": "Poor",
+                    "box": [
+                        117,
+                        788,
+                        137,
+                        798
+                    ]
+                },
+                {
+                    "text": "printing",
+                    "box": [
+                        138,
+                        789,
+                        169,
+                        797
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        170,
+                        788,
+                        187,
+                        798
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        187,
+                        789,
+                        201,
+                        796
+                    ]
+                },
+                {
+                    "text": "be",
+                    "box": [
+                        203,
+                        788,
+                        214,
+                        798
+                    ]
+                },
+                {
+                    "text": "paid",
+                    "box": [
+                        216,
+                        786,
+                        234,
+                        797
+                    ]
+                },
+                {
+                    "text": "for.",
+                    "box": [
+                        236,
+                        788,
+                        250,
+                        796
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "D. Advise us at once if instructions are not clear.",
+            "box": [
+                96,
+                807,
+                277,
+                830
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "D.",
+                    "box": [
+                        96,
+                        809,
+                        104,
+                        819
+                    ]
+                },
+                {
+                    "text": "Advise",
+                    "box": [
+                        116,
+                        809,
+                        144,
+                        819
+                    ]
+                },
+                {
+                    "text": "us",
+                    "box": [
+                        147,
+                        810,
+                        157,
+                        818
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        159,
+                        810,
+                        167,
+                        820
+                    ]
+                },
+                {
+                    "text": "once",
+                    "box": [
+                        169,
+                        807,
+                        190,
+                        820
+                    ]
+                },
+                {
+                    "text": "if",
+                    "box": [
+                        190,
+                        809,
+                        198,
+                        819
+                    ]
+                },
+                {
+                    "text": "instructions",
+                    "box": [
+                        198,
+                        809,
+                        245,
+                        820
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        249,
+                        809,
+                        262,
+                        817
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        264,
+                        807,
+                        277,
+                        817
+                    ]
+                },
+                {
+                    "text": "clear.",
+                    "box": [
+                        117,
+                        820,
+                        141,
+                        830
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "E. Under no circumstances are you to space out our advertisement without specific instructions from us.",
+            "box": [
+                95,
+                839,
+                287,
+                873
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "E.",
+                    "box": [
+                        95,
+                        839,
+                        103,
+                        849
+                    ]
+                },
+                {
+                    "text": "Under",
+                    "box": [
+                        116,
+                        839,
+                        141,
+                        850
+                    ]
+                },
+                {
+                    "text": "no",
+                    "box": [
+                        144,
+                        839,
+                        157,
+                        849
+                    ]
+                },
+                {
+                    "text": "circumstances",
+                    "box": [
+                        156,
+                        841,
+                        217,
+                        851
+                    ]
+                },
+                {
+                    "text": "are",
+                    "box": [
+                        218,
+                        842,
+                        232,
+                        850
+                    ]
+                },
+                {
+                    "text": "you",
+                    "box": [
+                        233,
+                        839,
+                        250,
+                        850
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        250,
+                        839,
+                        260,
+                        849
+                    ]
+                },
+                {
+                    "text": "space",
+                    "box": [
+                        263,
+                        841,
+                        287,
+                        851
+                    ]
+                },
+                {
+                    "text": "out",
+                    "box": [
+                        117,
+                        852,
+                        131,
+                        862
+                    ]
+                },
+                {
+                    "text": "our",
+                    "box": [
+                        133,
+                        852,
+                        148,
+                        862
+                    ]
+                },
+                {
+                    "text": "advertisement",
+                    "box": [
+                        149,
+                        852,
+                        209,
+                        862
+                    ]
+                },
+                {
+                    "text": "without",
+                    "box": [
+                        209,
+                        852,
+                        240,
+                        862
+                    ]
+                },
+                {
+                    "text": "specific",
+                    "box": [
+                        240,
+                        852,
+                        274,
+                        863
+                    ]
+                },
+                {
+                    "text": "instructions",
+                    "box": [
+                        117,
+                        863,
+                        164,
+                        873
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        165,
+                        863,
+                        187,
+                        871
+                    ]
+                },
+                {
+                    "text": "us.",
+                    "box": [
+                        187,
+                        865,
+                        202,
+                        872
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "SPACE BILLING INSTRUCTIONS:",
+            "box": [
+                448,
+                672,
+                589,
+                685
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SPACE BILLING",
+                    "box": [
+                        448,
+                        672,
+                        515,
+                        685
+                    ]
+                },
+                {
+                    "text": "INSTRUCTIONS:",
+                    "box": [
+                        518,
+                        672,
+                        589,
+                        683
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "The space is being brdered by:",
+            "box": [
+                447,
+                701,
+                579,
+                714
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        447,
+                        703,
+                        467,
+                        711
+                    ]
+                },
+                {
+                    "text": "space",
+                    "box": [
+                        468,
+                        703,
+                        493,
+                        714
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        494,
+                        704,
+                        502,
+                        714
+                    ]
+                },
+                {
+                    "text": "being",
+                    "box": [
+                        504,
+                        703,
+                        529,
+                        714
+                    ]
+                },
+                {
+                    "text": "brdered",
+                    "box": [
+                        531,
+                        701,
+                        563,
+                        712
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        564,
+                        703,
+                        579,
+                        713
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "LOAILLARD MEDIA SERVICES",
+            "box": [
+                448,
+                722,
+                577,
+                734
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "LOAILLARD",
+                    "box": [
+                        448,
+                        723,
+                        497,
+                        734
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        499,
+                        722,
+                        530,
+                        733
+                    ]
+                },
+                {
+                    "text": "SERVICES",
+                    "box": [
+                        531,
+                        723,
+                        577,
+                        734
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "Direct all invoices and full checking copies of all regional and national additions to:",
+            "box": [
+                447,
+                751,
+                622,
+                773
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Direct",
+                    "box": [
+                        448,
+                        751,
+                        472,
+                        764
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        473,
+                        751,
+                        483,
+                        764
+                    ]
+                },
+                {
+                    "text": "invoices",
+                    "box": [
+                        486,
+                        751,
+                        521,
+                        764
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        521,
+                        753,
+                        539,
+                        764
+                    ]
+                },
+                {
+                    "text": "full",
+                    "box": [
+                        541,
+                        751,
+                        554,
+                        762
+                    ]
+                },
+                {
+                    "text": "checking",
+                    "box": [
+                        554,
+                        751,
+                        592,
+                        764
+                    ]
+                },
+                {
+                    "text": "copies",
+                    "box": [
+                        594,
+                        753,
+                        622,
+                        764
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        447,
+                        765,
+                        457,
+                        773
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        459,
+                        764,
+                        469,
+                        771
+                    ]
+                },
+                {
+                    "text": "regional",
+                    "box": [
+                        471,
+                        765,
+                        505,
+                        773
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        507,
+                        765,
+                        524,
+                        773
+                    ]
+                },
+                {
+                    "text": "national",
+                    "box": [
+                        524,
+                        765,
+                        559,
+                        773
+                    ]
+                },
+                {
+                    "text": "additions",
+                    "box": [
+                        559,
+                        765,
+                        593,
+                        773
+                    ]
+                },
+                {
+                    "text": "to:",
+                    "box": [
+                        592,
+                        765,
+                        605,
+                        772
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "LORILLARD MEDIA SERVICES ONE PARK AVENUE 17TH FLOOR NEW YORK NEW YORK 10016- 5896",
+            "box": [
+                448,
+                785,
+                605,
+                828
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        448,
+                        785,
+                        497,
+                        796
+                    ]
+                },
+                {
+                    "text": "MEDIA",
+                    "box": [
+                        500,
+                        785,
+                        528,
+                        795
+                    ]
+                },
+                {
+                    "text": "SERVICES",
+                    "box": [
+                        531,
+                        785,
+                        576,
+                        793
+                    ]
+                },
+                {
+                    "text": "ONE",
+                    "box": [
+                        450,
+                        796,
+                        468,
+                        803
+                    ]
+                },
+                {
+                    "text": "PARK",
+                    "box": [
+                        471,
+                        796,
+                        496,
+                        804
+                    ]
+                },
+                {
+                    "text": "AVENUE",
+                    "box": [
+                        496,
+                        795,
+                        535,
+                        805
+                    ]
+                },
+                {
+                    "text": "17TH",
+                    "box": [
+                        450,
+                        804,
+                        470,
+                        815
+                    ]
+                },
+                {
+                    "text": "FLOOR",
+                    "box": [
+                        472,
+                        806,
+                        503,
+                        816
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        448,
+                        816,
+                        469,
+                        827
+                    ]
+                },
+                {
+                    "text": "YORK",
+                    "box": [
+                        471,
+                        817,
+                        500,
+                        827
+                    ]
+                },
+                {
+                    "text": "NEW",
+                    "box": [
+                        500,
+                        816,
+                        522,
+                        826
+                    ]
+                },
+                {
+                    "text": "YORK",
+                    "box": [
+                        524,
+                        814,
+                        549,
+                        827
+                    ]
+                },
+                {
+                    "text": "10016-",
+                    "box": [
+                        552,
+                        817,
+                        583,
+                        828
+                    ]
+                },
+                {
+                    "text": "5896",
+                    "box": [
+                        584,
+                        816,
+                        605,
+                        827
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "STEVE MOLLOY",
+            "box": [
+                479,
+                827,
+                546,
+                836
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "STEVE",
+                    "box": [
+                        479,
+                        827,
+                        508,
+                        835
+                    ]
+                },
+                {
+                    "text": "MOLLOY",
+                    "box": [
+                        510,
+                        828,
+                        546,
+                        836
+                    ]
+                }
+            ],
+            "id": 46
+        }
+    ]
+}

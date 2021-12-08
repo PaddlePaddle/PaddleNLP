@@ -1,0 +1,3535 @@
+{
+    "form": [
+        {
+            "box": [
+                503,
+                63,
+                560,
+                81
+            ],
+            "text": "Telephone:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        503,
+                        63,
+                        560,
+                        81
+                    ],
+                    "text": "Telephone:"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    42
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                444,
+                134,
+                521,
+                154
+            ],
+            "text": "TELEPHONE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        444,
+                        134,
+                        521,
+                        154
+                    ],
+                    "text": "TELEPHONE"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    44
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                14,
+                165,
+                42,
+                182
+            ],
+            "text": "AME",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        14,
+                        165,
+                        42,
+                        182
+                    ],
+                    "text": "AME"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    46
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                372,
+                166,
+                453,
+                186
+            ],
+            "text": "AFFILLATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        372,
+                        166,
+                        453,
+                        186
+                    ],
+                    "text": "AFFILLATION"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                13,
+                193,
+                62,
+                211
+            ],
+            "text": "DDRESS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        13,
+                        193,
+                        62,
+                        211
+                    ],
+                    "text": "DDRESS"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    47
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                446,
+                222,
+                524,
+                242
+            ],
+            "text": "TELEPHONE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        446,
+                        222,
+                        524,
+                        242
+                    ],
+                    "text": "TELEPHONE"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                372,
+                254,
+                453,
+                269
+            ],
+            "text": "AFFILIATION",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        372,
+                        254,
+                        453,
+                        269
+                    ],
+                    "text": "AFFILIATION"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                8,
+                254,
+                46,
+                268
+            ],
+            "text": "AME",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        8,
+                        254,
+                        46,
+                        268
+                    ],
+                    "text": "AME"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                7,
+                282,
+                64,
+                299
+            ],
+            "text": "DDRESS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        7,
+                        282,
+                        64,
+                        299
+                    ],
+                    "text": "DDRESS"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                349,
+                448,
+                390,
+                463
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        448,
+                        390,
+                        463
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    9,
+                    57
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                8,
+                447,
+                53,
+                462
+            ],
+            "text": "resider",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        8,
+                        447,
+                        53,
+                        462
+                    ],
+                    "text": "resider"
+                }
+            ],
+            "linking": [
+                [
+                    10,
+                    56
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                20,
+                468,
+                70,
+                486
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        20,
+                        468,
+                        70,
+                        486
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    11,
+                    58
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                22,
+                521,
+                69,
+                538
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        22,
+                        521,
+                        69,
+                        538
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    61
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                349,
+                500,
+                388,
+                515
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        500,
+                        388,
+                        515
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    30
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                351,
+                573,
+                390,
+                588
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        351,
+                        573,
+                        390,
+                        588
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    14,
+                    65
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                20,
+                592,
+                72,
+                609
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        20,
+                        592,
+                        72,
+                        609
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    15,
+                    66
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                20,
+                615,
+                51,
+                632
+            ],
+            "text": "Topic.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        20,
+                        615,
+                        51,
+                        632
+                    ],
+                    "text": "Topic."
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    67
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                21,
+                666,
+                71,
+                680
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        21,
+                        666,
+                        71,
+                        680
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    17,
+                    70
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                21,
+                689,
+                50,
+                702
+            ],
+            "text": "Topic",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        21,
+                        689,
+                        50,
+                        702
+                    ],
+                    "text": "Topic"
+                }
+            ],
+            "linking": [
+                [
+                    18,
+                    71
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                352,
+                642,
+                391,
+                662
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        352,
+                        642,
+                        391,
+                        662
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    31
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                349,
+                718,
+                391,
+                733
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        718,
+                        391,
+                        733
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    20,
+                    32
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                349,
+                788,
+                391,
+                803
+            ],
+            "text": "Position",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        788,
+                        391,
+                        803
+                    ],
+                    "text": "Position"
+                }
+            ],
+            "linking": [
+                [
+                    21,
+                    33
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                22,
+                807,
+                72,
+                824
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        22,
+                        807,
+                        72,
+                        824
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    78
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                20,
+                831,
+                49,
+                846
+            ],
+            "text": "Tοpic",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        20,
+                        831,
+                        49,
+                        846
+                    ],
+                    "text": "Tοpic"
+                }
+            ],
+            "linking": [
+                [
+                    23,
+                    79
+                ]
+            ],
+            "id": 23
+        },
+        {
+            "box": [
+                22,
+                737,
+                72,
+                754
+            ],
+            "text": "Affiliation",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        22,
+                        737,
+                        72,
+                        754
+                    ],
+                    "text": "Affiliation"
+                }
+            ],
+            "linking": [
+                [
+                    24,
+                    74
+                ]
+            ],
+            "id": 24
+        },
+        {
+            "box": [
+                21,
+                761,
+                49,
+                775
+            ],
+            "text": "Topic",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        21,
+                        761,
+                        49,
+                        775
+                    ],
+                    "text": "Topic"
+                }
+            ],
+            "linking": [
+                [
+                    25,
+                    75
+                ]
+            ],
+            "id": 25
+        },
+        {
+            "box": [
+                529,
+                149,
+                551,
+                159
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        529,
+                        149,
+                        551,
+                        159
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 26
+        },
+        {
+            "box": [
+                552,
+                151,
+                574,
+                161
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        552,
+                        151,
+                        574,
+                        161
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 27
+        },
+        {
+            "box": [
+                605,
+                149,
+                641,
+                162
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        605,
+                        149,
+                        641,
+                        162
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 28
+        },
+        {
+            "box": [
+                605,
+                237,
+                643,
+                247
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        605,
+                        237,
+                        643,
+                        247
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 29
+        },
+        {
+            "box": [
+                419,
+                493,
+                504,
+                513
+            ],
+            "text": "Professor",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        419,
+                        493,
+                        504,
+                        513
+                    ],
+                    "text": "Professor"
+                }
+            ],
+            "linking": [
+                [
+                    13,
+                    30
+                ]
+            ],
+            "id": 30
+        },
+        {
+            "box": [
+                413,
+                635,
+                498,
+                656
+            ],
+            "text": "Professor",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        413,
+                        635,
+                        498,
+                        656
+                    ],
+                    "text": "Professor"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    31
+                ]
+            ],
+            "id": 31
+        },
+        {
+            "box": [
+                419,
+                707,
+                510,
+                725
+            ],
+            "text": "Professor",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        419,
+                        707,
+                        510,
+                        725
+                    ],
+                    "text": "Professor"
+                }
+            ],
+            "linking": [
+                [
+                    20,
+                    32
+                ]
+            ],
+            "id": 32
+        },
+        {
+            "box": [
+                413,
+                779,
+                544,
+                796
+            ],
+            "text": "Cytogeneticist",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        413,
+                        779,
+                        544,
+                        796
+                    ],
+                    "text": "Cytogeneticist"
+                }
+            ],
+            "linking": [
+                [
+                    21,
+                    33
+                ]
+            ],
+            "id": 33
+        },
+        {
+            "box": [
+                21,
+                546,
+                50,
+                561
+            ],
+            "text": "Topic",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        21,
+                        546,
+                        50,
+                        561
+                    ],
+                    "text": "Topic"
+                }
+            ],
+            "linking": [
+                [
+                    34,
+                    62
+                ]
+            ],
+            "id": 34
+        },
+        {
+            "text": "Annual Meeting Los Angeles",
+            "box": [
+                75,
+                11,
+                225,
+                56
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Annual",
+                    "box": [
+                        82,
+                        11,
+                        143,
+                        31
+                    ]
+                },
+                {
+                    "text": "Meeting",
+                    "box": [
+                        147,
+                        14,
+                        217,
+                        35
+                    ]
+                },
+                {
+                    "text": "Los",
+                    "box": [
+                        75,
+                        29,
+                        118,
+                        51
+                    ]
+                },
+                {
+                    "text": "Angeles",
+                    "box": [
+                        122,
+                        31,
+                        225,
+                        56
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "26- 31 May 1983",
+            "box": [
+                106,
+                53,
+                197,
+                73
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "26-",
+                    "box": [
+                        106,
+                        53,
+                        124,
+                        68
+                    ]
+                },
+                {
+                    "text": "31",
+                    "box": [
+                        124,
+                        54,
+                        138,
+                        68
+                    ]
+                },
+                {
+                    "text": "May",
+                    "box": [
+                        138,
+                        53,
+                        165,
+                        73
+                    ]
+                },
+                {
+                    "text": "1983",
+                    "box": [
+                        168,
+                        53,
+                        197,
+                        70
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "ACCEPTED SYMPOSIUM",
+            "box": [
+                256,
+                0,
+                469,
+                21
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ACCEPTED",
+                    "box": [
+                        256,
+                        1,
+                        355,
+                        19
+                    ]
+                },
+                {
+                    "text": "SYMPOSIUM",
+                    "box": [
+                        353,
+                        0,
+                        469,
+                        21
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Preliminary Program Information",
+            "box": [
+                261,
+                22,
+                463,
+                44
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Preliminary",
+                    "box": [
+                        261,
+                        24,
+                        335,
+                        44
+                    ]
+                },
+                {
+                    "text": "Program",
+                    "box": [
+                        335,
+                        24,
+                        387,
+                        42
+                    ]
+                },
+                {
+                    "text": "Information",
+                    "box": [
+                        388,
+                        22,
+                        463,
+                        40
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Submit not later than 1 November",
+            "box": [
+                254,
+                59,
+                473,
+                81
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Submit",
+                    "box": [
+                        254,
+                        60,
+                        301,
+                        81
+                    ]
+                },
+                {
+                    "text": "not",
+                    "box": [
+                        302,
+                        61,
+                        327,
+                        81
+                    ]
+                },
+                {
+                    "text": "later",
+                    "box": [
+                        327,
+                        61,
+                        358,
+                        79
+                    ]
+                },
+                {
+                    "text": "than",
+                    "box": [
+                        360,
+                        63,
+                        391,
+                        78
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        390,
+                        63,
+                        401,
+                        80
+                    ]
+                },
+                {
+                    "text": "November",
+                    "box": [
+                        402,
+                        59,
+                        473,
+                        81
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "Return this form to:",
+            "box": [
+                501,
+                0,
+                636,
+                20
+            ],
+            "linking": [
+                [
+                    40,
+                    41
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Return",
+                    "box": [
+                        501,
+                        3,
+                        548,
+                        17
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        547,
+                        0,
+                        575,
+                        20
+                    ]
+                },
+                {
+                    "text": "form",
+                    "box": [
+                        574,
+                        1,
+                        609,
+                        19
+                    ]
+                },
+                {
+                    "text": "to:",
+                    "box": [
+                        612,
+                        1,
+                        636,
+                        19
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "AAAS Meetings Office 1101 Vermont Ave., N W. Washington, D. C. 20005",
+            "box": [
+                500,
+                17,
+                632,
+                64
+            ],
+            "linking": [
+                [
+                    40,
+                    41
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "AAAS",
+                    "box": [
+                        501,
+                        18,
+                        537,
+                        32
+                    ]
+                },
+                {
+                    "text": "Meetings",
+                    "box": [
+                        539,
+                        17,
+                        588,
+                        35
+                    ]
+                },
+                {
+                    "text": "Office",
+                    "box": [
+                        587,
+                        18,
+                        619,
+                        35
+                    ]
+                },
+                {
+                    "text": "1101",
+                    "box": [
+                        500,
+                        31,
+                        528,
+                        46
+                    ]
+                },
+                {
+                    "text": "Vermont",
+                    "box": [
+                        529,
+                        31,
+                        574,
+                        49
+                    ]
+                },
+                {
+                    "text": "Ave.,",
+                    "box": [
+                        571,
+                        35,
+                        602,
+                        50
+                    ]
+                },
+                {
+                    "text": "N",
+                    "box": [
+                        602,
+                        35,
+                        615,
+                        46
+                    ]
+                },
+                {
+                    "text": "W.",
+                    "box": [
+                        615,
+                        34,
+                        632,
+                        48
+                    ]
+                },
+                {
+                    "text": "Washington,",
+                    "box": [
+                        501,
+                        47,
+                        568,
+                        64
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        568,
+                        47,
+                        582,
+                        61
+                    ]
+                },
+                {
+                    "text": "C.",
+                    "box": [
+                        582,
+                        49,
+                        596,
+                        63
+                    ]
+                },
+                {
+                    "text": "20005",
+                    "box": [
+                        596,
+                        49,
+                        631,
+                        63
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "(202) 842- 9530",
+            "box": [
+                559,
+                64,
+                641,
+                81
+            ],
+            "linking": [
+                [
+                    0,
+                    42
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "(202)",
+                    "box": [
+                        559,
+                        64,
+                        590,
+                        81
+                    ]
+                },
+                {
+                    "text": "842-",
+                    "box": [
+                        589,
+                        64,
+                        613,
+                        81
+                    ]
+                },
+                {
+                    "text": "9530",
+                    "box": [
+                        613,
+                        64,
+                        641,
+                        79
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "READ REVERSE SIDE BEFORE FILLING OUT THIS FORM",
+            "box": [
+                173,
+                101,
+                516,
+                119
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "READ",
+                    "box": [
+                        173,
+                        101,
+                        211,
+                        116
+                    ]
+                },
+                {
+                    "text": "REVERSE",
+                    "box": [
+                        211,
+                        102,
+                        274,
+                        117
+                    ]
+                },
+                {
+                    "text": "SIDE",
+                    "box": [
+                        271,
+                        102,
+                        306,
+                        116
+                    ]
+                },
+                {
+                    "text": "BEFORE",
+                    "box": [
+                        306,
+                        102,
+                        359,
+                        117
+                    ]
+                },
+                {
+                    "text": "FILLING",
+                    "box": [
+                        359,
+                        102,
+                        412,
+                        119
+                    ]
+                },
+                {
+                    "text": "OUT",
+                    "box": [
+                        412,
+                        103,
+                        441,
+                        116
+                    ]
+                },
+                {
+                    "text": "THIS",
+                    "box": [
+                        443,
+                        103,
+                        475,
+                        117
+                    ]
+                },
+                {
+                    "text": "FORM",
+                    "box": [
+                        475,
+                        102,
+                        516,
+                        117
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "202/ 457- 4850",
+            "box": [
+                527,
+                127,
+                641,
+                151
+            ],
+            "linking": [
+                [
+                    1,
+                    44
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "202/",
+                    "box": [
+                        527,
+                        127,
+                        562,
+                        151
+                    ]
+                },
+                {
+                    "text": "457-",
+                    "box": [
+                        568,
+                        127,
+                        606,
+                        148
+                    ]
+                },
+                {
+                    "text": "4850",
+                    "box": [
+                        606,
+                        130,
+                        641,
+                        151
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "RINCIPAL ORGANIZER (who will receive correspondence):",
+            "box": [
+                14,
+                137,
+                337,
+                155
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RINCIPAL",
+                    "box": [
+                        14,
+                        137,
+                        74,
+                        154
+                    ]
+                },
+                {
+                    "text": "ORGANIZER",
+                    "box": [
+                        74,
+                        138,
+                        154,
+                        153
+                    ]
+                },
+                {
+                    "text": "(who",
+                    "box": [
+                        156,
+                        137,
+                        184,
+                        154
+                    ]
+                },
+                {
+                    "text": "will",
+                    "box": [
+                        186,
+                        138,
+                        206,
+                        153
+                    ]
+                },
+                {
+                    "text": "receive",
+                    "box": [
+                        205,
+                        140,
+                        243,
+                        155
+                    ]
+                },
+                {
+                    "text": "correspondence):",
+                    "box": [
+                        246,
+                        140,
+                        337,
+                        155
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "Marvin A Kastenbaum",
+            "box": [
+                61,
+                165,
+                248,
+                182
+            ],
+            "linking": [
+                [
+                    2,
+                    46
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Marvin",
+                    "box": [
+                        61,
+                        165,
+                        121,
+                        182
+                    ]
+                },
+                {
+                    "text": "A",
+                    "box": [
+                        124,
+                        165,
+                        142,
+                        182
+                    ]
+                },
+                {
+                    "text": "Kastenbaum",
+                    "box": [
+                        154,
+                        165,
+                        248,
+                        182
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "1825 Eye Street, NW Suite 800",
+            "box": [
+                61,
+                191,
+                320,
+                214
+            ],
+            "linking": [
+                [
+                    4,
+                    47
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "1825",
+                    "box": [
+                        61,
+                        193,
+                        102,
+                        210
+                    ]
+                },
+                {
+                    "text": "Eye",
+                    "box": [
+                        108,
+                        193,
+                        137,
+                        214
+                    ]
+                },
+                {
+                    "text": "Street,",
+                    "box": [
+                        144,
+                        193,
+                        203,
+                        214
+                    ]
+                },
+                {
+                    "text": "NW",
+                    "box": [
+                        207,
+                        191,
+                        231,
+                        209
+                    ]
+                },
+                {
+                    "text": "Suite",
+                    "box": [
+                        236,
+                        193,
+                        285,
+                        213
+                    ]
+                },
+                {
+                    "text": "800",
+                    "box": [
+                        291,
+                        193,
+                        320,
+                        211
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "CITY STATE, ",
+            "box": [
+                323,
+                193,
+                426,
+                213
+            ],
+            "linking": [
+                [
+                    48,
+                    49
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CITY",
+                    "box": [
+                        323,
+                        193,
+                        358,
+                        213
+                    ]
+                },
+                {
+                    "text": "STATE,",
+                    "box": [
+                        360,
+                        196,
+                        403,
+                        211
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        402,
+                        196,
+                        426,
+                        213
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "Washington DC 20006",
+            "box": [
+                433,
+                190,
+                618,
+                211
+            ],
+            "linking": [
+                [
+                    48,
+                    49
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Washington",
+                    "box": [
+                        433,
+                        190,
+                        535,
+                        211
+                    ]
+                },
+                {
+                    "text": "DC",
+                    "box": [
+                        543,
+                        191,
+                        563,
+                        209
+                    ]
+                },
+                {
+                    "text": "20006",
+                    "box": [
+                        568,
+                        190,
+                        618,
+                        210
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "",
+            "box": [
+                529,
+                236,
+                573,
+                249
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        529,
+                        237,
+                        551,
+                        248
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        552,
+                        236,
+                        573,
+                        249
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "O ORGANIZER (if applicable):",
+            "box": [
+                10,
+                221,
+                186,
+                243
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "O",
+                    "box": [
+                        10,
+                        221,
+                        30,
+                        242
+                    ]
+                },
+                {
+                    "text": "ORGANIZER",
+                    "box": [
+                        29,
+                        225,
+                        104,
+                        243
+                    ]
+                },
+                {
+                    "text": "(if",
+                    "box": [
+                        105,
+                        225,
+                        122,
+                        243
+                    ]
+                },
+                {
+                    "text": "applicable):",
+                    "box": [
+                        122,
+                        225,
+                        186,
+                        242
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "CITY, STATE, ZIP",
+            "box": [
+                324,
+                282,
+                424,
+                299
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CITY,",
+                    "box": [
+                        324,
+                        282,
+                        360,
+                        299
+                    ]
+                },
+                {
+                    "text": "STATE,",
+                    "box": [
+                        359,
+                        282,
+                        402,
+                        299
+                    ]
+                },
+                {
+                    "text": "ZIP",
+                    "box": [
+                        402,
+                        282,
+                        424,
+                        299
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "INAL TITLE OF SYMPOSIUM",
+            "box": [
+                10,
+                360,
+                188,
+                380
+            ],
+            "linking": [
+                [
+                    53,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "INAL",
+                    "box": [
+                        10,
+                        360,
+                        44,
+                        377
+                    ]
+                },
+                {
+                    "text": "TITLE",
+                    "box": [
+                        46,
+                        360,
+                        87,
+                        377
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        87,
+                        363,
+                        107,
+                        380
+                    ]
+                },
+                {
+                    "text": "SYMPOSIUM",
+                    "box": [
+                        108,
+                        360,
+                        188,
+                        378
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "FOR ONE SESSION",
+            "box": [
+                288,
+                324,
+                402,
+                342
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "FOR",
+                    "box": [
+                        288,
+                        324,
+                        319,
+                        342
+                    ]
+                },
+                {
+                    "text": "ONE",
+                    "box": [
+                        320,
+                        324,
+                        348,
+                        341
+                    ]
+                },
+                {
+                    "text": "SESSION",
+                    "box": [
+                        348,
+                        325,
+                        402,
+                        342
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "THE HUMAN CHROMOSOME",
+            "box": [
+                279,
+                351,
+                470,
+                373
+            ],
+            "linking": [
+                [
+                    53,
+                    55
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "THE",
+                    "box": [
+                        279,
+                        351,
+                        311,
+                        372
+                    ]
+                },
+                {
+                    "text": "HUMAN",
+                    "box": [
+                        317,
+                        352,
+                        367,
+                        370
+                    ]
+                },
+                {
+                    "text": "CHROMOSOME",
+                    "box": [
+                        372,
+                        351,
+                        470,
+                        373
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "Dr. William J. Schull",
+            "box": [
+                64,
+                439,
+                258,
+                461
+            ],
+            "linking": [
+                [
+                    10,
+                    56
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        64,
+                        439,
+                        93,
+                        459
+                    ]
+                },
+                {
+                    "text": "William",
+                    "box": [
+                        99,
+                        440,
+                        170,
+                        457
+                    ]
+                },
+                {
+                    "text": "J.",
+                    "box": [
+                        173,
+                        441,
+                        191,
+                        461
+                    ]
+                },
+                {
+                    "text": "Schull",
+                    "box": [
+                        201,
+                        439,
+                        258,
+                        461
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "Director - Genetics Centers",
+            "box": [
+                391,
+                436,
+                638,
+                460
+            ],
+            "linking": [
+                [
+                    9,
+                    57
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Director",
+                    "box": [
+                        391,
+                        439,
+                        468,
+                        460
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        472,
+                        440,
+                        487,
+                        458
+                    ]
+                },
+                {
+                    "text": "Genetics",
+                    "box": [
+                        490,
+                        439,
+                        567,
+                        457
+                    ]
+                },
+                {
+                    "text": "Centers",
+                    "box": [
+                        574,
+                        436,
+                        638,
+                        458
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "Univ. of Texas Graduate School of Biomedical Sciences (Houston)",
+            "box": [
+                73,
+                461,
+                658,
+                485
+            ],
+            "linking": [
+                [
+                    11,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Univ.",
+                    "box": [
+                        73,
+                        465,
+                        120,
+                        485
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        128,
+                        465,
+                        152,
+                        485
+                    ]
+                },
+                {
+                    "text": "Texas",
+                    "box": [
+                        156,
+                        464,
+                        205,
+                        484
+                    ]
+                },
+                {
+                    "text": "Graduate",
+                    "box": [
+                        219,
+                        466,
+                        294,
+                        481
+                    ]
+                },
+                {
+                    "text": "School",
+                    "box": [
+                        302,
+                        465,
+                        358,
+                        483
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        363,
+                        462,
+                        385,
+                        483
+                    ]
+                },
+                {
+                    "text": "Biomedical",
+                    "box": [
+                        391,
+                        464,
+                        485,
+                        484
+                    ]
+                },
+                {
+                    "text": "Sciences",
+                    "box": [
+                        492,
+                        462,
+                        567,
+                        484
+                    ]
+                },
+                {
+                    "text": "(Houston)",
+                    "box": [
+                        574,
+                        461,
+                        658,
+                        482
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "- Speaker",
+            "box": [
+                10,
+                499,
+                63,
+                517
+            ],
+            "linking": [
+                [
+                    59,
+                    60
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        10,
+                        501,
+                        18,
+                        515
+                    ]
+                },
+                {
+                    "text": "Speaker",
+                    "box": [
+                        22,
+                        499,
+                        63,
+                        517
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "Dr. Jorge J. Yunis",
+            "box": [
+                74,
+                494,
+                233,
+                512
+            ],
+            "linking": [
+                [
+                    59,
+                    60
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        74,
+                        494,
+                        102,
+                        512
+                    ]
+                },
+                {
+                    "text": "Jorge",
+                    "box": [
+                        109,
+                        494,
+                        152,
+                        511
+                    ]
+                },
+                {
+                    "text": "J.",
+                    "box": [
+                        158,
+                        494,
+                        178,
+                        512
+                    ]
+                },
+                {
+                    "text": "Yunis",
+                    "box": [
+                        186,
+                        494,
+                        233,
+                        511
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "Univ. of Minnesota School of Medicine",
+            "box": [
+                94,
+                510,
+                433,
+                532
+            ],
+            "linking": [
+                [
+                    12,
+                    61
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Univ.",
+                    "box": [
+                        94,
+                        515,
+                        140,
+                        532
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        148,
+                        514,
+                        170,
+                        531
+                    ]
+                },
+                {
+                    "text": "Minnesota",
+                    "box": [
+                        176,
+                        515,
+                        258,
+                        530
+                    ]
+                },
+                {
+                    "text": "School",
+                    "box": [
+                        274,
+                        513,
+                        327,
+                        531
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        334,
+                        513,
+                        354,
+                        528
+                    ]
+                },
+                {
+                    "text": "Medicine",
+                    "box": [
+                        362,
+                        510,
+                        433,
+                        528
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "The Oncogene, the Fragile Site, and Nonrandom Aberrations",
+            "box": [
+                67,
+                534,
+                586,
+                557
+            ],
+            "linking": [
+                [
+                    34,
+                    62
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        67,
+                        538,
+                        95,
+                        555
+                    ]
+                },
+                {
+                    "text": "Oncogene,",
+                    "box": [
+                        102,
+                        539,
+                        184,
+                        557
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        193,
+                        536,
+                        224,
+                        554
+                    ]
+                },
+                {
+                    "text": "Fragile",
+                    "box": [
+                        229,
+                        535,
+                        295,
+                        556
+                    ]
+                },
+                {
+                    "text": "Site,",
+                    "box": [
+                        300,
+                        535,
+                        347,
+                        556
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        358,
+                        534,
+                        389,
+                        554
+                    ]
+                },
+                {
+                    "text": "Nonrandom",
+                    "box": [
+                        391,
+                        534,
+                        479,
+                        552
+                    ]
+                },
+                {
+                    "text": "Aberrations",
+                    "box": [
+                        485,
+                        534,
+                        586,
+                        554
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "- Speaker",
+            "box": [
+                10,
+                571,
+                65,
+                591
+            ],
+            "linking": [
+                [
+                    63,
+                    64
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        10,
+                        571,
+                        21,
+                        591
+                    ]
+                },
+                {
+                    "text": "Speaker",
+                    "box": [
+                        20,
+                        571,
+                        65,
+                        586
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "Dr. Sheldon Wolff",
+            "box": [
+                75,
+                561,
+                238,
+                584
+            ],
+            "linking": [
+                [
+                    63,
+                    64
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        75,
+                        561,
+                        104,
+                        583
+                    ]
+                },
+                {
+                    "text": "Sheldon",
+                    "box": [
+                        110,
+                        564,
+                        178,
+                        584
+                    ]
+                },
+                {
+                    "text": "Wolff",
+                    "box": [
+                        186,
+                        563,
+                        238,
+                        581
+                    ]
+                }
+            ],
+            "id": 64
+        },
+        {
+            "text": "Chairman - Professor of Cytogenetic",
+            "box": [
+                391,
+                559,
+                713,
+                582
+            ],
+            "linking": [
+                [
+                    14,
+                    65
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Chairman",
+                    "box": [
+                        391,
+                        560,
+                        469,
+                        582
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        473,
+                        561,
+                        488,
+                        582
+                    ]
+                },
+                {
+                    "text": "Professor",
+                    "box": [
+                        492,
+                        561,
+                        576,
+                        582
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        584,
+                        559,
+                        604,
+                        581
+                    ]
+                },
+                {
+                    "text": "Cytogenetic",
+                    "box": [
+                        610,
+                        561,
+                        713,
+                        582
+                    ]
+                }
+            ],
+            "id": 65
+        },
+        {
+            "text": "Laborat. Radiobiology& Environmental Health - U. of Cal. San Francis",
+            "box": [
+                74,
+                582,
+                713,
+                606
+            ],
+            "linking": [
+                [
+                    15,
+                    66
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Laborat.",
+                    "box": [
+                        74,
+                        585,
+                        149,
+                        605
+                    ]
+                },
+                {
+                    "text": "Radiobiology&",
+                    "box": [
+                        156,
+                        584,
+                        287,
+                        605
+                    ]
+                },
+                {
+                    "text": "Environmental",
+                    "box": [
+                        293,
+                        584,
+                        412,
+                        606
+                    ]
+                },
+                {
+                    "text": "Health",
+                    "box": [
+                        419,
+                        585,
+                        478,
+                        606
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        482,
+                        587,
+                        497,
+                        605
+                    ]
+                },
+                {
+                    "text": "U.",
+                    "box": [
+                        501,
+                        584,
+                        521,
+                        606
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        528,
+                        584,
+                        550,
+                        601
+                    ]
+                },
+                {
+                    "text": "Cal.",
+                    "box": [
+                        554,
+                        584,
+                        590,
+                        604
+                    ]
+                },
+                {
+                    "text": "San",
+                    "box": [
+                        609,
+                        582,
+                        641,
+                        602
+                    ]
+                },
+                {
+                    "text": "Francis",
+                    "box": [
+                        647,
+                        584,
+                        713,
+                        604
+                    ]
+                }
+            ],
+            "id": 66
+        },
+        {
+            "text": "Sister- -Chromatid Exchanges",
+            "box": [
+                92,
+                608,
+                332,
+                630
+            ],
+            "linking": [
+                [
+                    16,
+                    67
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Sister-",
+                    "box": [
+                        92,
+                        613,
+                        160,
+                        630
+                    ]
+                },
+                {
+                    "text": "-Chromatid",
+                    "box": [
+                        158,
+                        608,
+                        245,
+                        629
+                    ]
+                },
+                {
+                    "text": "Exchanges",
+                    "box": [
+                        247,
+                        612,
+                        332,
+                        629
+                    ]
+                }
+            ],
+            "id": 67
+        },
+        {
+            "text": "- Speaker",
+            "box": [
+                10,
+                645,
+                63,
+                662
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        10,
+                        648,
+                        20,
+                        662
+                    ]
+                },
+                {
+                    "text": "Speaker",
+                    "box": [
+                        20,
+                        645,
+                        63,
+                        660
+                    ]
+                }
+            ],
+            "id": 68
+        },
+        {
+            "text": "Dr. Patricia Jacobs",
+            "box": [
+                67,
+                637,
+                245,
+                657
+            ],
+            "linking": [
+                [
+                    68,
+                    69
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        67,
+                        638,
+                        96,
+                        656
+                    ]
+                },
+                {
+                    "text": "Patricia",
+                    "box": [
+                        103,
+                        640,
+                        181,
+                        655
+                    ]
+                },
+                {
+                    "text": "Jacobs",
+                    "box": [
+                        186,
+                        637,
+                        245,
+                        657
+                    ]
+                }
+            ],
+            "id": 69
+        },
+        {
+            "text": "University of Hawai - Dept. of Anatomy",
+            "box": [
+                87,
+                656,
+                444,
+                679
+            ],
+            "linking": [
+                [
+                    17,
+                    70
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "University",
+                    "box": [
+                        87,
+                        658,
+                        182,
+                        675
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        186,
+                        656,
+                        208,
+                        674
+                    ]
+                },
+                {
+                    "text": "Hawai",
+                    "box": [
+                        214,
+                        656,
+                        267,
+                        678
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        275,
+                        659,
+                        289,
+                        673
+                    ]
+                },
+                {
+                    "text": "Dept.",
+                    "box": [
+                        295,
+                        658,
+                        341,
+                        678
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        348,
+                        656,
+                        369,
+                        673
+                    ]
+                },
+                {
+                    "text": "Anatomy",
+                    "box": [
+                        377,
+                        658,
+                        444,
+                        679
+                    ]
+                }
+            ],
+            "id": 70
+        },
+        {
+            "text": "Abnormal Human Chromosome Complements",
+            "box": [
+                66,
+                679,
+                409,
+                703
+            ],
+            "linking": [
+                [
+                    18,
+                    71
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Abnormal",
+                    "box": [
+                        66,
+                        683,
+                        143,
+                        703
+                    ]
+                },
+                {
+                    "text": "Human",
+                    "box": [
+                        151,
+                        679,
+                        200,
+                        701
+                    ]
+                },
+                {
+                    "text": "Chromosome",
+                    "box": [
+                        207,
+                        682,
+                        299,
+                        700
+                    ]
+                },
+                {
+                    "text": "Complements",
+                    "box": [
+                        303,
+                        679,
+                        409,
+                        700
+                    ]
+                }
+            ],
+            "id": 71
+        },
+        {
+            "text": "Dr. Raymond White",
+            "box": [
+                92,
+                707,
+                257,
+                729
+            ],
+            "linking": [
+                [
+                    73,
+                    72
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        92,
+                        707,
+                        124,
+                        728
+                    ]
+                },
+                {
+                    "text": "Raymond",
+                    "box": [
+                        131,
+                        709,
+                        198,
+                        727
+                    ]
+                },
+                {
+                    "text": "White",
+                    "box": [
+                        203,
+                        708,
+                        257,
+                        729
+                    ]
+                }
+            ],
+            "id": 72
+        },
+        {
+            "text": "- Speaker",
+            "box": [
+                8,
+                716,
+                63,
+                733
+            ],
+            "linking": [
+                [
+                    73,
+                    72
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        8,
+                        718,
+                        21,
+                        731
+                    ]
+                },
+                {
+                    "text": "Speaker",
+                    "box": [
+                        20,
+                        716,
+                        63,
+                        733
+                    ]
+                }
+            ],
+            "id": 73
+        },
+        {
+            "text": "University of Utah",
+            "box": [
+                95,
+                729,
+                264,
+                752
+            ],
+            "linking": [
+                [
+                    24,
+                    74
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "University",
+                    "box": [
+                        95,
+                        732,
+                        190,
+                        752
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        194,
+                        729,
+                        219,
+                        750
+                    ]
+                },
+                {
+                    "text": "Utah",
+                    "box": [
+                        219,
+                        730,
+                        264,
+                        747
+                    ]
+                }
+            ],
+            "id": 74
+        },
+        {
+            "text": "Human Linkage Map based on DNA Markers",
+            "box": [
+                95,
+                749,
+                463,
+                773
+            ],
+            "linking": [
+                [
+                    25,
+                    75
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "",
+                    "box": [
+                        95,
+                        750,
+                        109,
+                        771
+                    ]
+                },
+                {
+                    "text": "Human",
+                    "box": [
+                        112,
+                        751,
+                        162,
+                        769
+                    ]
+                },
+                {
+                    "text": "Linkage",
+                    "box": [
+                        169,
+                        751,
+                        236,
+                        769
+                    ]
+                },
+                {
+                    "text": "Map",
+                    "box": [
+                        236,
+                        753,
+                        271,
+                        773
+                    ]
+                },
+                {
+                    "text": "based",
+                    "box": [
+                        275,
+                        750,
+                        324,
+                        770
+                    ]
+                },
+                {
+                    "text": "on",
+                    "box": [
+                        332,
+                        749,
+                        354,
+                        771
+                    ]
+                },
+                {
+                    "text": "DNA",
+                    "box": [
+                        358,
+                        751,
+                        389,
+                        768
+                    ]
+                },
+                {
+                    "text": "Markers",
+                    "box": [
+                        392,
+                        750,
+                        463,
+                        768
+                    ]
+                }
+            ],
+            "id": 75
+        },
+        {
+            "text": "- Speaker",
+            "box": [
+                10,
+                788,
+                64,
+                806
+            ],
+            "linking": [
+                [
+                    76,
+                    77
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "-",
+                    "box": [
+                        10,
+                        793,
+                        20,
+                        803
+                    ]
+                },
+                {
+                    "text": "Speaker",
+                    "box": [
+                        22,
+                        788,
+                        64,
+                        806
+                    ]
+                }
+            ],
+            "id": 76
+        },
+        {
+            "text": "Dr. Michael A. Bender",
+            "box": [
+                75,
+                779,
+                265,
+                801
+            ],
+            "linking": [
+                [
+                    76,
+                    77
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Dr.",
+                    "box": [
+                        75,
+                        781,
+                        106,
+                        801
+                    ]
+                },
+                {
+                    "text": "Michael",
+                    "box": [
+                        113,
+                        779,
+                        180,
+                        799
+                    ]
+                },
+                {
+                    "text": "A.",
+                    "box": [
+                        183,
+                        779,
+                        201,
+                        796
+                    ]
+                },
+                {
+                    "text": "Bender",
+                    "box": [
+                        205,
+                        779,
+                        265,
+                        800
+                    ]
+                }
+            ],
+            "id": 77
+        },
+        {
+            "text": "Brookhaven National Laboratory - Medical Department",
+            "box": [
+                98,
+                799,
+                581,
+                823
+            ],
+            "linking": [
+                [
+                    22,
+                    78
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Brookhaven",
+                    "box": [
+                        98,
+                        802,
+                        192,
+                        823
+                    ]
+                },
+                {
+                    "text": "National",
+                    "box": [
+                        196,
+                        799,
+                        274,
+                        817
+                    ]
+                },
+                {
+                    "text": "Laboratory",
+                    "box": [
+                        275,
+                        799,
+                        373,
+                        821
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        385,
+                        800,
+                        402,
+                        821
+                    ]
+                },
+                {
+                    "text": "Medical",
+                    "box": [
+                        409,
+                        799,
+                        480,
+                        819
+                    ]
+                },
+                {
+                    "text": "Department",
+                    "box": [
+                        483,
+                        799,
+                        581,
+                        816
+                    ]
+                }
+            ],
+            "id": 78
+        },
+        {
+            "text": "Cyrogeneric Epidemiology",
+            "box": [
+                94,
+                824,
+                318,
+                846
+            ],
+            "linking": [
+                [
+                    23,
+                    79
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Cyrogeneric",
+                    "box": [
+                        94,
+                        824,
+                        203,
+                        846
+                    ]
+                },
+                {
+                    "text": "Epidemiology",
+                    "box": [
+                        208,
+                        824,
+                        318,
+                        845
+                    ]
+                }
+            ],
+            "id": 79
+        },
+        {
+            "text": "See Reverse Side",
+            "box": [
+                603,
+                852,
+                691,
+                870
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "See",
+                    "box": [
+                        603,
+                        853,
+                        625,
+                        868
+                    ]
+                },
+                {
+                    "text": "Reverse",
+                    "box": [
+                        626,
+                        853,
+                        667,
+                        870
+                    ]
+                },
+                {
+                    "text": "Side",
+                    "box": [
+                        669,
+                        852,
+                        691,
+                        869
+                    ]
+                }
+            ],
+            "id": 80
+        }
+    ]
+}

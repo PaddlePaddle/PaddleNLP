@@ -1,0 +1,1035 @@
+{
+    "form": [
+        {
+            "box": [
+                88,
+                142,
+                110,
+                152
+            ],
+            "text": "",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        142,
+                        110,
+                        152
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    17
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                492,
+                138,
+                513,
+                151
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        492,
+                        138,
+                        513,
+                        151
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    18
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                88,
+                222,
+                134,
+                236
+            ],
+            "text": "STRUCTURE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        222,
+                        134,
+                        236
+                    ],
+                    "text": "STRUCTURE"
+                }
+            ],
+            "linking": [
+                [
+                    2,
+                    20
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                88,
+                385,
+                134,
+                399
+            ],
+            "text": "COMMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        88,
+                        385,
+                        134,
+                        399
+                    ],
+                    "text": "COMMENTS"
+                }
+            ],
+            "linking": [
+                [
+                    3,
+                    23
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                469,
+                603,
+                484,
+                616
+            ],
+            "text": "J.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        469,
+                        603,
+                        484,
+                        616
+                    ],
+                    "text": "J."
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                490,
+                602,
+                503,
+                617
+            ],
+            "text": "D.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        490,
+                        602,
+                        503,
+                        617
+                    ],
+                    "text": "D."
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                513,
+                601,
+                548,
+                616
+            ],
+            "text": "Engle",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        513,
+                        601,
+                        548,
+                        616
+                    ],
+                    "text": "Engle"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                469,
+                687,
+                484,
+                701
+            ],
+            "text": "R.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        469,
+                        687,
+                        484,
+                        701
+                    ],
+                    "text": "R."
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                490,
+                686,
+                505,
+                700
+            ],
+            "text": "F.",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        490,
+                        686,
+                        505,
+                        700
+                    ],
+                    "text": "F."
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                513,
+                687,
+                572,
+                700
+            ],
+            "text": "Dufresne",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        513,
+                        687,
+                        572,
+                        700
+                    ],
+                    "text": "Dufresne"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                115,
+                186,
+                182,
+                204
+            ],
+            "text": "Vanitrope",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        115,
+                        186,
+                        182,
+                        204
+                    ],
+                    "text": "Vanitrope"
+                }
+            ],
+            "linking": [
+                [
+                    19,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                208,
+                369,
+                236,
+                386
+            ],
+            "text": "III",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        208,
+                        369,
+                        236,
+                        386
+                    ],
+                    "text": "III"
+                }
+            ],
+            "linking": [
+                [
+                    21,
+                    11
+                ]
+            ],
+            "id": 11
+        },
+        {
+            "box": [
+                451,
+                366,
+                482,
+                381
+            ],
+            "text": "B134",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        451,
+                        366,
+                        482,
+                        381
+                    ],
+                    "text": "B134"
+                }
+            ],
+            "linking": [
+                [
+                    22,
+                    12
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                479,
+                570,
+                559,
+                622
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        479,
+                        570,
+                        559,
+                        622
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    25,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                471,
+                648,
+                657,
+                711
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        471,
+                        648,
+                        657,
+                        711
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    24,
+                    14
+                ]
+            ],
+            "id": 14
+        },
+        {
+            "box": [
+                654,
+                785,
+                669,
+                873
+            ],
+            "text": "87086073",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        654,
+                        785,
+                        669,
+                        873
+                    ],
+                    "text": "87086073"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "text": "DECISION TREE ESTIMATION OF TOXIC RISK",
+            "box": [
+                212,
+                113,
+                556,
+                136
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "DECISION",
+                    "box": [
+                        212,
+                        115,
+                        289,
+                        136
+                    ]
+                },
+                {
+                    "text": "TREE",
+                    "box": [
+                        295,
+                        115,
+                        329,
+                        136
+                    ]
+                },
+                {
+                    "text": "ESTIMATION",
+                    "box": [
+                        335,
+                        115,
+                        430,
+                        136
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        434,
+                        115,
+                        459,
+                        133
+                    ]
+                },
+                {
+                    "text": "TOXIC",
+                    "box": [
+                        464,
+                        113,
+                        511,
+                        135
+                    ]
+                },
+                {
+                    "text": "RISK",
+                    "box": [
+                        517,
+                        115,
+                        556,
+                        132
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "J. D. Ergle and R. F. Dufresne",
+            "box": [
+                115,
+                142,
+                329,
+                161
+            ],
+            "linking": [
+                [
+                    0,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "J.",
+                    "box": [
+                        115,
+                        147,
+                        130,
+                        160
+                    ]
+                },
+                {
+                    "text": "D.",
+                    "box": [
+                        135,
+                        142,
+                        150,
+                        160
+                    ]
+                },
+                {
+                    "text": "Ergle",
+                    "box": [
+                        159,
+                        144,
+                        193,
+                        161
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        198,
+                        145,
+                        225,
+                        159
+                    ]
+                },
+                {
+                    "text": "R.",
+                    "box": [
+                        226,
+                        144,
+                        241,
+                        159
+                    ]
+                },
+                {
+                    "text": "F.",
+                    "box": [
+                        246,
+                        144,
+                        263,
+                        159
+                    ]
+                },
+                {
+                    "text": "Dufresne",
+                    "box": [
+                        270,
+                        142,
+                        329,
+                        159
+                    ]
+                }
+            ],
+            "id": 17
+        },
+        {
+            "text": "August 14, 1990",
+            "box": [
+                522,
+                135,
+                630,
+                159
+            ],
+            "linking": [
+                [
+                    1,
+                    18
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "August",
+                    "box": [
+                        522,
+                        137,
+                        565,
+                        159
+                    ]
+                },
+                {
+                    "text": "14,",
+                    "box": [
+                        571,
+                        137,
+                        592,
+                        155
+                    ]
+                },
+                {
+                    "text": "1990",
+                    "box": [
+                        595,
+                        135,
+                        630,
+                        153
+                    ]
+                }
+            ],
+            "id": 18
+        },
+        {
+            "text": "COMPOUND NAME",
+            "box": [
+                89,
+                169,
+                155,
+                180
+            ],
+            "linking": [
+                [
+                    19,
+                    10
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        89,
+                        169,
+                        132,
+                        179
+                    ]
+                },
+                {
+                    "text": "NAME",
+                    "box": [
+                        133,
+                        169,
+                        155,
+                        180
+                    ]
+                }
+            ],
+            "id": 19
+        },
+        {
+            "text": "CH3CH2O OH",
+            "box": [
+                279,
+                221,
+                532,
+                343
+            ],
+            "linking": [
+                [
+                    2,
+                    20
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "CH3CH2O",
+                    "box": [
+                        279,
+                        292,
+                        338,
+                        312
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        342,
+                        221,
+                        532,
+                        326
+                    ]
+                },
+                {
+                    "text": "OH",
+                    "box": [
+                        391,
+                        323,
+                        418,
+                        343
+                    ]
+                }
+            ],
+            "id": 20
+        },
+        {
+            "text": "ESTIMATED TOXICITY CLASS",
+            "box": [
+                89,
+                359,
+                195,
+                373
+            ],
+            "linking": [
+                [
+                    21,
+                    11
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ESTIMATED",
+                    "box": [
+                        89,
+                        360,
+                        131,
+                        373
+                    ]
+                },
+                {
+                    "text": "TOXICITY",
+                    "box": [
+                        133,
+                        359,
+                        165,
+                        372
+                    ]
+                },
+                {
+                    "text": "CLASS",
+                    "box": [
+                        163,
+                        360,
+                        195,
+                        373
+                    ]
+                }
+            ],
+            "id": 21
+        },
+        {
+            "text": "LORILLARO COMPOUND CODE NUMBER",
+            "box": [
+                387,
+                356,
+                535,
+                371
+            ],
+            "linking": [
+                [
+                    22,
+                    12
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LORILLARO",
+                    "box": [
+                        387,
+                        356,
+                        429,
+                        371
+                    ]
+                },
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        430,
+                        358,
+                        475,
+                        369
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        476,
+                        358,
+                        497,
+                        368
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        497,
+                        356,
+                        535,
+                        369
+                    ]
+                }
+            ],
+            "id": 22
+        },
+        {
+            "text": "This ethoxy substitued aromatic falls into class III.",
+            "box": [
+                119,
+                409,
+                496,
+                428
+            ],
+            "linking": [
+                [
+                    3,
+                    23
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "This",
+                    "box": [
+                        119,
+                        411,
+                        148,
+                        428
+                    ]
+                },
+                {
+                    "text": "ethoxy",
+                    "box": [
+                        154,
+                        413,
+                        197,
+                        428
+                    ]
+                },
+                {
+                    "text": "substitued",
+                    "box": [
+                        203,
+                        411,
+                        283,
+                        426
+                    ]
+                },
+                {
+                    "text": "aromatic",
+                    "box": [
+                        286,
+                        411,
+                        342,
+                        428
+                    ]
+                },
+                {
+                    "text": "falls",
+                    "box": [
+                        349,
+                        409,
+                        384,
+                        427
+                    ]
+                },
+                {
+                    "text": "into",
+                    "box": [
+                        391,
+                        409,
+                        420,
+                        426
+                    ]
+                },
+                {
+                    "text": "class",
+                    "box": [
+                        427,
+                        409,
+                        462,
+                        426
+                    ]
+                },
+                {
+                    "text": "III.",
+                    "box": [
+                        469,
+                        409,
+                        496,
+                        426
+                    ]
+                }
+            ],
+            "id": 23
+        },
+        {
+            "text": "Research Chemist",
+            "box": [
+                469,
+                700,
+                585,
+                718
+            ],
+            "linking": [
+                [
+                    24,
+                    14
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        469,
+                        701,
+                        528,
+                        718
+                    ]
+                },
+                {
+                    "text": "Chemist",
+                    "box": [
+                        532,
+                        700,
+                        585,
+                        714
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "Research Chemist",
+            "box": [
+                471,
+                616,
+                587,
+                631
+            ],
+            "linking": [
+                [
+                    25,
+                    13
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Research",
+                    "box": [
+                        471,
+                        617,
+                        528,
+                        631
+                    ]
+                },
+                {
+                    "text": "Chemist",
+                    "box": [
+                        534,
+                        616,
+                        587,
+                        630
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "LORILLARD RESEARCH CENTER",
+            "box": [
+                92,
+                926,
+                210,
+                937
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "LORILLARD",
+                    "box": [
+                        92,
+                        927,
+                        134,
+                        937
+                    ]
+                },
+                {
+                    "text": "RESEARCH",
+                    "box": [
+                        135,
+                        927,
+                        176,
+                        937
+                    ]
+                },
+                {
+                    "text": "CENTER",
+                    "box": [
+                        176,
+                        926,
+                        210,
+                        937
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "FORM ",
+            "box": [
+                635,
+                919,
+                694,
+                932
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "FORM",
+                    "box": [
+                        635,
+                        919,
+                        663,
+                        932
+                    ]
+                },
+                {
+                    "text": "",
+                    "box": [
+                        666,
+                        920,
+                        694,
+                        931
+                    ]
+                }
+            ],
+            "id": 27
+        }
+    ]
+}

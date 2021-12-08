@@ -1,0 +1,2971 @@
+{
+    "form": [
+        {
+            "box": [
+                43,
+                391,
+                96,
+                402
+            ],
+            "text": "EXPLOSIVE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        43,
+                        391,
+                        96,
+                        402
+                    ],
+                    "text": "EXPLOSIVE"
+                }
+            ],
+            "linking": [
+                [
+                    44,
+                    0
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                43,
+                412,
+                96,
+                426
+            ],
+            "text": "FLAMMABLE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        43,
+                        412,
+                        96,
+                        426
+                    ],
+                    "text": "FLAMMABLE"
+                }
+            ],
+            "linking": [
+                [
+                    44,
+                    1
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                42,
+                432,
+                109,
+                443
+            ],
+            "text": "RADIOACTIVE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        42,
+                        432,
+                        109,
+                        443
+                    ],
+                    "text": "RADIOACTIVE"
+                }
+            ],
+            "linking": [
+                [
+                    44,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                74,
+                471,
+                109,
+                484
+            ],
+            "text": "SOLID",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        74,
+                        471,
+                        109,
+                        484
+                    ],
+                    "text": "SOLID"
+                }
+            ],
+            "linking": [
+                [
+                    47,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                70,
+                489,
+                106,
+                497
+            ],
+            "text": "LIQUID",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        70,
+                        489,
+                        106,
+                        497
+                    ],
+                    "text": "LIQUID"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    7
+                ],
+                [
+                    47,
+                    4
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                42,
+                504,
+                110,
+                515
+            ],
+            "text": "PRESSURIZED",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        42,
+                        504,
+                        110,
+                        515
+                    ],
+                    "text": "PRESSURIZED"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                215,
+                476,
+                285,
+                497
+            ],
+            "text": "Colorless",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        215,
+                        476,
+                        285,
+                        497
+                    ],
+                    "text": "Colorless"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                123,
+                483,
+                134,
+                496
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        123,
+                        483,
+                        134,
+                        496
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    7
+                ]
+            ],
+            "id": 7
+        },
+        {
+            "box": [
+                289,
+                486,
+                321,
+                496
+            ],
+            "text": "COLOR",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        289,
+                        486,
+                        321,
+                        496
+                    ],
+                    "text": "COLOR"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                399,
+                133,
+                414,
+                153
+            ],
+            "text": "1",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        399,
+                        133,
+                        414,
+                        153
+                    ],
+                    "text": "1"
+                }
+            ],
+            "linking": [
+                [
+                    31,
+                    9
+                ]
+            ],
+            "id": 9
+        },
+        {
+            "box": [
+                592,
+                131,
+                646,
+                152
+            ],
+            "text": "642-138",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        592,
+                        131,
+                        646,
+                        152
+                    ],
+                    "text": "642-138"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    10
+                ]
+            ],
+            "id": 10
+        },
+        {
+            "box": [
+                682,
+                17,
+                745,
+                48
+            ],
+            "text": "B166",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        682,
+                        17,
+                        745,
+                        48
+                    ],
+                    "text": "B166"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                471,
+                183,
+                527,
+                197
+            ],
+            "text": "SIGNATURE:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        471,
+                        183,
+                        527,
+                        197
+                    ],
+                    "text": "SIGNATURE:"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ]
+            ],
+            "id": 12
+        },
+        {
+            "box": [
+                538,
+                161,
+                648,
+                200
+            ],
+            "text": "D.",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        538,
+                        161,
+                        648,
+                        200
+                    ],
+                    "text": "D."
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    13
+                ]
+            ],
+            "id": 13
+        },
+        {
+            "box": [
+                532,
+                158,
+                552,
+                175
+            ],
+            "text": "",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        532,
+                        158,
+                        552,
+                        175
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                563,
+                162,
+                608,
+                176
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        563,
+                        162,
+                        608,
+                        176
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    35,
+                    15
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                531,
+                233,
+                587,
+                253
+            ],
+            "text": "9/28/83",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        531,
+                        233,
+                        587,
+                        253
+                    ],
+                    "text": "9/28/83"
+                }
+            ],
+            "linking": [
+                [
+                    37,
+                    16
+                ]
+            ],
+            "id": 16
+        },
+        {
+            "box": [
+                654,
+                235,
+                706,
+                250
+            ],
+            "text": "20.845",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        654,
+                        235,
+                        706,
+                        250
+                    ],
+                    "text": "20.845"
+                }
+            ],
+            "linking": [
+                [
+                    38,
+                    17
+                ]
+            ],
+            "id": 17
+        },
+        {
+            "box": [
+                425,
+                472,
+                439,
+                485
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        425,
+                        472,
+                        439,
+                        485
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    57,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                627,
+                459,
+                691,
+                470
+            ],
+            "text": "DESSICATOR",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        627,
+                        459,
+                        691,
+                        470
+                    ],
+                    "text": "DESSICATOR"
+                }
+            ],
+            "linking": [
+                [
+                    55,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                627,
+                476,
+                673,
+                487
+            ],
+            "text": "FREEZER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        627,
+                        476,
+                        673,
+                        487
+                    ],
+                    "text": "FREEZER"
+                }
+            ],
+            "linking": [
+                [
+                    55,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                628,
+                492,
+                660,
+                505
+            ],
+            "text": "OTHER",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        628,
+                        492,
+                        660,
+                        505
+                    ],
+                    "text": "OTHER"
+                }
+            ],
+            "linking": [
+                [
+                    55,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                183,
+                230,
+                217,
+                248
+            ],
+            "text": "B166",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        183,
+                        230,
+                        217,
+                        248
+                    ],
+                    "text": "B166"
+                }
+            ],
+            "linking": [
+                [
+                    39,
+                    22
+                ]
+            ],
+            "id": 22
+        },
+        {
+            "box": [
+                349,
+                162,
+                383,
+                177
+            ],
+            "text": "3212",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        349,
+                        162,
+                        383,
+                        177
+                    ],
+                    "text": "3212"
+                }
+            ],
+            "linking": [],
+            "id": 23
+        },
+        {
+            "box": [
+                605,
+                413,
+                620,
+                426
+            ],
+            "text": "☑",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        605,
+                        413,
+                        620,
+                        426
+                    ],
+                    "text": "☑"
+                }
+            ],
+            "linking": [
+                [
+                    54,
+                    24
+                ]
+            ],
+            "id": 24
+        },
+        {
+            "box": [
+                693,
+                810,
+                713,
+                906
+            ],
+            "text": "00866042",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        693,
+                        810,
+                        713,
+                        906
+                    ],
+                    "text": "00866042"
+                }
+            ],
+            "linking": [],
+            "id": 25
+        },
+        {
+            "text": "HAZLETON LABORATORIES AMERICA INC",
+            "box": [
+                304,
+                74,
+                555,
+                125
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "HAZLETON",
+                    "box": [
+                        306,
+                        74,
+                        522,
+                        106
+                    ]
+                },
+                {
+                    "text": "LABORATORIES",
+                    "box": [
+                        304,
+                        110,
+                        431,
+                        123
+                    ]
+                },
+                {
+                    "text": "AMERICA",
+                    "box": [
+                        434,
+                        109,
+                        518,
+                        123
+                    ]
+                },
+                {
+                    "text": "INC",
+                    "box": [
+                        521,
+                        110,
+                        555,
+                        125
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "PROJECT SHEET",
+            "box": [
+                41,
+                82,
+                174,
+                100
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        41,
+                        82,
+                        115,
+                        99
+                    ]
+                },
+                {
+                    "text": "SHEET",
+                    "box": [
+                        120,
+                        82,
+                        174,
+                        100
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "9200 EESAURG TURNPIKE VIENNA VIRGINIA 22180 USA",
+            "box": [
+                581,
+                77,
+                743,
+                116
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "9200",
+                    "box": [
+                        581,
+                        77,
+                        623,
+                        88
+                    ]
+                },
+                {
+                    "text": "EESAURG",
+                    "box": [
+                        624,
+                        78,
+                        683,
+                        88
+                    ]
+                },
+                {
+                    "text": "TURNPIKE",
+                    "box": [
+                        683,
+                        81,
+                        743,
+                        91
+                    ]
+                },
+                {
+                    "text": "VIENNA",
+                    "box": [
+                        594,
+                        91,
+                        640,
+                        104
+                    ]
+                },
+                {
+                    "text": "VIRGINIA",
+                    "box": [
+                        640,
+                        92,
+                        694,
+                        100
+                    ]
+                },
+                {
+                    "text": "22180",
+                    "box": [
+                        694,
+                        92,
+                        739,
+                        105
+                    ]
+                },
+                {
+                    "text": "USA",
+                    "box": [
+                        645,
+                        102,
+                        681,
+                        116
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "DATE ISSUED",
+            "box": [
+                45,
+                140,
+                110,
+                153
+            ],
+            "linking": [
+                [
+                    29,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DATE",
+                    "box": [
+                        45,
+                        141,
+                        70,
+                        152
+                    ]
+                },
+                {
+                    "text": "ISSUED",
+                    "box": [
+                        75,
+                        140,
+                        110,
+                        153
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "Oct. 11, 1983",
+            "box": [
+                123,
+                130,
+                220,
+                150
+            ],
+            "linking": [
+                [
+                    29,
+                    30
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Oct.",
+                    "box": [
+                        123,
+                        130,
+                        152,
+                        148
+                    ]
+                },
+                {
+                    "text": "11,",
+                    "box": [
+                        159,
+                        130,
+                        187,
+                        150
+                    ]
+                },
+                {
+                    "text": "1983",
+                    "box": [
+                        191,
+                        130,
+                        220,
+                        147
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "PROJECT SHEET NO.",
+            "box": [
+                278,
+                141,
+                376,
+                156
+            ],
+            "linking": [
+                [
+                    31,
+                    9
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        278,
+                        142,
+                        324,
+                        155
+                    ]
+                },
+                {
+                    "text": "SHEET",
+                    "box": [
+                        325,
+                        141,
+                        353,
+                        154
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        358,
+                        142,
+                        376,
+                        156
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "PROJECT NO.",
+            "box": [
+                480,
+                141,
+                568,
+                157
+            ],
+            "linking": [
+                [
+                    32,
+                    10
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        480,
+                        141,
+                        543,
+                        156
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        547,
+                        142,
+                        568,
+                        157
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "STUDY TITLE & PROPOSAL NUMBER",
+            "box": [
+                46,
+                159,
+                211,
+                172
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "STUDY",
+                    "box": [
+                        46,
+                        159,
+                        78,
+                        170
+                    ]
+                },
+                {
+                    "text": "TITLE",
+                    "box": [
+                        80,
+                        161,
+                        109,
+                        172
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        110,
+                        162,
+                        121,
+                        172
+                    ]
+                },
+                {
+                    "text": "PROPOSAL",
+                    "box": [
+                        122,
+                        159,
+                        171,
+                        172
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        172,
+                        161,
+                        211,
+                        172
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "Acute Intraperitoneal Toxicity Study in Rats",
+            "box": [
+                49,
+                173,
+                374,
+                193
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Acute",
+                    "box": [
+                        49,
+                        173,
+                        88,
+                        191
+                    ]
+                },
+                {
+                    "text": "Intraperitoneal",
+                    "box": [
+                        96,
+                        173,
+                        205,
+                        191
+                    ]
+                },
+                {
+                    "text": "Toxicity",
+                    "box": [
+                        212,
+                        175,
+                        271,
+                        193
+                    ]
+                },
+                {
+                    "text": "Study",
+                    "box": [
+                        277,
+                        175,
+                        316,
+                        192
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        321,
+                        176,
+                        339,
+                        193
+                    ]
+                },
+                {
+                    "text": "Rats",
+                    "box": [
+                        345,
+                        176,
+                        374,
+                        191
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "PROJECT COORDINATOR",
+            "box": [
+                420,
+                161,
+                531,
+                175
+            ],
+            "linking": [
+                [
+                    35,
+                    15
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        420,
+                        161,
+                        463,
+                        174
+                    ]
+                },
+                {
+                    "text": "COORDINATOR",
+                    "box": [
+                        465,
+                        161,
+                        531,
+                        175
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "LOT NO.(s)",
+            "box": [
+                419,
+                204,
+                480,
+                217
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LOT",
+                    "box": [
+                        419,
+                        204,
+                        440,
+                        217
+                    ]
+                },
+                {
+                    "text": "NO.(s)",
+                    "box": [
+                        441,
+                        204,
+                        480,
+                        217
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "RECEIPT DATE(s)",
+            "box": [
+                527,
+                204,
+                611,
+                219
+            ],
+            "linking": [
+                [
+                    37,
+                    16
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RECEIPT",
+                    "box": [
+                        527,
+                        205,
+                        568,
+                        219
+                    ]
+                },
+                {
+                    "text": "DATE(s)",
+                    "box": [
+                        573,
+                        204,
+                        611,
+                        217
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "LH- NUMBER(s)",
+            "box": [
+                659,
+                208,
+                732,
+                219
+            ],
+            "linking": [
+                [
+                    38,
+                    17
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "LH-",
+                    "box": [
+                        659,
+                        208,
+                        679,
+                        219
+                    ]
+                },
+                {
+                    "text": "NUMBER(s)",
+                    "box": [
+                        680,
+                        208,
+                        732,
+                        219
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "TEST MATERIAL(s)",
+            "box": [
+                45,
+                201,
+                134,
+                215
+            ],
+            "linking": [
+                [
+                    39,
+                    22
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "TEST",
+                    "box": [
+                        45,
+                        203,
+                        70,
+                        214
+                    ]
+                },
+                {
+                    "text": "MATERIAL(s)",
+                    "box": [
+                        73,
+                        201,
+                        134,
+                        215
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "PERFORMING DEPARTMENTS",
+            "box": [
+                47,
+                291,
+                174,
+                306
+            ],
+            "linking": [
+                [
+                    40,
+                    42
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PERFORMING",
+                    "box": [
+                        47,
+                        291,
+                        104,
+                        304
+                    ]
+                },
+                {
+                    "text": "DEPARTMENTS",
+                    "box": [
+                        106,
+                        292,
+                        174,
+                        306
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "4 COPIES EACH DIRECTOR)",
+            "box": [
+                176,
+                292,
+                306,
+                306
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "4",
+                    "box": [
+                        176,
+                        293,
+                        190,
+                        303
+                    ]
+                },
+                {
+                    "text": "COPIES",
+                    "box": [
+                        191,
+                        292,
+                        227,
+                        303
+                    ]
+                },
+                {
+                    "text": "EACH",
+                    "box": [
+                        226,
+                        293,
+                        254,
+                        306
+                    ]
+                },
+                {
+                    "text": "DIRECTOR)",
+                    "box": [
+                        254,
+                        292,
+                        306,
+                        303
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "Acute/ Dermal Toxicology",
+            "box": [
+                47,
+                303,
+                224,
+                319
+            ],
+            "linking": [
+                [
+                    40,
+                    42
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Acute/",
+                    "box": [
+                        47,
+                        306,
+                        93,
+                        319
+                    ]
+                },
+                {
+                    "text": "Dermal",
+                    "box": [
+                        91,
+                        303,
+                        141,
+                        318
+                    ]
+                },
+                {
+                    "text": "Toxicology",
+                    "box": [
+                        147,
+                        307,
+                        224,
+                        318
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "PROTECTIVE PRECAUTIONS REQUIRED:",
+            "box": [
+                43,
+                355,
+                225,
+                371
+            ],
+            "linking": [
+                [
+                    43,
+                    44
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROTECTIVE",
+                    "box": [
+                        43,
+                        355,
+                        103,
+                        368
+                    ]
+                },
+                {
+                    "text": "PRECAUTIONS",
+                    "box": [
+                        105,
+                        356,
+                        169,
+                        367
+                    ]
+                },
+                {
+                    "text": "REQUIRED:",
+                    "box": [
+                        172,
+                        358,
+                        225,
+                        371
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "HAZARDOUS, COMPOUND",
+            "box": [
+                165,
+                369,
+                268,
+                382
+            ],
+            "linking": [
+                [
+                    43,
+                    44
+                ],
+                [
+                    44,
+                    0
+                ],
+                [
+                    44,
+                    45
+                ],
+                [
+                    44,
+                    46
+                ],
+                [
+                    44,
+                    1
+                ],
+                [
+                    44,
+                    2
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "HAZARDOUS,",
+                    "box": [
+                        165,
+                        369,
+                        217,
+                        382
+                    ]
+                },
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        221,
+                        370,
+                        268,
+                        380
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "CARCINOGEN (OSHA)",
+            "box": [
+                211,
+                391,
+                309,
+                405
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CARCINOGEN",
+                    "box": [
+                        211,
+                        391,
+                        272,
+                        405
+                    ]
+                },
+                {
+                    "text": "(OSHA)",
+                    "box": [
+                        275,
+                        391,
+                        309,
+                        401
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "CARCINOGEN (OTHER)",
+            "box": [
+                211,
+                413,
+                315,
+                426
+            ],
+            "linking": [
+                [
+                    44,
+                    46
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "CARCINOGEN",
+                    "box": [
+                        211,
+                        413,
+                        277,
+                        426
+                    ]
+                },
+                {
+                    "text": "(OTHER)",
+                    "box": [
+                        277,
+                        413,
+                        315,
+                        426
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "PHYSICAL DESCRIPTION:",
+            "box": [
+                45,
+                451,
+                163,
+                466
+            ],
+            "linking": [
+                [
+                    47,
+                    3
+                ],
+                [
+                    47,
+                    4
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PHYSICAL",
+                    "box": [
+                        45,
+                        451,
+                        92,
+                        466
+                    ]
+                },
+                {
+                    "text": "DESCRIPTION:",
+                    "box": [
+                        96,
+                        451,
+                        163,
+                        465
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "EXPERIMENTAL PROCEDURES",
+            "box": [
+                45,
+                522,
+                175,
+                537
+            ],
+            "linking": [
+                [
+                    48,
+                    49
+                ],
+                [
+                    48,
+                    60
+                ],
+                [
+                    48,
+                    61
+                ],
+                [
+                    48,
+                    62
+                ],
+                [
+                    48,
+                    63
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "EXPERIMENTAL",
+                    "box": [
+                        45,
+                        522,
+                        109,
+                        535
+                    ]
+                },
+                {
+                    "text": "PROCEDURES",
+                    "box": [
+                        115,
+                        524,
+                        175,
+                        537
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "to performed in Acure/Dermal Toxicology, building 18.",
+            "box": [
+                189,
+                522,
+                579,
+                542
+            ],
+            "linking": [
+                [
+                    48,
+                    49
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "to",
+                    "box": [
+                        189,
+                        525,
+                        206,
+                        539
+                    ]
+                },
+                {
+                    "text": "performed",
+                    "box": [
+                        208,
+                        522,
+                        278,
+                        537
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        286,
+                        525,
+                        299,
+                        540
+                    ]
+                },
+                {
+                    "text": "Acure/Dermal",
+                    "box": [
+                        304,
+                        524,
+                        392,
+                        541
+                    ]
+                },
+                {
+                    "text": "Toxicology,",
+                    "box": [
+                        398,
+                        527,
+                        483,
+                        542
+                    ]
+                },
+                {
+                    "text": "building",
+                    "box": [
+                        487,
+                        527,
+                        548,
+                        542
+                    ]
+                },
+                {
+                    "text": "18.",
+                    "box": [
+                        554,
+                        524,
+                        579,
+                        541
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "ORIGINAL SIGNED PROJECT SHEETS TO PSO",
+            "box": [
+                422,
+                295,
+                628,
+                310
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ORIGINAL",
+                    "box": [
+                        422,
+                        295,
+                        469,
+                        310
+                    ]
+                },
+                {
+                    "text": "SIGNED",
+                    "box": [
+                        472,
+                        295,
+                        507,
+                        310
+                    ]
+                },
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        511,
+                        296,
+                        550,
+                        309
+                    ]
+                },
+                {
+                    "text": "SHEETS",
+                    "box": [
+                        556,
+                        297,
+                        591,
+                        308
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        592,
+                        297,
+                        609,
+                        308
+                    ]
+                },
+                {
+                    "text": "PSO",
+                    "box": [
+                        608,
+                        297,
+                        628,
+                        310
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "FIXED DISTRIBUTION:",
+            "box": [
+                472,
+                316,
+                584,
+                329
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "FIXED",
+                    "box": [
+                        472,
+                        316,
+                        506,
+                        329
+                    ]
+                },
+                {
+                    "text": "DISTRIBUTION:",
+                    "box": [
+                        510,
+                        316,
+                        584,
+                        329
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "(1 COPY TO EACH) LAB ANIMAL MEDICINE QUALITY ASSURANCE CONTRACTS Sponsor",
+            "box": [
+                587,
+                317,
+                725,
+                387
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "(1",
+                    "box": [
+                        587,
+                        317,
+                        598,
+                        330
+                    ]
+                },
+                {
+                    "text": "COPY",
+                    "box": [
+                        602,
+                        320,
+                        627,
+                        333
+                    ]
+                },
+                {
+                    "text": "TO",
+                    "box": [
+                        628,
+                        320,
+                        643,
+                        333
+                    ]
+                },
+                {
+                    "text": "EACH)",
+                    "box": [
+                        645,
+                        318,
+                        673,
+                        332
+                    ]
+                },
+                {
+                    "text": "LAB",
+                    "box": [
+                        617,
+                        334,
+                        637,
+                        348
+                    ]
+                },
+                {
+                    "text": "ANIMAL",
+                    "box": [
+                        641,
+                        334,
+                        673,
+                        348
+                    ]
+                },
+                {
+                    "text": "MEDICINE",
+                    "box": [
+                        679,
+                        337,
+                        725,
+                        350
+                    ]
+                },
+                {
+                    "text": "QUALITY",
+                    "box": [
+                        616,
+                        351,
+                        658,
+                        364
+                    ]
+                },
+                {
+                    "text": "ASSURANCE",
+                    "box": [
+                        662,
+                        351,
+                        711,
+                        364
+                    ]
+                },
+                {
+                    "text": "CONTRACTS",
+                    "box": [
+                        617,
+                        366,
+                        670,
+                        376
+                    ]
+                },
+                {
+                    "text": "Sponsor",
+                    "box": [
+                        609,
+                        377,
+                        675,
+                        387
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "DIR. OF LIFE SCIENCES HEALTH SERVICES COMPOUND PREP (TOX) SCIENTIFIC RES TOX",
+            "box": [
+                430,
+                334,
+                539,
+                392
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "DIR.",
+                    "box": [
+                        430,
+                        337,
+                        451,
+                        347
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        455,
+                        334,
+                        466,
+                        345
+                    ]
+                },
+                {
+                    "text": "LIFE",
+                    "box": [
+                        469,
+                        335,
+                        490,
+                        348
+                    ]
+                },
+                {
+                    "text": "SCIENCES",
+                    "box": [
+                        496,
+                        334,
+                        539,
+                        345
+                    ]
+                },
+                {
+                    "text": "HEALTH",
+                    "box": [
+                        430,
+                        349,
+                        466,
+                        360
+                    ]
+                },
+                {
+                    "text": "SERVICES",
+                    "box": [
+                        472,
+                        351,
+                        515,
+                        362
+                    ]
+                },
+                {
+                    "text": "COMPOUND",
+                    "box": [
+                        430,
+                        362,
+                        482,
+                        376
+                    ]
+                },
+                {
+                    "text": "PREP",
+                    "box": [
+                        486,
+                        365,
+                        508,
+                        378
+                    ]
+                },
+                {
+                    "text": "(TOX)",
+                    "box": [
+                        514,
+                        366,
+                        538,
+                        377
+                    ]
+                },
+                {
+                    "text": "SCIENTIFIC",
+                    "box": [
+                        434,
+                        381,
+                        483,
+                        392
+                    ]
+                },
+                {
+                    "text": "RES",
+                    "box": [
+                        486,
+                        378,
+                        506,
+                        391
+                    ]
+                },
+                {
+                    "text": "TOX",
+                    "box": [
+                        510,
+                        381,
+                        531,
+                        392
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "FOLLOW DEPARTMENT AND COMPANY SAFETY MANUALS",
+            "box": [
+                420,
+                404,
+                582,
+                427
+            ],
+            "linking": [
+                [
+                    54,
+                    24
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "FOLLOW",
+                    "box": [
+                        420,
+                        404,
+                        458,
+                        415
+                    ]
+                },
+                {
+                    "text": "DEPARTMENT",
+                    "box": [
+                        461,
+                        404,
+                        520,
+                        412
+                    ]
+                },
+                {
+                    "text": "AND",
+                    "box": [
+                        521,
+                        404,
+                        538,
+                        415
+                    ]
+                },
+                {
+                    "text": "COMPANY",
+                    "box": [
+                        543,
+                        405,
+                        582,
+                        416
+                    ]
+                },
+                {
+                    "text": "SAFETY",
+                    "box": [
+                        422,
+                        416,
+                        458,
+                        426
+                    ]
+                },
+                {
+                    "text": "MANUALS",
+                    "box": [
+                        461,
+                        416,
+                        502,
+                        427
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "STORAGE CONDITIONS",
+            "box": [
+                423,
+                439,
+                523,
+                454
+            ],
+            "linking": [
+                [
+                    55,
+                    56
+                ],
+                [
+                    55,
+                    57
+                ],
+                [
+                    55,
+                    58
+                ],
+                [
+                    55,
+                    59
+                ],
+                [
+                    55,
+                    19
+                ],
+                [
+                    55,
+                    20
+                ],
+                [
+                    55,
+                    21
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "STORAGE",
+                    "box": [
+                        423,
+                        439,
+                        461,
+                        452
+                    ]
+                },
+                {
+                    "text": "CONDITIONS",
+                    "box": [
+                        466,
+                        440,
+                        523,
+                        454
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "STORE IN DARK",
+            "box": [
+                437,
+                455,
+                511,
+                469
+            ],
+            "linking": [
+                [
+                    55,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "STORE",
+                    "box": [
+                        437,
+                        455,
+                        466,
+                        469
+                    ]
+                },
+                {
+                    "text": "IN",
+                    "box": [
+                        466,
+                        457,
+                        483,
+                        468
+                    ]
+                },
+                {
+                    "text": "DARK",
+                    "box": [
+                        482,
+                        455,
+                        511,
+                        468
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "REFRIGERATOR 8 C",
+            "box": [
+                437,
+                469,
+                542,
+                488
+            ],
+            "linking": [
+                [
+                    57,
+                    18
+                ],
+                [
+                    55,
+                    57
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REFRIGERATOR",
+                    "box": [
+                        437,
+                        472,
+                        507,
+                        486
+                    ]
+                },
+                {
+                    "text": "8",
+                    "box": [
+                        518,
+                        471,
+                        531,
+                        488
+                    ]
+                },
+                {
+                    "text": "C",
+                    "box": [
+                        531,
+                        469,
+                        542,
+                        487
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "ROOM TEMPERATURE",
+            "box": [
+                437,
+                489,
+                530,
+                502
+            ],
+            "linking": [
+                [
+                    55,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "ROOM",
+                    "box": [
+                        437,
+                        490,
+                        466,
+                        501
+                    ]
+                },
+                {
+                    "text": "TEMPERATURE",
+                    "box": [
+                        469,
+                        489,
+                        530,
+                        502
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "SPECIAL INSTRUCTIONS WHILE DOSING",
+            "box": [
+                437,
+                504,
+                615,
+                519
+            ],
+            "linking": [
+                [
+                    55,
+                    59
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SPECIAL",
+                    "box": [
+                        437,
+                        504,
+                        475,
+                        515
+                    ]
+                },
+                {
+                    "text": "INSTRUCTIONS",
+                    "box": [
+                        478,
+                        507,
+                        542,
+                        518
+                    ]
+                },
+                {
+                    "text": "WHILE",
+                    "box": [
+                        542,
+                        506,
+                        573,
+                        519
+                    ]
+                },
+                {
+                    "text": "DOSING",
+                    "box": [
+                        574,
+                        507,
+                        615,
+                        518
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "The protocol for this study is attached.",
+            "box": [
+                91,
+                574,
+                383,
+                591
+            ],
+            "linking": [
+                [
+                    48,
+                    60
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        91,
+                        574,
+                        116,
+                        591
+                    ]
+                },
+                {
+                    "text": "protocol",
+                    "box": [
+                        120,
+                        577,
+                        181,
+                        590
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        186,
+                        577,
+                        213,
+                        588
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        218,
+                        574,
+                        247,
+                        591
+                    ]
+                },
+                {
+                    "text": "study",
+                    "box": [
+                        254,
+                        574,
+                        292,
+                        589
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        299,
+                        574,
+                        312,
+                        589
+                    ]
+                },
+                {
+                    "text": "attached.",
+                    "box": [
+                        320,
+                        577,
+                        383,
+                        590
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "The protocol was approved in sponsor letter of June 6, 1983.",
+            "box": [
+                95,
+                602,
+                531,
+                620
+            ],
+            "linking": [
+                [
+                    48,
+                    61
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        95,
+                        602,
+                        115,
+                        617
+                    ]
+                },
+                {
+                    "text": "protocol",
+                    "box": [
+                        120,
+                        602,
+                        179,
+                        619
+                    ]
+                },
+                {
+                    "text": "was",
+                    "box": [
+                        187,
+                        608,
+                        212,
+                        619
+                    ]
+                },
+                {
+                    "text": "approved",
+                    "box": [
+                        218,
+                        606,
+                        277,
+                        620
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        282,
+                        605,
+                        299,
+                        618
+                    ]
+                },
+                {
+                    "text": "sponsor",
+                    "box": [
+                        303,
+                        605,
+                        355,
+                        619
+                    ]
+                },
+                {
+                    "text": "letter",
+                    "box": [
+                        362,
+                        606,
+                        409,
+                        619
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        413,
+                        603,
+                        427,
+                        617
+                    ]
+                },
+                {
+                    "text": "June",
+                    "box": [
+                        437,
+                        606,
+                        465,
+                        620
+                    ]
+                },
+                {
+                    "text": "6,",
+                    "box": [
+                        472,
+                        606,
+                        487,
+                        620
+                    ]
+                },
+                {
+                    "text": "1983.",
+                    "box": [
+                        496,
+                        603,
+                        531,
+                        620
+                    ]
+                }
+            ],
+            "id": 61
+        },
+        {
+            "text": "The anticipated initiation date of this study is October 1983.",
+            "box": [
+                92,
+                630,
+                543,
+                651
+            ],
+            "linking": [
+                [
+                    48,
+                    62
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        92,
+                        630,
+                        113,
+                        647
+                    ]
+                },
+                {
+                    "text": "anticipated",
+                    "box": [
+                        120,
+                        633,
+                        204,
+                        648
+                    ]
+                },
+                {
+                    "text": "initiation",
+                    "box": [
+                        208,
+                        633,
+                        283,
+                        650
+                    ]
+                },
+                {
+                    "text": "date",
+                    "box": [
+                        286,
+                        634,
+                        320,
+                        649
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        325,
+                        634,
+                        343,
+                        645
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        348,
+                        635,
+                        377,
+                        649
+                    ]
+                },
+                {
+                    "text": "study",
+                    "box": [
+                        384,
+                        637,
+                        420,
+                        651
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        430,
+                        635,
+                        443,
+                        650
+                    ]
+                },
+                {
+                    "text": "October",
+                    "box": [
+                        451,
+                        634,
+                        503,
+                        651
+                    ]
+                },
+                {
+                    "text": "1983.",
+                    "box": [
+                        511,
+                        635,
+                        543,
+                        650
+                    ]
+                }
+            ],
+            "id": 62
+        },
+        {
+            "text": "The anticipated completion date of this study is November 1983.",
+            "box": [
+                91,
+                659,
+                550,
+                681
+            ],
+            "linking": [
+                [
+                    48,
+                    63
+                ]
+            ],
+            "label": "other",
+            "words": [
+                {
+                    "text": "The",
+                    "box": [
+                        91,
+                        659,
+                        115,
+                        676
+                    ]
+                },
+                {
+                    "text": "anticipated",
+                    "box": [
+                        123,
+                        662,
+                        204,
+                        677
+                    ]
+                },
+                {
+                    "text": "completion",
+                    "box": [
+                        208,
+                        665,
+                        281,
+                        676
+                    ]
+                },
+                {
+                    "text": "date",
+                    "box": [
+                        288,
+                        663,
+                        319,
+                        678
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        327,
+                        666,
+                        342,
+                        677
+                    ]
+                },
+                {
+                    "text": "this",
+                    "box": [
+                        349,
+                        666,
+                        378,
+                        679
+                    ]
+                },
+                {
+                    "text": "study",
+                    "box": [
+                        385,
+                        666,
+                        423,
+                        681
+                    ]
+                },
+                {
+                    "text": "is",
+                    "box": [
+                        426,
+                        662,
+                        443,
+                        680
+                    ]
+                },
+                {
+                    "text": "November",
+                    "box": [
+                        450,
+                        666,
+                        510,
+                        677
+                    ]
+                },
+                {
+                    "text": "1983.",
+                    "box": [
+                        514,
+                        663,
+                        550,
+                        678
+                    ]
+                }
+            ],
+            "id": 63
+        },
+        {
+            "text": "ML FORM NO. 5 REVISED 1- 81",
+            "box": [
+                49,
+                961,
+                123,
+                983
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "ML",
+                    "box": [
+                        52,
+                        961,
+                        62,
+                        968
+                    ]
+                },
+                {
+                    "text": "FORM",
+                    "box": [
+                        64,
+                        961,
+                        85,
+                        971
+                    ]
+                },
+                {
+                    "text": "NO.",
+                    "box": [
+                        88,
+                        961,
+                        105,
+                        969
+                    ]
+                },
+                {
+                    "text": "5",
+                    "box": [
+                        117,
+                        961,
+                        123,
+                        971
+                    ]
+                },
+                {
+                    "text": "REVISED",
+                    "box": [
+                        49,
+                        972,
+                        91,
+                        983
+                    ]
+                },
+                {
+                    "text": "1-",
+                    "box": [
+                        96,
+                        973,
+                        109,
+                        983
+                    ]
+                },
+                {
+                    "text": "81",
+                    "box": [
+                        109,
+                        972,
+                        120,
+                        983
+                    ]
+                }
+            ],
+            "id": 64
+        }
+    ]
+}

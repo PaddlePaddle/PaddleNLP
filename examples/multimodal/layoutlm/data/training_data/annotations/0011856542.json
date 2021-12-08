@@ -1,0 +1,1128 @@
+{
+    "form": [
+        {
+            "box": [
+                425,
+                258,
+                462,
+                272
+            ],
+            "text": "DATE",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        425,
+                        258,
+                        462,
+                        272
+                    ],
+                    "text": "DATE"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    2
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                259,
+                255,
+                301,
+                270
+            ],
+            "text": "BD-FF",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        259,
+                        255,
+                        301,
+                        270
+                    ],
+                    "text": "BD-FF"
+                }
+            ],
+            "linking": [
+                [
+                    7,
+                    1
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                500,
+                259,
+                551,
+                273
+            ],
+            "text": "1/4/90",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        500,
+                        259,
+                        551,
+                        273
+                    ],
+                    "text": "1/4/90"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                257,
+                382,
+                330,
+                397
+            ],
+            "text": "Marketing",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        257,
+                        382,
+                        330,
+                        397
+                    ],
+                    "text": "Marketing"
+                }
+            ],
+            "linking": [
+                [
+                    12,
+                    3
+                ]
+            ],
+            "id": 3
+        },
+        {
+            "box": [
+                65,
+                755,
+                91,
+                768
+            ],
+            "text": "cc:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        65,
+                        755,
+                        91,
+                        768
+                    ],
+                    "text": "cc:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    17
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                363,
+                737,
+                581,
+                794
+            ],
+            "text": "",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        363,
+                        737,
+                        581,
+                        794
+                    ],
+                    "text": ""
+                }
+            ],
+            "linking": [
+                [
+                    16,
+                    5
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "text": "PROJECT INITIATION FORM",
+            "box": [
+                256,
+                150,
+                458,
+                174
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        256,
+                        150,
+                        320,
+                        171
+                    ]
+                },
+                {
+                    "text": "INITIATION",
+                    "box": [
+                        327,
+                        156,
+                        412,
+                        174
+                    ]
+                },
+                {
+                    "text": "FORM",
+                    "box": [
+                        416,
+                        159,
+                        458,
+                        173
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "PROJECT CODE",
+            "box": [
+                71,
+                250,
+                182,
+                268
+            ],
+            "linking": [
+                [
+                    7,
+                    1
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        71,
+                        250,
+                        132,
+                        268
+                    ]
+                },
+                {
+                    "text": "CODE",
+                    "box": [
+                        138,
+                        252,
+                        182,
+                        266
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "PROJECT NAME",
+            "box": [
+                72,
+                294,
+                178,
+                310
+            ],
+            "linking": [
+                [
+                    8,
+                    9
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        72,
+                        294,
+                        132,
+                        308
+                    ]
+                },
+                {
+                    "text": "NAME",
+                    "box": [
+                        139,
+                        295,
+                        178,
+                        310
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "BULL DURHAM Full Flavor King Size Cigarettes",
+            "box": [
+                259,
+                296,
+                574,
+                316
+            ],
+            "linking": [
+                [
+                    8,
+                    9
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "BULL",
+                    "box": [
+                        259,
+                        296,
+                        292,
+                        313
+                    ]
+                },
+                {
+                    "text": "DURHAM",
+                    "box": [
+                        297,
+                        298,
+                        344,
+                        313
+                    ]
+                },
+                {
+                    "text": "Full",
+                    "box": [
+                        344,
+                        300,
+                        373,
+                        315
+                    ]
+                },
+                {
+                    "text": "Flavor",
+                    "box": [
+                        381,
+                        296,
+                        429,
+                        315
+                    ]
+                },
+                {
+                    "text": "King",
+                    "box": [
+                        427,
+                        298,
+                        466,
+                        313
+                    ]
+                },
+                {
+                    "text": "Size",
+                    "box": [
+                        467,
+                        301,
+                        496,
+                        316
+                    ]
+                },
+                {
+                    "text": "Cigarettes",
+                    "box": [
+                        499,
+                        301,
+                        574,
+                        316
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "J. F. Anders/ J. E. Mann",
+            "box": [
+                262,
+                338,
+                425,
+                359
+            ],
+            "linking": [
+                [
+                    11,
+                    10
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "J.",
+                    "box": [
+                        262,
+                        338,
+                        279,
+                        355
+                    ]
+                },
+                {
+                    "text": "F.",
+                    "box": [
+                        282,
+                        338,
+                        299,
+                        357
+                    ]
+                },
+                {
+                    "text": "Anders/",
+                    "box": [
+                        303,
+                        341,
+                        354,
+                        359
+                    ]
+                },
+                {
+                    "text": "J.",
+                    "box": [
+                        353,
+                        342,
+                        368,
+                        355
+                    ]
+                },
+                {
+                    "text": "E.",
+                    "box": [
+                        374,
+                        343,
+                        389,
+                        357
+                    ]
+                },
+                {
+                    "text": "Mann",
+                    "box": [
+                        394,
+                        340,
+                        425,
+                        359
+                    ]
+                }
+            ],
+            "id": 10
+        },
+        {
+            "text": "PROJECT LEADER",
+            "box": [
+                68,
+                334,
+                194,
+                353
+            ],
+            "linking": [
+                [
+                    11,
+                    10
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        68,
+                        334,
+                        133,
+                        353
+                    ]
+                },
+                {
+                    "text": "LEADER",
+                    "box": [
+                        136,
+                        335,
+                        194,
+                        350
+                    ]
+                }
+            ],
+            "id": 11
+        },
+        {
+            "text": "WORK REQUESTED BY",
+            "box": [
+                71,
+                375,
+                218,
+                393
+            ],
+            "linking": [
+                [
+                    12,
+                    3
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "WORK",
+                    "box": [
+                        71,
+                        375,
+                        109,
+                        393
+                    ]
+                },
+                {
+                    "text": "REQUESTED",
+                    "box": [
+                        111,
+                        379,
+                        191,
+                        393
+                    ]
+                },
+                {
+                    "text": "BY",
+                    "box": [
+                        193,
+                        381,
+                        218,
+                        393
+                    ]
+                }
+            ],
+            "id": 12
+        },
+        {
+            "text": "PROJECT OBJECTIVE",
+            "box": [
+                66,
+                417,
+                220,
+                437
+            ],
+            "linking": [
+                [
+                    13,
+                    14
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "PROJECT",
+                    "box": [
+                        66,
+                        417,
+                        132,
+                        437
+                    ]
+                },
+                {
+                    "text": "OBJECTIVE",
+                    "box": [
+                        137,
+                        422,
+                        220,
+                        437
+                    ]
+                }
+            ],
+            "id": 13
+        },
+        {
+            "text": "Develop 14- mg \"tar\" delivery king size cigarette for generic pricing directed toward young male smokers. Cigarette dimensions- 85 mm x 24.9 mm circumference- 20 mm filter- 24 mm tipping. Offshore tobacco blend with unique flavor formulation. Cork tipping.",
+            "box": [
+                255,
+                423,
+                639,
+                581
+            ],
+            "linking": [
+                [
+                    13,
+                    14
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "Develop",
+                    "box": [
+                        259,
+                        425,
+                        313,
+                        444
+                    ]
+                },
+                {
+                    "text": "14-",
+                    "box": [
+                        317,
+                        423,
+                        336,
+                        438
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        340,
+                        428,
+                        359,
+                        441
+                    ]
+                },
+                {
+                    "text": "\"tar\"",
+                    "box": [
+                        360,
+                        426,
+                        399,
+                        443
+                    ]
+                },
+                {
+                    "text": "delivery",
+                    "box": [
+                        401,
+                        429,
+                        461,
+                        446
+                    ]
+                },
+                {
+                    "text": "king",
+                    "box": [
+                        463,
+                        429,
+                        495,
+                        443
+                    ]
+                },
+                {
+                    "text": "size",
+                    "box": [
+                        500,
+                        427,
+                        529,
+                        445
+                    ]
+                },
+                {
+                    "text": "cigarette",
+                    "box": [
+                        534,
+                        430,
+                        599,
+                        447
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        257,
+                        453,
+                        284,
+                        468
+                    ]
+                },
+                {
+                    "text": "generic",
+                    "box": [
+                        288,
+                        456,
+                        341,
+                        471
+                    ]
+                },
+                {
+                    "text": "pricing",
+                    "box": [
+                        343,
+                        455,
+                        397,
+                        470
+                    ]
+                },
+                {
+                    "text": "directed",
+                    "box": [
+                        400,
+                        458,
+                        461,
+                        472
+                    ]
+                },
+                {
+                    "text": "toward",
+                    "box": [
+                        462,
+                        456,
+                        509,
+                        471
+                    ]
+                },
+                {
+                    "text": "young",
+                    "box": [
+                        513,
+                        458,
+                        552,
+                        475
+                    ]
+                },
+                {
+                    "text": "male",
+                    "box": [
+                        555,
+                        462,
+                        588,
+                        473
+                    ]
+                },
+                {
+                    "text": "smokers.",
+                    "box": [
+                        255,
+                        480,
+                        319,
+                        497
+                    ]
+                },
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        327,
+                        479,
+                        395,
+                        500
+                    ]
+                },
+                {
+                    "text": "dimensions-",
+                    "box": [
+                        402,
+                        479,
+                        488,
+                        501
+                    ]
+                },
+                {
+                    "text": "85",
+                    "box": [
+                        492,
+                        483,
+                        509,
+                        502
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        512,
+                        486,
+                        531,
+                        501
+                    ]
+                },
+                {
+                    "text": "x",
+                    "box": [
+                        533,
+                        489,
+                        545,
+                        502
+                    ]
+                },
+                {
+                    "text": "24.9",
+                    "box": [
+                        547,
+                        483,
+                        580,
+                        500
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        581,
+                        486,
+                        600,
+                        503
+                    ]
+                },
+                {
+                    "text": "circumference-",
+                    "box": [
+                        259,
+                        513,
+                        366,
+                        527
+                    ]
+                },
+                {
+                    "text": "20",
+                    "box": [
+                        368,
+                        508,
+                        387,
+                        527
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        392,
+                        513,
+                        412,
+                        526
+                    ]
+                },
+                {
+                    "text": "filter-",
+                    "box": [
+                        415,
+                        512,
+                        472,
+                        527
+                    ]
+                },
+                {
+                    "text": "24",
+                    "box": [
+                        476,
+                        513,
+                        494,
+                        530
+                    ]
+                },
+                {
+                    "text": "mm",
+                    "box": [
+                        494,
+                        513,
+                        515,
+                        528
+                    ]
+                },
+                {
+                    "text": "tipping.",
+                    "box": [
+                        519,
+                        514,
+                        578,
+                        529
+                    ]
+                },
+                {
+                    "text": "Offshore",
+                    "box": [
+                        257,
+                        534,
+                        315,
+                        553
+                    ]
+                },
+                {
+                    "text": "tobacco",
+                    "box": [
+                        322,
+                        537,
+                        373,
+                        555
+                    ]
+                },
+                {
+                    "text": "blend",
+                    "box": [
+                        376,
+                        535,
+                        416,
+                        550
+                    ]
+                },
+                {
+                    "text": "with",
+                    "box": [
+                        422,
+                        534,
+                        450,
+                        554
+                    ]
+                },
+                {
+                    "text": "unique",
+                    "box": [
+                        455,
+                        539,
+                        501,
+                        556
+                    ]
+                },
+                {
+                    "text": "flavor",
+                    "box": [
+                        505,
+                        539,
+                        549,
+                        556
+                    ]
+                },
+                {
+                    "text": "formulation.",
+                    "box": [
+                        554,
+                        539,
+                        639,
+                        556
+                    ]
+                },
+                {
+                    "text": "Cork",
+                    "box": [
+                        259,
+                        563,
+                        292,
+                        581
+                    ]
+                },
+                {
+                    "text": "tipping.",
+                    "box": [
+                        295,
+                        560,
+                        352,
+                        581
+                    ]
+                }
+            ],
+            "id": 14
+        },
+        {
+            "text": "OTHER PERSONNEL ASSIGNED",
+            "box": [
+                66,
+                581,
+                175,
+                621
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "OTHER",
+                    "box": [
+                        66,
+                        588,
+                        107,
+                        603
+                    ]
+                },
+                {
+                    "text": "PERSONNEL",
+                    "box": [
+                        108,
+                        581,
+                        175,
+                        605
+                    ]
+                },
+                {
+                    "text": "ASSIGNED",
+                    "box": [
+                        80,
+                        603,
+                        144,
+                        621
+                    ]
+                }
+            ],
+            "id": 15
+        },
+        {
+            "text": "Approved by",
+            "box": [
+                368,
+                718,
+                466,
+                732
+            ],
+            "linking": [
+                [
+                    16,
+                    5
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Approved",
+                    "box": [
+                        368,
+                        718,
+                        442,
+                        732
+                    ]
+                },
+                {
+                    "text": "by",
+                    "box": [
+                        447,
+                        719,
+                        466,
+                        732
+                    ]
+                }
+            ],
+            "id": 16
+        },
+        {
+            "text": "RSS RDC PHL PRC DRB Records Project Leader Other Personnel Assigned",
+            "box": [
+                106,
+                756,
+                313,
+                873
+            ],
+            "linking": [
+                [
+                    4,
+                    17
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "RSS",
+                    "box": [
+                        108,
+                        756,
+                        137,
+                        769
+                    ]
+                },
+                {
+                    "text": "RDC",
+                    "box": [
+                        110,
+                        771,
+                        138,
+                        783
+                    ]
+                },
+                {
+                    "text": "PHL",
+                    "box": [
+                        106,
+                        784,
+                        135,
+                        796
+                    ]
+                },
+                {
+                    "text": "PRC",
+                    "box": [
+                        111,
+                        796,
+                        137,
+                        813
+                    ]
+                },
+                {
+                    "text": "DRB",
+                    "box": [
+                        110,
+                        811,
+                        138,
+                        826
+                    ]
+                },
+                {
+                    "text": "Records",
+                    "box": [
+                        107,
+                        827,
+                        171,
+                        842
+                    ]
+                },
+                {
+                    "text": "Project",
+                    "box": [
+                        106,
+                        842,
+                        169,
+                        855
+                    ]
+                },
+                {
+                    "text": "Leader",
+                    "box": [
+                        172,
+                        840,
+                        226,
+                        857
+                    ]
+                },
+                {
+                    "text": "Other",
+                    "box": [
+                        107,
+                        855,
+                        151,
+                        869
+                    ]
+                },
+                {
+                    "text": "Personnel",
+                    "box": [
+                        156,
+                        855,
+                        236,
+                        873
+                    ]
+                },
+                {
+                    "text": "Assigned",
+                    "box": [
+                        241,
+                        858,
+                        313,
+                        870
+                    ]
+                }
+            ],
+            "id": 17
+        }
+    ]
+}

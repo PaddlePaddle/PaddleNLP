@@ -1,0 +1,707 @@
+{
+    "form": [
+        {
+            "box": [
+                89,
+                232,
+                135,
+                250
+            ],
+            "text": "Date:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        89,
+                        232,
+                        135,
+                        250
+                    ],
+                    "text": "Date:"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                690,
+                775,
+                710,
+                874
+            ],
+            "text": "81186212",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        690,
+                        775,
+                        710,
+                        874
+                    ],
+                    "text": "81186212"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                89,
+                943,
+                128,
+                961
+            ],
+            "text": "4/79",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        89,
+                        943,
+                        128,
+                        961
+                    ],
+                    "text": "4/79"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "text": "New Competitive Activity",
+            "box": [
+                254,
+                56,
+                478,
+                76
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "New",
+                    "box": [
+                        254,
+                        57,
+                        285,
+                        74
+                    ]
+                },
+                {
+                    "text": "Competitive",
+                    "box": [
+                        292,
+                        56,
+                        394,
+                        71
+                    ]
+                },
+                {
+                    "text": "Activity",
+                    "box": [
+                        401,
+                        59,
+                        478,
+                        76
+                    ]
+                }
+            ],
+            "id": 3
+        },
+        {
+            "text": "Please fill in the following information, as appropriate and send to C. W. Toti, Marketing Services Director, at the New York Office. Thank you.",
+            "box": [
+                87,
+                109,
+                646,
+                163
+            ],
+            "linking": [],
+            "label": "other",
+            "words": [
+                {
+                    "text": "Please",
+                    "box": [
+                        89,
+                        112,
+                        148,
+                        129
+                    ]
+                },
+                {
+                    "text": "fill",
+                    "box": [
+                        156,
+                        109,
+                        191,
+                        129
+                    ]
+                },
+                {
+                    "text": "in",
+                    "box": [
+                        198,
+                        109,
+                        219,
+                        127
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        229,
+                        109,
+                        261,
+                        126
+                    ]
+                },
+                {
+                    "text": "following",
+                    "box": [
+                        267,
+                        110,
+                        349,
+                        127
+                    ]
+                },
+                {
+                    "text": "information,",
+                    "box": [
+                        356,
+                        110,
+                        462,
+                        127
+                    ]
+                },
+                {
+                    "text": "as",
+                    "box": [
+                        472,
+                        110,
+                        497,
+                        130
+                    ]
+                },
+                {
+                    "text": "appropriate",
+                    "box": [
+                        497,
+                        113,
+                        605,
+                        130
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        610,
+                        115,
+                        646,
+                        129
+                    ]
+                },
+                {
+                    "text": "send",
+                    "box": [
+                        89,
+                        131,
+                        130,
+                        146
+                    ]
+                },
+                {
+                    "text": "to",
+                    "box": [
+                        138,
+                        130,
+                        155,
+                        148
+                    ]
+                },
+                {
+                    "text": "C.",
+                    "box": [
+                        162,
+                        130,
+                        180,
+                        145
+                    ]
+                },
+                {
+                    "text": "W.",
+                    "box": [
+                        189,
+                        130,
+                        210,
+                        145
+                    ]
+                },
+                {
+                    "text": "Toti,",
+                    "box": [
+                        218,
+                        128,
+                        261,
+                        145
+                    ]
+                },
+                {
+                    "text": "Marketing",
+                    "box": [
+                        274,
+                        130,
+                        356,
+                        145
+                    ]
+                },
+                {
+                    "text": "Services",
+                    "box": [
+                        366,
+                        131,
+                        440,
+                        145
+                    ]
+                },
+                {
+                    "text": "Director,",
+                    "box": [
+                        446,
+                        130,
+                        528,
+                        145
+                    ]
+                },
+                {
+                    "text": "at",
+                    "box": [
+                        535,
+                        133,
+                        560,
+                        144
+                    ]
+                },
+                {
+                    "text": "the",
+                    "box": [
+                        567,
+                        133,
+                        596,
+                        147
+                    ]
+                },
+                {
+                    "text": "New",
+                    "box": [
+                        87,
+                        147,
+                        121,
+                        162
+                    ]
+                },
+                {
+                    "text": "York",
+                    "box": [
+                        127,
+                        148,
+                        166,
+                        162
+                    ]
+                },
+                {
+                    "text": "Office.",
+                    "box": [
+                        172,
+                        147,
+                        235,
+                        162
+                    ]
+                },
+                {
+                    "text": "Thank you.",
+                    "box": [
+                        256,
+                        149,
+                        345,
+                        163
+                    ]
+                }
+            ],
+            "id": 4
+        },
+        {
+            "text": "Reported by:",
+            "box": [
+                85,
+                198,
+                200,
+                215
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Reported",
+                    "box": [
+                        85,
+                        198,
+                        167,
+                        215
+                    ]
+                },
+                {
+                    "text": "by:",
+                    "box": [
+                        175,
+                        198,
+                        200,
+                        215
+                    ]
+                }
+            ],
+            "id": 5
+        },
+        {
+            "text": "Manufacturer & Brand:",
+            "box": [
+                92,
+                267,
+                282,
+                284
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Manufacturer",
+                    "box": [
+                        92,
+                        267,
+                        202,
+                        284
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        209,
+                        270,
+                        223,
+                        284
+                    ]
+                },
+                {
+                    "text": "Brand:",
+                    "box": [
+                        228,
+                        267,
+                        282,
+                        284
+                    ]
+                }
+            ],
+            "id": 6
+        },
+        {
+            "text": "Type of product, size(s) & list price:",
+            "box": [
+                89,
+                303,
+                438,
+                321
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Type",
+                    "box": [
+                        89,
+                        303,
+                        131,
+                        320
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        137,
+                        303,
+                        157,
+                        317
+                    ]
+                },
+                {
+                    "text": "product,",
+                    "box": [
+                        163,
+                        306,
+                        234,
+                        319
+                    ]
+                },
+                {
+                    "text": "size(s)",
+                    "box": [
+                        243,
+                        306,
+                        306,
+                        321
+                    ]
+                },
+                {
+                    "text": "&",
+                    "box": [
+                        316,
+                        304,
+                        334,
+                        318
+                    ]
+                },
+                {
+                    "text": "list",
+                    "box": [
+                        339,
+                        303,
+                        374,
+                        320
+                    ]
+                },
+                {
+                    "text": "price:",
+                    "box": [
+                        381,
+                        303,
+                        438,
+                        320
+                    ]
+                }
+            ],
+            "id": 7
+        },
+        {
+            "text": "Extent of distribution:",
+            "box": [
+                91,
+                408,
+                301,
+                425
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Extent",
+                    "box": [
+                        91,
+                        411,
+                        150,
+                        425
+                    ]
+                },
+                {
+                    "text": "of",
+                    "box": [
+                        154,
+                        408,
+                        178,
+                        423
+                    ]
+                },
+                {
+                    "text": "distribution:",
+                    "box": [
+                        182,
+                        409,
+                        301,
+                        424
+                    ]
+                }
+            ],
+            "id": 8
+        },
+        {
+            "text": "Information and hearsay from outside contacts:",
+            "box": [
+                91,
+                514,
+                510,
+                530
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Information",
+                    "box": [
+                        91,
+                        515,
+                        196,
+                        529
+                    ]
+                },
+                {
+                    "text": "and",
+                    "box": [
+                        200,
+                        515,
+                        232,
+                        528
+                    ]
+                },
+                {
+                    "text": "hearsay",
+                    "box": [
+                        237,
+                        515,
+                        304,
+                        529
+                    ]
+                },
+                {
+                    "text": "from",
+                    "box": [
+                        310,
+                        514,
+                        352,
+                        529
+                    ]
+                },
+                {
+                    "text": "outside",
+                    "box": [
+                        356,
+                        515,
+                        426,
+                        529
+                    ]
+                },
+                {
+                    "text": "contacts:",
+                    "box": [
+                        430,
+                        515,
+                        510,
+                        530
+                    ]
+                }
+            ],
+            "id": 9
+        },
+        {
+            "text": "Further information (please attach any relevant materials; POS, advertising, brochures, etc.):",
+            "box": [
+                89,
+                684,
+                621,
+                719
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Further",
+                    "box": [
+                        92,
+                        686,
+                        159,
+                        701
+                    ]
+                },
+                {
+                    "text": "information",
+                    "box": [
+                        165,
+                        686,
+                        266,
+                        700
+                    ]
+                },
+                {
+                    "text": "(please",
+                    "box": [
+                        277,
+                        686,
+                        338,
+                        703
+                    ]
+                },
+                {
+                    "text": "attach",
+                    "box": [
+                        345,
+                        687,
+                        406,
+                        701
+                    ]
+                },
+                {
+                    "text": "any",
+                    "box": [
+                        411,
+                        687,
+                        440,
+                        702
+                    ]
+                },
+                {
+                    "text": "relevant",
+                    "box": [
+                        447,
+                        684,
+                        522,
+                        704
+                    ]
+                },
+                {
+                    "text": "materials;",
+                    "box": [
+                        527,
+                        686,
+                        621,
+                        704
+                    ]
+                },
+                {
+                    "text": "POS,",
+                    "box": [
+                        89,
+                        705,
+                        127,
+                        716
+                    ]
+                },
+                {
+                    "text": "advertising,",
+                    "box": [
+                        135,
+                        703,
+                        244,
+                        718
+                    ]
+                },
+                {
+                    "text": "brochures,",
+                    "box": [
+                        254,
+                        704,
+                        345,
+                        718
+                    ]
+                },
+                {
+                    "text": "etc.):",
+                    "box": [
+                        355,
+                        704,
+                        409,
+                        719
+                    ]
+                }
+            ],
+            "id": 10
+        }
+    ]
+}

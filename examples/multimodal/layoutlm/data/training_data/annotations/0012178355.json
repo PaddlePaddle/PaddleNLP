@@ -1,0 +1,2528 @@
+{
+    "form": [
+        {
+            "box": [
+                43,
+                89,
+                77,
+                103
+            ],
+            "text": "BRAND",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        43,
+                        89,
+                        77,
+                        103
+                    ],
+                    "text": "BRAND"
+                }
+            ],
+            "linking": [
+                [
+                    0,
+                    26
+                ]
+            ],
+            "id": 0
+        },
+        {
+            "box": [
+                117,
+                105,
+                176,
+                116
+            ],
+            "text": "Domestic",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        117,
+                        105,
+                        176,
+                        116
+                    ],
+                    "text": "Domestic"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    2
+                ]
+            ],
+            "id": 1
+        },
+        {
+            "box": [
+                200,
+                105,
+                211,
+                115
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        200,
+                        105,
+                        211,
+                        115
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    1,
+                    2
+                ]
+            ],
+            "id": 2
+        },
+        {
+            "box": [
+                235,
+                103,
+                274,
+                117
+            ],
+            "text": "Export",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        235,
+                        103,
+                        274,
+                        117
+                    ],
+                    "text": "Export"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                45,
+                244,
+                127,
+                257
+            ],
+            "text": "Description:",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        45,
+                        244,
+                        127,
+                        257
+                    ],
+                    "text": "Description:"
+                }
+            ],
+            "linking": [
+                [
+                    4,
+                    40
+                ]
+            ],
+            "id": 4
+        },
+        {
+            "box": [
+                388,
+                506,
+                417,
+                521
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        388,
+                        506,
+                        417,
+                        521
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [
+                [
+                    5,
+                    59
+                ]
+            ],
+            "id": 5
+        },
+        {
+            "box": [
+                172,
+                535,
+                253,
+                549
+            ],
+            "text": "ENDORSEMENTS",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        535,
+                        253,
+                        549
+                    ],
+                    "text": "ENDORSEMENTS"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                360,
+                535,
+                391,
+                548
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        360,
+                        535,
+                        391,
+                        548
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                75,
+                561,
+                96,
+                576
+            ],
+            "text": "CQA",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        75,
+                        561,
+                        96,
+                        576
+                    ],
+                    "text": "CQA"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                77,
+                644,
+                99,
+                659
+            ],
+            "text": "ELT",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        77,
+                        644,
+                        99,
+                        659
+                    ],
+                    "text": "ELT"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                78,
+                670,
+                139,
+                685
+            ],
+            "text": "Marketing",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        78,
+                        670,
+                        139,
+                        685
+                    ],
+                    "text": "Marketing"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                173,
+                698,
+                227,
+                713
+            ],
+            "text": "APPROVAL",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        173,
+                        698,
+                        227,
+                        713
+                    ],
+                    "text": "APPROVAL"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                362,
+                701,
+                393,
+                715
+            ],
+            "text": "Date",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        362,
+                        701,
+                        393,
+                        715
+                    ],
+                    "text": "Date"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                77,
+                729,
+                102,
+                744
+            ],
+            "text": "CQA",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        77,
+                        729,
+                        102,
+                        744
+                    ],
+                    "text": "CQA"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                80,
+                757,
+                141,
+                771
+            ],
+            "text": "President",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        80,
+                        757,
+                        141,
+                        771
+                    ],
+                    "text": "President"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                74,
+                411,
+                138,
+                424
+            ],
+            "text": "Rationale",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        74,
+                        411,
+                        138,
+                        424
+                    ],
+                    "text": "Rationale"
+                }
+            ],
+            "linking": [
+                [
+                    48,
+                    15
+                ]
+            ],
+            "id": 15
+        },
+        {
+            "box": [
+                344,
+                103,
+                398,
+                118
+            ],
+            "text": "Military",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        344,
+                        103,
+                        398,
+                        118
+                    ],
+                    "text": "Military"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                479,
+                103,
+                539,
+                117
+            ],
+            "text": "Contract",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        479,
+                        103,
+                        539,
+                        117
+                    ],
+                    "text": "Contract"
+                }
+            ],
+            "linking": [],
+            "id": 17
+        },
+        {
+            "box": [
+                310,
+                187,
+                321,
+                202
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        310,
+                        187,
+                        321,
+                        202
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    32,
+                    18
+                ]
+            ],
+            "id": 18
+        },
+        {
+            "box": [
+                365,
+                216,
+                438,
+                227
+            ],
+            "text": "Processing",
+            "label": "question",
+            "words": [
+                {
+                    "box": [
+                        365,
+                        216,
+                        438,
+                        227
+                    ],
+                    "text": "Processing"
+                }
+            ],
+            "linking": [
+                [
+                    28,
+                    19
+                ]
+            ],
+            "id": 19
+        },
+        {
+            "box": [
+                309,
+                423,
+                323,
+                437
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        309,
+                        423,
+                        323,
+                        437
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    49,
+                    20
+                ]
+            ],
+            "id": 20
+        },
+        {
+            "box": [
+                311,
+                453,
+                322,
+                466
+            ],
+            "text": "X",
+            "label": "answer",
+            "words": [
+                {
+                    "box": [
+                        311,
+                        453,
+                        322,
+                        466
+                    ],
+                    "text": "X"
+                }
+            ],
+            "linking": [
+                [
+                    51,
+                    21
+                ]
+            ],
+            "id": 21
+        },
+        {
+            "box": [
+                49,
+                797,
+                84,
+                812
+            ],
+            "text": "10111",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        49,
+                        797,
+                        84,
+                        812
+                    ],
+                    "text": "10111"
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "box": [
+                560,
+                845,
+                675,
+                867
+            ],
+            "text": "621626776",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        560,
+                        845,
+                        675,
+                        867
+                    ],
+                    "text": "621626776"
+                }
+            ],
+            "linking": [],
+            "id": 23
+        },
+        {
+            "text": "Attachment II",
+            "box": [
+                42,
+                49,
+                132,
+                60
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "Attachment",
+                    "box": [
+                        42,
+                        49,
+                        110,
+                        60
+                    ]
+                },
+                {
+                    "text": "II",
+                    "box": [
+                        119,
+                        49,
+                        132,
+                        60
+                    ]
+                }
+            ],
+            "id": 24
+        },
+        {
+            "text": "SPECIFICATION CHANGE PROPOSAL",
+            "box": [
+                232,
+                61,
+                429,
+                75
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "SPECIFICATION",
+                    "box": [
+                        232,
+                        61,
+                        320,
+                        75
+                    ]
+                },
+                {
+                    "text": "CHANGE",
+                    "box": [
+                        327,
+                        63,
+                        369,
+                        74
+                    ]
+                },
+                {
+                    "text": "PROPOSAL",
+                    "box": [
+                        376,
+                        61,
+                        429,
+                        74
+                    ]
+                }
+            ],
+            "id": 25
+        },
+        {
+            "text": "ELI CUTTER KS",
+            "box": [
+                124,
+                89,
+                214,
+                104
+            ],
+            "linking": [
+                [
+                    0,
+                    26
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "ELI",
+                    "box": [
+                        124,
+                        89,
+                        146,
+                        103
+                    ]
+                },
+                {
+                    "text": "CUTTER",
+                    "box": [
+                        154,
+                        91,
+                        195,
+                        104
+                    ]
+                },
+                {
+                    "text": "KS",
+                    "box": [
+                        200,
+                        91,
+                        214,
+                        101
+                    ]
+                }
+            ],
+            "id": 26
+        },
+        {
+            "text": "SPECIFICATION CHANGE NUMBER 84- 79",
+            "box": [
+                365,
+                88,
+                602,
+                103
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "SPECIFICATION",
+                    "box": [
+                        365,
+                        88,
+                        454,
+                        103
+                    ]
+                },
+                {
+                    "text": "CHANGE",
+                    "box": [
+                        458,
+                        88,
+                        501,
+                        103
+                    ]
+                },
+                {
+                    "text": "NUMBER",
+                    "box": [
+                        508,
+                        89,
+                        551,
+                        102
+                    ]
+                },
+                {
+                    "text": "84-",
+                    "box": [
+                        563,
+                        89,
+                        585,
+                        102
+                    ]
+                },
+                {
+                    "text": "79",
+                    "box": [
+                        584,
+                        89,
+                        602,
+                        102
+                    ]
+                }
+            ],
+            "id": 27
+        },
+        {
+            "text": "TYPE OF SPECIFICATION CHANGE (Check all that apply)",
+            "box": [
+                71,
+                131,
+                417,
+                147
+            ],
+            "linking": [
+                [
+                    28,
+                    29
+                ],
+                [
+                    28,
+                    31
+                ],
+                [
+                    28,
+                    30
+                ],
+                [
+                    28,
+                    32
+                ],
+                [
+                    28,
+                    33
+                ],
+                [
+                    28,
+                    34
+                ],
+                [
+                    28,
+                    35
+                ],
+                [
+                    28,
+                    36
+                ],
+                [
+                    28,
+                    37
+                ],
+                [
+                    28,
+                    38
+                ],
+                [
+                    28,
+                    39
+                ],
+                [
+                    28,
+                    19
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "TYPE",
+                    "box": [
+                        71,
+                        133,
+                        99,
+                        146
+                    ]
+                },
+                {
+                    "text": "OF",
+                    "box": [
+                        106,
+                        134,
+                        120,
+                        144
+                    ]
+                },
+                {
+                    "text": "SPECIFICATION",
+                    "box": [
+                        127,
+                        133,
+                        215,
+                        144
+                    ]
+                },
+                {
+                    "text": "CHANGE",
+                    "box": [
+                        222,
+                        134,
+                        264,
+                        142
+                    ]
+                },
+                {
+                    "text": "(Check",
+                    "box": [
+                        271,
+                        133,
+                        310,
+                        146
+                    ]
+                },
+                {
+                    "text": "all",
+                    "box": [
+                        317,
+                        131,
+                        337,
+                        145
+                    ]
+                },
+                {
+                    "text": "that",
+                    "box": [
+                        345,
+                        133,
+                        372,
+                        147
+                    ]
+                },
+                {
+                    "text": "apply)",
+                    "box": [
+                        378,
+                        131,
+                        417,
+                        145
+                    ]
+                }
+            ],
+            "id": 28
+        },
+        {
+            "text": "Packaging, Temporary",
+            "box": [
+                71,
+                148,
+                210,
+                161
+            ],
+            "linking": [
+                [
+                    28,
+                    29
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Packaging,",
+                    "box": [
+                        71,
+                        148,
+                        138,
+                        159
+                    ]
+                },
+                {
+                    "text": "Temporary",
+                    "box": [
+                        147,
+                        148,
+                        210,
+                        161
+                    ]
+                }
+            ],
+            "id": 29
+        },
+        {
+            "text": "Cigarette Design, Trial",
+            "box": [
+                70,
+                159,
+                230,
+                174
+            ],
+            "linking": [
+                [
+                    28,
+                    30
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        70,
+                        161,
+                        133,
+                        174
+                    ]
+                },
+                {
+                    "text": "Design,",
+                    "box": [
+                        140,
+                        162,
+                        187,
+                        172
+                    ]
+                },
+                {
+                    "text": "Trial",
+                    "box": [
+                        194,
+                        159,
+                        230,
+                        172
+                    ]
+                }
+            ],
+            "id": 30
+        },
+        {
+            "text": "Tar Adjustment < 1 mg",
+            "box": [
+                70,
+                172,
+                217,
+                190
+            ],
+            "linking": [
+                [
+                    28,
+                    31
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tar",
+                    "box": [
+                        70,
+                        175,
+                        92,
+                        186
+                    ]
+                },
+                {
+                    "text": "Adjustment",
+                    "box": [
+                        99,
+                        173,
+                        167,
+                        187
+                    ]
+                },
+                {
+                    "text": "<",
+                    "box": [
+                        175,
+                        176,
+                        186,
+                        190
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        189,
+                        172,
+                        196,
+                        189
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        200,
+                        176,
+                        217,
+                        189
+                    ]
+                }
+            ],
+            "id": 31
+        },
+        {
+            "text": "New Product",
+            "box": [
+                71,
+                189,
+                148,
+                203
+            ],
+            "linking": [
+                [
+                    28,
+                    32
+                ],
+                [
+                    32,
+                    18
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "New",
+                    "box": [
+                        71,
+                        189,
+                        91,
+                        203
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        98,
+                        190,
+                        148,
+                        201
+                    ]
+                }
+            ],
+            "id": 32
+        },
+        {
+            "text": "Equivalent Additive",
+            "box": [
+                70,
+                203,
+                206,
+                217
+            ],
+            "linking": [
+                [
+                    28,
+                    33
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Equivalent",
+                    "box": [
+                        70,
+                        204,
+                        141,
+                        217
+                    ]
+                },
+                {
+                    "text": "Additive",
+                    "box": [
+                        147,
+                        203,
+                        206,
+                        216
+                    ]
+                }
+            ],
+            "id": 33
+        },
+        {
+            "text": "Equivalent Filter/ Paper/ /Tipping",
+            "box": [
+                71,
+                215,
+                284,
+                232
+            ],
+            "linking": [
+                [
+                    28,
+                    34
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Equivalent",
+                    "box": [
+                        71,
+                        216,
+                        141,
+                        229
+                    ]
+                },
+                {
+                    "text": "Filter/",
+                    "box": [
+                        148,
+                        216,
+                        189,
+                        230
+                    ]
+                },
+                {
+                    "text": "Paper/",
+                    "box": [
+                        189,
+                        216,
+                        228,
+                        231
+                    ]
+                },
+                {
+                    "text": "/Tipping",
+                    "box": [
+                        230,
+                        215,
+                        284,
+                        232
+                    ]
+                }
+            ],
+            "id": 34
+        },
+        {
+            "text": "Packaging, Permanent",
+            "box": [
+                366,
+                145,
+                501,
+                161
+            ],
+            "linking": [
+                [
+                    28,
+                    35
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Packaging,",
+                    "box": [
+                        366,
+                        148,
+                        433,
+                        161
+                    ]
+                },
+                {
+                    "text": "Permanent",
+                    "box": [
+                        440,
+                        145,
+                        501,
+                        159
+                    ]
+                }
+            ],
+            "id": 35
+        },
+        {
+            "text": "Cigarette Design, Permanent",
+            "box": [
+                363,
+                159,
+                555,
+                174
+            ],
+            "linking": [
+                [
+                    28,
+                    36
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cigarette",
+                    "box": [
+                        363,
+                        159,
+                        426,
+                        173
+                    ]
+                },
+                {
+                    "text": "Design,",
+                    "box": [
+                        432,
+                        161,
+                        482,
+                        174
+                    ]
+                },
+                {
+                    "text": "Permanent",
+                    "box": [
+                        487,
+                        161,
+                        555,
+                        172
+                    ]
+                }
+            ],
+            "id": 36
+        },
+        {
+            "text": "Tar Adjustment > 1 mg",
+            "box": [
+                366,
+                173,
+                516,
+                188
+            ],
+            "linking": [
+                [
+                    28,
+                    37
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Tar",
+                    "box": [
+                        366,
+                        173,
+                        388,
+                        187
+                    ]
+                },
+                {
+                    "text": "Adjustment",
+                    "box": [
+                        392,
+                        175,
+                        459,
+                        188
+                    ]
+                },
+                {
+                    "text": ">",
+                    "box": [
+                        466,
+                        176,
+                        476,
+                        186
+                    ]
+                },
+                {
+                    "text": "1",
+                    "box": [
+                        482,
+                        176,
+                        490,
+                        183
+                    ]
+                },
+                {
+                    "text": "mg",
+                    "box": [
+                        496,
+                        176,
+                        516,
+                        186
+                    ]
+                }
+            ],
+            "id": 37
+        },
+        {
+            "text": "Discontinue Product",
+            "box": [
+                365,
+                189,
+                496,
+                203
+            ],
+            "linking": [
+                [
+                    28,
+                    38
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Discontinue",
+                    "box": [
+                        365,
+                        190,
+                        442,
+                        200
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        447,
+                        189,
+                        496,
+                        203
+                    ]
+                }
+            ],
+            "id": 38
+        },
+        {
+            "text": "Equivalent Packaging Material",
+            "box": [
+                365,
+                201,
+                566,
+                216
+            ],
+            "linking": [
+                [
+                    28,
+                    39
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Equivalent",
+                    "box": [
+                        365,
+                        201,
+                        435,
+                        216
+                    ]
+                },
+                {
+                    "text": "Packaging",
+                    "box": [
+                        440,
+                        203,
+                        501,
+                        216
+                    ]
+                },
+                {
+                    "text": "Material",
+                    "box": [
+                        507,
+                        201,
+                        566,
+                        215
+                    ]
+                }
+            ],
+            "id": 39
+        },
+        {
+            "text": "ELI CUTTER KS, for test market, using AMELIA \"B\" Blend (XLF -680G)",
+            "box": [
+                141,
+                243,
+                591,
+                258
+            ],
+            "linking": [
+                [
+                    4,
+                    40
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "ELI",
+                    "box": [
+                        141,
+                        243,
+                        163,
+                        258
+                    ]
+                },
+                {
+                    "text": "CUTTER",
+                    "box": [
+                        169,
+                        244,
+                        211,
+                        258
+                    ]
+                },
+                {
+                    "text": "KS,",
+                    "box": [
+                        216,
+                        244,
+                        236,
+                        255
+                    ]
+                },
+                {
+                    "text": "for",
+                    "box": [
+                        243,
+                        244,
+                        264,
+                        255
+                    ]
+                },
+                {
+                    "text": "test",
+                    "box": [
+                        271,
+                        246,
+                        298,
+                        257
+                    ]
+                },
+                {
+                    "text": "market,",
+                    "box": [
+                        303,
+                        244,
+                        350,
+                        255
+                    ]
+                },
+                {
+                    "text": "using",
+                    "box": [
+                        360,
+                        247,
+                        394,
+                        258
+                    ]
+                },
+                {
+                    "text": "AMELIA",
+                    "box": [
+                        401,
+                        244,
+                        443,
+                        257
+                    ]
+                },
+                {
+                    "text": "\"B\"",
+                    "box": [
+                        447,
+                        243,
+                        471,
+                        256
+                    ]
+                },
+                {
+                    "text": "Blend",
+                    "box": [
+                        473,
+                        244,
+                        511,
+                        257
+                    ]
+                },
+                {
+                    "text": "(XLF",
+                    "box": [
+                        517,
+                        244,
+                        545,
+                        255
+                    ]
+                },
+                {
+                    "text": "-680G)",
+                    "box": [
+                        546,
+                        244,
+                        591,
+                        255
+                    ]
+                }
+            ],
+            "id": 40
+        },
+        {
+            "text": "*Cost Summary-",
+            "box": [
+                46,
+                271,
+                150,
+                286
+            ],
+            "linking": [],
+            "label": "header",
+            "words": [
+                {
+                    "text": "*Cost",
+                    "box": [
+                        46,
+                        271,
+                        80,
+                        286
+                    ]
+                },
+                {
+                    "text": "Summary-",
+                    "box": [
+                        87,
+                        274,
+                        150,
+                        285
+                    ]
+                }
+            ],
+            "id": 41
+        },
+        {
+            "text": "REQUESTED IMPLEMENTATION DATE",
+            "box": [
+                74,
+                297,
+                271,
+                313
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "REQUESTED",
+                    "box": [
+                        74,
+                        300,
+                        133,
+                        311
+                    ]
+                },
+                {
+                    "text": "IMPLEMENTATION",
+                    "box": [
+                        142,
+                        297,
+                        237,
+                        311
+                    ]
+                },
+                {
+                    "text": "DATE",
+                    "box": [
+                        244,
+                        299,
+                        271,
+                        313
+                    ]
+                }
+            ],
+            "id": 42
+        },
+        {
+            "text": "9 /17 /84",
+            "box": [
+                304,
+                300,
+                355,
+                313
+            ],
+            "linking": [
+                [
+                    42,
+                    43
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "9",
+                    "box": [
+                        304,
+                        300,
+                        311,
+                        311
+                    ]
+                },
+                {
+                    "text": "/17",
+                    "box": [
+                        313,
+                        300,
+                        333,
+                        313
+                    ]
+                },
+                {
+                    "text": "/84",
+                    "box": [
+                        334,
+                        300,
+                        355,
+                        311
+                    ]
+                }
+            ],
+            "id": 43
+        },
+        {
+            "text": "COST SUMMARY",
+            "box": [
+                74,
+                327,
+                156,
+                340
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ],
+                [
+                    44,
+                    46
+                ],
+                [
+                    44,
+                    47
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "COST SUMMARY",
+                    "box": [
+                        74,
+                        327,
+                        156,
+                        340
+                    ]
+                }
+            ],
+            "id": 44
+        },
+        {
+            "text": "Obsolete Material Cost",
+            "box": [
+                101,
+                342,
+                252,
+                355
+            ],
+            "linking": [
+                [
+                    44,
+                    45
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Obsolete",
+                    "box": [
+                        101,
+                        342,
+                        158,
+                        353
+                    ]
+                },
+                {
+                    "text": "Material",
+                    "box": [
+                        162,
+                        342,
+                        216,
+                        355
+                    ]
+                },
+                {
+                    "text": "Cost",
+                    "box": [
+                        223,
+                        344,
+                        252,
+                        355
+                    ]
+                }
+            ],
+            "id": 45
+        },
+        {
+            "text": "Special Equipment/ Material Cost",
+            "box": [
+                101,
+                355,
+                312,
+                370
+            ],
+            "linking": [
+                [
+                    44,
+                    46
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Special",
+                    "box": [
+                        101,
+                        356,
+                        150,
+                        370
+                    ]
+                },
+                {
+                    "text": "Equipment/",
+                    "box": [
+                        156,
+                        355,
+                        217,
+                        369
+                    ]
+                },
+                {
+                    "text": "Material",
+                    "box": [
+                        216,
+                        355,
+                        276,
+                        368
+                    ]
+                },
+                {
+                    "text": "Cost",
+                    "box": [
+                        284,
+                        356,
+                        312,
+                        369
+                    ]
+                }
+            ],
+            "id": 46
+        },
+        {
+            "text": "Est. Annual Product Cost Change",
+            "box": [
+                102,
+                370,
+                310,
+                384
+            ],
+            "linking": [
+                [
+                    44,
+                    47
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Est.",
+                    "box": [
+                        102,
+                        370,
+                        129,
+                        381
+                    ]
+                },
+                {
+                    "text": "Annual",
+                    "box": [
+                        135,
+                        370,
+                        176,
+                        380
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        183,
+                        370,
+                        232,
+                        381
+                    ]
+                },
+                {
+                    "text": "Cost",
+                    "box": [
+                        239,
+                        370,
+                        266,
+                        383
+                    ]
+                },
+                {
+                    "text": "Change",
+                    "box": [
+                        272,
+                        370,
+                        310,
+                        384
+                    ]
+                }
+            ],
+            "id": 47
+        },
+        {
+            "text": "ATTACHMENTS (Check if Included)",
+            "box": [
+                73,
+                395,
+                285,
+                410
+            ],
+            "linking": [
+                [
+                    48,
+                    15
+                ],
+                [
+                    48,
+                    49
+                ],
+                [
+                    48,
+                    50
+                ],
+                [
+                    48,
+                    51
+                ],
+                [
+                    48,
+                    52
+                ],
+                [
+                    48,
+                    53
+                ],
+                [
+                    48,
+                    54
+                ],
+                [
+                    48,
+                    55
+                ],
+                [
+                    48,
+                    56
+                ]
+            ],
+            "label": "header",
+            "words": [
+                {
+                    "text": "ATTACHMENTS",
+                    "box": [
+                        73,
+                        395,
+                        150,
+                        409
+                    ]
+                },
+                {
+                    "text": "(Check",
+                    "box": [
+                        156,
+                        395,
+                        197,
+                        408
+                    ]
+                },
+                {
+                    "text": "if",
+                    "box": [
+                        205,
+                        395,
+                        218,
+                        409
+                    ]
+                },
+                {
+                    "text": "Included)",
+                    "box": [
+                        226,
+                        395,
+                        285,
+                        410
+                    ]
+                }
+            ],
+            "id": 48
+        },
+        {
+            "text": "Product Specification List",
+            "box": [
+                77,
+                423,
+                252,
+                438
+            ],
+            "linking": [
+                [
+                    48,
+                    49
+                ],
+                [
+                    49,
+                    20
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Product",
+                    "box": [
+                        77,
+                        426,
+                        124,
+                        437
+                    ]
+                },
+                {
+                    "text": "Specification",
+                    "box": [
+                        130,
+                        423,
+                        219,
+                        437
+                    ]
+                },
+                {
+                    "text": "List",
+                    "box": [
+                        225,
+                        423,
+                        252,
+                        438
+                    ]
+                }
+            ],
+            "id": 49
+        },
+        {
+            "text": "Packaging Art Stat.",
+            "box": [
+                75,
+                439,
+                205,
+                453
+            ],
+            "linking": [
+                [
+                    48,
+                    50
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Packaging",
+                    "box": [
+                        75,
+                        439,
+                        135,
+                        453
+                    ]
+                },
+                {
+                    "text": "Art",
+                    "box": [
+                        142,
+                        440,
+                        162,
+                        451
+                    ]
+                },
+                {
+                    "text": "Stat.",
+                    "box": [
+                        170,
+                        439,
+                        205,
+                        452
+                    ]
+                }
+            ],
+            "id": 50
+        },
+        {
+            "text": "Processing Detail",
+            "box": [
+                74,
+                451,
+                194,
+                466
+            ],
+            "linking": [
+                [
+                    48,
+                    51
+                ],
+                [
+                    51,
+                    21
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Processing",
+                    "box": [
+                        74,
+                        451,
+                        142,
+                        466
+                    ]
+                },
+                {
+                    "text": "Detail",
+                    "box": [
+                        149,
+                        453,
+                        194,
+                        466
+                    ]
+                }
+            ],
+            "id": 51
+        },
+        {
+            "text": "Initial Production Requirement",
+            "box": [
+                74,
+                466,
+                279,
+                479
+            ],
+            "linking": [
+                [
+                    48,
+                    52
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Initial",
+                    "box": [
+                        74,
+                        466,
+                        123,
+                        477
+                    ]
+                },
+                {
+                    "text": "Production",
+                    "box": [
+                        130,
+                        466,
+                        200,
+                        477
+                    ]
+                },
+                {
+                    "text": "Requirement",
+                    "box": [
+                        205,
+                        466,
+                        279,
+                        479
+                    ]
+                }
+            ],
+            "id": 52
+        },
+        {
+            "text": "Cost Analysis",
+            "box": [
+                367,
+                411,
+                457,
+                425
+            ],
+            "linking": [
+                [
+                    48,
+                    53
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Cost",
+                    "box": [
+                        367,
+                        411,
+                        392,
+                        424
+                    ]
+                },
+                {
+                    "text": "Analysis",
+                    "box": [
+                        401,
+                        412,
+                        457,
+                        425
+                    ]
+                }
+            ],
+            "id": 53
+        },
+        {
+            "text": "Spec. Change Detail",
+            "box": [
+                367,
+                423,
+                498,
+                439
+            ],
+            "linking": [
+                [
+                    48,
+                    54
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Spec.",
+                    "box": [
+                        367,
+                        425,
+                        399,
+                        439
+                    ]
+                },
+                {
+                    "text": "Change",
+                    "box": [
+                        408,
+                        423,
+                        450,
+                        437
+                    ]
+                },
+                {
+                    "text": "Detail",
+                    "box": [
+                        455,
+                        423,
+                        498,
+                        437
+                    ]
+                }
+            ],
+            "id": 54
+        },
+        {
+            "text": "Casing Flavoring Formulae",
+            "box": [
+                365,
+                437,
+                542,
+                453
+            ],
+            "linking": [
+                [
+                    48,
+                    55
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Casing",
+                    "box": [
+                        365,
+                        440,
+                        411,
+                        453
+                    ]
+                },
+                {
+                    "text": "Flavoring",
+                    "box": [
+                        406,
+                        439,
+                        474,
+                        452
+                    ]
+                },
+                {
+                    "text": "Formulae",
+                    "box": [
+                        483,
+                        437,
+                        542,
+                        450
+                    ]
+                }
+            ],
+            "id": 55
+        },
+        {
+            "text": "Blend Formulae",
+            "box": [
+                365,
+                451,
+                467,
+                465
+            ],
+            "linking": [
+                [
+                    48,
+                    56
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Blend",
+                    "box": [
+                        365,
+                        454,
+                        404,
+                        464
+                    ]
+                },
+                {
+                    "text": "Formulae",
+                    "box": [
+                        408,
+                        451,
+                        467,
+                        465
+                    ]
+                }
+            ],
+            "id": 56
+        },
+        {
+            "text": "Prepared By:",
+            "box": [
+                75,
+                507,
+                159,
+                522
+            ],
+            "linking": [
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "question",
+            "words": [
+                {
+                    "text": "Prepared",
+                    "box": [
+                        75,
+                        507,
+                        129,
+                        522
+                    ]
+                },
+                {
+                    "text": "By:",
+                    "box": [
+                        137,
+                        507,
+                        159,
+                        522
+                    ]
+                }
+            ],
+            "id": 57
+        },
+        {
+            "text": "D. M. Frank",
+            "box": [
+                226,
+                506,
+                302,
+                521
+            ],
+            "linking": [
+                [
+                    57,
+                    58
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "D.",
+                    "box": [
+                        226,
+                        506,
+                        239,
+                        519
+                    ]
+                },
+                {
+                    "text": "M.",
+                    "box": [
+                        244,
+                        508,
+                        258,
+                        521
+                    ]
+                },
+                {
+                    "text": "Frank",
+                    "box": [
+                        267,
+                        508,
+                        302,
+                        519
+                    ]
+                }
+            ],
+            "id": 58
+        },
+        {
+            "text": "10/ 10/ 84",
+            "box": [
+                462,
+                506,
+                521,
+                521
+            ],
+            "linking": [
+                [
+                    5,
+                    59
+                ]
+            ],
+            "label": "answer",
+            "words": [
+                {
+                    "text": "10/",
+                    "box": [
+                        462,
+                        506,
+                        482,
+                        521
+                    ]
+                },
+                {
+                    "text": "10/",
+                    "box": [
+                        485,
+                        507,
+                        503,
+                        521
+                    ]
+                },
+                {
+                    "text": "84",
+                    "box": [
+                        503,
+                        508,
+                        521,
+                        521
+                    ]
+                }
+            ],
+            "id": 59
+        },
+        {
+            "text": "RD&E - Product",
+            "box": [
+                77,
+                589,
+                173,
+                605
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RD&E",
+                    "box": [
+                        77,
+                        589,
+                        106,
+                        604
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        109,
+                        592,
+                        122,
+                        602
+                    ]
+                },
+                {
+                    "text": "Product",
+                    "box": [
+                        124,
+                        591,
+                        173,
+                        605
+                    ]
+                }
+            ],
+            "id": 60
+        },
+        {
+            "text": "RD&E - Process",
+            "box": [
+                77,
+                617,
+                172,
+                632
+            ],
+            "linking": [],
+            "label": "question",
+            "words": [
+                {
+                    "text": "RD&E",
+                    "box": [
+                        77,
+                        617,
+                        105,
+                        632
+                    ]
+                },
+                {
+                    "text": "-",
+                    "box": [
+                        110,
+                        619,
+                        118,
+                        630
+                    ]
+                },
+                {
+                    "text": "Process",
+                    "box": [
+                        126,
+                        617,
+                        172,
+                        631
+                    ]
+                }
+            ],
+            "id": 61
+        }
+    ]
+}
