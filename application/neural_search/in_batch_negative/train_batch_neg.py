@@ -28,7 +28,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from batch_negative.model import SemanticIndexBatchNeg,SemanticIndexBatchNegSimCSE
+from batch_negative.model import SemanticIndexBatchNeg
 from data import read_text_pair, convert_example, create_dataloader
 
 # yapf: disable
@@ -108,11 +108,7 @@ def do_train():
         margin=args.margin,
         scale=args.scale,
         output_emb_size=args.output_emb_size)
-    
-    # model=SemanticIndexBatchNegSimCSE(pretrained_model,
-    #     margin=args.margin,
-    #     scale=args.scale,
-    #     output_emb_size=args.output_emb_size)
+
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)

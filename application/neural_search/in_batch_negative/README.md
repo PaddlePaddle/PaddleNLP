@@ -41,13 +41,15 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 ## 1. 技术方案和评估指标
 
 ### 技术方案
-双塔模型，采用ERNIE1.0热启
-在...阶段引入In-batch negatives 策略...
+
+双塔模型，采用ERNIE1.0热启,在召回训练阶段引入In-batch negatives 策略，使用hnswlib建立索引库，进行召回测试。
 
 
 ### 评估指标
 
 （1）采用 Recall@1，Recall@5 ，Recall@10 ，Recall@20  和 Recall@50 指标来评估语义索引模型的召回效果。
+
+Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序的召回列表中返回前k个结果）结果中检索出的相关结果数和库中所有的相关结果数的比率，衡量的是检索系统的查全率。
 
 **效果评估**
 
@@ -67,10 +69,8 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 * python >= 3.x
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.1
-* hnswlib >=0.5.2
+* [hnswlib](https://github.com/nmslib/hnswlib) >=0.5.2
 * visualdl >= 2.2.2
-
-- [hnswlib](https://github.com/nmslib/hnswlib)
 
 <a name="代码结构"></a>
 
@@ -128,7 +128,7 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/inbatch_model.zip)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/inbatch_model.zip)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|f3e5c7d7b0b718c2530c5e1b136b2d74|
 
 ### 训练环境说明
 
