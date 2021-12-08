@@ -170,19 +170,20 @@ class DialogueTask(Task):
             for batch in inputs['data_loader']:
                 input_ids, token_type_ids, position_ids, attention_mask = batch
                 ids, scores = self._model.generate(input_ids=input_ids, 
-                                                  token_type_ids=token_type_ids,
-                                                  position_ids=position_ids,
-                                                  attention_mask=attention_mask,
-                                                  max_length=64,
-                                                  min_length=1,
-                                                  decode_strategy='sampling',
-                                                  temperature=1.0,
-                                                  top_k=5,
-                                                  top_p=1.0,
-                                                  num_beams=0,
-                                                  length_penalty=1.0,
-                                                  early_stopping=False,
-                                                  num_return_sequences=1)
+                                                   token_type_ids=token_type_ids,
+                                                   position_ids=position_ids,
+                                                   attention_mask=attention_mask,
+                                                   max_length=64,
+                                                   min_length=1,
+                                                   decode_strategy='sampling',
+                                                   temperature=1.0,
+                                                   top_k=5,
+                                                   top_p=1.0,
+                                                   num_beams=0,
+                                                   length_penalty=1.0,
+                                                   early_stopping=False,
+                                                   use_faster=False,
+                                                   num_return_sequences=1)
                 all_ids.extend([ids])
                 all_scores.extend([scores])
         inputs['ids'] = all_ids
