@@ -78,19 +78,19 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "unified_transformer-12L-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
             "unified_transformer-12L-cn-luge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
             "plato-mini":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini-vocab.txt",
         },
         "sentencepiece_model_file": {
             "unified_transformer-12L-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
             "unified_transformer-12L-cn-luge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
             "plato-mini":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-spm.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini-spm.model",
         },
     }
     pretrained_init_configuration = {

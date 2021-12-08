@@ -161,15 +161,15 @@ class MBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "mbart-large-cc25":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
             "mbart-large-en-ro":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
             "mbart-large-50-one-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
             "mbart-large-50-many-to-one-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
             "mbart-large-50-many-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
         }
     }
     base_model_prefix = "mbart"

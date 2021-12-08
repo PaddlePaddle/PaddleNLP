@@ -128,9 +128,9 @@ class CTRLTokenizer(PretrainedTokenizer):
         "merges_file": "merges.txt",
     }
     ctrl_vocab_link = (
-        "http://paddlenlp.bj.bcebos.com/models/transformers/ctrl/vocab.json")
+        "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/vocab.json")
     ctrl_merges_link = (
-        "http://paddlenlp.bj.bcebos.com/models/transformers/ctrl/merges.txt")
+        "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/merges.txt")
     pretrained_resource_files_map = {
         "vocab_file": {
             "ctrl": ctrl_vocab_link,

@@ -273,7 +273,7 @@ class BigBirdPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "bigbird-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bigbird/bigbird-base-uncased.pdparams",
         }
     }
     base_model_prefix = "bigbird"

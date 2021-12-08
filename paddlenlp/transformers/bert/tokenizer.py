@@ -305,29 +305,29 @@ class BertTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "bert-base-uncased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-uncased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
             "bert-large-uncased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-large-uncased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-uncased-vocab.txt",
             "bert-base-cased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-cased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
             "bert-large-cased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-large-cased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-cased-vocab.txt",
             "bert-base-multilingual-uncased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-multilingual-uncased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-uncased-vocab.txt",
             "bert-base-multilingual-cased":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-multilingual-cased-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-cased-vocab.txt",
             "bert-base-chinese":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
             "bert-wwm-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese-vocab.txt",
             "bert-wwm-ext-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
             "macbert-large-chinese":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
             "macbert-base-chinese":
-            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
             "simbert-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
         }
     }
     pretrained_init_configuration = {
