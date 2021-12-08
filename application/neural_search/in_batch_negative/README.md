@@ -78,6 +78,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 ```
 |—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
+|—— data
+    |—— train.csv # 训练集合
+    |—— test.csv. # 测试集合
+    |—— corpus.csv # 召回集合
 |—— batch_negative
     |—— model.py # In-batch negatives 策略核心网络结构
 |—— deploy
@@ -91,7 +95,6 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
 ```
-
 
 <a name="数据准备"></a>
 
@@ -142,8 +145,10 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可
 
+把下载的数据集帮在data目录下：
+
 ```
-root_path=train_0.001
+root_path=inbatch
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train_batch_neg.py \
     --device gpu \
@@ -155,7 +160,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 1 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file data/${root_path}/train.csv 
+    --train_set_file data/train.csv 
+
 ```
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
@@ -195,12 +201,13 @@ d. 评估
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
 ```
+root_dir="checkpoints/inbatch" 
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_25000/model_state.pdparams" \
+        --params_path "${root_dir}/model_40/model_state.pdparams" \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
