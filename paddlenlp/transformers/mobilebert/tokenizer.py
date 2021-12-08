@@ -55,6 +55,7 @@ class MobileBertTokenizer(BertTokenizer):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
+        
         Args:
             batch_text_or_text_pairs (list):
                 The element of list can be sequence or sequence pair, and the
@@ -109,8 +110,9 @@ class MobileBertTokenizer(BertTokenizer):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
+        
         Returns:
-            list[dict]:
+            dict:
                 The dict has the following optional items:
                 - **input_ids** (list[int]): List of token ids to be fed to a model.
                 - **position_ids** (list[int], optional): List of token position ids to be
