@@ -35,14 +35,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from paddlenlp.transformers import BertTokenizer
-from pypinyin import NORMAL, Style, pinyin
 from functools import lru_cache
+from pypinyin import NORMAL, Style, pinyin
+
+from paddlenlp.transformers import BertTokenizer
 
 
 class ChineseBertTokenizer(BertTokenizer):
     """
     Construct a ChineseBert tokenizer. `ChineseBertTokenizer` is identical to `BertTokenizerr`.
+    The difference between them is that ChineseBert has the extra process about pinyin id.
     For more information regarding those methods, please refer to this superclass.
     """
     pretrained_resource_files_map = {

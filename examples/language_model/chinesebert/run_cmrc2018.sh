@@ -1,5 +1,4 @@
 python train_cmrc2018.py \
-    --model_type chinesebert \
     --data_dir "data/cmrc2018" \
     --model_name_or_path ChineseBERT-large \
     --max_seq_length 512 \

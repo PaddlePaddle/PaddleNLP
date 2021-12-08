@@ -1,11 +1,11 @@
-# chineseBert with PaddleNLP
+# ChineseBert with PaddleNLP
 
 [ChineseBERT: Chinese Pretraining Enhanced by Glyph and Pinyin Information](https://arxiv.org/pdf/2106.16038.pdf)
 
 **摘要：**
 最近的汉语预训练模型忽略了汉语特有的两个重要方面：字形和拼音，它们对语言理解具有重要的语法和语义信息。在本研究中，我们提出了汉语预训练，它将汉字的字形和拼音信息纳入语言模型预训练中。字形嵌入是基于汉字的不同字体获得的，能够从视觉特征中捕捉汉字语义，拼音嵌入代表汉字的发音，处理汉语中高度流行的异义现象（同一汉字具有不同的发音和不同的含义）。在大规模的未标记中文语料库上进行预训练后，所提出的ChineseBERT模型在训练步骤较少的基线模型上产生了显著的性能提高。该模型在广泛的中国自然语言处理任务上实现了新的SOTA性能，包括机器阅读理解、自然语言推理、文本分类、句子对匹配和命名实体识别方面的竞争性能。
 
-本项目是 ConvBert 在 Paddle 2.x上的开源实现。
+本项目是 ChineseBert 在 Paddle 2.x上的开源实现。
 
 ## **数据准备**
 涉及到的ChnSentiCorp，crmc2018，XNLI数据
@@ -96,7 +96,6 @@ test数据集 acc最好结果为81.657,达到论文精度要求。
 ```shell
 # 开始训练
 python train_cmrc2018.py \
-    --model_type chinesebert \
     --data_dir "data/cmrc2018" \
     --model_name_or_path ChineseBERT-large \
     --max_seq_length 512 \
@@ -116,8 +115,7 @@ python train_cmrc2018.py \
     --use_amp
 ```
 其中参数释义如下：
-- `model_type` 指示了模型类型。
-- `data_path` 表示微调数据路径
+- `data_path` 表示微调数据路径。
 - `model_name_or_path` 模型名称或者路径，支持ChineseBERT-base、ChineseBERT-large两种种规格。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `train_batch_size` 表示训练过程中每次迭代**每张卡**上的样本数目。
@@ -148,10 +146,10 @@ python train_cmrc2018.py \
 
 ```
 
-#### （2）运行eval.py，生成test数据集预测答案
+#### （2）运行eval_cmrc.py，生成test数据集预测答案
 
 ```bash
-python eval.py --model_name_or_path outputs/step-340 --n_best_size 35 --max_answer_length 65
+python eval_cmrc.py --model_name_or_path outputs/step-340 --n_best_size 35 --max_answer_length 65
 ```
 
 其中，model_name_or_path为模型路径

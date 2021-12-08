@@ -202,18 +202,3 @@ def get_dev_dataloader(tokenizer, args, splits="dev"):
         return_list=True, )
 
     return data_loader
-
-
-if __name__ == "__main__":
-    from easydict import EasyDict
-    args = EasyDict(
-        num_workers=0,
-        eval_batch_size=4,
-        train_batch_size=4,
-        max_seq_length=512,
-        doc_stride=128)
-    from chinesebert import ChineseBertTokenizerFast
-    tokenizer = ChineseBertTokenizerFast.from_pretrained(
-        r"E:\02models\shannoai\ChineseBERT-base\pd")
-    get_train_dataloader(tokenizer, args)
-    get_dev_dataloader(tokenizer, args)

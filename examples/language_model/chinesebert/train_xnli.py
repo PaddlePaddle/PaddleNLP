@@ -19,27 +19,20 @@ import time
 import os
 import numpy as np
 import random
+import sys
 from functools import partial
+
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-
 import paddle
-import sys
 from paddle.nn import functional as F
-
 from paddle.nn.layer import CrossEntropyLoss
-
 from paddle.io import DataLoader
-
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ChineseBertForSequenceClassification
 from paddlenlp.transformers import ChineseBertTokenizer
-
 from paddlenlp.datasets import load_dataset
 
-import random
-import paddle
-import numpy as np
 from utils import set_seed
 
 parser = argparse.ArgumentParser()
@@ -126,9 +119,6 @@ idx = 1
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    # global idx
-    # print(idx, example)
-    # idx = idx + 1
 
     label_map = {
         "contradictory": 0,
@@ -148,34 +138,19 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     return input_ids, pinyin_ids, label
 
 
-# # 批量数据大小
-# batch_size = 32
-# # 文本序列最大长度
-# max_seq_length = 256
-
-# 将数据处理成模型可读入的数据格式
+# Process the data into a data format that the model can read in.
 trans_func = partial(
     convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
-# 将数据组成批量式数据，如
-# 将不同长度的文本序列padding到批量式数据中最大长度
-# 将每条数据label堆叠在一起
-
+# Form data into batch data, such as padding text sequences of different lengths into the maximum length of batch data, 
+# and stack each data label together
 batchify_fn = lambda samples, fn=Tuple(
     Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-    # Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
     Pad(axis=0, pad_val=0),  # pinyin_ids
     Stack()  # labels
 ): [data for data in fn(samples)]
 
-# batchify_fn = lambda samples, fn=Dict(
-#     "input_ids":Pad(axis=0, pad_val=tokenizer.pad_token_id), # input_ids
-#     "pinyin_ids":Pad(axis=0, pad_val=0),                     # pinyin_ids
-#     "labels":Stack(dtype="int64")                            # labels
-# ): fn(samples)
-
 from utils import create_dataloader
-# from utils import get_dataloader
 
 train_data_loader = create_dataloader(
     train_ds,
@@ -221,41 +196,22 @@ optimizer = paddle.optimizer.AdamW(
     weight_decay=args.weight_decay,
     apply_decay_param_fun=lambda x: x in decay_params)
 
-# # # 训练轮次
-# epochs = 5
-# # 训练过程中保存模型参数的文件夹
-# ckpt_dir = "XNLI_ckpt"
-# # len(train_data_loader)一轮训练所需要的step数
-# num_training_steps = len(train_data_loader) * epochs
-
-# # Adam优化器
-# optimizer = paddle.optimizer.AdamW(
-#     beta1=0.9, beta2=0.98, 
-#     learning_rate=2e-5,
-#     parameters= model.parameters())
-# 交叉熵损失函数
+# cross-entropy cost function
 criterion = paddle.nn.loss.CrossEntropyLoss()
-# accuracy评价指标
+# accuracy metric
 metric = paddle.metric.Accuracy()
 print(args)
-# 开启训练
+# train
 global_step = 0
 tic_train = time.time()
 for epoch in range(1, args.epochs + 1):
     for step, batch in enumerate(train_data_loader, start=1):
-        # print(batch)
         input_ids, pinyin_ids, labels = batch
-        # print(input_ids.shape)
         batch_size, length = input_ids.shape
-        # 喂数据给model
-        #print(batch)
         pinyin_ids = paddle.reshape(pinyin_ids, [batch_size, length, 8])
         logits = model(input_ids, pinyin_ids)
-        # 计算损失函数值
         loss = criterion(logits, labels)
-        # 预测分类概率值
         probs = F.softmax(logits, axis=1)
-        # 计算acc
         correct = metric.compute(probs, labels)
         metric.update(correct)
         acc = metric.accumulate()
@@ -268,23 +224,17 @@ for epoch in range(1, args.epochs + 1):
                    10 / (time.time() - tic_train)))
             tic_train = time.time()
 
-        # 反向梯度回传，更新参数
         loss.backward()
         optimizer.step()
         lr_scheduler.step()
         optimizer.clear_grad()
 
         if global_step % 100 == 0:
-
-            # 评估当前训练的模型
             dev_acc = evaluate(model, criterion, metric, dev_data_loader)
             test_acc = evaluate(model, criterion, metric, test_data_loader)
             if test_acc >= 0.816:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                    # sys.exit(0)
-                    # 保存当前模型参数等
                     model.save_pretrained(save_dir)
-                    # 保存tokenizer的词表等
                     tokenizer.save_pretrained(save_dir)

@@ -14,7 +14,63 @@
 # limitations under the License.
 
 import argparse
+from tqdm.auto import tqdm
 import os
+
+import paddle
+
+from dataset_cmrc2018 import get_dev_dataloader
+from train_cmrc2018 import MODEL_CLASSES
+from metric import compute_prediction
+from utils import save_json
+
+
+@paddle.no_grad()
+def evaluate(model, data_loader, args, output_dir="./"):
+    model.eval()
+    all_start_logits = []
+    all_end_logits = []
+
+    for batch in tqdm(data_loader):
+        input_ids, token_type_ids, pinyin_ids = batch
+        start_logits_tensor, end_logits_tensor = model(
+            input_ids, token_type_ids=token_type_ids, pinyin_ids=pinyin_ids)
+        all_start_logits.extend(start_logits_tensor.numpy().tolist())
+        all_end_logits.extend(end_logits_tensor.numpy().tolist())
+
+    all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
+        data_loader.dataset.data,
+        data_loader.dataset.new_data,
+        (all_start_logits, all_end_logits),
+        False,
+        args.n_best_size,
+        args.max_answer_length,
+        args.null_score_diff_threshold, )
+
+    save_json(all_predictions, os.path.join(output_dir, "all_predictions.json"))
+    if args.save_nbest_json:
+        save_json(all_nbest_json,
+                  os.path.join(output_dir, "all_nbest_json.json"))
+
+
+def main(args):
+    print(args)
+    paddle.set_device(args.device)
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    model = model_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    splits = "test"
+    dev_data_loader = get_dev_dataloader(tokenizer, args, splits=splits)
+    evaluate(model, dev_data_loader, args, output_dir=args.output_dir)
+
+    data_dir = args.data_dir
+    dev_ground_truth_file_path = os.path.join(data_dir, "dev.json")
+    dev_predict_file_path = os.path.join(args.output_dir,
+                                         "all_predictions.json")
+    if splits == "dev":
+        from cmrc_evaluate import get_result
+        get_result(dev_ground_truth_file_path, dev_predict_file_path)
 
 
 def parse_args():
@@ -127,7 +183,6 @@ def parse_args():
         default=128,
         help="When splitting up a long document into chunks, how much stride to take between chunks.",
     )
-
     parser.add_argument(
         "--n_best_size",
         type=int,
@@ -144,7 +199,6 @@ def parse_args():
         "--max_query_length", type=int, default=64, help="Max query length.")
     parser.add_argument(
         "--max_answer_length", type=int, default=65, help="Max answer length.")
-
     parser.add_argument(
         "--use_amp",
         action="store_true",
@@ -173,3 +227,8 @@ def parse_args():
     os.makedirs(args.logdir, exist_ok=True)
 
     return args
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)

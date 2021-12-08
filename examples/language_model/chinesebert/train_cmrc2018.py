@@ -17,6 +17,7 @@ import logging
 import math
 import os
 import argparse
+from tqdm import tqdm
 
 import paddle
 from paddle.amp import GradScaler, auto_cast
@@ -27,11 +28,9 @@ from paddlenlp.transformers import (
     ErnieForQuestionAnswering,
     ErnieTokenizer, )
 from paddlenlp.transformers import ChineseBertForQuestionAnswering, ChineseBertTokenizer
-from tqdm import tqdm
 
-# from args import parse_args
 from dataset_cmrc2018 import get_dev_dataloader, get_train_dataloader
-from metric import compute_prediction, squad_evaluate
+from metric_cmrc import compute_prediction, squad_evaluate
 from utils import (
     CrossEntropyLossForSQuAD,
     get_scheduler,

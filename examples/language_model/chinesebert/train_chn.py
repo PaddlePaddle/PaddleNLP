@@ -20,26 +20,17 @@ import os
 import numpy as np
 import random
 from functools import partial
-import paddle.nn.functional as F
+
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-
 import paddle
-
 from paddle.nn import functional as F
-
 from paddle.nn.layer import CrossEntropyLoss
-
 from paddle.io import DataLoader
-
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ChineseBertForSequenceClassification
 from paddlenlp.transformers import ChineseBertTokenizer
-
 from paddlenlp.datasets import load_dataset
 
-import random
-import paddle
-import numpy as np
 from utils import set_seed
 
 parser = argparse.ArgumentParser()
@@ -123,12 +114,13 @@ tokenizer = ChineseBertTokenizer.from_pretrained("ChineseBERT-large")
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    # 将原数据处理成model可读入的格式，enocded_inputs是一个dict，包含input_ids、token_type_ids等字段
+    # The original data is processed into a format that can be read in by the model, 
+    # enocded_ Inputs is a dict that contains inputs_ids、token_type_ids、etc.
     encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
 
-    # input_ids：对文本切分token后，在词汇表中对应的token id
+    # input_ids：After the text is segmented into tokens, the corresponding token id in the vocabulary.
     input_ids = encoded_inputs["input_ids"]
-    # token_type_ids：当前token属于句子1还是句子2，即上述图中表达的segment ids
+    # token_type_ids：Does the current token belong to sentence 1 or sentence 2, that is, the segment ids.
 
     token_type_ids = encoded_inputs["token_type_ids"]
     pinyin_ids = encoded_inputs["pinyin_ids"]
@@ -137,18 +129,12 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     return input_ids, pinyin_ids, label
 
 
-# # 批量数据大小
-# batch_size = 16
-# # 文本序列最大长度
-# max_seq_length = 256
-
-# 将数据处理成模型可读入的数据格式
+# Process the data into a data format that the model can read in.
 trans_func = partial(
     convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
-# 将数据组成批量式数据，如
-# 将不同长度的文本序列padding到批量式数据中最大长度
-# 将每条数据label堆叠在一起
+# Form data into batch data, such as padding text sequences of different lengths into the maximum length of batch data, 
+# and stack each data label together
 batchify_fn = lambda samples, fn=Tuple(
     Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
     # Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
@@ -179,11 +165,6 @@ test_data_loader = create_dataloader(
 
 from utils import evaluate
 
-# # # 训练轮次
-# epochs = 10
-# # 训练过程中保存模型参数的文件夹
-# ckpt_dir = "Chn_ckpt"
-# # len(train_data_loader)一轮训练所需要的step数
 num_training_steps = len(train_data_loader) * args.epochs
 
 lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -205,34 +186,23 @@ optimizer = paddle.optimizer.AdamW(
     weight_decay=args.weight_decay,
     apply_decay_param_fun=lambda x: x in decay_params)
 
-# # Adam优化器
-# optimizer = paddle.optimizer.AdamW(
-#     beta1=0.9, beta2=0.98, 
-#     learning_rate=2e-5,
-#     parameters= model.parameters())
-# 交叉熵损失函数
+# cross-entropy cost function
 criterion = paddle.nn.loss.CrossEntropyLoss()
-# accuracy评价指标
+# accuracy metric
 metric = paddle.metric.Accuracy()
 print(args)
-# 开启训练
+# train
 global_step = 0
 tic_train = time.time()
 for epoch in range(1, args.epochs + 1):
     for step, batch in enumerate(train_data_loader, start=1):
-        # print(batch)
         input_ids, pinyin_ids, labels = batch
-        # print(input_ids.shape)
         batch_size, length = input_ids.shape
-        # 喂数据给model
-        #print(batch)
         pinyin_ids = paddle.reshape(pinyin_ids, [batch_size, length, 8])
         logits = model(input_ids, pinyin_ids)
-        # 计算损失函数值
         loss = criterion(logits, labels)
-        # 预测分类概率值
         probs = F.softmax(logits, axis=1)
-        # 计算acc
+
         correct = metric.compute(probs, labels)
         metric.update(correct)
         acc = metric.accumulate()
@@ -245,24 +215,17 @@ for epoch in range(1, args.epochs + 1):
                    10 / (time.time() - tic_train)))
             tic_train = time.time()
 
-        # 反向梯度回传，更新参数
         loss.backward()
         optimizer.step()
         lr_scheduler.step()
         optimizer.clear_grad()
 
         if global_step % 100 == 0:
-
-            # 评估当前训练的模型
             dev_acc = evaluate(model, criterion, metric, dev_data_loader)
             test_acc = evaluate(model, criterion, metric, test_data_loader)
             if test_acc >= 0.959:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                # save_dir = os.path.join(ckpt_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                    # sys.exit(0)
-                    # 保存当前模型参数等
                     model.save_pretrained(save_dir)
-                    # 保存tokenizer的词表等
                     tokenizer.save_pretrained(save_dir)

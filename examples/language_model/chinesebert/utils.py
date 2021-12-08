@@ -18,8 +18,8 @@ import pickle
 import random
 from collections import OrderedDict
 import numpy as np
+
 from paddlenlp.datasets import MapDataset
-import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
