@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import math
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -792,6 +793,7 @@ class MobileBertPretrainedModel(PretrainedModel):
 class MobileBertForPreTraining(MobileBertPretrainedModel):
     """
     MobileBert Model with pretraining tasks on top.
+    
     Args:
         bert (:class:`MobileBertModel`):
             An instance of :class:`MobileBertModel`.
@@ -827,6 +829,7 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
             output_hidden_states=None, ):
         r"""
         The MobileBertForPreTraining forward method, overrides the __call__() special method.
+        
         Args:
             input_ids (Tensor):
                 See :class:`MobileBertModel`.
@@ -844,6 +847,7 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
                 See :class:`MobileBertModel`.
             output_hidden_states (bool, optional):
                 See :class:`MobileBertModel`.
+        
         Returns:
             tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
             With the fields:
@@ -854,6 +858,7 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
             - `seq_relationship_score` (Tensor):
                 The scores of next sentence prediction.
                 Its data type should be float32 and its shape is [batch_size, 2].
+        
         .. code-block::
                 import paddle
                 from paddlenlp.transformers import MobileBertModel, MobileBertTokenizer
@@ -892,6 +897,7 @@ class MobileBertModel(MobileBertPretrainedModel):
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+    
     Args:
         vocab_size (int):
             Vocabulary size of `inputs_ids` in `MobileBertModel`. Also is the vocab size of token embedding matrix.
@@ -1026,6 +1032,7 @@ class MobileBertModel(MobileBertPretrainedModel):
                       is_attention_chunked=False):
         """
         Prepare the head mask if needed.
+        
         Args:
             head_mask (:obj:`paddle.Tensor` with shape :obj:`[num_heads]` or :obj:`[num_hidden_layers x num_heads]`, `optional`):
                 The mask indicating if we should keep the heads or not (1.0 for keep, 0.0 for discard).
@@ -1033,6 +1040,7 @@ class MobileBertModel(MobileBertPretrainedModel):
                 The number of hidden layers in the model.
             is_attention_chunked: (:obj:`bool`, `optional`, defaults to :obj:`False`):
                 Whether or not the attentions scores are computed by chunks or not.
+        
         Returns:
             :obj:`paddle.Tensor` with shape :obj:`[num_hidden_layers x batch x num_heads x seq_length x seq_length]` or
             list with :obj:`[None]` for each layer.
@@ -1074,6 +1082,7 @@ class MobileBertModel(MobileBertPretrainedModel):
             output_attentions=None, ):
         r'''
         The MobileBertModel forward method, overrides the `__call__()` special method.
+        
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
@@ -1109,6 +1118,7 @@ class MobileBertModel(MobileBertPretrainedModel):
             output_attentions (bool, optional):
                 Whether to return the output of each self attention layers.
                 Defaults to `None`.
+        
         Returns:
             tuple: Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_outputs`, `pooled_output`).
             With the fields:
@@ -1123,6 +1133,7 @@ class MobileBertModel(MobileBertPretrainedModel):
                 A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
                 The length of the list is `num_hidden_layers`.
                 Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+        
         Example:
             .. code-block::
                 import paddle
@@ -1188,6 +1199,7 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
     """
     MobileBert Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
+    
     Args:
         mobilebert (:class:`MobileBertModel`):
             An instance of MobileBert.
@@ -1220,6 +1232,7 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
                 output_hidden_states=None):
         r"""
         The MobileBertForSequenceClassification forward method, overrides the __call__() special method.
+        
         Args:
             input_ids (Tensor):
                 See :class:`MobileBertModel`.
@@ -1237,9 +1250,11 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
                 See :class:`MobileBertModel`.
             output_hidden_states (bool, optional):
                 See :class:`MobileBertModel`.
+        
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_classes]` and dtype as float32.
+        
         Example:
             .. code-block::
                 import paddle
@@ -1275,6 +1290,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
     """
     MobileBert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
+    
     Args:
         mobilebert (:class:`MobileBert`):
             An instance of MobileBert.
@@ -1303,6 +1319,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
             output_hidden_states=None, ):
         r"""
         The MobileBertForQuestionAnswering forward method, overrides the __call__() special method.
+        
         Args:
             input_ids (Tensor):
                 See :class:`MobileBertModel`.
@@ -1328,6 +1345,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
                 Labels for position (index) of the end of the labelled span for computing the token classification loss.
                 Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
                 sequence are not taken into account for computing the loss.
+        
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
             With the fields:
@@ -1337,6 +1355,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
             - `end_logits` (Tensor):
                 A tensor of the input token classification logits, indicates the end position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
+        
         Example:
             .. code-block::
                 import paddle
