@@ -217,6 +217,7 @@ class BeamSearchScorer(object):
                  final_beam_scores,
                  final_beam_tokens,
                  final_beam_indices,
+                 origin_len=0,
                  pad_token_id=None,
                  eos_token_id=None):
         batch_size = len(self._beam_hyps)
@@ -232,7 +233,7 @@ class BeamSearchScorer(object):
                 batch_beam_idx = batch_idx * self.num_beams + beam_id
                 final_score = final_beam_scores[batch_beam_idx].numpy().item()
                 final_tokens = input_ids[batch_beam_idx]
-                beam_hyp.add(final_tokens, final_score)
+                beam_hyp.add(final_tokens, final_score, origin_len=origin_len)
 
         # select the best hypotheses
         sent_lengths = paddle.zeros(
@@ -514,11 +515,11 @@ class GenerationMixin(object):
             raise AttributeError(
                 "'num_beam_groups != 1' is not supported yet in the faster version"
             )
-        if kwargs['early_stopping'] != False:
-            # not support for early_stopping yet in the faster version
-            raise AttributeError(
-                "'early_stopping != False' is not supported yet in the faster version"
-            )
+        # if kwargs['early_stopping'] != False:
+        #     # not support for early_stopping yet in the faster version
+        #     raise AttributeError(
+        #         "'early_stopping != False' is not supported yet in the faster version"
+        #     )
         if kwargs['forced_eos_token_id'] is not None:
             # not support for forced_eos_token_id yet in the faster version
             raise AttributeError(
@@ -549,7 +550,7 @@ class GenerationMixin(object):
                  num_return_sequences=1,
                  diversity_rate=0.0,
                  use_cache=True,
-                 use_fast=True,
+                 use_faster=True,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -617,7 +618,7 @@ class GenerationMixin(object):
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
-            use_fast: (bool, optional): Whether to use faster entry of model 
+            use_faster: (bool, optional): Whether to use faster entry of model 
                 for generation. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
@@ -723,7 +724,7 @@ class GenerationMixin(object):
         ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy)
 
-        if getattr(self, '_faster_entry', None) is not False and use_fast:
+        if getattr(self, '_faster_entry', None) is not False and use_faster:
             args = locals()
             args.pop('self')
             args.pop("__class__", None)
@@ -751,7 +752,7 @@ class GenerationMixin(object):
                 self._convert_to_faster(args)
                 logger.warning(e)
                 logger.warning(
-                    "FasterGenerate is not available, "
+                    "FasterGeneration is not available, "
                     "and the original version would be used instead.")
 
         # params check
@@ -801,7 +802,8 @@ class GenerationMixin(object):
             forced_eos_token_id=forced_eos_token_id,
             num_beams=num_beams,
             num_beam_groups=num_beam_groups,
-            diversity_rate=diversity_rate)
+            diversity_rate=diversity_rate,
+            repetition_penalty=repetition_penalty)
 
         if decode_strategy == 'greedy_search':
             if num_return_sequences > 1:
@@ -1138,6 +1140,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores
@@ -1274,6 +1277,7 @@ class GenerationMixin(object):
             beam_scores,
             next_tokens,
             next_indices,
+            origin_len=origin_len,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id)
         return pred_ids[:, origin_len:], scores

@@ -22,10 +22,8 @@ from paddle.nn import CrossEntropyLoss, MSELoss
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'CTRLModel',
-    "CTRLLMHeadModel",
-    'CTRLForSequenceClassification',
-    'SinusoidalPositionalEmbedding',
+    'CTRLModel', "CTRLLMHeadModel", 'CTRLForSequenceClassification',
+    'SinusoidalPositionalEmbedding', 'CTRLForCausalLM'
 ]
 
 
@@ -866,3 +864,6 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
 
         output = (pooled_logits, ) + ctrl_outputs[1:]
         return ((loss, ) + output) if loss is not None else output
+
+
+CTRLForCausalLM = CTRLLMHeadModel
