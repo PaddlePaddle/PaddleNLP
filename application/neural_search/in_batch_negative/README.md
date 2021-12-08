@@ -181,11 +181,17 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --train_set_file recall/train.csv 
 
 ```
+
 参数含义说明
+
 * `device`: 使用 cpu/gpu 进行训练
+* `batch_size`: 训练的batch size的大小
+* `learning_rate`: 训练的学习率的大小
+* `epochs`: 训练的epoch数
 * `save_dir`: 模型存储路径
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
+* `max_seq_length`: 输入序列的最大长度
 * `margin`: 正样本相似度与负样本之间的目标 Gap
 * `train_set_file`: 训练集文件
 
