@@ -438,15 +438,13 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        outputs = (logits, )  # + outputs[2:]
+        outputs = (logits, )
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
             # Only keep active parts of the loss
             if attention_mask is not None:
                 active_loss = attention_mask.reshape([-1, ]) == 1
-                # print("active_loss shape: {}, dtype: {}".format(active_loss.shape, active_loss.dtype))
                 active_logits = logits.reshape([-1, self.num_classes])
-                # print("active_logits: ", active_logits.shape)
                 active_logits = active_logits[active_loss]
                 active_labels = labels.reshape([-1, ])[active_loss]
                 loss = loss_fct(active_logits, active_labels)
