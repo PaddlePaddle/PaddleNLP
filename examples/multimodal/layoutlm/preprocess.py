@@ -3,7 +3,7 @@ import json
 import os
 
 from PIL import Image
-from transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer
 
 
 def bbox_string(box, width, length):
