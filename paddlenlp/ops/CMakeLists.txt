@@ -296,8 +296,7 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
-# WARNING: when upgrade to FT5.0, please update the hard code line number.
-set(OPEN_ATTENTION_MUTE_COMMAND sed -i '584,586d' ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h)
+set(OPEN_ATTENTION_MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W\\WOpenMultiHeadAttention\\W[^)]\\{1,\\})/ /" {})
 
 set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
