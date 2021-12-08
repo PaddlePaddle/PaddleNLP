@@ -78,6 +78,7 @@ std::vector<paddle::Tensor> MBartDecodingCUDAForward(
     const int& num_layer_,
     const int& start_id_,
     const int& end_id_,
+    const float& temperature,
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
     const float& alpha,

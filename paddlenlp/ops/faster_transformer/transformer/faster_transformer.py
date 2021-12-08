@@ -1237,11 +1237,11 @@ class FasterMBART(MBartPretrainedModel):
             self._model, 'decoder_start_token_id', None)
 
         #(gongenlei) Not enable_faster_encoder temporarily
-        # self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.encoder(input_ids)
-        # self.encoder = disable_faster_encoder(self.encoder)
+        self.encoder = disable_faster_encoder(self.encoder)
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."

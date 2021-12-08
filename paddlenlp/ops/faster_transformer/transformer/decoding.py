@@ -448,8 +448,8 @@ def infer_mbart_decoding(
         decoder_ln_bias, mbart_ln_weight, mbart_ln_bias, linear_weight,
         linear_bias, pos_emb, trg_word, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
-        _max_out_len, _diversity_rate, _rel_len, _alpha, _early_stopping,
-        _hidden_act):
+        _max_out_len, _diversity_rate, _rel_len, _alpha, _temperature,
+        _early_stopping, _hidden_act):
     helper = LayerHelper('fusion_mbart_decoding', **locals())
 
     inputs = {
@@ -508,6 +508,7 @@ def infer_mbart_decoding(
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
         "alpha": _alpha,
+        "temperature": _temperature,
         "early_stopping": _early_stopping,
         "hidden_act": _hidden_act
     }
@@ -1872,6 +1873,7 @@ class InferMBartDecoding(nn.Layer):
                 eos_token_id=None,
                 pad_token_id=None,
                 alpha=0.6,
+                temperature=1.0,
                 early_stopping=False):
         # Beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
         decoding_strategy = self._decoding_strategy
@@ -1909,7 +1911,7 @@ class InferMBartDecoding(nn.Layer):
             beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
-            alpha, early_stopping, self._hidden_act)
+            alpha, temperature, early_stopping, self._hidden_act)
 
         ids = finalize(
             beam_size,

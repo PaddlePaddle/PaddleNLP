@@ -94,6 +94,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
     const int& num_layer_,
     const int& start_id_,
     const int& end_id_,
+    const float& temperature,
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
     const float& alpha,
@@ -151,8 +152,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
           : paddle::Tensor(paddle::PlaceType::kGPU, {1});
   auto trg_length_ptr = trg_length.mutable_data<int>(input.place());
 
-  if (trg_word_shape.size() == 2 && trg_word_shape[0] != 0 &&
-      trg_word_shape[0] != 0) {
+  if (trg_word_shape.size() == 2 && trg_word_shape[0] != 0) {
     decoding_params.trg_word = trg_word.data<int>();
 
     get_trg_length_mbart<<<1, trg_word_shape[0], 0, stream>>>(
@@ -385,7 +385,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
         2, /*pos_offset BART and MBART only for now*/
         activate,
         false,  // pos_bias
-        1.0,    // temperature
+        temperature,    // temperature
         1.0,    // repeat_penalty
         false,  // prefix_lm
         true /*is_mbart */);
@@ -453,6 +453,7 @@ std::vector<paddle::Tensor> MBartDecodingCUDAForward(
     const int& num_layer,
     const int& bos_id,
     const int& eos_id,
+    const float& temperature,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
     const float& alpha,
@@ -519,6 +520,7 @@ std::vector<paddle::Tensor> MBartDecodingCUDAForward(
           num_layer,
           bos_id,
           eos_id,
+          temperature,
           max_len,
           beam_search_diversity_rate,
           alpha,
@@ -580,6 +582,7 @@ std::vector<paddle::Tensor> MBartDecodingCUDAForward(
           num_layer,
           bos_id,
           eos_id,
+          temperature,
           max_len,
           beam_search_diversity_rate,
           alpha,
