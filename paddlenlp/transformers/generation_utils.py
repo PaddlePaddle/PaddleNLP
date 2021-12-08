@@ -802,7 +802,8 @@ class GenerationMixin(object):
             forced_eos_token_id=forced_eos_token_id,
             num_beams=num_beams,
             num_beam_groups=num_beam_groups,
-            diversity_rate=diversity_rate)
+            diversity_rate=diversity_rate,
+            repetition_penalty=repetition_penalty)
 
         if decode_strategy == 'greedy_search':
             if num_return_sequences > 1:
