@@ -839,7 +839,6 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterMBART
-        decode_strategy = kwargs.get('decode_strategy')
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         if decode_strategy == 'sampling' and kwargs.get(
                 'top_k') != 0 and kwargs.get('top_p') != 1:
@@ -847,9 +846,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                     "Only topk sampling or topp sampling are supported. " \
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         self._faster_entry = FasterMBART(
-            self,
-            decode_strategy=decode_strategy,
-            use_fp16_decoding=use_fp16_decoding).forward
+            self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def forward(self,

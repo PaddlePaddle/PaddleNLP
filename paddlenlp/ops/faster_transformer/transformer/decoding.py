@@ -1679,7 +1679,6 @@ class InferBartDecoding(nn.Layer):
 class InferMBartDecoding(nn.Layer):
     def __init__(self,
                  model,
-                 decoding_strategy="beam_search_v3",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  hidden_act="gelu"):
@@ -1872,6 +1871,7 @@ class InferMBartDecoding(nn.Layer):
                 beam_size=4,
                 top_k=1,
                 top_p=0.0,
+                decoding_strategy="beam_search_v3",
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
@@ -1882,7 +1882,6 @@ class InferMBartDecoding(nn.Layer):
                 temperature=1.0,
                 early_stopping=False):
         # Beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
-        decoding_strategy = self._decoding_strategy
         if decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
         elif decoding_strategy == "greedy_search":

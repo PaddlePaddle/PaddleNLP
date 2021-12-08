@@ -1146,11 +1146,7 @@ class FasterBART(BartPretrainedModel):
 
 
 class FasterMBART(MBartPretrainedModel):
-    def __init__(self,
-                 model,
-                 decode_strategy="sampling",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterMBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1167,7 +1163,6 @@ class FasterMBART(MBartPretrainedModel):
 
         self.decoding = InferMBartDecoding(
             model=self._model,
-            decoding_strategy=decode_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             hidden_act=model.mbart.config['activation_function'])
@@ -1186,6 +1181,7 @@ class FasterMBART(MBartPretrainedModel):
                 num_beams=4,
                 top_k=1,
                 top_p=0.0,
+                decode_strategy="beam_search_v3",
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
@@ -1193,6 +1189,7 @@ class FasterMBART(MBartPretrainedModel):
                 max_length=256,
                 diversity_rate=0.0,
                 length_penalty=0.6,
+                temperature=1.0,
                 num_return_sequences=1,
                 early_stopping=False,
                 **model_kwargs):
@@ -1222,11 +1219,11 @@ class FasterMBART(MBartPretrainedModel):
                                  dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
-        if self._decode_strategy.startswith("beam_search") and num_beams > 1:
+        if decode_strategy.startswith("beam_search") and num_beams > 1:
             encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
                 encoder_output, expand_size=num_beams, seq_len=seq_len)
             seq_len = expanded_kwargs["seq_len"]
-        elif self._decode_strategy == "sampling" and num_return_sequences > 1:
+        elif decode_strategy == "sampling" and num_return_sequences > 1:
             encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
                 encoder_output,
                 expand_size=num_return_sequences,
@@ -1248,13 +1245,15 @@ class FasterMBART(MBartPretrainedModel):
             beam_size=num_beams,
             trg_word=trg_word,
             top_k=top_k,
+            top_p=top_p,
+            decode_strategy=decode_strategy,
+            diversity_rate=diversity_rate,
+            max_out_len=max_length,
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
-            top_p=top_p,
-            max_out_len=max_length,
-            diversity_rate=diversity_rate,
             alpha=length_penalty,
+            temperature=temperature,
             early_stopping=early_stopping)
 
     generate = forward
