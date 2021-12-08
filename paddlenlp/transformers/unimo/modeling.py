@@ -24,6 +24,7 @@ __all__ = [
     "UNIMOPretrainedModel",
     'UNIMOModel',
     'UNIMOLMHeadModel',
+    'UNIMOForMaskedLM',
 ]
 
 
@@ -529,3 +530,6 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+UNIMOForMaskedLM = UNIMOLMHeadModel
