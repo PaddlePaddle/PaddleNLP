@@ -816,24 +816,27 @@ class InferGptDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        for mod in self.model.gpt.decoder.layers:
+        for i, mod in enumerate(self.model.gpt.decoder.layers):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
 
-            self.slf_q_weight.append(
-                paddle.concat(
-                    [
-                        mod.self_attn.q_proj.weight,
-                        mod.self_attn.k_proj.weight, mod.self_attn.v_proj.weight
-                    ],
-                    axis=-1))
-            self.slf_q_bias.append(
-                paddle.concat(
-                    [
-                        mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
-                        mod.self_attn.v_proj.bias
-                    ],
-                    axis=-1))
+            q_weights = paddle.concat(
+                [
+                    mod.self_attn.q_proj.weight, mod.self_attn.k_proj.weight,
+                    mod.self_attn.v_proj.weight
+                ],
+                axis=-1)
+            setattr(self, "slf_q_weight_" + str(i), q_weights)
+            self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
+
+            q_biases = paddle.concat(
+                [
+                    mod.self_attn.q_proj.bias, mod.self_attn.k_proj.bias,
+                    mod.self_attn.v_proj.bias
+                ],
+                axis=-1)
+            setattr(self, "slf_q_bias_" + str(i), q_biases)
+            self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
 
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
