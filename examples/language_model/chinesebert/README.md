@@ -8,7 +8,9 @@
 本项目是 ConvBert 在 Paddle 2.x上的开源实现。
 
 ## **数据准备**
-数据在data目录下。
+涉及到的ChnSentiCorp，crmc2018，XNLI数据
+部分Paddle已提供，其他可参考https://github.com/27182812/ChineseBERT_paddle,
+在data目录下。
 
 
 ## **模型预训练**
