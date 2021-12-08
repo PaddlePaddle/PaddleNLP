@@ -61,12 +61,14 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 ## 2. 环境依赖和安装说明
 
+推荐使用GPU进行训练，在预测阶段使用CPU或者GPU均可。
+
 **环境依赖**
 * python >= 3.x
-* paddlepaddle-gpu >= 2.1.3
+* paddlepaddle >= 2.1.3
 * paddlenlp >= 2.1
 * hnswlib >=0.5.2
-* visualdl
+* visualdl >= 2.2.2
 
 - [hnswlib](https://github.com/nmslib/hnswlib)
 
