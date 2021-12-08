@@ -32,6 +32,7 @@ option(WITH_DECODER     "Compile with Transformer Decoder"                      
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 option(WITH_BART        "Compile with BART"                                         ON)
+option(WITH_MBART       "Compile with MBART"                                        ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -64,8 +65,12 @@ if(WITH_BART)
   list(APPEND decoding_op_files fusion_bart_decoding_op.cc fusion_bart_decoding_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON must be set to use FasterTransformer. ")
+if(WITH_MBART)
+  list(APPEND decoding_op_files fusion_mbart_decoding_op.cc fusion_mbart_decoding_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART AND NOT WITH_MBART)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON or/and -DWITH_MBART=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
