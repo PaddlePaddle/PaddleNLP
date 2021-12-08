@@ -91,15 +91,15 @@ class XLNetTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "xlnet-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased-spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-base-cased-spiece.model",
             "xlnet-large-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased-spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-large-cased-spiece.model",
             "chinese-xlnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-base-spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-base-spiece.model",
             "chinese-xlnet-mid":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-mid-spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-mid-spiece.model",
             "chinese-xlnet-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large-spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-large-spiece.model",
         }
     }
     pretrained_init_configuration = {

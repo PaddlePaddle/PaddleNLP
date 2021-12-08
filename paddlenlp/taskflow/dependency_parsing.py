@@ -26,15 +26,15 @@ from .models import BiAffineParser
 
 URLS = {
     "ddparser": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser.tar.gz",
+        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser.tar.gz",
         "bcb79081d9e6f46c3dbc0dbfcce445ec",
     ],
     "ddparser-ernie-1.0": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz",
+        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz",
         "77640972889c68fcb0459611e932530b",
     ],
     "ddparser-ernie-gram-zh": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz",
+        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz",
         "7f8326ccdf64d31f0482ad23fa3caacc",
     ],
 }

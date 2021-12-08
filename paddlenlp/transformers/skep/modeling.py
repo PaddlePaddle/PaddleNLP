@@ -160,11 +160,11 @@ class SkepPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "skep_ernie_1.0_large_ch":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_1.0_large_ch.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.pdparams",
             "skep_ernie_2.0_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_2.0_large_en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.pdparams",
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.pdparams",
         }
     }
     base_model_prefix = "skep"

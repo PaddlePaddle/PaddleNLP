@@ -71,13 +71,13 @@ class RobertaTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "roberta-wwm-ext":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/vocab.txt",
             "roberta-wwm-ext-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/vocab.txt",
             "rbt3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
         }
     }
     pretrained_init_configuration = {
