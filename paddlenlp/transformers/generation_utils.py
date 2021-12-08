@@ -360,7 +360,7 @@ class GenerationMixin(object):
                                      **model_kwargs):
 
         index = paddle.tile(
-            paddle.arange(input_ids.shape[0]).unsqueeze(-1),
+            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
             [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)

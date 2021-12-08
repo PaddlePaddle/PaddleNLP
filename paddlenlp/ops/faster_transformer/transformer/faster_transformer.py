@@ -658,9 +658,9 @@ class FasterGPT(GPTPretrainedModel):
                 decode_strategy="sample",
                 num_return_sequences=1,
                 **model_kwargs):
-
         if input_ids.dtype == paddle.int64:
             input_ids = paddle.cast(input_ids, "int32")
+
         # change top_p to zero if not using top_p sampling for FT
         if decode_strategy == "greedy_search":
             top_p = 0.0
