@@ -77,27 +77,26 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 ## 3. 代码结构
 
 ```
-|—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
-|—— train_batch_neg.sh  # In-batch negatives训练的bash脚本
 |—— batch_negative
     |—— model.py # In-batch negatives 策略核心网络结构
-|—— deploy
-    |—— python
-        |—— predict.py # PaddleInference
 |—— ann_util.py # Ann 建索引库相关函数
 |—— base_model.py # 语义索引模型基类
 |—— data.py # 数据读取、数据转换等预处理逻辑
+|—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
+|—— train_batch_neg.sh  # In-batch negatives训练的bash脚本
 |—— evaluate.py # 根据召回结果和评估集计算评估指标
 |—— evaluate.sh # 运行召回评估指标的脚本
 |—— predict.py # 给定输入文件，计算文本 pair 的相似度
 |—— predict.sh  # 预测脚本
-|—— export_model.py # 动态图转换成静态图
-|—— run_build_index.sh # 从召回库中召回给定文本的相似文本的脚本
-|—— export.sh  # 动态图转换成静态图脚本
 |—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
+|—— run_build_index.sh # 从召回库中召回给定文本的相似文本的脚本
+|—— export_model.py # 动态图转换成静态图
+|—— export.sh  # 动态图转换成静态图脚本
+|—— deploy
+    |—— python
+        |—— predict.py # PaddleInference
 |—— deploy.sh # Paddle Inference部署脚本
-
 ```
 
 <a name="数据准备"></a>
