@@ -274,7 +274,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 sh run_build_index.sh
 ```
 
-
+run_build_index.sh还包含cpu和gpu运行的脚本，默认是gpu的脚本
 
 成功运行结束后，会在 `./recall_result_dir/` 目录下产出 `recall_result.txt` 文件
 
@@ -375,6 +375,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
 ```
 sh predict.sh
 ```
+predict.sh文件包含了cpu和gpu运行的脚本，默认是gpu运行的脚本
 
 产出如下结果
 ```
