@@ -326,7 +326,7 @@ class MPNetPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "mpnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mpnet/mpnet-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/model_state.pdparams",
         }
     }
     base_model_prefix = "mpnet"

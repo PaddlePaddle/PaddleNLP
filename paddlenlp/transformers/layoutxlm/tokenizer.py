@@ -64,7 +64,7 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "layoutxlm-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutxlm_base/sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {

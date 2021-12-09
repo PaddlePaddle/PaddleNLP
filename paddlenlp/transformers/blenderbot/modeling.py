@@ -125,11 +125,11 @@ class BlenderbotPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "blenderbot-3B":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B.pdparams",
             "blenderbot-1B-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill.pdparams",
             "blenderbot-400M-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill.pdparams",
         }
     }
 

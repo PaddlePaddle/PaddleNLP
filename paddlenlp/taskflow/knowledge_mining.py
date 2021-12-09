@@ -107,20 +107,20 @@ LABEL_TO_SCHEMA = {
 
 URLS = {
     "TermTree.V1.0": [
-        "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
+        "https://bj.bcebos.com/kg-concept/TermTree/TermTree.V1.0.tar.gz",
         "3514221be5017b3b4349daa6435f7b5e"
     ],
     "termtree_type": [
-        "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/termtree_type.csv",
         "062cb9ac24f4135bf836e2a2fc5a1209"
     ],
     "termtree_tags_pos": [
-        "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/termtree_tags_pos.txt",
         "87db06ae6ca42565157045ab3e9a996f"
     ],
     "name_category_map.json": [
-        "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/name_category_map.json",
-        "40e8adaaadb567e90978c5389d595b48",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/name_category_map.json",
+        "c60810205993d307d919a26a3b96786f",
     ],
 }
 
@@ -213,7 +213,7 @@ class WordTagTask(Task):
         self._summary_num = 2
 
         if self._params_path:
-            self._task_path = os.path.abspath(self._params_path).rsplit("/", 1)[0]
+            self._task_path = os.path.dirname(os.path.realpath(self._params_path))
 
         self._load_static_model(self._params_path)
 

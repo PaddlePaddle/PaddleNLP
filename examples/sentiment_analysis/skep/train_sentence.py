@@ -122,8 +122,8 @@ def convert_example(example,
         encoded_inputs = tokenizer(
             text=example["text"], max_seq_len=max_seq_length)
 
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
+    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
+    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
 
     if not is_test:
         if dataset_name == "sst-2":

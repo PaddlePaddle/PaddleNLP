@@ -42,7 +42,7 @@ usage = r"""
 
 URLS = {
     "gpt-cpm-large-cn": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/text_generation/gpt-cpm/gpt-cpm-large-cn_params.tar",
+        "https://bj.bcebos.com/paddlenlp/taskflow/text_generation/gpt-cpm/gpt-cpm-large-cn_params.tar",
         "5aad6f81053cfdbba4797f044fcf66d1"
     ],
 }
