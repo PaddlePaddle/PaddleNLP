@@ -76,6 +76,8 @@ from .layoutlmv2.modeling import *
 from .layoutlmv2.tokenizer import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
+from .layoutlm.modeling import *
+from .layoutlm.tokenizer import *
 from .t5.modeling import *
 from .t5.tokenizer import *
 from .mbart.modeling import *
