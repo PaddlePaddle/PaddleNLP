@@ -20,6 +20,8 @@ from seqeval.metrics import (
 # relative reference
 from utils import parse_args
 from funsd import FunsdDataset
+from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddlenlp.metrics import AccuracyAndF1
 from paddlenlp.transformers import LayoutLMModel, LayoutLMForTokenClassification, LayoutLMTokenizer
 
 
@@ -46,23 +48,21 @@ def train(args):
         level=logging.INFO
         if paddle.distributed.get_rank() == 0 else logging.WARN, )
 
-    labels = get_labels(args.labels)
+    all_labels = get_labels(args.labels)
     pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
 
     tokenizer = LayoutLMTokenizer.from_pretrained(args.model_name_or_path)
 
-    # for training process, model is needed for the bert class
-    # else it can directly loaded for the downstream task
     if not args.do_train:
         model = LayoutLMForTokenClassification.from_pretrained(
             args.model_name_or_path)
     else:
         model = LayoutLMModel.from_pretrained(args.model_name_or_path)
         model = LayoutLMForTokenClassification(
-            model, num_classes=len(labels), dropout=None)
+            model, num_classes=len(all_labels), dropout=None)
 
     train_dataset = FunsdDataset(
-        args, tokenizer, labels, pad_token_label_id, mode="train")
+        args, tokenizer, all_labels, pad_token_label_id, mode="train")
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=True)
 
@@ -95,6 +95,10 @@ def train(args):
         epsilon=args.adam_epsilon,
         weight_decay=args.weight_decay)
 
+    #loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_dataset.label_list else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=pad_token_label_id)
+    # metric = AccuracyAndF1()
+
     # Train!
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
@@ -123,21 +127,29 @@ def train(args):
             desc="Iteration",
             disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
-            # model.eval()
             model.train()
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
-                "labels": batch[3],
+                #"labels": batch[3],
             }
             inputs["bbox"] = batch[4]
             inputs["token_type_ids"] = batch[2]
-            outputs = model(**inputs)
+
+            logits = model(**inputs)
+            '''
             # model outputs are always tuple in ppnlp (see doc)
             loss = outputs[0]
-
             loss = loss.mean()
-
+            '''
+            labels = batch[3]
+            print(logits.shape)
+            print(labels.shape)
+            loss = loss_fct(logits, )
+            '''
+            loss = loss_fct(
+                logits.reshape([-1, len(num_labels)]),
+                labels.reshape([-1, ]))'''
             logger.info("train loss: {}".format(loss.numpy()))
             loss.backward()
 
@@ -158,7 +170,9 @@ def train(args):
                             args,
                             model,
                             tokenizer,
-                            labels,
+                            #metric,
+                            num_labels,
+                            loss_fct,
                             pad_token_label_id,
                             mode="test", )
                         logger.info("results: {}".format(results))
@@ -187,15 +201,18 @@ def train(args):
     return global_step, tr_loss / global_step
 
 
-def evaluate(args,
-             model,
-             tokenizer,
-             labels,
-             pad_token_label_id,
-             mode,
-             prefix=""):
+def evaluate(
+        args,
+        model,
+        tokenizer,
+        #metric,
+        num_labels,
+        loss_fct,
+        pad_token_label_id,
+        mode,
+        prefix=""):
     eval_dataset = FunsdDataset(
-        args, tokenizer, labels, pad_token_label_id, mode=mode)
+        args, tokenizer, num_labels, pad_token_label_id, mode=mode)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
@@ -213,34 +230,47 @@ def evaluate(args,
     preds = None
     out_label_ids = None
     model.eval()
+    #metric.reset()
+
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         with paddle.no_grad():
-            inputs = {
-                "input_ids": batch[0],
-                "attention_mask": batch[1],
-                "labels": batch[3],
-            }
-            inputs["bbox"] = batch[4]
+            tmp_eval_loss = loss_fct(logits, labels)
+            eval_loss += tmp_eval_loss.item()
+            inputs["input_ids"] = batch[0]
+            inputs["attention_mask"] = batch[1]
             inputs["token_type_ids"] = batch[2]
-            outputs = model(**inputs)
+            inputs["bbox"] = batch[4]
+
+            logits = model(**inputs)
+            labels = batch[3]
+
+            tmp_eval_loss = loss_fct(
+                logits.reshape([-1, len(num_labels)]), labels.reshape([-1, ]))
+            tmp_eval_loss = loss_fct(logits, labels)
+            eval_loss += tmp_eval_loss.item()
+            #correct = metric.compute(logits.reshape([-1, len(num_labels)]), labels.reshape([-1, ]))
+            #metric.update(correct)
+
             tmp_eval_loss, logits = outputs[:2]
-
             tmp_eval_loss = tmp_eval_loss.mean()
-
             eval_loss += tmp_eval_loss.item()
         nb_eval_steps += 1
         if preds is None:
             preds = logits.numpy()
-            out_label_ids = inputs["labels"].numpy()
+            out_label_ids = batch["labels"].numpy()
         else:
             preds = np.append(preds, logits.numpy(), axis=0)
             out_label_ids = np.append(
-                out_label_ids, inputs["labels"].numpy(), axis=0)
+                out_label_ids, batch["labels"].numpy(), axis=0)
+
+    #res = metric.accumulate()
+    eval_loss = eval_loss / nb_eval_steps
+    preds = np.argmax(preds, axis=2)
 
     eval_loss = eval_loss / nb_eval_steps
     preds = np.argmax(preds, axis=2)
 
-    label_map = {i: label for i, label in enumerate(labels)}
+    label_map = {i: label for i, label in enumerate(num_labels)}
 
     out_label_list = [[] for _ in range(out_label_ids.shape[0])]
     preds_list = [[] for _ in range(out_label_ids.shape[0])]
@@ -260,12 +290,19 @@ def evaluate(args,
 
     report = classification_report(out_label_list, preds_list)
     logger.info("\n" + report)
+    '''
+    results = {
+        "loss": eval_loss,
+        "precision": res[1],
+        "recall": res[2],
+        "f1": res[3],
+    }'''
 
     logger.info("***** Eval results %s *****", prefix)
     for key in sorted(results.keys()):
         logger.info("  %s = %s", key, str(results[key]))
 
-    return results, preds_list
+    return results, preds
 
 
 if __name__ == "__main__":

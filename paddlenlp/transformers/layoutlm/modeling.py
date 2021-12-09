@@ -419,7 +419,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         return self.layoutlm.embeddings.word_embeddings
 
     def forward(self,
-                input_ids=None,
+                input_ids,
                 bbox=None,
                 attention_mask=None,
                 token_type_ids=None,
@@ -478,24 +478,26 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        outputs = (logits, )
-        '''
-        if labels is not None:
-            loss_fct = paddle.nn.CrossEntropyLoss()
-            # Only keep active parts of the loss
-            if attention_mask is not None:
-                active_loss = attention_mask.reshape([-1, ]) == 1
-                active_logits = logits.reshape([-1, self.num_classes])
-                active_logits = active_logits[active_loss]
-                active_labels = labels.reshape([-1, ])[active_loss]
-                loss = loss_fct(active_logits, active_labels)
-            else:
-                loss = loss_fct(
-                    logits.reshape([-1, self.num_classes]),
-                    labels.reshape([-1, ]))
-            outputs = (loss, ) + outputs'''
+        return logits
 
-        return outputs
+        # outputs = (logits, )
+        #
+        # if labels is not None:
+        #     loss_fct = paddle.nn.CrossEntropyLoss()
+        #
+        #     if attention_mask is not None:
+        #         active_loss = attention_mask.reshape([-1, ]) == 1
+        #         active_logits = logits.reshape([-1, self.num_classes])
+        #         active_logits = active_logits[active_loss]
+        #         active_labels = labels.reshape([-1, ])[active_loss]
+        #         loss = loss_fct(active_logits, active_labels)
+        #     else:
+        #         loss = loss_fct(
+        #             logits.reshape([-1, self.num_classes]),
+        #             labels.reshape([-1, ]))
+        #     outputs = (loss, ) + outputs
+        #
+        # return outputs
 
 
 class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
