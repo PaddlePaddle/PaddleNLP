@@ -31,7 +31,7 @@ class DuReaderRobust(DatasetBuilder):
     over-sensitivity, over-stability and generalization ability of the model.
     '''
 
-    URL = 'https://dataset-bj.cdn.bcebos.com/qianyan/dureader_robust-data.tar.gz'
+    URL = 'https://bj.bcebos.com/paddlenlp/datasets/dureader_robust-data.tar.gz'
     MD5 = '82f3d191a115ec17808856866787606e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

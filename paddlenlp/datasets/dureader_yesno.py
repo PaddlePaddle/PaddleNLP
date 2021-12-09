@@ -33,7 +33,7 @@ class DuReaderYesNo(DatasetBuilder):
     {Yes, No, Depends}.
     '''
 
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/dureader_yesno-data.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/dureader_yesno-data.tar.gz"
     MD5 = '30c744d65e87fdce00cdc707fd008138'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
