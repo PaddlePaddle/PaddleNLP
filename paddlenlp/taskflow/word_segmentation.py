@@ -26,7 +26,7 @@ from .lexical_analysis import load_vocab, LacTask
 
 URLS = {
     "word_segmentation_params": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/lexical_analysis/lac/lac_params.tar.gz",
+        "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/lac_params.tar.gz",
         'ee9a3eaba5f74105410410e3c5b28fbc'
     ],
 }

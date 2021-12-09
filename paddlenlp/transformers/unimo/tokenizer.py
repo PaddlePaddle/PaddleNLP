@@ -80,11 +80,11 @@ class UNIMOTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "unimo-text-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-lcsts-new":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
         }
     }
     pretrained_init_configuration = {
