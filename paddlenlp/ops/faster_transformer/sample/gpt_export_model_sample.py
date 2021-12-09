@@ -119,6 +119,7 @@ def do_predict(args):
             tokenizer.eos_token_id,
             tokenizer.eos_token_id,
             tokenizer.pad_token_id,
+            None,  # forced_eos_token_id
             args.temperature,
         ])
 

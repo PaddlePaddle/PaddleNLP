@@ -232,31 +232,46 @@ python -u -m paddle.distributed.launch --gpus "0" \
 0.9800204038619995
 ```
 
-## 使用FasterTransformer进行快速预测
-不同于上述原生预测的是，使用FasterTransformer的预测是使用了集成了FasterTransformer库的Paddle自定算子，在一定的配置下，可以对TransformerEncoder的预测进行加速。
+## 使用 FasterTransformer 加速预测
 
+我们基于 Paddle 自定义算子功能集成了[NVIDIA FasterTransformer](https://github.com/NVIDIA/FasterTransformer) 的高性能加速能力，通过简单易用的 Python API 即可得到 GPU 上更高性能预测能力。
+- FT FP32 相比 Paddle 前向加速比为 1.13 ~ 4.18
+- FT FP16 相比 Paddle 前向加速比为 3.65 ~ 5.42
+- 支持 Post-Normalization 和 Pre-Normalizaiton 2 种 Transformer 结构
+- 支持 GELU 和 RELU 2 个激活函数
+
+详细性能评测数据如下表:
+
+| batch size | max_seq_len | Paddle 前向(ms)|FT FP32(ms)  | FT FP16(ms) |Speedup(FT FP32/Paddle)|Speedup(FT FP16/Paddle)|
+| ---------- | ----------- | ------------------- | ------------------- |------------------ |------------------ |------------------ |
+| 16         | 16          | 23.56  |  5.40 | 5.38 | 4.18| 4.19|
+| 16         | 32          | 22.34  |  8.11  | 5.57|2.75|4.01|
+| 16         | 64          | 22.79   | 14.84  |5.39|1.54|4.23|
+| 32         | 16          | 23.41      | 8.16   |5.30|2.87|4.42|
+| 32         | 32          | 22.67      | 14.84   |6.21|1.53|3.65|
+| 32         | 64          | 33.49 | 28.53   |6.05|1.17|5.54|
+| 64         | 16          | 22.60  | 14.81   |5.59|1.53|4.04|
+| 64         | 32          | 33.52  | 28.22   |6.24|1.19|5.37|
+| 64         | 64          | 62.62  | 55.25   |11.55|1.13|5.42|
+
+Note: 测试环境如下
+```
+硬件: NVIDIA Tesla V100 16G 单卡
+Paddle Version: 2.2.1
+CUDA: 10.1
+cuDNN: 7.6
+```
+
+可参考如下命令使用高性能预测能力
 ```shell
 python -u -m paddle.distributed.launch --gpus "0" faster_predict.py \
    --init_from_params "batch_neg_v1.0/model_state.pdparams"   \
    --output_emb_size 256   \
    --batch_size 32  \
    --max_seq_length 64  \
+   --use_fp16 \
    --text_pair_file ${your_input_file} \
-
 ```
-
-执行上述操作后，可以得到与原生预测非常接近的结果，在float32下，且batch_size=32, max_seq_len=64时，二种方式预测下最终余弦相似度的最大绝对误差约为3.93e-6。
-
-通过比较，可以得到在不同batch_size, max_seq_len下，使用集成了FasterTransformer的高性能算子可以对Encoder部分的推理进行加速（其余参数都与默认值相同）。在NVIDIA Tesla V100，16GB的机器上，使用单卡预测得到部分性能数据如下，从表中可以看出在更小的batch_size和max_seq_len上，使用FasterTransformer预测更有优势。
-
-| batch size | max_seq_len | FT加速算子(单位：s) | Paddle原生(单位：s) |
-| ---------- | ----------- | ------------------- | ------------------- |
-| 16         | 16          | 22.645333290100098  | 51.55912470817566   |
-| 16         | 32          | 27.326106071472168  | 57.17143130302429   |
-| 16         | 64          | 33.31318140029907   | 52.44770574569702   |
-| 32         | 16          | 12.891342163085938  | 22.621662139892578  |
-| 32         | 32          | 17.206310987472534  | 22.18772006034851   |
-
 
 ## 模型介绍
 简要介绍 In-batch negatives 策略和 HardestNeg 策略思路
