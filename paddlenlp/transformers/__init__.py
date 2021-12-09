@@ -82,3 +82,5 @@ from .reformer.modeling import *
 from .reformer.tokenizer import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
+from .funnel.modeling import *
+from .funnel.tokenizer import *
