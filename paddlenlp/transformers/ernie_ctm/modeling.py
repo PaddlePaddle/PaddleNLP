@@ -169,11 +169,11 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
             "wordtag":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag_pos.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/wordtag_pos.pdparams",
             "nptag":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/nptag.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/nptag.pdparams",
         }
     }
     base_model_prefix = "ernie_ctm"
