@@ -71,8 +71,8 @@ def convert_example(example,
         token_type_ids(obj: `list[int]`): List of sequence pair mask. 
     """
     encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
+    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
+    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
 
     return input_ids, token_type_ids
 

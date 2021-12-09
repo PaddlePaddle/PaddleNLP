@@ -136,7 +136,7 @@ def parse_args():
     parser.add_argument(
         "--scale_loss",
         type=float,
-        default=1.0,
+        default=2**15,
         help="The value of scale_loss for fp16.")
     parser.add_argument(
         "--use_pure_fp16",

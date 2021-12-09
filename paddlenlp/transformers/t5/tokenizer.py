@@ -53,11 +53,11 @@ class T5Tokenizer(AlbertEnglishTokenizer):
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "t5-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-small/spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/spiece.model",
             "t5-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-base/spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/spiece.model",
             "t5-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-large/spiece.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/spiece.model",
         },
     }
 
