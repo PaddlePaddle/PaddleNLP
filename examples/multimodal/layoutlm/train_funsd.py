@@ -46,7 +46,8 @@ def train(args):
         level=logging.INFO
         if paddle.distributed.get_rank() == 0 else logging.WARN, )
 
-    labels = get_labels(args.labels)
+    all_labels = get_labels(args.labels)
+
     pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
 
     tokenizer = LayoutLMTokenizer.from_pretrained(args.model_name_or_path)
@@ -59,11 +60,10 @@ def train(args):
     else:
         model = LayoutLMModel.from_pretrained(args.model_name_or_path)
         model = LayoutLMForTokenClassification(
-            model, num_classes=len(labels), dropout=None)
+            model, num_classes=len(all_labels), dropout=None)
 
     train_dataset = FunsdDataset(
-        args, tokenizer, labels, pad_token_label_id, mode="train")
-
+        args, tokenizer, all_labels, pad_token_label_id, mode="train")
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=True)
 
@@ -96,7 +96,9 @@ def train(args):
         epsilon=args.adam_epsilon,
         weight_decay=args.weight_decay)
 
-    # Train!
+    loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=pad_token_label_id)
+
+    # Train
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
     logger.info("  Num Epochs = %d", args.num_train_epochs)
@@ -116,31 +118,26 @@ def train(args):
         int(args.num_train_epochs),
         desc="Epoch",
         disable=args.local_rank not in [-1, 0])
-    set_seed(
-        args)  # Added here for reproductibility (even between python 2 and 3)
+    set_seed(args)
     for _ in train_iterator:
         epoch_iterator = tqdm(
             train_dataloader,
             desc="Iteration",
             disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
-            # model.eval()
             model.train()
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
-                "labels": batch[3],
+                "token_type_ids": batch[2],
+                "bbox": batch[4],
             }
-
-            inputs["bbox"] = batch[4]
-            inputs["token_type_ids"] = batch[2]
-
-            outputs = model(**inputs)
-            # model outputs are always tuple in ppnlp (see doc)
-            loss = outputs[0]
+            labels = batch[3]
+            logits = model(**inputs)
+            loss = loss_fct(
+                logits.reshape([-1, len(all_labels)]), labels.reshape([-1, ]))
 
             loss = loss.mean()
-
             logger.info("train loss: {}".format(loss.numpy()))
             loss.backward()
 
@@ -161,7 +158,8 @@ def train(args):
                             args,
                             model,
                             tokenizer,
-                            labels,
+                            all_labels,
+                            loss_fct,
                             pad_token_label_id,
                             mode="test", )
                         logger.info("results: {}".format(results))
@@ -193,13 +191,13 @@ def train(args):
 def evaluate(args,
              model,
              tokenizer,
-             labels,
+             all_labels,
+             loss_fct,
              pad_token_label_id,
              mode,
              prefix=""):
     eval_dataset = FunsdDataset(
-        args, tokenizer, labels, pad_token_label_id, mode=mode)
-
+        args, tokenizer, all_labels, pad_token_label_id, mode=mode)
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
     eval_dataloader = paddle.io.DataLoader(
@@ -207,7 +205,7 @@ def evaluate(args,
         batch_size=args.eval_batch_size,
         collate_fn=None, )
 
-    # Eval!
+    # Eval
     logger.info("***** Running evaluation %s *****", prefix)
     logger.info("  Num examples = %d", len(eval_dataset))
     logger.info("  Batch size = %d", args.eval_batch_size)
@@ -221,30 +219,29 @@ def evaluate(args,
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
-                "labels": batch[3],
+                "token_type_ids": batch[2],
+                "bbox": batch[4],
             }
-            inputs["bbox"] = batch[4]
-            inputs["token_type_ids"] = batch[2]
-            outputs = model(**inputs)
-            tmp_eval_loss, logits = outputs[:2]
-
+            labels = batch[3]
+            attention_mask = batch[1]
+            logits = model(**inputs)
+            tmp_eval_loss = loss_fct(
+                logits.reshape([-1, len(all_labels)]), labels.reshape([-1, ]))
             tmp_eval_loss = tmp_eval_loss.mean()
-
             eval_loss += tmp_eval_loss.item()
+
         nb_eval_steps += 1
         if preds is None:
             preds = logits.numpy()
-            out_label_ids = inputs["labels"].numpy()
+            out_label_ids = labels.numpy()
         else:
             preds = np.append(preds, logits.numpy(), axis=0)
-            out_label_ids = np.append(
-                out_label_ids, inputs["labels"].numpy(), axis=0)
+            out_label_ids = np.append(out_label_ids, labels.numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
     preds = np.argmax(preds, axis=2)
 
-    label_map = {i: label for i, label in enumerate(labels)}
-
+    label_map = {i: label for i, label in enumerate(all_labels)}
     out_label_list = [[] for _ in range(out_label_ids.shape[0])]
     preds_list = [[] for _ in range(out_label_ids.shape[0])]
 
@@ -261,17 +258,6 @@ def evaluate(args,
         "f1": f1_score(out_label_list, preds_list),
     }
 
-    #     with open("test_gt.txt", "w") as fout:
-    #         for lbl in out_label_list:
-    #             for l in lbl:
-    #                 fout.write(l + "\t")
-    #             fout.write("\n")
-    #     with open("test_pred.txt", "w") as fout:
-    #         for lbl in preds_list:
-    #             for l in lbl:
-    #                 fout.write(l + "\t")
-    #             fout.write("\n")
-
     report = classification_report(out_label_list, preds_list)
     logger.info("\n" + report)
 
@@ -279,7 +265,7 @@ def evaluate(args,
     for key in sorted(results.keys()):
         logger.info("  %s = %s", key, str(results[key]))
 
-    return results, preds_list
+    return results, preds
 
 
 if __name__ == "__main__":

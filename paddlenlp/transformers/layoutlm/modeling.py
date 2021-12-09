@@ -16,7 +16,6 @@
 
 import copy
 import math
-
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
@@ -24,7 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
-from paddlenlp.transformers import PretrainedModel, register_base_model
+from .. import PretrainedModel, register_base_model
 
 __all__ = [
     "LayoutLMModel",
@@ -71,6 +70,7 @@ class LayoutLMEmbeddings(Layer):
             vocab_size, hidden_size, padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
+        # gry add for layoutlm
         self.x_position_embeddings = nn.Embedding(max_2d_position_embeddings,
                                                   hidden_size)
         self.y_position_embeddings = nn.Embedding(max_2d_position_embeddings,
@@ -79,7 +79,7 @@ class LayoutLMEmbeddings(Layer):
                                                   hidden_size)
         self.w_position_embeddings = nn.Embedding(max_2d_position_embeddings,
                                                   hidden_size)
-
+        # end of gry add for layoutlm
         #self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size, padding_idx=pad_token_id)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -94,18 +94,21 @@ class LayoutLMEmbeddings(Layer):
                 bbox=None,
                 token_type_ids=None,
                 position_ids=None):
-        input_shape = input_ids.shape
-        seq_length = input_shape[1]
+        #input_shape = input_ids.size()
+        #seq_length = input_shape[1]
         if position_ids is None:
-            position_ids = self.position_ids[:, :seq_length]
+            ones = paddle.ones_like(input_ids, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=-1)
 
+            position_ids = seq_length - ones
+            position_ids.stop_gradient = True
         if token_type_ids is None:
-            token_type_ids = torch.zeros(
-                input_shape, dtype=torch.long, device=device)
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
         word_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
+        # gry add
         try:
             left_position_embeddings = self.x_position_embeddings(bbox[:, :, 0])
             upper_position_embeddings = self.y_position_embeddings(bbox[:, :,
@@ -122,6 +125,7 @@ class LayoutLMEmbeddings(Layer):
                                                            bbox[:, :, 1])
         w_position_embeddings = self.w_position_embeddings(bbox[:, :, 2] -
                                                            bbox[:, :, 0])
+        # end of gry add
 
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
@@ -181,9 +185,9 @@ class LayoutLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlm-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-base-uncased/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm_base-uncased/model_state.pdparams",
             "layoutlm-large-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-large-uncased/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm_large-uncased/model_state.pdparams",
         },
     }
     base_model_prefix = "layoutlm"
@@ -260,6 +264,7 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             pad_token_id=0,
             pool_act="tanh", ):
         super(LayoutLMModel, self).__init__()
+        #self.config = kwargs
         self.num_hidden_layers = num_hidden_layers
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -282,7 +287,7 @@ class LayoutLMModel(LayoutLMPretrainedModel):
 
     def forward(
             self,
-            input_ids,
+            input_ids=None,
             bbox=None,
             token_type_ids=None,
             position_ids=None,
@@ -296,12 +301,6 @@ class LayoutLMModel(LayoutLMPretrainedModel):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            bbox (Tensor, optional):
-                Bounding boxes of each input sequence tokens. Selected in the
-                range ``[0, max_2d_position_embeddings-1]``. Each bounding box should be a normalized
-                version in (x0, y0, x1, y1) format, where (x0, y0) corresponds to the position of the
-                upper left corner in the bounding box, and (x1, y1) represents the position of the
-                lower right corner.
             token_type_ids (Tensor, optional):
                 Segment token indices to indicate different portions of the inputs.
                 Selected in the range ``[0, type_vocab_size - 1]``.
@@ -344,26 +343,17 @@ class LayoutLMModel(LayoutLMPretrainedModel):
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and its shape is [batch_size, hidden_size].
         '''
+
         input_shape = input_ids.shape
-        if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
-        else:
-            if attention_mask.ndim == 2:
-                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-        '''
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
-        '''
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
-        if position_ids is None:
-            seq_length = input_shape[1]
-            position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
         if bbox is None:
             bbox = paddle.zeros(tuple(list(input_shape) + [4]), dtype="int64")
 
@@ -415,7 +405,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                                   self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
                                     num_classes)
-        self.apply(self.init_weights)
+        self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
@@ -426,7 +416,6 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                labels=None,
                 output_hidden_states=False):
         r"""
         The LayoutLMForTokenClassification forward method, overrides the __call__() special method.
@@ -442,8 +431,9 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                 See :class:`LayoutLMModel`.
             position_ids(Tensor, optional):
                 See :class:`LayoutLMModel`.
-            output_hidden_states (Tensor, optional):
+            output_hidden_states(Tensor, optional):
                 See :class:`LayoutLMModel`.
+
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
@@ -453,11 +443,11 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import LayoutLMForTokenClassification
-                from paddlenlp.transformers import LayoutLMTokenizer
+                from paddlenlp.transformers import LayoutLMFForTokenClassification
+                from paddlenlp.transformers import LayoutLMFTokenizer
 
-                tokenizer = LayoutLMTokenizer.from_pretrained('layoutlm-base-uncased')
-                model = LayoutLMForTokenClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
+                tokenizer = LayoutLMFTokenizer.from_pretrained('layoutlm-base-uncased')
+                model = LayoutLMFForTokenClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -476,32 +466,25 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            output_hidden_states=output_hidden_states)
+            output_hidden_states=False)
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        #return logits
-        outputs = (logits, )
-
-        if labels is not None:
-            loss_fct = paddle.nn.CrossEntropyLoss()
-
-            if attention_mask is not None:
-                active_loss = attention_mask.reshape([-1, ]) == 1
-                active_logits = logits.reshape([-1, self.num_classes])
-                active_logits = active_logits[active_loss]
-                active_labels = labels.reshape([-1, ])[active_loss]
-                loss = loss_fct(active_logits, active_labels)
-            else:
-                loss = loss_fct(
-                    logits.reshape([-1, self.num_classes]),
-                    labels.reshape([-1, ]))
-            outputs = (loss, ) + outputs
-
-        return outputs
+        return logits
 
 
 class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
+    """
+    LayoutLM Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
+
+    Args:
+        layoutlm (:class:`LayoutLMModel`):
+            An instance of LayoutLMModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+    """
+
     def __init__(self, layoutlm, num_classes=2):
         super(LayoutLMForSequenceClassification, self).__init__()
         self.layoutlm = layoutlm
@@ -516,7 +499,7 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             bbox=None,
             attention_mask=None,
             token_type_ids=None,
@@ -536,9 +519,8 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
                 See :class:`LayoutLMModel`.
             position_ids(Tensor, optional):
                 See :class:`LayoutLMModel`.
-            output_hidden_states (Tensor, optional):
+            output_hidden_states(Tensor, optional):
                 See :class:`LayoutLMModel`.
-
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
@@ -633,6 +615,7 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
     Args:
         layoutlm (:class:`LayoutLMModel`):
             An instance of :class:`LayoutLMModel`.
+
     """
 
     def __init__(self, layoutlm):
