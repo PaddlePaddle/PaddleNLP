@@ -491,11 +491,11 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "squeezebert-uncased":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
             "squeezebert-mnli":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
             "squeezebert-mnli-headless":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
         }
     }
 

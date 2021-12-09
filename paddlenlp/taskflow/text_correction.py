@@ -60,9 +60,9 @@ usage = r"""
 
 URLS = {
     "csc-ernie-1.0": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
+        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
         None,  # md5
-        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
+        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
     ],
 }
 

@@ -79,13 +79,13 @@ class NeZhaTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "nezha-base-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-base-wwm-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-large-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-large-wwm-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
         }
     }
     pretrained_init_configuration = {

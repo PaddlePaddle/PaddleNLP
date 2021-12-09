@@ -644,11 +644,11 @@ class T5PretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "t5-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-small/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/model_state.pdparams",
             "t5-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
             "t5-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/t5/t5-large/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
         }
     }
 

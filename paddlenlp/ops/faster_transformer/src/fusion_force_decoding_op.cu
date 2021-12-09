@@ -145,8 +145,7 @@ std::vector<paddle::Tensor> decoding_kernel(
           : paddle::Tensor(paddle::PlaceType::kGPU, {1});
   auto trg_length_ptr = trg_length.mutable_data<int>(input.place());
 
-  if (trg_word_shape.size() == 2 && trg_word_shape[0] != 0 &&
-      trg_word_shape[0] != 0) {
+  if (trg_word_shape.size() == 2 && trg_word_shape[0] != 0) {
     decoding_params.trg_word = trg_word.data<int>();
 
     get_trg_length<<<1, trg_word_shape[0], 0, stream>>>(

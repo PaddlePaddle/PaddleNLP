@@ -127,17 +127,17 @@ class TinyBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "tinybert-4l-312d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams",
             "tinybert-6l-768d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d.pdparams",
             "tinybert-4l-312d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
             "tinybert-6l-768d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
             "tinybert-4l-312d-zh":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-zh.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh.pdparams",
             "tinybert-6l-768d-zh":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-zh.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh.pdparams",
         }
     }
     base_model_prefix = "tinybert"

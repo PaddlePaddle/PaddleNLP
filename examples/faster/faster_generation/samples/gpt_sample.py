@@ -26,7 +26,10 @@ inputs_ids = tokenizer(inputs)["input_ids"]
 inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64').unsqueeze(0)
 
 outputs, _ = model.generate(
-    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search')
+    input_ids=inputs_ids,
+    max_length=10,
+    decode_strategy='greedy_search',
+    use_faster=True)
 
 result = tokenizer.convert_ids_to_string(outputs[0].numpy().tolist())
 
