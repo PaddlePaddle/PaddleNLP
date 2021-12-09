@@ -72,6 +72,8 @@ from .auto.modeling import *
 from .auto.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
+from .layoutlmv2.modeling import *
+from .layoutlmv2.tokenizer import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .layoutlm.modeling import *
@@ -82,3 +84,5 @@ from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
+from .mobilebert.modeling import *
+from .mobilebert.tokenizer import *

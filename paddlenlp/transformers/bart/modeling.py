@@ -98,9 +98,9 @@ class BartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "bart-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
             "bart-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams"
         }
     }
     base_model_prefix = "bart"
@@ -768,9 +768,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
                     "Only topk sampling or topp sampling are supported. " \
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         self._faster_entry = FasterBART(
-            self,
-            decode_strategy=decode_strategy,
-            use_fp16_decoding=use_fp16_decoding).forward
+            self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def forward(self,

@@ -18,6 +18,7 @@ model_name = 'plato-mini'
 
 tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
+model.eval()
 
 
 def postprocess_response(token_ids, tokenizer):
@@ -33,7 +34,7 @@ def postprocess_response(token_ids, tokenizer):
     return tokens
 
 
-inputs = ['你好啊，你今年多大了']
+inputs = '你好啊，你今年多大了'
 
 inputs_ids = tokenizer.dialogue_encode(
     inputs,
@@ -48,7 +49,8 @@ outputs, _ = model.generate(
     attention_mask=inputs_ids['attention_mask'],
     max_length=64,
     decode_strategy='sampling',
-    top_k=5)
+    top_k=5,
+    use_faster=True)
 
 result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)
