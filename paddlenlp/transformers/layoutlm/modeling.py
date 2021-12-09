@@ -79,7 +79,7 @@ class LayoutLMEmbeddings(Layer):
                                                   hidden_size)
         self.w_position_embeddings = nn.Embedding(max_2d_position_embeddings,
                                                   hidden_size)
-        
+
         #self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size, padding_idx=pad_token_id)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -480,44 +480,12 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        return logits
-        # outputs = (logits, )
-        #
-        # if labels is not None:
-        #     loss_fct = paddle.nn.CrossEntropyLoss()
-        #
-        #     if attention_mask is not None:
-        #         active_loss = attention_mask.reshape([-1, ]) == 1
-        #         active_logits = logits.reshape([-1, self.num_classes])
-        #         active_logits = active_logits[active_loss]
-        #         active_labels = labels.reshape([-1, ])[active_loss]
-        #         loss = loss_fct(active_logits, active_labels)
-        #     else:
-        #         loss = loss_fct(
-        #             logits.reshape([-1, self.num_classes]),
-        #             labels.reshape([-1, ]))
-        #     outputs = (loss, ) + outputs
-        #
-        # return outputs
-
-
-class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
-    """
-    LayoutLM Model with a linear layer on top of the output layer,
-    designed for sequence classification/regression tasks like GLUE tasks.
-
-    Args:
-        layoutlm (:class:`LayoutLMModel`):
-            An instance of LayoutLMModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-    """
-
-=======
+        #return logits
         outputs = (logits, )
+
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            # Only keep active parts of the loss
+
             if attention_mask is not None:
                 active_loss = attention_mask.reshape([-1, ]) == 1
                 active_logits = logits.reshape([-1, self.num_classes])
