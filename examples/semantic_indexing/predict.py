@@ -125,7 +125,7 @@ if __name__ == "__main__":
             "Please set --params_path with correct pretrained model file")
 
     if args.use_fp16:
-        convert_to_fp16(model)
+        convert_to_fp16(model.ptm.encoder)
 
     cosin_sim = predict(model, valid_data_loader)
     for idx, cosine in enumerate(cosin_sim):
