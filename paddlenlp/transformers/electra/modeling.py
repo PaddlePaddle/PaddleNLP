@@ -230,15 +230,15 @@ class ElectraPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "electra-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-small.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-small.pdparams",
             "electra-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-base.pdparams",
             "electra-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-large.pdparams",
             "chinese-electra-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
         }
     }
 

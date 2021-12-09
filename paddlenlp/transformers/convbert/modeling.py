@@ -412,11 +412,11 @@ class ConvBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "convbert-base":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-base/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-base/model_state.pdparams",
             "convbert-medium-small":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-medium-small/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-medium-small/model_state.pdparams",
             "convbert-small":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-small/model_state.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-small/model_state.pdparams",
         }
     }
 

@@ -243,3 +243,7 @@ class Taskflow(object):
         """
         task_list = list(TASKS.keys())
         return task_list
+
+    def from_segments(self, *inputs):
+        results = self.task_instance.from_segments(inputs)
+        return results

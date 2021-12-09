@@ -101,11 +101,11 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "unified_transformer-12L-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn.pdparams",
             "unified_transformer-12L-cn-luge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
             "plato-mini":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
