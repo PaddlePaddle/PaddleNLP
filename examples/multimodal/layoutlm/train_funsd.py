@@ -99,7 +99,7 @@ def train(args):
     loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=pad_token_label_id)
     # metric = AccuracyAndF1()
 
-    # Train!
+    # Train
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
     logger.info("  Num Epochs = %d", args.num_train_epochs)
@@ -131,24 +131,23 @@ def train(args):
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
-                #"labels": batch[3],
+                "token_type_ids": batch[2],
+                "labels": batch[3],
+                "bbox": batch[4],
             }
-            inputs["bbox"] = batch[4]
-            inputs["token_type_ids"] = batch[2]
-
-            logits = model(**inputs)
-            '''
-            # model outputs are always tuple in ppnlp (see doc)
-            loss = outputs[0]
-            loss = loss.mean()
-            '''
             labels = batch[3]
+            logits = model(**inputs)
+
+            # model outputs are always tuple in ppnlp (see doc)
+            # loss = outputs[0]
+            # loss = loss.mean()
             print(logits.shape)
             print(labels.shape)
-            loss = loss_fct(logits, )
+            loss = loss_fct(logits, labels)
+            loss = loss.mean()
             '''
             loss = loss_fct(
-                logits.reshape([-1, len(num_labels)]),
+                logits.reshape([-1, len(all_labels)]),
                 labels.reshape([-1, ]))'''
             logger.info("train loss: {}".format(loss.numpy()))
             loss.backward()
@@ -170,8 +169,7 @@ def train(args):
                             args,
                             model,
                             tokenizer,
-                            #metric,
-                            num_labels,
+                            all_labels,
                             loss_fct,
                             pad_token_label_id,
                             mode="test", )
@@ -201,18 +199,16 @@ def train(args):
     return global_step, tr_loss / global_step
 
 
-def evaluate(
-        args,
-        model,
-        tokenizer,
-        #metric,
-        num_labels,
-        loss_fct,
-        pad_token_label_id,
-        mode,
-        prefix=""):
+def evaluate(args,
+             model,
+             tokenizer,
+             all_labels,
+             loss_fct,
+             pad_token_label_id,
+             mode,
+             prefix=""):
     eval_dataset = FunsdDataset(
-        args, tokenizer, num_labels, pad_token_label_id, mode=mode)
+        args, tokenizer, all_labels, pad_token_label_id, mode=mode)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
@@ -234,43 +230,51 @@ def evaluate(
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         with paddle.no_grad():
-            tmp_eval_loss = loss_fct(logits, labels)
-            eval_loss += tmp_eval_loss.item()
-            inputs["input_ids"] = batch[0]
-            inputs["attention_mask"] = batch[1]
-            inputs["token_type_ids"] = batch[2]
-            inputs["bbox"] = batch[4]
-
-            logits = model(**inputs)
+            inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "token_type_ids": batch[2],
+                "labels": batch[3],
+                "bbox": batch[4],
+            }
+            '''
+            print('inputs_ids', batch[0].shape, batch[0])
+            print('attention_mask', batch[1].shape, batch[1])
+            print('token_type_ids', batch[2].shape, batch[2])
+            print('labels', batch[3].shape, batch[3])
+            print('bbox', batch[4].shape, batch[4])'''
             labels = batch[3]
-
-            tmp_eval_loss = loss_fct(
-                logits.reshape([-1, len(num_labels)]), labels.reshape([-1, ]))
-            tmp_eval_loss = loss_fct(logits, labels)
-            eval_loss += tmp_eval_loss.item()
-            #correct = metric.compute(logits.reshape([-1, len(num_labels)]), labels.reshape([-1, ]))
-            #metric.update(correct)
-
-            tmp_eval_loss, logits = outputs[:2]
+            attention_mask = batch[1]
+            logits = model(**inputs)
+            print('logits', logits.shape)
+            # tmp_eval_loss = loss_fct(
+            #     logits.reshape([-1, len(num_labels)]), labels.reshape([-1, ]))
+            if attention_mask is not None:
+                active_loss = attention_mask.reshape([-1, ]) == 1
+                active_logits = logits.reshape(
+                    [-1, len(all_labels)])[active_loss]
+                active_labels = labels.reshape([-1, ])[active_loss]
+                tmp_eval_loss = loss_fct(active_logits, active_labels)
+            else:
+                tmp_eval_loss = loss_fct(
+                    logits.reshape([-1, len(all_labels)]),
+                    labels.reshape([-1, ]))
             tmp_eval_loss = tmp_eval_loss.mean()
             eval_loss += tmp_eval_loss.item()
+
         nb_eval_steps += 1
         if preds is None:
             preds = logits.numpy()
-            out_label_ids = batch["labels"].numpy()
+            out_label_ids = labels.numpy()
         else:
             preds = np.append(preds, logits.numpy(), axis=0)
-            out_label_ids = np.append(
-                out_label_ids, batch["labels"].numpy(), axis=0)
-
-    #res = metric.accumulate()
-    eval_loss = eval_loss / nb_eval_steps
-    preds = np.argmax(preds, axis=2)
+            out_label_ids = np.append(out_label_ids, labels.numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
+    print(preds)
     preds = np.argmax(preds, axis=2)
 
-    label_map = {i: label for i, label in enumerate(num_labels)}
+    label_map = {i: label for i, label in enumerate(all_labels)}
 
     out_label_list = [[] for _ in range(out_label_ids.shape[0])]
     preds_list = [[] for _ in range(out_label_ids.shape[0])]
@@ -290,13 +294,6 @@ def evaluate(
 
     report = classification_report(out_label_list, preds_list)
     logger.info("\n" + report)
-    '''
-    results = {
-        "loss": eval_loss,
-        "precision": res[1],
-        "recall": res[2],
-        "f1": res[3],
-    }'''
 
     logger.info("***** Eval results %s *****", prefix)
     for key in sorted(results.keys()):

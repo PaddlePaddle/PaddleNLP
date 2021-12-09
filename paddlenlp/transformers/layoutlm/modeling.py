@@ -479,7 +479,6 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
-
         # outputs = (logits, )
         #
         # if labels is not None:
