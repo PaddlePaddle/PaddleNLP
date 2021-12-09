@@ -186,7 +186,7 @@ pip install -r requirements.txt
 
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  Baseline |  - | -| - | - |-| 标准 pair-wise 训练范式，通过随机采样产生负样本|
+|  Baseline | 30.077| 43.513| 48.633 | 53.448 |59.632| 标准 pair-wise 训练范式，通过随机采样产生负样本|
 |  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
 |  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
 |  SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
