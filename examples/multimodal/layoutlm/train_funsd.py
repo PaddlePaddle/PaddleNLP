@@ -130,12 +130,8 @@ def train(args):
                 "attention_mask": batch[1],
                 "labels": batch[3],
             }
-            if args.model_type in ["layoutlm"]:
-                inputs["bbox"] = batch[4]
-            inputs["token_type_ids"] = (
-                batch[2] if args.model_type in ["bert", "layoutlm"] else
-                None)  # RoBERTa don"t use segment_ids
-
+            inputs["bbox"] = batch[4]
+            inputs["token_type_ids"] = batch[2]
             outputs = model(**inputs)
             # model outputs are always tuple in ppnlp (see doc)
             loss = outputs[0]
@@ -224,11 +220,8 @@ def evaluate(args,
                 "attention_mask": batch[1],
                 "labels": batch[3],
             }
-            if args.model_type in ["layoutlm"]:
-                inputs["bbox"] = batch[4]
-            inputs["token_type_ids"] = (
-                batch[2] if args.model_type in ["bert", "layoutlm"] else
-                None)  # RoBERTa don"t use segment_ids
+            inputs["bbox"] = batch[4]
+            inputs["token_type_ids"] = batch[2]
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
 
