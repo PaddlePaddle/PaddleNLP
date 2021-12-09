@@ -564,6 +564,10 @@ __global__ void topk_stage_2_opt3_sampling(
         ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
         break;
       }
+      if (i == k - 1) {
+        ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
+        break;
+      }
     }
     if (finished_buf != nullptr) {
       if (sequence_length != nullptr) {
@@ -2143,6 +2147,10 @@ __global__ void topk_topp_sampling_kernel_v2(
     for (int i = 0; i < k; i++) {
       rand_num = rand_num - (float)s_val2[s_id[i]];
       if (rand_num <= 0.0f) {
+        ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
+        break;
+      }
+      if (i == k - 1) {
         ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
         break;
       }
