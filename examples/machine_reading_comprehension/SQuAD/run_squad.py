@@ -163,9 +163,9 @@ def evaluate(model, data_loader, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, token_type_ids = batch
+        input_ids, token_type_ids, attention_mask = batch
         start_logits_tensor, end_logits_tensor = model(input_ids,
-                                                       token_type_ids)
+                                                       token_type_ids=token_type_ids, attention_mask=attention_mask)
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -252,6 +252,7 @@ def run(args):
         train_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            'attention_mask': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
             "start_positions": Stack(dtype="int64"),
             "end_positions": Stack(dtype="int64")
         }): fn(samples)
@@ -289,10 +290,10 @@ def run(args):
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, start_positions, end_positions = batch
+                input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
 
                 logits = model(
-                    input_ids=input_ids, token_type_ids=token_type_ids)
+                    input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
@@ -330,7 +331,8 @@ def run(args):
 
         dev_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
         }): fn(samples)
 
         dev_data_loader = DataLoader(
