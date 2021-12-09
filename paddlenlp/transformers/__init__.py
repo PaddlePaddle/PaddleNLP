@@ -80,3 +80,5 @@ from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
+from .chinesebert.modeling import *
+from .chinesebert.tokenizer import *
