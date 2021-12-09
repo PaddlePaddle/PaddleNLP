@@ -94,9 +94,9 @@ def convert_example_to_feature(example,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
 
-    input_ids = tokenized_input['input_ids']
-    token_type_ids = tokenized_input['token_type_ids']
-    seq_len = tokenized_input['seq_len']
+    input_ids = np.array(tokenized_input['input_ids'], dtype="int64")
+    token_type_ids = np.array(tokenized_input['token_type_ids'], dtype="int64")
+    seq_len = np.array(tokenized_input['seq_len'], dtype="int64")
 
     if is_test:
         return input_ids, token_type_ids, seq_len
