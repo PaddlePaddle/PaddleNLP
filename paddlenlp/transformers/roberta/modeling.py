@@ -189,9 +189,7 @@ class RobertaPretrainedModel(PretrainedModel):
                     if hasattr(self, "initializer_range") else
                     self.roberta.config["initializer_range"],
                     shape=layer.weight.shape))
-        elif isinstance(
-                layer, nn.LayerNorm
-        ):  # roberta-base,large的eps=1e-5; wwm-ext为1e-12,方便通过config调整对齐
+        elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = self.layer_norm_eps if hasattr(
                 self,
                 "layer_norm_eps") else self.roberta.config["layer_norm_eps"]
@@ -266,8 +264,7 @@ class RobertaModel(RobertaPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 layer_norm_eps=1e-12
-                 ):  # roberta-base,large的eps=1e-5; wwm-ext为1e-12,方便通过config调整对齐
+                 layer_norm_eps=1e-12):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -626,6 +623,15 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
 
 
 class RobertaForMaskedLM(RobertaPretrainedModel):
+    """
+    Roberta Model with a `masked language modeling` head on top.
+
+    Args:
+        bert (:class:RobertaModel`):
+            An instance of :class:`RobertaModel`.
+
+    """
+
     def __init__(self, roberta):
         super().__init__()
 
@@ -649,6 +655,39 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`RobertaModel`.
+            position_ids (Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import RobertaForMaskedLM, RobertaTokenizer
+
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+                model = RobertaForMaskedLM.from_pretrained('roberta-wwm-ext')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 13, 30522]
+
+        """
 
         outputs = self.roberta(
             input_ids,
@@ -683,6 +722,15 @@ class RobertaLMHead(nn.Layer):
 
 
 class RobertaForCausalLM(RobertaPretrainedModel):
+    """
+    Roberta Model with a `Causal language modeling` head on top.
+
+    Args:
+        bert (:class:RobertaModel`):
+            An instance of :class:`RobertaModel`.
+
+    """
+
     def __init__(self, roberta):
         super().__init__()
 
@@ -707,14 +755,35 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None):
         r"""
-        Example::
-            >>> from paddlenlp.transformers import RobertaTokenizer, RobertaForCausalLM, RobertaConfig
-            >>> import paddle
-            >>> tokenizer = RobertaBPETokenizer.from_pretrained('roberta-base')
-            >>> model = RobertaForCausalLM.from_pretrained('roberta-base', config=config)
-            >>> inputs = tokenizer("Hello, my dog is cute")['input_ids']
-            >>> inputs = paddle.to_tensor(inputs)
-            >>> outputs = model(inputs)
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`RobertaModel`.
+            position_ids (Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import RobertaForCausalLM, RobertaTokenizer
+
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+                model = RobertaForCausalLM.from_pretrained('roberta-wwm-ext')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 13, 30522]
         """
 
         outputs = self.roberta(
