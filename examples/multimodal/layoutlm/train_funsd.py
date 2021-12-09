@@ -49,10 +49,15 @@ def train(args):
         if paddle.distributed.get_rank() == 0 else logging.WARN, )
 
     all_labels = get_labels(args.labels)
+
+    labels = get_labels(args.labels)
     pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
 
     tokenizer = LayoutLMTokenizer.from_pretrained(args.model_name_or_path)
 
+
+    # for training process, model is needed for the bert class
+    # else it can directly loaded for the downstream task
     if not args.do_train:
         model = LayoutLMForTokenClassification.from_pretrained(
             args.model_name_or_path)
@@ -95,6 +100,7 @@ def train(args):
         epsilon=args.adam_epsilon,
         weight_decay=args.weight_decay)
 
+
     #loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_dataset.label_list else paddle.nn.loss.MSELoss()
     loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=pad_token_label_id)
     # metric = AccuracyAndF1()
@@ -127,6 +133,8 @@ def train(args):
             desc="Iteration",
             disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
+
+            # model.eval()
             model.train()
             inputs = {
                 "input_ids": batch[0],
@@ -149,6 +157,20 @@ def train(args):
             loss = loss_fct(
                 logits.reshape([-1, len(all_labels)]),
                 labels.reshape([-1, ]))'''
+                "labels": batch[3],
+            }
+            if args.model_type in ["layoutlm"]:
+                inputs["bbox"] = batch[4]
+            inputs["token_type_ids"] = (
+                batch[2] if args.model_type in ["bert", "layoutlm"] else
+                None)  # RoBERTa don"t use segment_ids
+
+            outputs = model(**inputs)
+            # model outputs are always tuple in ppnlp (see doc)
+            loss = outputs[0]
+
+            loss = loss.mean()
+
             logger.info("train loss: {}".format(loss.numpy()))
             loss.backward()
 
@@ -209,7 +231,6 @@ def evaluate(args,
              prefix=""):
     eval_dataset = FunsdDataset(
         args, tokenizer, all_labels, pad_token_label_id, mode=mode)
-
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
     eval_dataloader = paddle.io.DataLoader(
@@ -226,8 +247,6 @@ def evaluate(args,
     preds = None
     out_label_ids = None
     model.eval()
-    #metric.reset()
-
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         with paddle.no_grad():
             inputs = {
@@ -275,6 +294,32 @@ def evaluate(args,
     preds = np.argmax(preds, axis=2)
 
     label_map = {i: label for i, label in enumerate(all_labels)}
+                "labels": batch[3],
+            }
+            if args.model_type in ["layoutlm"]:
+                inputs["bbox"] = batch[4]
+            inputs["token_type_ids"] = (
+                batch[2] if args.model_type in ["bert", "layoutlm"] else
+                None)  # RoBERTa don"t use segment_ids
+            outputs = model(**inputs)
+            tmp_eval_loss, logits = outputs[:2]
+
+            tmp_eval_loss = tmp_eval_loss.mean()
+
+            eval_loss += tmp_eval_loss.item()
+        nb_eval_steps += 1
+        if preds is None:
+            preds = logits.numpy()
+            out_label_ids = inputs["labels"].numpy()
+        else:
+            preds = np.append(preds, logits.numpy(), axis=0)
+            out_label_ids = np.append(
+                out_label_ids, inputs["labels"].numpy(), axis=0)
+
+    eval_loss = eval_loss / nb_eval_steps
+    preds = np.argmax(preds, axis=2)
+
+    label_map = {i: label for i, label in enumerate(labels)}
 
     out_label_list = [[] for _ in range(out_label_ids.shape[0])]
     preds_list = [[] for _ in range(out_label_ids.shape[0])]
