@@ -258,9 +258,9 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlmv2-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2_base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2-base-uncased/model_state.pdparams",
             "layoutlmv2-large-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2_large/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2-large-uncased/model_state.pdparams",
         }
     }
     base_model_prefix = "layoutlmv2"
