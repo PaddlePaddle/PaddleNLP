@@ -229,7 +229,7 @@ def do_train(args):
                 data = [data]
             train_reader_cost = time.time() - batch_start
 
-
+            '''
             if step_idx == 150:
                 core.nvprof_start()
                 core.nvprof_enable_record_event()
@@ -241,7 +241,7 @@ def do_train(args):
             if step_idx >= 150 and step_idx < 155:
                 core.nvprof_nvtx_pop()
                 core.nvprof_nvtx_push(str(step_idx))
-                
+            '''    
 
             if args.is_distributed:
                 outs = exe.run(train_program,

@@ -1,7 +1,7 @@
 # The frequency to save trained models when training.
 save_step: 10000
 # The frequency to fetch and print output when training.
-print_step: 100
+print_step: 10
 # Path of the checkpoint, to resume the previous training
 init_from_checkpoint: ""
 # Path of the pretrain model, to better solve the current task
@@ -13,7 +13,7 @@ save_model: "trained_models"
 # The directory for saving inference model 
 inference_model_dir: "infer_model"
 # Set seed for CE or debug
-random_seed: None
+random_seed: 100
 # The file to output the translation results of predict_file to.
 output_file: "predict.txt"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
@@ -31,7 +31,7 @@ src_lang: "en"
 trg_lang: "de"
 pool_size: 200000
 sort_type: "global"
-batch_size: 4096
+batch_size: 8192
 infer_batch_size: 8
 shuffle_batch: True
 # Data shuffle only works when sort_type is pool or none
@@ -52,7 +52,7 @@ beta1: 0.9
 beta2: 0.997
 eps: 1e-9
 # The parameters for learning rate scheduling.
-warmup_steps: 4000
+warmup_steps: 16000
 # The weight used to mix up the ground-truth distribution and the fixed
 # uniform distribution in label smoothing when training.
 # Set this as zero if label smoothing is not wanted.
@@ -123,8 +123,8 @@ dropout: 0.1
 weight_sharing: True
 
 # Mixed precision training
-use_amp: False
-use_pure_fp16: False
+use_amp: True
+use_pure_fp16: True
 scale_loss: 128.0
 
 # Maximum iteration for training. 

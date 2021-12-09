@@ -52,7 +52,7 @@ beta1: 0.9
 beta2: 0.997
 eps: 1e-9
 # The parameters for learning rate scheduling.
-warmup_steps: 4000
+warmup_steps: 16000
 # The weight used to mix up the ground-truth distribution and the fixed
 # uniform distribution in label smoothing when training.
 # Set this as zero if label smoothing is not wanted.

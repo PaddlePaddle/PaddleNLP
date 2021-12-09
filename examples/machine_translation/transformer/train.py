@@ -126,7 +126,8 @@ def do_train(args):
         beta1=args.beta1,
         beta2=args.beta2,
         epsilon=float(args.eps),
-        parameters=transformer.parameters())
+        parameters=transformer.parameters(),
+        use_multi_tensor=True)
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -197,8 +198,8 @@ def do_train(args):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-                tokens_per_cards = token_num.numpy()
                 scaled = scaler.scale(avg_cost)  # scale the loss
+                tokens_per_cards = token_num.numpy()
                 scaled.backward()  # do backward
 
                 scaler.minimize(optimizer, scaled)  # update parameters
