@@ -18,8 +18,6 @@ import unittest
 import paddle
 import copy
 import sys
-sys.path.append('/home/aistudio/PaddleNLP')
-sys.path.append('/home/aistudio/PaddleNLP/tests')
 
 from paddlenlp.transformers import RobertaModel
 from paddlenlp.transformers import RobertaForQuestionAnswering, RobertaForSequenceClassification, RobertaForTokenClassification, \
