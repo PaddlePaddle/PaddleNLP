@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = ['FunnelTokenizer','FunnelTokenizerFast']
+__all__ = ['FunnelTokenizer']
 
 from collections import Iterable
 import os
@@ -31,94 +31,7 @@ def stem(token):
         return token
 
 
-
 class FunnelTokenizer(BertTokenizer):
-    cls_token_type_id = 2
-    resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "funnel-transformer/small": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/vocab.txt",
-            "funnel-transformer/small-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/vocab.txt",
-            "funnel-transformer/medium": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/vocab.txt",
-            "funnel-transformer/medium-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/vocab.txt",
-            "funnel-transformer/intermediate": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/vocab.txt",
-            "funnel-transformer/intermediate-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/vocab.txt",
-            "funnel-transformer/large": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/vocab.txt",
-            "funnel-transformer/large-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/vocab.txt",
-            "funnel-transformer/xlarge": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/vocab.txt",
-            "funnel-transformer/xlarge-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/vocab.txt",
-        }
-    }
-    pretrained_init_configuration = {
-        "funnel-transformer/small": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/small-base": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/medium": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/medium-base": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/intermediate": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/intermediate-base": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/large": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/large-base": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/xlarge": {
-            "do_lower_case": True
-        },
-        "funnel-transformer/xlarge-base": {
-            "do_lower_case": True
-        },
-    }
-
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="<unk>",
-                 sep_token="<sep>",
-                 pad_token="<pad>",
-                 cls_token="<cls>",
-                 mask_token="<mask>",
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 wordpieces_prefix="##",
-                 tokenize_chinese_chars=True,
-                 clean_text=True,
-                 strip_accents=None,
-                 **kwargs):
-        if not os.path.isfile(vocab_file):
-            raise ValueError(
-                "Can't find a vocabulary file at path '{}'. To load the "
-                "vocabulary from a pretrained model please use "
-                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                    .format(vocab_file))
-        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
-
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
-        _sep = [self.sep_token_id]
-        _cls = [self.cls_token_id]
-        if token_ids_1 is None:
-            return len(_cls) * [self.cls_token_type_id] + len(token_ids_0 + _sep) * [0]
-        return len(_cls) * [self.cls_token_type_id] + len(token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
-
-
-class FunnelTokenizerFast(BertTokenizer):
     cls_token_type_id = 2
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
