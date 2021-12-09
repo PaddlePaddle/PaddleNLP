@@ -77,7 +77,7 @@ class Clue(DatasetBuilder):
     BUILDER_CONFIGS = {
         'afqmc': {
             'url':
-            "https://storage.googleapis.com/cluebenchmark/tasks/afqmc_public.zip",
+            "https://bj.bcebos.com/paddlenlp/datasets/afqmc_public.zip",
             'md5': '3377b559bb4e61d03a35282550902ca0',
             'splits': {
                 'train': [
@@ -97,7 +97,7 @@ class Clue(DatasetBuilder):
         },
         'tnews': {
             'url':
-            "https://storage.googleapis.com/cluebenchmark/tasks/tnews_public.zip",
+            "https://bj.bcebos.com/paddlenlp/datasets/tnews_public.zip",
             'md5': '38186ed0a751bc33e3ae0c1b59319777',
             'splits': {
                 'train': [
@@ -128,7 +128,7 @@ class Clue(DatasetBuilder):
         },
         'iflytek': {
             'url':
-            'https://storage.googleapis.com/cluebenchmark/tasks/iflytek_public.zip',
+            'https://bj.bcebos.com/paddlenlp/datasets/iflytek_public.zip',
             'md5': "19e4b19947db126f69aae18db0da2b87",
             'splits': {
                 'train': [
@@ -152,7 +152,7 @@ class Clue(DatasetBuilder):
         },
         'ocnli': {
             'url':
-            'https://storage.googleapis.com/cluebenchmark/tasks/ocnli_public.zip',
+            'https://bj.bcebos.com/paddlenlp/datasets/ocnli_public.zip',
             'md5': 'acb426f6f3345076c6ce79239e7bc307',
             'splits': {
                 'train': [
@@ -172,7 +172,7 @@ class Clue(DatasetBuilder):
         },
         'cmnli': {
             'url':
-            'https://storage.googleapis.com/cluebenchmark/tasks/cmnli_public.zip',
+            'https://bj.bcebos.com/paddlenlp/datasets/cmnli_public.zip',
             'md5': 'e0e8caefd9b3491220c18b466233f2ff',
             'splits': {
                 'train': [
@@ -192,7 +192,7 @@ class Clue(DatasetBuilder):
         },
         'cluewsc2020': {
             'url':
-            'https://storage.googleapis.com/cluebenchmark/tasks/cluewsc2020_public.zip',
+            'https://bj.bcebos.com/paddlenlp/datasets/cluewsc2020_public.zip',
             'md5': '2e387e20e93eeab0ffaded5b0d2dfd3d',
             'splits': {
                 'train': [
@@ -216,7 +216,7 @@ class Clue(DatasetBuilder):
         },
         'csl': {
             'url':
-            'https://storage.googleapis.com/cluebenchmark/tasks/csl_public.zip',
+            'https://bj.bcebos.com/paddlenlp/datasets/csl_public.zip',
             'md5': '394a2ccbf6ddd7e331be4d5d7798f0f6',
             'splits': {
                 'train': [

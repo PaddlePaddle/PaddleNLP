@@ -31,7 +31,7 @@ class Couplet(DatasetBuilder):
     https://github.com/v-zich/couplet-clean-dataset, which filters dirty data
     from the original repository https://github.com/wb14123/couplet-dataset.
     """
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/couplet.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
                                                      'src_md5', 'tgt_md5'))
     MD5 = '5c0dcde8eec6a517492227041c2e2d54'
