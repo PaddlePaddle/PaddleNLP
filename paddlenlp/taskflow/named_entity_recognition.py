@@ -24,6 +24,7 @@ import itertools
 from .utils import download_file
 from .utils import TermTree
 from .knowledge_mining import WordTagTask
+from .utils import Customization
 
 usage = r"""
           from paddlenlp import Taskflow 
@@ -35,8 +36,7 @@ usage = r"""
           '''
 
           ner = Taskflow("ner")
-          ner(["热梅茶是一道以梅子为主要原料制作的茶饮",
-               "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
+          ner(["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
           '''
           [[('热梅茶', '饮食类_饮品'), ('是', '肯定词'), ('一道', '数量词'), ('以', '介词'), ('梅子', '饮食类'), ('为', '肯定词'), ('主要原料', '物体类'), ('制作', '场景事件'), ('的', '助词'), ('茶饮', '饮食类_饮品')], [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]]
           '''
@@ -56,6 +56,13 @@ class NERTask(WordTagTask):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
+        self._custom_vocab = self.kwargs[
+            'custom_vocab'] if 'custom_vocab' in self.kwargs else None
+        if self._custom_vocab:
+            self._custom = Customization()
+            self._custom.load_customization(self._custom_vocab)
+        else:
+            self._custom = None
 
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
@@ -65,7 +72,8 @@ class NERTask(WordTagTask):
                 for index in batch_pred_tags[sent_index][self.summary_num:-1]
             ]
             sent = batch_texts[sent_index]
-            
+            if self._custom:
+                self._custom.parse_customization(sent, tags, prefix=True)
             sent_out = []
             tags_out = []
             partial_word = ""
