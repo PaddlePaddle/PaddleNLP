@@ -48,7 +48,8 @@ outputs, _ = model.generate(
     forced_bos_token_id=bos_id,
     decode_strategy="beam_search",
     num_beams=4,
-    max_length=50)
+    max_length=50,
+    use_faster=True)
 
 result = postprocess_response(outputs[0].numpy().tolist(), bos_id, eos_id)
 

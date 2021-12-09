@@ -31,14 +31,16 @@ from .models import BoWModel, LSTMModel, SkepSequenceModel
 from .task import Task
 
 URLS = {
-    "bilstm_vocab":
-    ["https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt", None],
+    "bilstm_vocab": [
+        "https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt", 
+        "df714f0bfd6d749f88064679b4c97fd5"
+    ],
     "bilstm": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/bilstm/bilstm.pdparams",
+        "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/bilstm/bilstm.pdparams",
         "609fc068aa35339e20f8310b5c20887c"
     ],
     "skep_ernie_1.0_large_ch": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/skep_ernie_1.0_large_ch.pdparams",
+        "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/skep_ernie_1.0_large_ch.pdparams",
         "cf7aa5f5ffa834b329bbcb1dca54e9fc"
     ]
 }

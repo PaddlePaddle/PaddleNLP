@@ -76,7 +76,7 @@ class ErnieGramTokenizer(ErnieTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-gram-zh":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gram_zh/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {"ernie-gram-zh": {"do_lower_case": True}, }
