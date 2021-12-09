@@ -172,6 +172,9 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可。
 
+如果使用CPU进行训练，则需要吧`--gpus`参数去除，然后吧`device`设置成cpu即可，详细请参考train_batch_neg.sh文件的训练设置
+
+然后运行下面的命令使用GPU训练，得到语义索引模型：
 
 ```
 root_path=recall
@@ -250,7 +253,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --output_emb_size 256\
         --max_seq_length 60 \
         --recall_num 50 \
-        --similar_text_pair "recall/test.csv" \
+        --similar_text_pair "recall/dev.csv" \
         --corpus_file "recall/corpus.csv" 
 ```
 参数含义说明
@@ -314,6 +317,27 @@ recall@50=78.84
 
 ## 7. 预测
 
+我们可以基于语义索引模型预测文本的语义向量或者计算文本 Pair 的语义相似度。
+
+### 7.1 功能一：抽取文本的语义向量
+
+修改inference.py文件里面输入文本id2corpus和模型路径；params_path，就可以运行下面的命令抽取向量了：
+
+```
+python inference.py
+```
+预测结果位256维的向量：
+
+```
+[1, 256]
+[[ 0.07766181 -0.13780491  0.03388524 -0.14910668 -0.0334941   0.06780092
+   0.0104043   0.03168401  0.02605671  0.02088691  0.05520441 -0.0852212
+   .....
+```
+
+### 7.2 功能二：计算文本 Pair 的语义相似度
+
+
 ### 准备预测数据
 
 待预测数据为 tab 分隔的 csv 文件，每一行为 1 个文本 Pair，部分示例如下:
@@ -375,10 +399,10 @@ python export_model.py --params_path checkpoints/inbatch/model_40/model_state.pd
 也可以运行下面的bash脚本：
 
 ```
-sh export.sh
+sh export_model.sh
 ```
 
-### Python服务
+### Paddle Inference预测
 
 
 然后使用PaddleInference

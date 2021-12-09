@@ -25,7 +25,8 @@ if __name__ == "__main__":
     max_seq_length=64
     output_emb_size=256
     batch_size=1
-    params_path='checkpoints/train_0.001/model_40/model_state.pdparams'
+    params_path='checkpoints/inbatch/model_40/model_state.pdparams'
+    id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
@@ -53,7 +54,6 @@ if __name__ == "__main__":
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
 
-    id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
 
     # conver_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
@@ -79,6 +79,4 @@ if __name__ == "__main__":
 
     text_embedding=all_embeddings[0]
     print(text_embedding.shape)
-    print(text_embedding)
-    
-
+    print(text_embedding.numpy())
