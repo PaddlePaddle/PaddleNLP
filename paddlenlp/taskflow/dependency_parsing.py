@@ -43,33 +43,43 @@ usage = r"""
            from paddlenlp import Taskflow 
 
            ddp = Taskflow("dependency_parsing")
-           ddp("百度是一家高科技公司")
+           ddp("三亚是一座美丽的城市")
            '''
-           [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}]
            '''
-           ddp(["百度是一家高科技公司", "他送了一本书"])
+           ddp(["三亚是一座美丽的城市", "他送了一本书"])
            '''
-           [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': ['2', '0', '2', '5', '2'], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
-           '''
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+           '''       
 
            ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
-           ddp("百度是一家高科技公司")
+           ddp("三亚是一座美丽的城市")
            '''
-           [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+           [{'word': ['三亚', '是', '一座', '美丽的城市'], 'head': [2, 0, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'VOB'], 'postag': ['LOC', 'v', 'm', 'n'], 'prob': [1.0, 1.0, 1.0, 1.0]}]
            '''
 
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
-           ddp("百度是一家高科技公司")
+           ddp("三亚是一座美丽的城市")
            '''
-           [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}]
            '''
 
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
-           ddp("百度是一家高科技公司")
+           ddp("三亚是一座美丽的城市")
            '''
-           [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}]
            '''
 
+           # 已分词输入
+           ddp = Taskflow("dependency_parsing", segmented=True)
+           ddp.from_segments([["三亚", "是", "一座", "美丽", "的", "城市"]])
+           '''
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}]
+           '''
+           ddp.from_segments([['三亚', '是', '一座', '美丽', '的', '城市'], ['他', '送', '了', '一本', '书']])
+           '''
+           [{'word': ['三亚', '是', '一座', '美丽', '的', '城市'], 'head': [2, 0, 6, 6, 4, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'MT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+           '''   
          """
 
 
@@ -83,7 +93,7 @@ class DDParserTask(Task):
         prob(bool): Whether to return the probability of predicted heads.
         use_pos(bool): Whether to return the postag.
         batch_size(int): Numbers of examples a batch.
-        return_visual(bool): If set True, the result will contain the dependency visualization.
+        return_visual(bool): If True, the result will contain the dependency visualization.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
@@ -141,11 +151,26 @@ class DDParserTask(Task):
 
         self.use_cuda = use_cuda
         self.lac = LAC(mode="lac" if self.use_pos else "seg",
-                       use_cuda=self.use_cuda)
+                    use_cuda=self.use_cuda)
         if self.static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
+
+    def _check_segmented_words(self, inputs):
+        inputs = inputs[0]
+        if not all([isinstance(i, list) and i and all(i) for i in inputs]):
+            raise TypeError("Invalid input format.")
+        return inputs    
+
+    def from_segments(self, segmented_words):
+        segmented_words = self._check_segmented_words(segmented_words)
+        inputs = {}
+        inputs['words'] = segmented_words
+        inputs = self._preprocess_words(inputs)
+        outputs = self._run_model(inputs)
+        results = self._postprocess(outputs)
+        return results
 
     def _construct_input_spec(self):
         """
@@ -182,40 +207,13 @@ class DDParserTask(Task):
         """
         return None
 
-    def _preprocess(self, inputs):
-        """
-        Transform the raw text to the model inputs, two steps involved:
-           1) Transform the raw text to token ids.
-           2) Generate the other model inputs from the raw text and token ids.
-        """
-        inputs = self._check_input_text(inputs)
-        # Get the config from the kwargs
-        num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-
-        lac_results = []
-        position = 0
-
-        while position < len(inputs):
-            lac_results += self.lac.run(inputs[position:position +
-                                               self.batch_size])
-            position += self.batch_size
-
-        outputs = {}
-        if not self.use_pos:
-            outputs['words'] = lac_results
-        else:
-            outputs['words'], outputs[
-                'postags'] = [raw for raw in zip(*lac_results)]
-
+    def _preprocess_words(self, inputs):
         examples = []
-        for text in outputs['words']:
-            example = {"FORM": text, }
+        for text in inputs['words']:
+            example = {"FORM": text}
             example = convert_example(
                 example,
-                vocabs=[self.word_vocab, self.rel_vocab], )
+                vocabs=[self.word_vocab, self.rel_vocab])
             examples.append(example)
 
         batches = [
@@ -230,7 +228,40 @@ class DDParserTask(Task):
 
         batches = [flat_words(batchify_fn(batch)[0]) for batch in batches]
 
-        outputs['data_loader'] = batches
+        inputs['data_loader'] = batches
+        return inputs
+
+    def _preprocess(self, inputs):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+
+        # Get the config from the kwargs
+        num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
+        lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
+
+        outputs = {}
+
+        lac_results = []
+        position = 0
+
+        inputs = self._check_input_text(inputs)
+        while position < len(inputs):
+            lac_results += self.lac.run(inputs[position:position +
+                                            self.batch_size])
+            position += self.batch_size
+
+        if not self.use_pos:
+            outputs['words'] = lac_results
+        else:
+            outputs['words'], outputs[
+                'postags'] = [raw for raw in zip(*lac_results)]
+
+        outputs = self._preprocess_words(outputs)
         return outputs
 
     def _run_model(self, inputs):
