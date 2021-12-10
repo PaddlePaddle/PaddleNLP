@@ -642,7 +642,8 @@ Transformer预训练模型适用任务汇总
 ------------------------------------
 
 PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。
-只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
+使用Auto模块，可以加载不同网络结构的预训练模型，无需查找
+模型对应的类别。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
 
 .. code:: python
 
@@ -651,13 +652,13 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
     import paddle
     from paddlenlp.datasets import load_dataset
-    from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+    from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     train_ds = load_dataset("chnsenticorp", splits=["train"])
 
-    model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
+    model = AutoModelForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
-    tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
+    tokenizer = AutoTokenizer.from_pretrained("bert-wwm-chinese")
 
     def convert_example(example, tokenizer):
         encoded_inputs = tokenizer(text=example["text"], max_seq_len=512, pad_to_max_seq_len=True)
@@ -684,8 +685,10 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
 1. 加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。
 2. 加载预训练模型：PaddleNLP的预训练模型可以很容易地通过 ``from_pretrained()`` 方法加载。
+   Auto模块（包括AutoModel, AutoTokenizer, 及各种下游任务类）提供了方便易用的接口，
+   无需指定类别，即可调用不同网络结构的预训练模型。
    第一个参数是汇总表中对应的 ``Pretrained Weight``，可加载对应的预训练权重。
-   ``BertForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 ``num_classes`` 等，
+   ``AutoModelForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 ``num_classes`` 等，
    也是通过 ``from_pretrained()`` 传入。``Tokenizer`` 使用同样的 ``from_pretrained`` 方法加载。
 3. 通过 ``Dataset`` 的 ``map`` 函数，使用 ``tokenizer`` 将 ``dataset`` 从原始文本处理成模型的输入。
 4. 定义 ``BatchSampler`` 和 ``DataLoader``，shuffle数据、组合Batch。
