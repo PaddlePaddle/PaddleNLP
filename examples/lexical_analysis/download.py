@@ -19,7 +19,7 @@ import argparse
 
 from paddle.utils.download import get_path_from_url
 
-URL = "https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz"
+URL = "https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz"
 
 
 def main(arguments):

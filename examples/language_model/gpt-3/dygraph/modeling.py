@@ -34,7 +34,6 @@ from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer, Sha
 import paddle.incubate as incubate
 from paddle.distributed.fleet.utils import recompute
 
-
 __all__ = [
     'GPTModel',
     "GPTPretrainedModel",
@@ -284,7 +283,12 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None, use_recompute=False):
+    def __init__(self,
+                 decoder_layers,
+                 num_layers,
+                 norm=None,
+                 hidden_size=None,
+                 use_recompute=False):
         super(TransformerDecoder, self).__init__()
 
         self.num_layers = num_layers
@@ -643,11 +647,11 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
         }
     }
     base_model_prefix = "gpt"

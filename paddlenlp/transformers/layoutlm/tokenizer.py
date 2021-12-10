@@ -28,16 +28,16 @@ class LayoutLMTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "layoutlm-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-base-uncased/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-base-uncased/vocab.txt",
             "layoutlm-large-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-large-uncased/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-large-uncased/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "layoutlm_base-uncased": {
+        "layoutlm-base-uncased": {
             "do_lower_case": True
         },
-        "layoutlm_large-uncased": {
+        "layoutlm-large-uncased": {
             "do_lower_case": True
         },
     }

@@ -22,11 +22,6 @@ def parse_args():
         help="The input data dir. Should contain the training files for the CoNLL-2003 NER task.",
     )
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True, )
-    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,

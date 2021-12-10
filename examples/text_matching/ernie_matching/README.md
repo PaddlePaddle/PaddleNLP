@@ -7,8 +7,8 @@
 
 | 模型  | dev acc |
 | ---- | ------- |
-| [ERNIE-1.0-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie1.0_zh_pointwise_matching_model.tar)  | 89.43 |
-| [ERNIE-Gram-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 90.60 |
+| [ERNIE-1.0-Base](https://bj.bcebos.com/paddlenlp/models/text_matching/ernie1.0_zh_pointwise_matching_model.tar)  | 89.43 |
+| [ERNIE-Gram-Base](https://bj.bcebos.com/paddlenlp/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 90.60 |
 
 ## 快速开始
 
