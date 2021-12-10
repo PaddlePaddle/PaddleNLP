@@ -270,6 +270,7 @@ pip install -r requirements.txt
 
 |  模型 |  AUC |
 | ------------ | ------------ |
+|  In-batchNegative |  0.582 | 
 |  ERNIE-Gram |  0.801 | 
 
 
