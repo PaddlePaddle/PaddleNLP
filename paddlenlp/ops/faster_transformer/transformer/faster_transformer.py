@@ -705,8 +705,12 @@ class FasterGPT(GPTPretrainedModel):
 
         if num_return_sequences > 1:
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_return_sequences, seq_len=seq_len)
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
             seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
 
         return self.decoding(
             input_ids,
@@ -1257,10 +1261,15 @@ class FasterMBART(MBartPretrainedModel):
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
 
-        # TODO(gongenlei) Need to expand
         if forced_bos_token_id is not None:
-            trg_word = paddle.full(
-                [batch_size, 1], forced_bos_token_id, dtype="int32")
+            if decode_strategy == "sampling":
+                trg_word = paddle.full(
+                    [batch_size * num_return_sequences, 1],
+                    forced_bos_token_id,
+                    dtype="int32")
+            else:
+                trg_word = paddle.full(
+                    [batch_size, 1], forced_bos_token_id, dtype="int32")
         else:
             trg_word = paddle.zeros([0])
 
