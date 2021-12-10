@@ -51,7 +51,7 @@ MAPPING_NAMES = OrderedDict([
     ("Ernie", "ernie"),
     ("GPT", "gpt"),
     ("LayoutXLM", "layoutxlm"),
-    ("LayoutLMV2", "layoutlmv2"),
+    ("LayoutLMv2", "layoutlmv2"),
     ("LayoutLM", "layoutlm"),
     ("MBart", "mbart"),
     ("MPNet", "mpnet"),
