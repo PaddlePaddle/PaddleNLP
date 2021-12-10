@@ -143,7 +143,7 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
 
     Args:
         loss_fct (callable):
-            Loss function for distillation.
+            Loss function for distillation. It only supports kl_div loss now.
         s (Tensor):
             Q, K, V of Student.
         t (Tensor):
