@@ -2,7 +2,6 @@ export CUDA_VISIBLE_DEVICES=7
 
 python3.7 train_funsd.py \
     --data_dir "./data/" \
-    --model_type "layoutlm" \
     --model_name_or_path "layoutlm-base-uncased" \
     --do_lower_case \
     --max_seq_length 512 \
