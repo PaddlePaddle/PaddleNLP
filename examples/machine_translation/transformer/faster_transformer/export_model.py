@@ -15,7 +15,6 @@ from pprint import pprint
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
 from paddlenlp.ops import FasterTransformer
-from paddlenlp.ops import enable_faster_encoder
 from paddlenlp.utils.log import logger
 
 sys.path.append("../")
@@ -38,15 +37,6 @@ def parse_args():
         "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
-    parser.add_argument(
-        "--enable_faster_encoder",
-        action="store_true",
-        help="Whether to use faster version encoder to predict. This is experimental option for now. "
-    )
-    parser.add_argument(
-        "--use_fp16_encoder",
-        action="store_true",
-        help="Whether to use fp16 encoder to predict. ")
     parser.add_argument(
         "--decoding_strategy",
         default="beam_search",
@@ -123,8 +113,6 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
-        enable_faster_encoder=args.enable_faster_encoder,
-        use_fp16_encoder=args.use_fp16_encoder,
         rel_len=args.use_rel_len,
         alpha=args.alpha)
 
@@ -134,10 +122,6 @@ def do_predict(args):
     # Load checkpoint.
     transformer.load(init_from_params=os.path.join(args.init_from_params,
                                                    "transformer.pdparams"))
-
-    if args.enable_faster_encoder:
-        transformer = enable_faster_encoder(
-            transformer, need_build=False, use_fp16=args.use_fp16_encoder)
 
     # Convert dygraph model to static graph model 
     transformer = paddle.jit.to_static(
@@ -167,8 +151,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
-    args.enable_faster_encoder = ARGS.enable_faster_encoder
-    args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
     args.topk = ARGS.topk
