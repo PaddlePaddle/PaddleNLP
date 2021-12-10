@@ -42,7 +42,7 @@ def calc_multi_relation_loss(loss_fct,
 
     Args:
         loss_fct (callable):
-            Loss function for distillation.
+            Loss function for distillation. It only supports kl_div loss now.
         s (Tensor):
             Q, K, V of Student.
         t (Tensor):
