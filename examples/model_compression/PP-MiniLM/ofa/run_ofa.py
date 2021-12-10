@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 import argparse
 import logging
 import os
+import sys
 import random
 import time
 import math
@@ -25,40 +26,19 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import DataLoader
-from paddle.metric import Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import TinyBertModel, TinyBertForSequenceClassification, TinyBertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
-from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer, ErnieModel
-from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
+
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
 from paddleslim.nas.ofa.utils import nlp_utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 
-METRIC_CLASSES = {
-    "afqmc": Accuracy,
-    "tnews": Accuracy,
-    "iflytek": Accuracy,
-    "ocnli": Accuracy,
-    "cmnli": Accuracy,
-    "cluewsc2020": Accuracy,
-    "csl": Accuracy,
-}
-
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
-    "tinybert": (TinyBertForSequenceClassification, TinyBertTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-}
+sys.path.append("../")
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
 def parse_args():
@@ -202,14 +182,6 @@ def evaluate(model, metric, data_loader, width_mult, student=False):
     for i, batch in enumerate(data_loader):
         input_ids, segment_ids, labels = batch
         logits = model(input_ids, segment_ids, attention_mask=[None, None])
-        #print(logits)
-        #sys.exit()
-        #if student:
-        #print(batch)
-        #print(logits)
-        #import pdb; pdb.set_trace() # ofa_model和保存下来的超网络model不对
-
-        #sys.exit()
         if isinstance(logits, tuple):
             logits = logits[0]
         correct = metric.compute(logits, labels)
@@ -262,60 +234,6 @@ def soft_cross_entropy(inp, target):
     inp_likelihood = F.log_softmax(inp, axis=-1)
     target_prob = F.softmax(target, axis=-1)
     return -1. * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
-
-
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a glue example into necessary features"""
-    if not is_test:
-        # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
-        # Get the label
-        label = example['label']
-        label = np.array([label], dtype=label_dtype)
-    # Convert raw text to feature
-    if 'sentence' in example:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
-    elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
-    elif 'keyword' in example:  # CSL
-        sentence1 = " ".join(example['keyword'])
-        example = tokenizer(
-            sentence1, text_pair=example['abst'], max_seq_len=max_seq_length)
-    elif 'target' in example:  # wsc
-        text, query, pronoun, query_idx, pronoun_idx = example['text'], example[
-            'target']['span1_text'], example['target']['span2_text'], example[
-                'target']['span1_index'], example['target']['span2_index']
-        text_list = list(text)
-        # print(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
-        if pronoun_idx > query_idx:
-            text_list.insert(query_idx, "_")
-            text_list.insert(query_idx + len(query) + 1, "_")
-            text_list.insert(pronoun_idx + 2, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 2 + 1, "]")
-        else:
-            text_list.insert(pronoun_idx, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 1, "]")
-            text_list.insert(query_idx + 2, "_")
-            text_list.insert(query_idx + len(query) + 2 + 1, "_")
-        text = "".join(text_list)
-        # print(text)
-        example = tokenizer(text, max_seq_len=max_seq_length)
-
-    if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
 
 
 def do_train(args):
@@ -372,8 +290,7 @@ def do_train(args):
     origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.
-    sp_config = supernet(
-        expand_ratio=[1.0])  #expand_ratio=args.width_mult_list)
+    sp_config = supernet(expand_ratio=[1.0])
     model = Convert(sp_config).convert(model)
     # Use weights saved in the dictionary to initialize supernet.
     utils.set_state_dict(model, origin_weights)
@@ -384,7 +301,6 @@ def do_train(args):
     model.set_state_dict(super_sd)
 
     # Step3: Define teacher model.
-    #print(args.model_name_or_path, "**************")
     teacher_model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
 
@@ -474,11 +390,7 @@ def do_train(args):
                 logits, teacher_logits = ofa_model(
                     input_ids, segment_ids, attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
-                if args.task_name == 'sts-b':
-                    logit_loss = paddle.zeros(shape=[1], dtype='float32')
-                else:
-                    logit_loss = soft_cross_entropy(logits,
-                                                    teacher_logits.detach())
+                logit_loss = soft_cross_entropy(logits, teacher_logits.detach())
                 loss = rep_loss + args.lambda_logit * logit_loss
                 loss.backward()
             optimizer.step()
@@ -498,7 +410,6 @@ def do_train(args):
                 print("eval done total : %s s" % (time.time() - tic_eval))
                 for idx, width_mult in enumerate(args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
-                    #print(net_config)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     res = evaluate(ofa_model, metric, dev_data_loader,
@@ -507,8 +418,6 @@ def do_train(args):
 
                     if best_res < res:
                         output_dir = args.output_dir
-                        #output_dir = os.path.join(args.output_dir,
-                        #"model_%d" % global_step)
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
                         # need better way to get inner model of DataParallel
@@ -516,13 +425,8 @@ def do_train(args):
                             model, paddle.DataParallel) else model
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        print("res saved", res)
-                        #res = evaluate(ofa_model, metric,
-                        #dev_data_loader, width_mult, True)
                         best_res = res
-                        #sys.exit()
             if global_step >= num_training_steps:
-                print("best_res: ", best_res)
                 return
     print("best_res: ", best_res)
 

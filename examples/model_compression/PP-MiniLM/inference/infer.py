@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import sys
 from functools import partial
 import numpy as np
 
@@ -21,74 +22,9 @@ import paddle
 from paddle import inference
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddle.metric import Metric, Accuracy, Precision, Recall
-from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-
-METRIC_CLASSES = {
-    "afqmc": Accuracy,
-    "tnews": Accuracy,
-    "iflytek": Accuracy,
-    "ocnli": Accuracy,
-    "cmnli": Accuracy,
-    "cluewsc2020": Accuracy,
-    "csl": Accuracy,
-}
-
-MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
-
-
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a glue example into necessary features"""
-    if not is_test:
-        # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
-        # Get the label
-        label = example['label']
-        label = np.array([label], dtype=label_dtype)
-    # Convert raw text to feature
-    if 'sentence' in example:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
-    elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
-    elif 'keyword' in example:  # CSL
-        sentence1 = " ".join(example['keyword'])
-        example = tokenizer(
-            sentence1, text_pair=example['abst'], max_seq_len=max_seq_length)
-    elif 'target' in example:  # wsc
-        text, query, pronoun, query_idx, pronoun_idx = example['text'], example[
-            'target']['span1_text'], example['target']['span2_text'], example[
-                'target']['span1_index'], example['target']['span2_index']
-        text_list = list(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
-        if pronoun_idx > query_idx:
-            text_list.insert(query_idx, "_")
-            text_list.insert(query_idx + len(query) + 1, "_")
-            text_list.insert(pronoun_idx + 2, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 2 + 1, "]")
-        else:
-            text_list.insert(pronoun_idx, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 1, "]")
-            text_list.insert(query_idx + 2, "_")
-            text_list.insert(query_idx + len(query) + 2 + 1, "_")
-        text = "".join(text_list)
-        example = tokenizer(text, max_seq_len=max_seq_length)
-
-    if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
+sys.path.append("../")
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
 def parse_args():
@@ -138,7 +74,6 @@ def parse_args():
         "--use_trt",
         action='store_true',
         help="Whether to use inference engin TensorRT.", )
-
     parser.add_argument(
         "--collect_shape",
         action='store_true',
@@ -146,7 +81,7 @@ def parse_args():
     parser.add_argument(
         "--int8",
         action='store_true',
-        help="Whether int8 inference.", )
+        help="Whether to use int8 inference.", )
     args = parser.parse_args()
     return args
 
@@ -232,7 +167,6 @@ class Predictor(object):
             input_handle.copy_from_cpu(input_field.numpy() if isinstance(
                 input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        paddle.fluid.core._cuda_synchronize(self.device)
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]

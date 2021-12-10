@@ -26,18 +26,13 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import BertModel, BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
 
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-}
+MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
 
 
 def ernie_forward(self,
@@ -186,8 +181,6 @@ def do_train(args):
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
 
-    #for name, params in origin_model.named_parameters():
-    #    print(name, params.name)
     origin_model_new = ofa_model.export(
         best_config,
         input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
@@ -203,10 +196,7 @@ def do_train(args):
         os.makedirs(output_dir)
     model_to_save = origin_model_new
     model_to_save.save_pretrained(output_dir)
-    #print(origin_model_new.state_dict().keys())
-    #print("=====================")
-    #for name, params in origin_model_new.named_parameters():
-    #    print(name, params.name)
+
     if args.static_sub_model != None:
         export_static_model(origin_model_new, args.static_sub_model,
                             args.max_seq_length)

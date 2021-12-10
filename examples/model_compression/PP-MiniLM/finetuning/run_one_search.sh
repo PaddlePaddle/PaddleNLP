@@ -50,5 +50,6 @@ do
     then
     sh run_clue.sh CMNLI $lr $bs 3 128 $3 ${OUTPUT_DIR} > ${OUTPUT_DIR}/cmnli/${lr}_${bs}_3_128.log
     fi
+    done
 done
 
