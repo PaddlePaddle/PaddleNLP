@@ -118,7 +118,8 @@ def do_predict(args):
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
                 decode_strategy="sampling",
-                use_fp16_decoding=args.use_fp16_decoding)
+                use_fp16_decoding=args.use_fp16_decoding,
+                use_faster=True)
             output_sequence = out_seq.numpy()
 
         paddle.fluid.core._cuda_synchronize(place)
