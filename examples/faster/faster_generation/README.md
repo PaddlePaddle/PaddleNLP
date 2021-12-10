@@ -43,13 +43,13 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - torch version 1.10.0+cu113
 - transformers version 4.12.5
 
-- **BART** (bart-base, batch_size=4, max_length=32)
+**BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="../../../docs/imgs/bart_perf.png" width="400" height ="200" />
 </p>
 
-- **GPT** (gpt2, batch_size=4, max_length=32)
+**GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="../../../docs/imgs/bart_perf.png" width="400" height ="200" />
