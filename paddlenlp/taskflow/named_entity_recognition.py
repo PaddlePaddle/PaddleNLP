@@ -56,11 +56,11 @@ class NERTask(WordTagTask):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._custom_vocab = self.kwargs[
-            'custom_vocab'] if 'custom_vocab' in self.kwargs else None
-        if self._custom_vocab:
+        self._user_dict = self.kwargs[
+            'user_dict'] if 'user_dict' in self.kwargs else None
+        if self._user_dict:
             self._custom = Customization()
-            self._custom.load_customization(self._custom_vocab)
+            self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
 

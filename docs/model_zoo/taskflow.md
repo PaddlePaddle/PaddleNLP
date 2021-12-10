@@ -83,9 +83,9 @@ seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 
 #### 自定义词典
 
-用户可以通过装载自定义词典来定制化分词结果。
+用户可以通过装载自定义词典来定制化分词结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
 
-词典文件`custom_seg.txt`示例：
+词典文件`user_dict.txt`示例：
 
 ```text
 平原上的火焰
@@ -103,7 +103,7 @@ seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 ```python
 from paddlenlp import Taskflow
 
-my_seg = Taskflow("word_segmentation", custom_vocab="custom_seg.txt")
+my_seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
 my_seg("平原上的火焰计划于年末上映")
 >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
 ```
@@ -111,7 +111,7 @@ my_seg("平原上的火焰计划于年末上映")
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `custom_vocab`：用户自定义词典文件，默认为None。
+* `user_dict`：用户自定义词典文件，默认为None。
 
 ### 词性标注
 
@@ -140,9 +140,9 @@ tag(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 
 #### 自定义词典
 
-用户可以通过装载自定义词典来定制化分词和词性标注结果。
+用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
 
-词典文件`custom_pos.txt`示例：
+词典文件`user_dict.txt`示例：
 
 ```text
 赛里木湖/LAKE
@@ -162,7 +162,7 @@ tag(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 ```python
 from paddlenlp import Taskflow
 
-my_pos = Taskflow("pos_tagging", custom_vocab="custom_pos.txt")
+my_pos = Taskflow("pos_tagging", user_dict="user_dict.txt")
 my_pos("赛里木湖是新疆海拔最高的高山湖泊")
 >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
 ```
@@ -170,7 +170,7 @@ my_pos("赛里木湖是新疆海拔最高的高山湖泊")
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认值为1。
-* `custom_vocab`：用户自定义词典文件，默认为None。
+* `user_dict`：用户自定义词典文件，默认为None。
 
 ### 命名实体识别
 
@@ -187,9 +187,9 @@ ner(["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》�
 
 #### 自定义词典
 
-用户可以通过装载自定义词典来定制化分词和词性标注结果。
+用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
 
-词典文件`custom_ner.txt`示例：
+词典文件`user_dict.txt`示例：
 
 ```text
 长津湖/电影类_实体
@@ -209,7 +209,7 @@ ner(["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》�
 ```python
 from paddlenlp import Taskflow
 
-my_ner = Taskflow("ner", custom_vocab="custom_ner.txt")
+my_ner = Taskflow("ner", user_dict="user_dict.txt")
 my_ner("《长津湖》收尾，北美是最大海外票仓")
 >>> [('《', 'w'), ('长津湖', '电影类_实体'), ('》', 'w'), ('收', '词汇用语'), ('尾', '术语类'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最', '修饰词'), ('大', '修饰词'), ('海外票仓', '场所类')]
 ```
@@ -229,7 +229,7 @@ my_ner = Taskflow("ner", params_path="/path/to/your/params", tag_path="/path/to/
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `custom_vocab`：用户自定义词典文件，默认为None。
+* `user_dict`：用户自定义词典文件，默认为None。
 * `params_path`：模型参数文件路径，默认为None。
 * `tag_path`：标签文件路径，默认为None。
 
