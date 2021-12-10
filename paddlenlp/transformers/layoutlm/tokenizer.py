@@ -34,10 +34,10 @@ class LayoutLMTokenizer(BertTokenizer):
         }
     }
     pretrained_init_configuration = {
-        "layoutlm_base-uncased": {
+        "layoutlm-base-uncased": {
             "do_lower_case": True
         },
-        "layoutlm_large-uncased": {
+        "layoutlm-large-uncased": {
             "do_lower_case": True
         },
     }
