@@ -42,8 +42,6 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import PretrainedModel, register_base_model
 from paddlenlp.transformers.bert.modeling import BertPooler, BertPretrainingHeads
 
-# from .fusion_embedding import FusionBertEmbeddings
-
 __all__ = [
     "ChineseBertModel",
     "ChineseBertPretrainedModel",
@@ -55,7 +53,6 @@ __all__ = [
 ]
 
 
-# fusion_embedding.py
 class PinyinEmbedding(nn.Layer):
     def __init__(self,
                  pinyin_map_len: int,
@@ -65,6 +62,7 @@ class PinyinEmbedding(nn.Layer):
         Pinyin Embedding Layer.
 
         Args:
+            pinyin_map_len (int): the size of pinyin map, which about 26 Romanian characters and 6 numbers. 
             embedding_size (int): the size of each embedding vector.
             pinyin_out_dim (int): kernel number of conv.
 
@@ -264,9 +262,9 @@ class ChineseBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ChineseBERT-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
             "ChineseBERT-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
         }
     }
 

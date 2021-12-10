@@ -26,7 +26,7 @@ GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.
 cd static # 或者 cd dygraph
 # 下载样例数据
 mkdir data && cd data
-wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/train.data.json_ids.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz
 cd ..
 # 运行pretrian 脚本
 sh run.sh
