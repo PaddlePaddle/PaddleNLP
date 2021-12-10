@@ -73,7 +73,7 @@ PP-MiniLM模型的蒸馏方法介绍
 
 本方法参考了MiniLMv2提出的Multi-Head Self-Attention Relation Distillation蒸馏算法。原始的MiniLMv2算法引入了用24层large-size的模型蒸馏6层模型的思想，即用24层的Roberta-wwm-ext-large教师模型的倒数几层的Q-Q、K-K、V-V之间的relation 去蒸馏6层学生模型的最后一层。在论文中，这种relation是一种token-token relation。
 
-本方案在MiniLMv2的基础上，通过引入样本间关系知识蒸馏做了进一步算法优化，主要利用第20层的Q-Q、K-K、V-V之间的sample-sample relation对6层学生模型PP-MiniLM第6层的Q-Q、K-K、V-V之间的sample-sample relation进行蒸馏。具体的做法是，首先将学生、教师用于蒸馏的层上的head数进行统一，然后将Q、K、V的shape均转置成[seq_len, head_num, batch_size, head_dim]，再对Q-Q、K-K、V-V之间的关系进行蒸馏。这种方法比使用原始MiniLMv2算法在CLUE上平均准确率高0.36。
+本方案在MiniLMv2的基础上，通过引入样本间关系知识蒸馏做了进一步算法优化，主要利用第20层的Q-Q、K-K、V-V之间的sample-sample relation对6层学生模型PP-MiniLM第6层的Q-Q、K-K、V-V之间的sample-sample relation进行蒸馏。具体的做法是，首先将学生、教师用于蒸馏的层上的head数进行统一，然后将Q、K、V的shape均转置成[seq_len, head_num, batch_size, head_dim]，再对Q-Q、K-K、V-V之间的关系进行蒸馏。这种方法比使用原始MiniLMv2算法在CLUE上平均准确率高0.36。
 
 
 ### 数据介绍
