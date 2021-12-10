@@ -25,12 +25,9 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-
 sys.path.append('.')
 
-print(sys.path)
 from base_model import SemanticIndexBase,SemanticIndexBaseStatic
-
 from data import convert_example
 
 # yapf: disable

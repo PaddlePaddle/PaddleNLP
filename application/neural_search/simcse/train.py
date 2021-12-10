@@ -112,7 +112,7 @@ def do_train():
        args.model_name_or_path,
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
-    print("loading model from {}".format(model_name_or_path))
+    print("loading model from {}".format(args.model_name_or_path))
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
