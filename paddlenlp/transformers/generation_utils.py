@@ -368,8 +368,6 @@ class GenerationMixin(object):
         if attention_mask is not None:
             model_kwargs["attention_mask"] = paddle.gather(attention_mask,
                                                            index)
-        else:
-            model_kwargs["attention_mask"] = None
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]

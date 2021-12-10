@@ -686,7 +686,7 @@ class FasterGPT(GPTPretrainedModel):
                 seq_len=seq_len,
                 attention_mask=attention_mask)
             seq_len = model_kwargs["seq_len"]
-            attention_mask = model_kwargs["attention_mask"]
+            attention_mask = model_kwargs.get("attention_mask", None)
 
         return self.decoding(
             input_ids,
