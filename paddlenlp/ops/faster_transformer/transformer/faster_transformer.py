@@ -100,7 +100,14 @@ class FasterTransformer(TransformerModel):
             for details. Bigger `diversity_rate` would lead to more diversity.
             if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
             to 0 if not set.
-        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        use_fp16_decoding(bool, optional):
+            Whether to use fp16 for decoding. 
+        enable_faster_encoder(bool, optional):
+            Whether to use the faster version of encoder. This is experimental option for now.
+            Defaults to False.
+        use_fp16_encoder(bool, optional):
+            Whether to use fp16 for encoder. Only works when enable_faster_encoder is True.
+            Defaults to False.
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
             of source text. Only works in `v2` temporarily. It is suggest to set
@@ -135,6 +142,8 @@ class FasterTransformer(TransformerModel):
                  diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
+                 enable_faster_encoder=False,
+                 use_fp16_encoder=False,
                  rel_len=False,
                  alpha=0.6):
         # if decoding_lib is None:
@@ -154,6 +163,8 @@ class FasterTransformer(TransformerModel):
         self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.enable_faster_encoder = args.pop("enable_faster_encoder")
+        self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
         self.dropout = dropout
@@ -163,6 +174,13 @@ class FasterTransformer(TransformerModel):
         self.bos_id = bos_id
         self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
+
+        if self.enable_faster_encoder:
+            logger.warning(
+                "enable_faster_encoder is an experimental option and subject to change."
+            )
+        elif self.use_fp16_encoder:
+            self.use_fp16_encoder = False
 
         self.decoding_linear = nn.Linear(
             in_features=d_model, out_features=trg_vocab_size)
@@ -210,10 +228,16 @@ class FasterTransformer(TransformerModel):
         enc_input = F.dropout(
             src_emb, p=self.dropout,
             training=False) if self.dropout else src_emb
+
+        if self.enable_faster_encoder and self.use_fp16_encoder:
+            enc_input = paddle.cast(enc_input, dtype="float16")
+
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
-        if self.use_fp16_decoding:
+        if self.use_fp16_decoding and enc_output.dtype != paddle.float16:
             enc_output = paddle.cast(enc_output, dtype="float16")
+        elif not self.use_fp16_decoding and enc_output.dtype != paddle.float32:
+            enc_output = paddle.cast(enc_output, dtype="float32")
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
@@ -1104,12 +1128,12 @@ class FasterBART(BartPretrainedModel):
                 forced_eos_token_id=None,
                 **model_kwargs):
 
-        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-        self.encoder = disable_faster_encoder(self.encoder)
+            self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
@@ -1207,12 +1231,13 @@ class FasterMBART(MBartPretrainedModel):
         decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
             self._model, 'decoder_start_token_id', None)
 
-        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+        #(gongenlei) Not enable_faster_encoder temporarily
         if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-        self.encoder = disable_faster_encoder(self.encoder)
+            self.encoder = disable_faster_encoder(self.encoder)
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."

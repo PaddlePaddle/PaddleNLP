@@ -241,7 +241,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
 def enable_faster_encoder(self,
                           need_build=True,
                           use_fp16=False,
-                          decoding_lib=None):
+                          encoder_lib=None):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -285,13 +285,13 @@ def enable_faster_encoder(self,
             try:
                 # Pass decoding lib to prevent re-building encoder.
                 # Todo: check weather decoding lib have contained encoder or not.
-                if decoding_lib is not None:
-                    load_op_meta_info_and_register_op(decoding_lib)
+                if encoder_lib is not None:
+                    load_op_meta_info_and_register_op(encoder_lib)
                 else:
                     load("FasterTransformer", verbose=True)
             except Exception:
                 logger.warning(
-                    "Exception occurs when using FasterTransformer. " \
+                    "Exception occurs when using FasterEncoder. " \
                     "The original forward will be involved. ")
                 return self
         for layer in self.children():
