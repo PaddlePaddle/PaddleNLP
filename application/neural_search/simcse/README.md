@@ -61,11 +61,11 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 
 **环境依赖**
 * python >= 3.x
-* paddlepaddle-gpu >= 2.1.3
+* paddlepaddle >= 2.1.3
 * paddlenlp >= 2.1
-* hnswlib >=0.5.2
+* [hnswlib](https://github.com/nmslib/hnswlib) >=0.5.2
+* visualdl >= 2.2.2
 
-- [hnswlib](https://github.com/nmslib/hnswlib)
 
 
 <a name="代码结构"></a>
@@ -80,14 +80,20 @@ simcse/
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
+├── deploy.sh # Paddle Inference的bash脚本
 |—— ann_util.py # Ann 建索引库相关函数
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
+├── export_model.py # 动态图转静态图
+├── export_model.sh # 动态图转静态图bash脚本
 ├── predict.py # 基于训练好的无监督语义匹配模型计算文本 Pair 相似度
+├── predict.sh # 预测的bash脚本
 ├── evaluate.py # 根据召回结果和评估集计算评估指标
-|—— predict.py # 给定输入文件，计算文本 pair 的相似度
+├── evaluate.sh # 召回评估bash脚本
 |—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
-└── train.py # SimCSE 模型训练、评估逻辑
+├── run_build_index.sh  # 索引的构建脚本
+├── train.py # SimCSE 模型训练、评估逻辑
+└── train.sh # 训练的bash脚本
 ```
 
 <a name="数据准备"></a>
@@ -163,8 +169,8 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--infer_with_fc_pooler \
 	--dropout 0.2 \
     --output_emb_size 256 \
-	--train_set_file "./data/train_unsupervised.csv" \
-	--test_set_file "./data/test.csv" 
+	--train_set_file "./recall/train_unsupervised.csv" \
+	--test_set_file "./recall/test.csv" 
 ```
 也可以使用bash脚本：
 
@@ -206,15 +212,19 @@ checkpoints/
 效果评估分为 4 个步骤:
 
 a. 获取Doc端Embedding
+
 基于语义索引模型抽取出Doc样本库的文本向量，
 
 b. 采用hnswlib对Doc端Embedding建库
+
 使用 ANN 引擎构建索引库(这里基于 [hnswlib](https://github.com/nmslib/hnswlib) 进行 ANN 索引)
 
 c. 获取Query的Embedding并查询相似结果
+
 基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
 d. 评估
+
 基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
@@ -222,7 +232,7 @@ d. 评估
 接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50 指标:
 ```
 python -u evaluate.py \
-        --similar_text_pair "data/test.csv" \
+        --similar_text_pair "recall/dev.csv" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 50
 ```
@@ -274,7 +284,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
-    --text_pair_file "data/test.csv"
+    --text_pair_file "recall/test.csv"
 ```
 
 参数含义说明

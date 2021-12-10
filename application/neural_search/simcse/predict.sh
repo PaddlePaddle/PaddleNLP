@@ -7,4 +7,4 @@ python -u -m paddle.distributed.launch --gpus "3" \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
-    --text_pair_file "data/test.csv"
+    --text_pair_file "recall/test.csv"
