@@ -78,27 +78,27 @@ class RobertaTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "roberta-wwm-ext":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/vocab.txt",
             "roberta-wwm-ext-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/vocab.txt",
             "rbt3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
             "roberta-base-ft-chinanews-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
             "roberta-base-ft-cluener2020-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
             "roberta-base-chn-extractive-qa":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
             "roberta-en-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
             "roberta-en-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
             "roberta-base-squad2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
             "tiny-distilroberta-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
         },
         "merges_file": {
             "roberta-wwm-ext": None,
@@ -109,13 +109,13 @@ class RobertaTokenizer(PretrainedTokenizer):
             "roberta-base-ft-cluener2020-chn": None,
             "roberta-base-chn-extractive-qa": None,
             "roberta-en-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
             "roberta-en-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
             "roberta-base-squad2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
             "tiny-distilroberta-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
         }
     }
     pretrained_init_configuration = {
@@ -460,11 +460,11 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
             "roberta-base-ft-chinanews-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
             "roberta-base-ft-cluener2020-chn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
             "roberta-base-chn-extractive-qa":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -770,23 +770,23 @@ class RobertaBPETokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "roberta-en-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
             "roberta-en-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
             "roberta-base-squad2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
             "tiny-distilroberta-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
         },
         "merges_file": {
             "roberta-en-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
             "roberta-en-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
             "roberta-base-squad2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
             "tiny-distilroberta-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
         }
     }
     pretrained_init_configuration = {
