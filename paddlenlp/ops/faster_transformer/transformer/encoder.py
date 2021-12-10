@@ -227,7 +227,11 @@ def encoder_forward(self, src, src_mask=None, cache=None):
 
     max_seq_len = src.shape[1]
     # broadcast
-    src_mask = paddle.concat(x=[src_mask] * max_seq_len, axis=2)
+    if src_mask is not None:
+        src_mask = paddle.concat(x=[src_mask] * max_seq_len, axis=2)
+    else:
+        src_mask = paddle.zeros([0], dtype=src.dtype)
+
     output = src
     for i, layer in enumerate(self.layers):
         output = layer(output, src_mask)
@@ -239,7 +243,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
 def enable_faster_encoder(self,
                           need_build=True,
                           use_fp16=False,
-                          decoding_lib=None):
+                          encoder_lib=None):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -283,13 +287,13 @@ def enable_faster_encoder(self,
             try:
                 # Pass decoding lib to prevent re-building encoder.
                 # Todo: check weather decoding lib have contained encoder or not.
-                if decoding_lib is not None:
-                    load_op_meta_info_and_register_op(decoding_lib)
+                if encoder_lib is not None:
+                    load_op_meta_info_and_register_op(encoder_lib)
                 else:
                     load("FasterTransformer", verbose=True)
             except Exception:
                 logger.warning(
-                    "Exception occurs when using FasterTransformer. " \
+                    "Exception occurs when using FasterEncoder. " \
                     "The original forward will be involved. ")
                 return self
         for layer in self.children():
