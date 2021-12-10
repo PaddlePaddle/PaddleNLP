@@ -404,6 +404,12 @@ sh export_model.sh
 
 ### Paddle Inference预测
 
+修改id2corpus的样本：
+
+```
+id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+
+```
 
 然后使用PaddleInference
 

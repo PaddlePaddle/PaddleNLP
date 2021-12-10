@@ -199,20 +199,3 @@ if __name__ == "__main__":
     res=predictor.predict(corpus_list, tokenizer)
     print(res.shape)
     print(res)
-    
-    # test_ds = load_dataset("fewclue", name="tnews", splits=["test"])
-    # processor = processor_dict["tnews"](9)
-    # test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC["tnews"])
-
-    # batches = [
-    #     test_ds[idx:idx + args.batch_size]
-    #     for idx in range(0, len(test_ds), args.batch_size)
-    # ]
-
-    # results = []
-    # for batch_data in batches:
-    #     results.extend(predictor.predict(batch_data, tokenizer))
-    # for idx, text in enumerate(test_ds):
-    #     print('Data: {} \t Label: {}'.format(text, results[idx]))
-    # if args.benchmark:
-    #     predictor.autolog.report()
