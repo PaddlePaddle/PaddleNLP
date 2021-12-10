@@ -1103,7 +1103,8 @@ class FasterBART(BartPretrainedModel):
         self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
-            encoder_output = self.encoder(input_ids)
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
         self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
@@ -1206,7 +1207,8 @@ class FasterMBART(MBartPretrainedModel):
         self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
-            encoder_output = self.encoder(input_ids)
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
         self.encoder = disable_faster_encoder(self.encoder)
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
