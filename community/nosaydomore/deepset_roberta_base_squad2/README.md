@@ -9,7 +9,7 @@
 from paddlenlp.transformers import (
     RobertaModel, RobertaForMaskedLM, RobertaForQuestionAnswering,
     RobertaForSequenceClassification, RobertaForTokenClassification)
-from paddlenlp.transformers import RobertaBPETokenizer, RobertaTokenizer
+from paddlenlp.transformers import RobertaTokenizer
 import paddle
 import os
 import numpy as np
@@ -50,7 +50,7 @@ def decode(start, end, topk, max_answer_len, undesired_tokens):
 
     return starts, ends, scores
 
-tokenizer = RobertaBPETokenizer.from_pretrained('deepset/roberta-base-squad2')
+tokenizer = RobertaTokenizer.from_pretrained('deepset_roberta_base_squad2')
 questions = ['Where do I live?']
 contexts = ['My name is Sarah and I live in London']
 
