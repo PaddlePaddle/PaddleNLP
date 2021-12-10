@@ -201,19 +201,13 @@ def encoder_forward(self, src, src_mask=None, cache=None):
         src (Tensor):
             The input of Transformer encoder. It is a tensor
             with shape `[batch_size, sequence_length, d_model]`. The data
-            type should be float32 or float64.
+            type should be float32 or float16.
         src_mask (Tensor, optional):
             A tensor used in multi-head attention to prevents attention to
             some unwanted positions, usually the paddings or the subsequent
             positions. It is a tensor with shape `[batch_size, 1, 1, sequence_length]`.
-            When the data type is bool, the unwanted positions have `False`
-            values and the others have `True` values. When the data type is
-            int, the unwanted positions have 0 values and the others have 1
-            values. When the data type is float, the unwanted positions have
-            `-INF` values and the others have 0 values. It can be None when
-            nothing wanted or needed to be prevented attention to. Defaults
-            to None.
-
+            The data type must be float, the unwanted positions have `-INF` values or other non-zeros
+            and the wanted positions must be 0.0.
     Returns:
         output (Tensor|tuple):
             It is a tensor that has the same shape and data type as `src`,
@@ -225,9 +219,17 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             `paddle.nn.MultiHeadAttention.forward` for more details.
     """
 
-    max_seq_len = src.shape[1]
-    # broadcast
-    src_mask = paddle.concat(x=[src_mask] * max_seq_len, axis=2)
+    if src_mask.dtype == paddle.float16:
+        src_mask = paddle.cast(src_mask, "float32")
+
+    src_mask = src_mask == 0.0
+    src_mask = paddle.cast(src_mask, src.dtype)
+
+    # transpose_src_mask: [batch_size, 1, sequence_length, 1]
+    transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
+
+    # src_mask: [batch_size, 1, sequence_length, sequence_length]
+    src_mask = src_mask * transpose_src_mask
     output = src
     for i, layer in enumerate(self.layers):
         output = layer(output, src_mask)
