@@ -69,7 +69,7 @@ query title label
 在模型训练之前，需要先下载词汇表文件simnet_vocab.txt，用于构造词-id映射关系。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/data/simnet_vocab.txt
+wget https://bj.bcebos.com/paddlenlp/data/simnet_vocab.txt
 ```
 
 **NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。

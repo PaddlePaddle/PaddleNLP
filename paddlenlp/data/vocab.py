@@ -190,7 +190,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -248,7 +248,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -311,7 +311,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -349,7 +349,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -415,7 +415,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -484,7 +484,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(
@@ -546,7 +546,7 @@ class Vocab(object):
 
                 from paddlenlp.data import Vocab
                 # The vocab file. The sample file can be downloaded firstly.
-                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                # wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
                 vocab_file_path = './senta_word_dict.txt'
                 # Initialize the Vocab
                 vocab = Vocab.load_vocabulary(

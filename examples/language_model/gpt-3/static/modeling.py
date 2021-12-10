@@ -228,7 +228,7 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
-        
+
         weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.dropout:
@@ -619,11 +619,11 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -740,10 +740,9 @@ class GPTModel(GPTPretrainedModel):
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
-                                                        input_ids)
+                                                         input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-
 
         encoder_outputs = self.decoder(
             embedding_output,
@@ -791,10 +790,10 @@ class GPTForPretraining(GPTPretrainedModel):
                 use_cache=False,
                 cache=None):
         outputs = self.gpt(input_ids,
-                        position_ids=position_ids,
-                        attention_mask=attention_mask,
-                        use_cache=use_cache,
-                        cache=cache)
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:

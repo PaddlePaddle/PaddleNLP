@@ -4,7 +4,7 @@
 
 语义索引库提供了前沿语义索引策略的训练、语义索引模型的效果评估方案、支持用户基于我们开源的语义索引模型进行文本 Pair 的相似度计算或者 Embedding 语义表示抽取。
 
-我们基于 ERNIE1.0 热启，分别采用 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略和 HardestNeg 策略开源了 [batch_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar) 和 [hardest_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/hardest_neg_v1.0.tar) 模型，相比 Baseline 模型效果有显著提升:
+我们基于 ERNIE1.0 热启，分别采用 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略和 HardestNeg 策略开源了 [batch_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/batch_neg_v1.0.tar) 和 [hardest_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/hardest_neg_v1.0.tar) 模型，相比 Baseline 模型效果有显著提升:
 
 ## 效果评估
 |  模型 |  Recall@10 | Recall@50  |策略简要说明|
@@ -20,15 +20,15 @@
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[batch_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:128 max_len:64 </div>|<div style="width: 100pt">单卡v100-16g</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
-|[hardest_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/hardest_neg_v1.0.tar)|margin:0.2 epoch:3 lr:5E-5 bs:128 max_len:64 |单卡v100-16g|b535d890110ea608c8562c525a0b84b5|
+|[batch_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/batch_neg_v1.0.tar)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:128 max_len:64 </div>|<div style="width: 100pt">单卡v100-16g</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
+|[hardest_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/hardest_neg_v1.0.tar)|margin:0.2 epoch:3 lr:5E-5 bs:128 max_len:64 |单卡v100-16g|b535d890110ea608c8562c525a0b84b5|
 
 
 ## 数据准备
 ### 数据生成
 我们基于开源语义匹配数据集构造生成了面向语义索引的训练集、评估集、召回库。
 #### 构造训练集
-从开源语义相似度任务评测数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))的训练集和测试集中抽取出所有语义相似的文本 Pair 作为训练集 [semantic_pair_train.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)。
+从开源语义相似度任务评测数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))的训练集和测试集中抽取出所有语义相似的文本 Pair 作为训练集 [semantic_pair_train.tsv](https://bj.bcebos.com/paddlenlp/models/semantic_index/semantic_pair_train.tsv)。
 
 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略和 HardestNeg 策略训练数据每一行由 `tab` 分隔的语义相似的文本 Pair 对，样例数据如下:
 ```
@@ -40,18 +40,18 @@
 
 
 #### 构造评估集
-从开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx)) 的验证集中抽取出正例文本 Pair 生成评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv)，其中第 1 列文本作为输入模型的源文本 *Source Text*、第 2 列文本作为语义相似的目标文本 *Target Text*。
+从开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx)) 的验证集中抽取出正例文本 Pair 生成评估集 [same_semantic.tsv](https://bj.bcebos.com/paddlenlp/models/semantic_index/same_semantic.tsv)，其中第 1 列文本作为输入模型的源文本 *Source Text*、第 2 列文本作为语义相似的目标文本 *Target Text*。
 
 #### 构造召回库
-抽取出开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))训练集中的所有文本和验证集中所有文本 Pair 的第 2 列 *Target Text* 生成召回库 [corpus_file](https://paddlenlp.bj.bcebos.com/models/semantic_index/corpus_file)
+抽取出开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))训练集中的所有文本和验证集中所有文本 Pair 的第 2 列 *Target Text* 生成召回库 [corpus_file](https://bj.bcebos.com/paddlenlp/models/semantic_index/corpus_file)
 
 
 ### 数据下载
 |数据|描述|数量|MD5|
 | ------------ | ------------ | ------------ | -------- |
-|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)](https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
-|[评估集(same_semantic.tsv)](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv)|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
-|[召回库(corpus_file）](https://paddlenlp.bj.bcebos.com/models/semantic_index/corpus_file)|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
+|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/semantic_pair_train.tsv)</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
+|[评估集(same_semantic.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/same_semantic.tsv)|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
+|[召回库(corpus_file）](https://bj.bcebos.com/paddlenlp/models/semantic_index/corpus_file)|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
 
 
 ## 项目依赖:
@@ -134,7 +134,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 2. 召回
 基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 1 步中建立的索引库中进行 ANN 查询召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
-3. 评估： 基于评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv) 和召回结果 `recall_result` 计算评估指标 R@10 和 R@50
+3. 评估： 基于评估集 [same_semantic.tsv](https://bj.bcebos.com/paddlenlp/models/semantic_index/same_semantic.tsv) 和召回结果 `recall_result` 计算评估指标 R@10 和 R@50
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 

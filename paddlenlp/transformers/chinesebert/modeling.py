@@ -262,9 +262,9 @@ class ChineseBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ChineseBERT-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
             "ChineseBERT-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
         }
     }
 
