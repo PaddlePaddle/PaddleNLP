@@ -63,7 +63,7 @@ wordtag/
 我们提供了少数样本用以示例增量训练。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset_v2.tar.gz && tar -zxvf wordtag_dataset_v2.tar.gz
+wget https://bj.bcebos.com/paddlenlp/paddlenlp/datasets/wordtag_dataset_v2.tar.gz && tar -zxvf wordtag_dataset_v2.tar.gz
 ```
 解压之后
 

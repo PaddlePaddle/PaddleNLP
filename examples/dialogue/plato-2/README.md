@@ -26,13 +26,13 @@ PLATO-2的训练过程及其他细节详见 [Knover](https://github.com/PaddlePa
 
 您可以从以下位置下载预训练模型文件：
 
-* PLATO-2, 24-layers, 16-heads, 1024-hidden, EN: [预训练模型](https://paddlenlp.bj.bcebos.com/models/transformers/plato2/24L.pdparams)
-* PLATO-2, 32-layers, 32-heads, 2048-hidden, EN: [预训练模型](https://paddlenlp.bj.bcebos.com/models/transformers/plato2/32L.pdparams)
+* PLATO-2, 24-layers, 16-heads, 1024-hidden, EN: [预训练模型](https://bj.bcebos.com/paddlenlp/models/transformers/plato2/24L.pdparams)
+* PLATO-2, 32-layers, 32-heads, 2048-hidden, EN: [预训练模型](https://bj.bcebos.com/paddlenlp/models/transformers/plato2/32L.pdparams)
 
 以24层预训练模型为例：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/models/transformers/plato2/24L.pdparams
+wget https://bj.bcebos.com/paddlenlp/models/transformers/plato2/24L.pdparams
 ```
 
 **NOTE:** PLATO-2网络参数量较大，24层网络至少需要显存16G，32层网络至少需要显存22G，用户可选择合适的网络层数及预训练模型。
@@ -40,7 +40,7 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/plato2/24L.pdparams
 sentencepiece分词预训练模型和词表文件下载：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/models/transformers/plato2/data.tar.gz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/plato2/data.tar.gz
 tar -zxf data.tar.gz
 ```
 

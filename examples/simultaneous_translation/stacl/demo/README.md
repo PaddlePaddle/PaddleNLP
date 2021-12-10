@@ -47,9 +47,9 @@
 ##### 1. 模型参数配置
 可以在`transformer_demo.yaml` 文件中设置相应的参数，下面给出主要的参数配置：
 
-- `src_bpe_dict`配置源语言（这里是中文）的BPE词表，[中文BPE词表下载](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.zh)
-- `src_vocab_fpath`配置源语言（这里是中文）词表，[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab)
-- `trg_vocab_fpath`配置目标语言（这里是英文）词表，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
+- `src_bpe_dict`配置源语言（这里是中文）的BPE词表，[中文BPE词表下载](https://bj.bcebos.com/paddlenlp/models/stacl/2M.zh2en.dict4bpe.zh)
+- `src_vocab_fpath`配置源语言（这里是中文）词表，[source vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.20k.zh.vocab)
+- `trg_vocab_fpath`配置目标语言（这里是英文）词表，[target vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.10k.en.vocab)
 - `device`选择预测用的设备，支持cpu/gpu/xpu，默认为cpu
 
 ##### 2. 语音同传参数配置
