@@ -144,8 +144,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 ├── sort # 排序数据集
     ├── test_pairwise.csv   # 排序测试集
     └── train_pairwise.csv  # 排序训练集
-
-
+    
 ```
 
 <a name="模型训练"></a>

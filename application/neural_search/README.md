@@ -91,9 +91,7 @@ Post-Training的时候使用的是全量的数据，使用了文本的query,titl
 
 数据集的下载地址为：
 
-```
-wget https://bj.bcebos.com/v1/paddlenlp/data/wanfang_opensource_data.zip
-```
+- [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
 
 
 ### 3.2 技术方案和评估指标
