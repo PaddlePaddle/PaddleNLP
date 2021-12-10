@@ -13,9 +13,8 @@ python -u -m paddle.distributed.launch --gpus "3" \
 
 # cpu
 # root_dir="checkpoints/inbatch" 
-
 # python predict.py \
-#     --device gpu \
+#     --device cpu \
 #     --params_path "${root_dir}/model_40/model_state.pdparams" \
 #     --output_emb_size 256 \
 #     --batch_size 128 \
