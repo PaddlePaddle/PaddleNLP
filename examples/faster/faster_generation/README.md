@@ -13,7 +13,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
-- 解码速度快。最高可达非加速版generate函数的**18倍**。HuggingFace generate函数的**12倍**。**并支持FP16混合精度计算**。
+- 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
 
 ### Inference Model Support
