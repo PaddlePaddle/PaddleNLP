@@ -1,6 +1,6 @@
-# PP-MiniLM中文特色小模型
+# PP-MiniLM中文小模型
 
-PP-MiniLM 中文特色小模型案例旨在提供训推一体的高精度、高性能小模型解决方案。
+PP-MiniLM 中文特小模型案例旨在提供训推一体的高精度、高性能小模型解决方案。
 
 当前解决方案依托业界领先的 Task Agnostic 模型蒸馏技术、裁剪技术、量化技术，使得小模型兼具推理速度快、模型效果好、参数规模小的 3 大特点。
 
@@ -14,16 +14,17 @@ PP-MiniLM 中文特色小模型案例旨在提供训推一体的高精度、高�
 
 | Model                   | #Params       | #FLOPs | Speedup | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE平均值 |
 | ----------------------- | ------------- | ------ | ------- | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ---------- |
-| Bert-base               | 102.3M        |        | 1.00x   | 74.17 | 57.17 | 61.14   |       | 75.08 | 80.26 | 81.47 |            |
+| Bert-base               | 102.3M        |        | 1.00x   | 74.17 | 57.17 | 61.14   | 81.14 | 75.08 | 80.26 | 81.47 |
+72.92      |
 | TinyBERT<sub>6</sub>    | 59.7M         |        | 1.64x   | 72.22 | 55.82 | 58.10   | 79.53 | 74.00 | 75.99 | 80.57 | 70.89      |
 | UER-py RoBERTa L6- H768 | 59.7M         |        | 1.64x   | 69.74 | 66.36 | 59.95   | 77.00 | 71.39 | 71.05 | 82.83 | 71.19      |
 | ERNIE-Tiny              | 90.7M         |        | 1.76x   | 70.78 | 55.70 | 59.95   | 75.40 | 70.98 | 67.43 | 76.60 | 68.12      |
 | PP-MiniLM 6L-768H       | 59.7M         |        | 1.64x   | 74.28 | 57.33 | 61.72   | 81.06 | 76.2  | 86.51 | 78.77 | 73.70      |
-| PP-MiniLM裁剪后         | 49.1M (+裁剪) |        | 1.88x   | 73.82 | 57.33 | 61.60   | 81.38 | 76.20 | 85.52 | 79.00 | 73.55      |
-| PP-MiniLM量化后         | 49.2M(+量化)  |        | 3.56x   | 73.61 | 57.18 | 61.49   | 81.26 | 76.31 | 84.54 | 77.67 | 73.15      |
-|                         |               |        |         |       |       |         |       |       |       |       |            |
+| PP-MiniLM裁剪后          | 49.1M          |        | 1.88x   | 73.82 | 57.33 | 61.60   | 81.38 | 76.20 | 85.52 | 79.00 | 73.55      |
+| PP-MiniLM量化后          | 49.2M          |        | 3.56x   | 73.61 | 57.18 | 61.49   | 81.26 | 76.31 | 84.54 | 77.67 | 73.15      |
+|                         |               |        |         |       |       |         |       |       |       |       |          |
 
-
+** NOTE** 量化后的模型比量化前多0.1M是因为保存了scale值。
 
 方案流程一览：
 
@@ -62,16 +63,19 @@ PP-MiniLM 中文特色小模型案例旨在提供训推一体的高精度、高�
 
 ## 通用蒸馏（可选）
 
-### 环境要求
+### 环境建议
 
 本实验基于NVIDIA Tesla V100 32G 8卡进行，训练周期约为2-3天。若资源有限，可以直接下载这一步得到的模型跳过此步骤，直接使用链接的模型用下游任务数据进行微调。
 
 
 ### 原理介绍
 
-PP-MiniLM模型的蒸馏方法介绍：
+PP-MiniLM模型的蒸馏方法介绍
 
-本方案在MiniLMv2提出的Multi-Head Self-Attention Relation Distillation蒸馏算法的基础上，通过引入样本间关系知识蒸馏做了进一步算法优化。即用24层的Roberta-wwm-ext-large教师模型的第20层对6层学生模型PP-MiniLM第6层的Q-Q、K-K、V-V之间的样本间关系进行蒸馏。首先将学生、教师用于蒸馏的层上的head数进行统一，然后将Q、K、V的shape均转置成[seq_len, head_num, batch_size, head_dim]，再对Q-Q、K-K、V-V之间的关系进行蒸馏。这种方法比使用原始MiniLMv2算法在CLUE上平均准确率高0.36。
+
+本方法参考了MiniLMv2提出的Multi-Head Self-Attention Relation Distillation蒸馏算法。原始的MiniLMv2算法引入了用24层large-size的模型蒸馏6层模型的思想，即用24层的Roberta-wwm-ext-large教师模型的倒数几层的Q-Q、K-K、V-V之间的relation 去蒸馏6层学生模型的最后一层。在论文中，这种relation是一种token-token relation。
+
+本方案在MiniLMv2的基础上，通过引入样本间关系知识蒸馏做了进一步算法优化，主要利用第20层的Q-Q、K-K、V-V之间的sample-sample relation对6层学生模型PP-MiniLM第6层的Q-Q、K-K、V-V之间的sample-sample relation进行蒸馏。具体的做法是，首先将学生、教师用于蒸馏的层上的head数进行统一，然后将Q、K、V的shape均转置成[seq_len, head_num, batch_size, head_dim]，再对Q-Q、K-K、V-V之间的关系进行蒸馏。这种方法比使用原始MiniLMv2算法在CLUE上平均准确率高0.36。
 
 
 ### 数据介绍
@@ -92,8 +96,8 @@ cd ..
 - `model_type` 指示了学生模型类型，当前仅支持'ernie'、'roberta'。
 - `num_relation_heads` relation heads的个数，一般对于large size的教师模型是64，对于base size的教师模型是48。
 - `teacher_model_type`指示了教师模型类型，当前仅支持'ernie'、'roberta'。
-- `teacher_layer_index`蒸馏时使用的教师模型的层数
-- `student_layer_index` 蒸馏时使用的学生模型的层数
+- `teacher_layer_index`蒸馏时使用的教师模型的层
+- `student_layer_index` 蒸馏时使用的学生模型的层
 - `teacher_model_name_or_path`教师模型的名称，例如`'roberta-wwm-ext-large'`
 - `max_seq_length` 最大的样本长度
 - `num_layers` 学生模型的层数，目前仅支持2，4，6
@@ -151,7 +155,7 @@ sh run_clue.sh CLUEWSC2020 1e-4 32 3 128 0 $GENERAL_MODEL_DIR
 | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ---------- |
 | 74.28 | 57.33 | 61.72   | 81.06 | 76.20 | 86.51 | 78.77 | 73.70      |
 
-### 你可以这样导出Fine-tuning之后的模型直接用于部署
+### 导出Fine-tuning之后的模型
 
 假设fine-tuning之后的模型保存的地址为`$GENERAL_MODEL_DIR/models/CLUEWSC2020/1e-4_32`，可以运行下方命令对动态图模型导出为可用于部署的静态图模型：
 
@@ -179,7 +183,7 @@ sh run_ofa.sh CLUEWSC2020 5e-5 16 50 128 4  ../general_distill/ernie-batchbatch-
 
 执行完成后，模型保存的路径位于`ofa_models/CLUEWSC2020/0.75/best_model/`。
 
-### 导出裁剪后的模型：
+### 导出裁剪后的模型
 
 这一步可以同时得到动态图、静态图的模型参数
 
