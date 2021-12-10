@@ -16,7 +16,6 @@
 
 import copy
 import math
-
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
@@ -265,6 +264,7 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             pad_token_id=0,
             pool_act="tanh", ):
         super(LayoutLMModel, self).__init__()
+        #self.config = kwargs
         self.num_hidden_layers = num_hidden_layers
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -343,8 +343,8 @@ class LayoutLMModel(LayoutLMPretrainedModel):
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and its shape is [batch_size, hidden_size].
         '''
-        input_shape = input_ids.shape
 
+        input_shape = input_ids.shape
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -354,12 +354,6 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
-        if position_ids is None:
-            seq_length = input_shape[1]
-            position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
         if bbox is None:
             bbox = paddle.zeros(tuple(list(input_shape) + [4]), dtype="int64")
 
@@ -388,6 +382,21 @@ class LayoutLMModel(LayoutLMPretrainedModel):
 
 
 class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
+    """
+    LayoutLM Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
+
+    Args:
+        layoutlm (:class:`LayoutLMModel`):
+            An instance of LayoutLMModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of LayoutLM.
+            If None, use the same value as `hidden_dropout_prob` of `LayoutLMModel`
+            instance `layoutlm`. Defaults to None.
+    """
+
     def __init__(self, layoutlm, num_classes=2, dropout=None):
         super(LayoutLMForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -396,20 +405,58 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                                   self.layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
                                     num_classes)
-        self.dropout.apply(self.init_weights)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
 
     def forward(self,
-                input_ids=None,
+                input_ids,
                 bbox=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                labels=None,
                 output_hidden_states=False):
+        r"""
+        The LayoutLMForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`LayoutLMModel`.
+            bbox (Tensor):
+                See :class:`LayoutLMModel`.
+            attention_mask (list, optional):
+                See :class:`LayoutLMModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`LayoutLMModel`.
+            position_ids(Tensor, optional):
+                See :class:`LayoutLMModel`.
+            output_hidden_states(Tensor, optional):
+                See :class:`LayoutLMModel`.
+
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import LayoutLMFForTokenClassification
+                from paddlenlp.transformers import LayoutLMFTokenizer
+
+                tokenizer = LayoutLMFTokenizer.from_pretrained('layoutlm-base-uncased')
+                model = LayoutLMFForTokenClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 13, 2]
+
+        """
         if attention_mask is not None:
             attention_mask = attention_mask.unsqueeze(
                 axis=[1, 2]).astype("int64")
@@ -419,30 +466,25 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            output_hidden_states=output_hidden_states)
+            output_hidden_states=False)
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        outputs = (logits, )
-        if labels is not None:
-            loss_fct = paddle.nn.CrossEntropyLoss()
-            # Only keep active parts of the loss
-            if attention_mask is not None:
-                active_loss = attention_mask.reshape([-1, ]) == 1
-                active_logits = logits.reshape([-1, self.num_classes])
-                active_logits = active_logits[active_loss]
-                active_labels = labels.reshape([-1, ])[active_loss]
-                loss = loss_fct(active_logits, active_labels)
-            else:
-                loss = loss_fct(
-                    logits.reshape([-1, self.num_classes]),
-                    labels.reshape([-1, ]))
-            outputs = (loss, ) + outputs
-
-        return outputs
+        return logits
 
 
 class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
+    """
+    LayoutLM Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
+
+    Args:
+        layoutlm (:class:`LayoutLMModel`):
+            An instance of LayoutLMModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+    """
+
     def __init__(self, layoutlm, num_classes=2):
         super(LayoutLMForSequenceClassification, self).__init__()
         self.layoutlm = layoutlm
@@ -457,12 +499,51 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             bbox=None,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
             output_hidden_states=False, ):
+        r"""
+        The LayoutLMForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`LayoutLMModel`.
+            bbox (Tensor):
+                See :class:`LayoutLMModel`.
+            attention_mask (list, optional):
+                See :class:`LayoutLMModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`LayoutLMModel`.
+            position_ids(Tensor, optional):
+                See :class:`LayoutLMModel`.
+            output_hidden_states(Tensor, optional):
+                See :class:`LayoutLMModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import LayoutLMForSequenceClassification
+                from paddlenlp.transformers import LayoutLMTokenizer
+
+                tokenizer = LayoutLMTokenizer.from_pretrained('layoutlm-base-uncased')
+                model = LayoutLMForSequenceClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 2]
+
+        """
         outputs = self.layoutlm(
             input_ids=input_ids,
             bbox=bbox,
