@@ -235,7 +235,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 ## 使用 FasterTransformer 加速预测
 
 我们基于 Paddle 自定义算子功能集成了[NVIDIA FasterTransformer](https://github.com/NVIDIA/FasterTransformer) 的高性能加速能力，通过简单易用的 Python API 即可得到 GPU 上更高性能预测能力。
-- FT FP32 相比 Paddle 前向加速比为 1.13 ~ 4.18
+- FT FP32 相比 Paddle 前向加速比为 1.13 ~ 4.36
 - FT FP16 相比 Paddle 前向加速比为 3.65 ~ 5.42
 - 支持 Post-Normalization 和 Pre-Normalizaiton 2 种 Transformer 结构
 - 支持 GELU 和 RELU 2 个激活函数
@@ -244,7 +244,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 
 | batch size | max_seq_len | Paddle 前向(ms)|FT FP32(ms)  | FT FP16(ms) |Speedup(FT FP32/Paddle)|Speedup(FT FP16/Paddle)|
 | ---------- | ----------- | ------------------- | ------------------- |------------------ |------------------ |------------------ |
-| 16         | 16          | 23.56  |  5.40 | 5.38 | 4.18| 4.19|
+| 16         | 16          | 23.56  |  5.40 | 5.38 | 4.36| 4.38|
 | 16         | 32          | 22.34  |  8.11  | 5.57|2.75|4.01|
 | 16         | 64          | 22.79   | 14.84  |5.39|1.54|4.23|
 | 32         | 16          | 23.41      | 8.16   |5.30|2.87|4.42|
@@ -265,7 +265,7 @@ cuDNN: 7.6
 可参考如下命令使用高性能预测能力
 ```shell
 python -u -m paddle.distributed.launch --gpus "0" faster_predict.py \
-   --init_from_params "batch_neg_v1.0/model_state.pdparams"   \
+   --params_path "batch_neg_v1.0/model_state.pdparams"   \
    --output_emb_size 256   \
    --batch_size 32  \
    --max_seq_length 64  \
