@@ -55,7 +55,7 @@
 首先下载样例数据：
 ```
 mkdir data && cd data
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/baike.txt
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/baike.txt
 cd ..
 ```
 ### 原始数据转换 jsonl 格式

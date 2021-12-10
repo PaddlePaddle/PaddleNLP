@@ -19,11 +19,11 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 用户需要下载样例数据和词表文件，即可运行预训练脚本，训练ERNIE Base模型。
 ```shell
 # 下载样例数据集，并解压
-wget https://paddlenlp.bj.bcebos.com/data/ernie_hybrid_parallelism_data.tar
+wget https://bj.bcebos.com/paddlenlp/data/ernie_hybrid_parallelism_data.tar
 tar -xvf ernie_hybrid_parallelism_data.tar
 
 # 下载Vocab文件
-wget https://paddlenlp.bj.bcebos.com/data/ernie_hybrid_parallelism-30k-clean.vocab.txt -O ./config/vocab.txt
+wget https://bj.bcebos.com/paddlenlp/data/ernie_hybrid_parallelism-30k-clean.vocab.txt -O ./config/vocab.txt
 
 # 运行Pretrain 脚本
 sh pretrain.sh

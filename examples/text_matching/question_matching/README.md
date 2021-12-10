@@ -28,8 +28,8 @@
 | ---- | ---- |-----|--------|------- |
 | ernie-1.0-base |0.0| 86.96 |76.20 | 77.50|
 | bert-base-chinese |0.0| 86.93| 76.90 |77.60 |
-| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p0_baseline_model.tar) | 0.0 |87.66 | **80.80** | **81.20** |
-| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p1_baseline_model.tar) | 0.1 |87.91 | 80.20 | 80.80 |
+| [ernie-gram-zh](https://bj.bcebos.com/paddlenlp/models/text_matching/question_matching_rdrop0p0_baseline_model.tar) | 0.0 |87.66 | **80.80** | **81.20** |
+| [ernie-gram-zh](https://bj.bcebos.com/paddlenlp/models/text_matching/question_matching_rdrop0p1_baseline_model.tar) | 0.1 |87.91 | 80.20 | 80.80 |
 | ernie-gram-zh | 0.2 |87.47 | 80.10 | 81.00 |
 
 

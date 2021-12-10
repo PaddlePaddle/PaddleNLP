@@ -30,7 +30,7 @@ parser.add_argument(
     '--url',
     help='URL of target',
     type=str,
-    default="https://paddlenlp.bj.bcebos.com/datasets/sighan_test.zip")
+    default="https://bj.bcebos.com/paddlenlp/datasets/sighan_test.zip")
 args = parser.parse_args()
 
 
