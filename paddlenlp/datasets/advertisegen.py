@@ -35,10 +35,10 @@ class AdvertiseGen(DatasetBuilder):
     SPLITS = {
         'train': META_INFO(
             os.path.join('train.json'), 'c0cc79f912099faa6175d28d3ddafafe',
-            'https://paddlenlp.bj.bcebos.com/datasets/AdvertiseGen/train.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/train.json'),
         'dev': META_INFO(
             os.path.join('dev.json'), '5fda84828628a9722da5436485601df3',
-            'https://paddlenlp.bj.bcebos.com/datasets/AdvertiseGen/dev.json')
+            'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/dev.json')
     }
 
     def _get_data(self, mode, **kwargs):
