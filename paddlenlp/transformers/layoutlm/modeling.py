@@ -158,27 +158,22 @@ class LayoutLMPretrainedModel(PretrainedModel):
             "layer_norm_eps": 1e-12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "use_cache": True,
         },
         "layoutlm-large-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
+            "vocab_size": 30522,
             "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
             "num_attention_heads": 16,
             "num_hidden_layers": 24,
+            "intermediate_size": 4096,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_2d_position_embeddings": 1024,
+            "max_position_embeddings": 512,
+            "initializer_range": 0.02,
+            "layer_norm_eps": 1e-12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "output_attentions": False,
-            "output_hidden_states": False,
-            "num_labels": 2,
-            "use_cache": True,
-            "vocab_size": 30522
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -242,8 +237,23 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             The dropout probability for all fully connected layers in the embeddings and encoder.
         attention_probs_dropout_prob (float):
             The dropout probability for all fully connected layers in the pooler.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids`.
+            Defaults to `16`.
         initializer_range (float):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`LayoutLMPretrainedModel.init_weights()` for how weights are initialized in `LayoutLMModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+        pooled_act (str, optional):
+            The non-linear activation function in the pooling layer.
+            Defaults to `"tanh"`.
     """
 
     def __init__(
