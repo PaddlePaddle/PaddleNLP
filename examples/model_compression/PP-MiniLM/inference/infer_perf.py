@@ -14,27 +14,16 @@
 
 import argparse
 import os
+import time
 from functools import partial
 import numpy as np
 
 import paddle
 from paddle import inference
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddle.metric import Metric, Accuracy, Precision, Recall
-from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-
-METRIC_CLASSES = {
-    "afqmc": Accuracy,
-    "tnews": Accuracy,
-    "iflytek": Accuracy,
-    "ocnli": Accuracy,
-    "cmnli": Accuracy,
-    "cluewsc2020": Accuracy,
-    "csl": Accuracy,
-}
 
 MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
 
@@ -95,12 +84,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument(
-        "--task_name",
-        default='afqmc',
-        type=str,
-        help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+    parser.add_argument("--task_name", default='afqmc', type=str)
     parser.add_argument(
         "--model_type",
         default='ernie',
@@ -108,16 +92,16 @@ def parse_args():
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
-        "--tokenizer_path",
-        default='../general_distill/ernie-batchbatch-50w_400000/',
-        type=str,
-        help="The directory for tokenizer.", )
-    parser.add_argument(
         "--model_path",
         default='./quant_models/model',
         type=str,
         required=True,
         help="The path prefix of inference model to be used.", )
+    parser.add_argument(
+        "--tokenizer_path",
+        default='../general_distill/ernie-batchbatch-50w_400000/',
+        type=str,
+        help="The directory for tokenizer.", )
     parser.add_argument(
         "--device",
         default="gpu",
@@ -149,18 +133,6 @@ def parse_args():
         help="Whether int8 inference.", )
     args = parser.parse_args()
     return args
-
-
-@paddle.no_grad()
-def evaluate(outputs, metric, data_loader):
-    metric.reset()
-    for i, batch in enumerate(data_loader):
-        input_ids, segment_ids, labels = batch
-        logits = paddle.to_tensor(outputs[i][0])
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-    res = metric.accumulate()
-    print("acc: %s, " % res, end='')
 
 
 class Predictor(object):
@@ -207,14 +179,12 @@ class Predictor(object):
                 config.tensorrt_engine_enabled()))
             if args.collect_shape:
                 config.collect_shape_range_info(
-                    os.path.join(
-                        os.path.dirname(args.model_path), args.task_name +
-                        '_shape_range_info.pbtxt'))
+                    os.path.dirname(args.model_path) + "/" + args.task_name +
+                    '_shape_range_info.pbtxt')
             else:
                 config.enable_tuned_tensorrt_dynamic_shape(
-                    os.path.join(
-                        os.path.dirname(args.model_path),
-                        args.task_name + "_shape_range_info.pbtxt"), True)
+                    os.path.dirname(args.model_path) + "/" + args.task_name +
+                    "_shape_range_info.pbtxt", True)
         predictor = paddle.inference.create_predictor(config)
         input_handles = [
             predictor.get_input_handle(name)
@@ -227,20 +197,17 @@ class Predictor(object):
 
         return cls(predictor, input_handles, output_handles)
 
-    def predict_batch(self, data):
+    def predict_batch(self, data, prin=False):
         for input_field, input_handle in zip(data, self.input_handles):
             input_handle.copy_from_cpu(input_field.numpy() if isinstance(
                 input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        paddle.fluid.core._cuda_synchronize(self.device)
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]
-
         return output
 
     def predict(self, dataset, collate_fn, args, batch_size=1):
-        metric = METRIC_CLASSES[args.task_name]()
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=batch_size, shuffle=False)
         data_loader = paddle.io.DataLoader(
@@ -249,22 +216,14 @@ class Predictor(object):
             collate_fn=collate_fn,
             num_workers=0,
             return_list=True)
-        outputs = []
-        metric.reset()
+        time1 = time.time()
         for i, data in enumerate(data_loader):
-            if len(data) == 2:
-                output = self.predict_batch(data)
-            else:
-                output = self.predict_batch([data[0], data[1]])
-                logits = paddle.to_tensor(output)
-                correct = metric.compute(logits, data[2])
-                metric.update(correct)
-            outputs.append(output)
-        if len(data) > 2:
-            res = metric.accumulate()
-            print("task name: %s, acc: %s, " % (args.task_name, res), end='')
+            if i < 20:  # skip warmup steps.
+                continue
+            output = self.predict_batch([data[0], data[1]])
+            logits = paddle.to_tensor(output)
 
-        return outputs
+        print("time: ", time.time() - time1)
 
 
 def main():

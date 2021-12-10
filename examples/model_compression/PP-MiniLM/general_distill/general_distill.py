@@ -33,7 +33,7 @@ from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import RobertaModel, RobertaTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers.distill_utils import to_distill, calc_minilm_loss_multi_relation
+from paddlenlp.transformers.distill_utils import to_distill, calc_multi_relation_loss
 
 MODEL_CLASSES = {
     "roberta": (RobertaModel, RobertaTokenizer),
@@ -245,6 +245,7 @@ class PretrainingDataset(paddle.io.Dataset):
             line = line[:max_seq_length]
             tokenized_example = tokenizer(line, max_seq_len=max_seq_length)
             input_ids.append(tokenized_example['input_ids'])
+
         self.inputs = np.asarray(input_ids)
         f.close()
 
@@ -396,7 +397,7 @@ def do_train(args):
                 input_ids = batch[0]
                 attention_mask = paddle.unsqueeze(
                     (input_ids == pad_token_id
-                     ).astype(paddle.get_default_dtype()) * -1e9,
+                     ).astype(paddle.get_default_dtype()) * -1e4,
                     axis=[1, 2])
                 with paddle.amp.auto_cast(
                         args.use_amp,
@@ -408,35 +409,27 @@ def do_train(args):
                     q_t, q_s = teacher.outputs.q, student.outputs.q
                     batch_size = q_t.shape[0]
                     pad_seq_len = q_t.shape[2]
-                    loss_qr1, loss_qr2, loss_qr3 = calc_minilm_loss_multi_relation(
+                    loss_q = calc_multi_relation_loss(
                         kl_loss_fct, q_s, q_t, attention_mask,
                         args.num_relation_heads, args.alpha, args.beta)
                     del q_t, q_s
                     # K-K relation
                     k_t, k_s = teacher.outputs.k, student.outputs.k
-                    loss_kr1, loss_kr2, loss_kr3 = calc_minilm_loss_multi_relation(
+                    loss_k = calc_multi_relation_loss(
                         kl_loss_fct, k_s, k_t, attention_mask,
                         args.num_relation_heads, args.alpha, args.beta)
                     del k_t, k_s
 
                     # V-V relation
                     v_t, v_s = teacher.outputs.v, student.outputs.v
-                    loss_vr1, loss_vr2, loss_vr3 = calc_minilm_loss_multi_relation(
+                    loss_v = calc_multi_relation_loss(
                         kl_loss_fct, v_s, v_t, attention_mask,
                         args.num_relation_heads, args.alpha, args.beta)
 
                     del v_t, v_s
 
-                    loss1 = (loss_qr1 + loss_kr1 + loss_vr1)
-                    loss1 /= args.num_relation_heads * pad_seq_len * batch_size
-
-                    loss2 = loss_qr2 + loss_kr2 + loss_vr2
-                    loss2 /= args.num_relation_heads * pad_seq_len * batch_size
-
-                    loss3 = loss_qr3 + loss_kr3 + loss_vr3
-                    loss3 /= args.num_relation_heads * pad_seq_len * batch_size
-                    loss = (1 - args.alpha - args.beta
-                            ) * loss1 + loss2 * args.alpha + loss3 * args.beta
+                    loss = loss_q + loss_k + loss_v
+                    loss /= args.num_relation_heads * pad_seq_len * batch_size
 
                 if args.use_amp:
                     scaler.scale(loss).backward()
@@ -453,10 +446,10 @@ def do_train(args):
                 train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
                     logger.info(
-                        "global step: %d, epoch: %d, batch: %d, loss: %f, loss1: %f, loss2: %f, loss3: %f,"
+                        "global step: %d, epoch: %d, batch: %d, loss: %f, "
                         "lr: %f, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                        % (global_step, epoch, step, loss, loss1, loss2, loss3,
-                           optimizer.get_lr(), train_cost_avg.get_average(),
+                        % (global_step, epoch, step, loss, optimizer.get_lr(),
+                           train_cost_avg.get_average(),
                            total_samples / args.logging_steps, total_samples /
                            (args.logging_steps * train_cost_avg.get_average())))
                     total_samples = 0

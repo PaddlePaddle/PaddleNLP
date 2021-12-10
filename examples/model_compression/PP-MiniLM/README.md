@@ -255,6 +255,8 @@ cd ..
 
 由于开启了动态shape功能，因此需要设置获取shape的范围。Paddle Inference提供了相应的接口，即首先通过离线输入数据来统计出所有临时tensor的shape范围，TRT子图的tensor输入shape范围可直接根据上一步tune出来的结果来设置，即可完成自动shape范围设置。统计完成后，只需设置统计结果路径，即可启用tuned_dynamic_shape功能。在本案例中，只需要先设置--collect_shape参数，运行infer.py，然后再取消传入这个参数，再次运行infer.py。例如：
 
+本案例是在NVIDIA Tesla T4 单卡上，cuda版本11.1、cudnn版本8.1、TensorRT版本7.2，使用inference/infer.py脚本，对量化后的模型进行预测。
+
 INT8预测脚本：
 
 ```shell
@@ -277,9 +279,19 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 ```
 
 ### 性能测试
-本案例是在NVIDIA Tesla T4 单卡上，cuda11.1、cudnn8.1、TensorRT7.2，使用inference/infer.py脚本，对量化后的模型进行预测。
 
-测试性能时采用了TNEWS数据集下的模型，下表三行分别是微调后的模型、OFA裁剪蒸馏后的模型、量化方法为mse、校准集数量为4的量化模型，计算dev上预测的总耗时（去除前20个steps）。
+测试性能环境同上，基于NVIDIA Tesla T4 单卡上，cuda版本11.1、cudnn版本8.1、TensorRT版本7.2。采用的是TNEWS数据集下训练的模型，下表三行分别是微调后的模型、OFA裁剪蒸馏后的模型、量化方法为mse、校准集数量为4的量化模型，计算dev上预测的总耗时（去除前20个steps）。
+
+运行性能测试脚本可以得到FP32、裁剪后、量化后模型的耗时，取5个非--collect_shap阶段打印出的时长取平均：
+
+```shell
+
+sh infer_perf.sh
+```
+
+```shell
+cd ..
+```
 
 可以发现借助PaddleSlim裁剪、量化后的模型比原BERT-base模型推理速度加速255.86%，其中裁剪可以加速87.98%。
 
@@ -289,15 +301,3 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 | FP32               | 12.61       | 63.68%  |
 | FP32+裁剪          | 10.98       | 87.98%  |
 | FP32+裁剪+INT8量化 | 5.80        | 255.86% |
-
-
-INT8预测脚本：
-
-```shell
-
-sh infer.sh
-```
-
-```shell
-cd ..
-```

@@ -39,6 +39,7 @@ def calc_multi_relation_loss(loss_fct,
     Calculates loss for multiple Q-Q, K-K and V-V relation. It supports
     head-head relation, sample-sample relation and origin token-token relation.
     The final loss value could be balanced by weight `alpha` and `beta`.
+
     Args:
         loss_fct (callable):
             Loss function for distillation. It only supports kl_div loss now.
@@ -58,9 +59,11 @@ def calc_multi_relation_loss(loss_fct,
         beta (float):
             The weight for sample-sample relation.
             Defaults to 0.0.
+
     Returns:
         Tensor: Weighted loss of token-token loss, head-head loss and
             sample-sample loss.
+
     """
     # Initialize head_num
     if num_relation_heads > 0 and num_relation_heads != s.shape[1]:
@@ -150,8 +153,10 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
             The number of relation heads. 0 means `num_relation_heads` equals
             to origin head num.
             Defaults to 0.
+
     Returns:
         Tensor: MiniLM loss value.
+
     """
     # Initialize head_num
     if num_relation_heads > 0 and num_relation_heads != s.shape[1]:
