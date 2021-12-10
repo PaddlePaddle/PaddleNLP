@@ -40,7 +40,7 @@ DGU模型中的6个任务，分别采用不同的评估指标在test集上进行
 下载数据集压缩包并解压后，DGU_datasets目录下共存在6个目录，分别对应每个任务的训练集train.txt、评估集dev.txt和测试集test.txt。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/DGU_datasets.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/DGU_datasets.tar.gz
 tar -zxf DGU_datasets.tar.gz
 ```
 

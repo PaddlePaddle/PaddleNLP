@@ -103,15 +103,15 @@ class ChineseBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ChineseBERT-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/vocab.txt",
             "ChineseBERT-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-base/tokenizer_config.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/tokenizer_config.json",
         },
         "tokenizer_config_file": {
             "ChineseBERT-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/vocab.txt",
             "ChineseBERT-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese_bert/chinesebert-large/tokenizer_config.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/tokenizer_config.json",
         },
     }
     pretrained_init_configuration = {

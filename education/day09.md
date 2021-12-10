@@ -22,9 +22,9 @@ cd PaddleNLP/examples/simultaneous_translation/stacl/demo
 
 ## 3. 配置词表
 下载词表文件到demo目录下，词表文件为：
-- [中文BPE词表下载](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.zh)
-- [source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab)
-- [target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
+- [中文BPE词表下载](https://bj.bcebos.com/paddlenlp/models/stacl/2M.zh2en.dict4bpe.zh)
+- [source vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.20k.zh.vocab)
+- [target vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.10k.en.vocab)
 
 ## 4. 配置依赖环境
 
