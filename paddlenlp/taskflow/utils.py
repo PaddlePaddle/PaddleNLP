@@ -694,7 +694,7 @@ class Customization(object):
                 self.dictitem[phrase] = (tags, offset)
                 self.ac.add_word(phrase)
 
-    def parse_customization(self, query, lac_tags):
+    def parse_customization(self, query, lac_tags, prefix=False):
         """Use custom vocab to modify the lac results"""
         if not self.ac:
             logging.warning("customization dict is not load")
@@ -706,16 +706,30 @@ class Customization(object):
             index = begin
 
             tags, offsets = self.dictitem[phrase]
-            for tag, offset in zip(tags, offsets):
-                while index < begin + offset:
-                    if len(tag) == 0:
-                        lac_tags[index] = lac_tags[index][:-1] + 'I'
-                    else:
-                        lac_tags[index] = tag + "-I"
-                    index += 1
-
-            lac_tags[begin] = lac_tags[begin][:-1] + 'B'
-            for offset in offsets:
-                index = begin + offset
-                if index < len(lac_tags):
-                    lac_tags[index] = lac_tags[index][:-1] + 'B'
+            
+            if prefix:
+                for tag, offset in zip(tags, offsets):
+                    while index < begin + offset:
+                        if len(tag) == 0:
+                            lac_tags[index] = "I" + lac_tags[index][1:]
+                        else:
+                            lac_tags[index] = "I-" + tag
+                        index += 1
+                lac_tags[begin] = "B" + lac_tags[begin][1:]
+                for offset in offsets:
+                    index = begin + offset
+                    if index < len(lac_tags):
+                        lac_tags[index] = "B" + lac_tags[index][1:]
+            else:
+                for tag, offset in zip(tags, offsets):
+                    while index < begin + offset:
+                        if len(tag) == 0:
+                            lac_tags[index] = lac_tags[index][:-1] + "I"
+                        else:
+                            lac_tags[index] = tag + "-I"
+                        index += 1
+                lac_tags[begin] = lac_tags[begin][:-1] + "B"
+                for offset in offsets:
+                    index = begin + offset
+                    if index < len(lac_tags):
+                        lac_tags[index] = lac_tags[index][:-1] + "B"

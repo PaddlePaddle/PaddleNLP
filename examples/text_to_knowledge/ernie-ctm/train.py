@@ -64,17 +64,17 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, metric, criterion, data_loader, tags, tags_to_idx):
+def evaluate(model, metric, data_loader, tags, tags_to_idx):
     model.eval()
     metric.reset()
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, seq_len, tags = batch
-        seq_logits, _ = model(input_ids,
+        loss, seq_logits = model(input_ids,
                               token_type_ids,
                               lengths=seq_len,
                               tag_labels=tags)
-        loss = criterion(seq_logits, seq_len, tags).mean()
+        loss = loss.mean()
         losses.append(loss.numpy())
         
         correct = metric.compute(
@@ -109,9 +109,9 @@ def do_train(args):
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
     model = ErnieCtmWordtagModel.from_pretrained(
         "wordtag",
-        num_tag=len(tags_to_idx),
-        num_cls_label=4,
-        ignore_index=tags_to_idx["O"])
+        num_tag=len(tags_to_idx))
+    model.crf_loss = LinearChainCrfLoss(
+        LinearChainCrf(len(tags_to_idx), 0.1, with_start_stop_tag=False))
 
     trans_func = partial(
         convert_example,
@@ -170,9 +170,6 @@ def do_train(args):
     logger.info("WarmUp steps: %s" % warmup)
 
     metric = SequenceAccuracy()
-    crf_lr = 0.1
-    crf = LinearChainCrf(len(tags_to_idx), crf_lr, with_start_stop_tag=False)
-    criterion = LinearChainCrfLoss(crf)
 
     total_loss = 0
     global_step = 0
@@ -185,12 +182,11 @@ def do_train(args):
             global_step += 1
             input_ids, token_type_ids, seq_len, tags = batch
 
-            seq_logits, _ = model(
+            loss, _ = model(
                 input_ids,
                 token_type_ids,
                 lengths=seq_len,
                 tag_labels=tags)
-            loss = criterion(seq_logits, seq_len, tags)
             loss = loss.mean()
             total_loss += loss
             loss.backward()
@@ -219,7 +215,7 @@ def do_train(args):
                 model_to_save.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
 
-        evaluate(model, metric, criterion, dev_data_loader, tags, tags_to_idx)
+        evaluate(model, metric, dev_data_loader, tags, tags_to_idx)
 
 
 def print_arguments(args):
