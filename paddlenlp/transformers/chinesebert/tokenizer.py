@@ -761,10 +761,10 @@ class ChineseBertTokenizer(BertTokenizer):
         Args:
             text (str):
                 The sequence to be processed.
-            text_pair (): 
+            text_pair (str, optional): 
                 Same as `text` argument, while it represents for the latter sequence of the sequence pair.
                 Defaults to `None`.
-            offset_mapping (list,optional):
+            offset_mapping (list, optional):
                 A list of wordpiece offsets with the appropriate offsets of special tokens.
                 Defaults to `None`.
                 
