@@ -124,7 +124,7 @@ def do_predict(args):
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
-        output_sequence = out_seq.numpy()
+        output_sequence = out_seq.numpy().tolist()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
         print(tokenizer.convert_ids_to_string(output_sequence[i]))

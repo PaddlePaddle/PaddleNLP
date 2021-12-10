@@ -29,9 +29,9 @@ class LayoutLMv2Tokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "layoutlmv2-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlmv2/layoutlmv2-base-uncased/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-base-uncased/vocab.txt",
             "layoutlmv2-large-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlmv2/layoutlmv2-large-uncased/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-large-uncased/vocab.txt",
         }
     }
     pretrained_init_configuration = {

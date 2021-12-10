@@ -71,10 +71,10 @@ datasets = load_dataset('wmt14ende', splits=('test'))
 
 使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
 
-我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[transformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
+我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[transformer-base-wmt_ende_bpe](https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
 
 ``` sh
-wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
 tar -zxf transformer-base-wmt_ende_bpe.tar.gz
 ```
 
@@ -131,7 +131,7 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 #### 导出基于 FasterTransformer 的预测库使用模型文件
 
-我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
+我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
 
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
