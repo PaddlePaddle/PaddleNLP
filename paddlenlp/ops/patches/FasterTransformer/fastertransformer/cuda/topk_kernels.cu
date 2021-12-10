@@ -560,7 +560,7 @@ __global__ void topk_stage_2_opt3_sampling(
     rand_num = (float)curand_uniform(curandstate + blockIdx.x) * s_sum;
     for (int i = 0; i < k; i++) {
       rand_num = rand_num - (float)s_val2[s_id[i]];
-      if (rand_num <= 0.0f) {
+      if (rand_num <= 0.0f || i == k - 1) {
         ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
         break;
       }
@@ -2142,7 +2142,7 @@ __global__ void topk_topp_sampling_kernel_v2(
                (float)prob_threshold * s_sum;
     for (int i = 0; i < k; i++) {
       rand_num = rand_num - (float)s_val2[s_id[i]];
-      if (rand_num <= 0.0f) {
+      if (rand_num <= 0.0f || i == k - 1) {
         ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
         break;
       }

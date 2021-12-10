@@ -37,31 +37,31 @@ class C3(DatasetBuilder):
             META_INFO(
                 os.path.join('c3-d-train.json'),
                 '291b07679bef785aa66bb5343f1b49b2',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-d-train.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-d-train.json'),
             META_INFO(
                 os.path.join('c3-m-train.json'),
                 'db321e631eb3e6f508e438992652618f',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-m-train.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-m-train.json'),
         ],
         'dev': [
             META_INFO(
                 os.path.join('c3-d-dev.json'),
                 '446e75358789d3fbe8730089cadf5fb0',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-d-dev.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-d-dev.json'),
             META_INFO(
                 os.path.join('c3-m-dev.json'),
                 'beb2f2e08c18cd8e9429c6a55de6b8db',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-m-dev.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-m-dev.json'),
         ],
         'test': [
             META_INFO(
                 os.path.join('c3-d-test.json'),
                 '002561f15f4942328761c50c90ced36c',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-d-test.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-d-test.json'),
             META_INFO(
                 os.path.join('c3-m-test.json'),
                 'f5f14c517926d22047b7bfd369dab724',
-                'https://paddlenlp.bj.bcebos.com/datasets/c3/c3-m-test.json'),
+                'https://bj.bcebos.com/paddlenlp/datasets/c3/c3-m-test.json'),
         ],
     }
 

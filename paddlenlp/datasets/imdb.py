@@ -35,7 +35,7 @@ class Imdb(DatasetBuilder):
     Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset.
 
     """
-    URL = 'https://dataset.bj.bcebos.com/imdb%2FaclImdb_v1.tar.gz'
+    URL = 'https://bj.bcebos.com/dataset/imdb%2FaclImdb_v1.tar.gz'
     MD5 = '7c2ac02c03563afcf9b574c7e56c153a'
     META_INFO = collections.namedtuple('META_INFO', ('data_dir', 'md5'))
     SPLITS = {

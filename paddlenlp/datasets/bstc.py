@@ -34,7 +34,7 @@ class BSTC(DatasetBuilder):
     BUILDER_CONFIGS = {
         'transcription_translation': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/bstc_transcription_translation.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/bstc_transcription_translation.tar.gz",
             'md5': '236800188e397c42a3251982aeee48ee',
             'splits': {
                 'train':
@@ -48,7 +48,7 @@ class BSTC(DatasetBuilder):
             }
         },
         'asr': {
-            'url': "https://paddlenlp.bj.bcebos.com/datasets/bstc_asr.tar.gz",
+            'url': "https://bj.bcebos.com/paddlenlp/datasets/bstc_asr.tar.gz",
             'md5': '3a0cc5039f45e62e29485e27d3a5f5a7',
             'splits': {
                 'train': [os.path.join('bstc_asr', 'train', 'asr_sentences')],

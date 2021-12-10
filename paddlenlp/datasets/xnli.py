@@ -35,7 +35,7 @@ class XNLI(DatasetBuilder):
     For more information, please visit https://github.com/facebookresearch/XNLI
     """
 
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/xnli.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/xnli.tar.gz"
     MD5 = "800618c3505abe85f24bb3877ad0fcf1"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
