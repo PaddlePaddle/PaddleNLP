@@ -36,7 +36,8 @@
 # SOFTWARE.
 
 from functools import lru_cache
-from pypinyin import NORMAL, Style, pinyin
+
+from paddle.utils import try_import
 
 from paddlenlp.transformers import BertTokenizer
 
@@ -730,6 +731,8 @@ class ChineseBertTokenizer(BertTokenizer):
         Returns:
             dict: the map of pinyin locations and pinyin tensor.
         """
+        pinyin = try_import("pypinyin.pinyin")
+        Style = try_import("pypinyin.Style")
         pinyin_list = pinyin(
             text,
             style=Style.TONE3,
