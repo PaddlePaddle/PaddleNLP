@@ -52,7 +52,7 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 **GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../../../docs/imgs/bart_perf.png" width="800" height ="400" />
+  <img src="../../../docs/imgs/gpt_perf.png" width="800" height ="400" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/faster/faster_generation/perf)
