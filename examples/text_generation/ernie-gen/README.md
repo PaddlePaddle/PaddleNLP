@@ -27,7 +27,7 @@ ERNIE-GEN 是面向生成任务的预训练-微调框架，首次在预训练阶
 完整数据集可以通过以下命令下载并解压：
 
 ```bash
-wget --no-check-certificate https://paddlenlp.bj.bcebos.com/datasets/poetry.tar.gz
+wget --no-check-certificate https://bj.bcebos.com/paddlenlp/datasets/poetry.tar.gz
 tar xvf poetry.tar.gz
 ```
 
@@ -65,7 +65,7 @@ python -u ./train.py \
 - `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `init_checkpoint` 表示模型加载路径，通过设置此参数可以开启增量训练。
 
-训练会持续很长的时间，为此我们提供了[微调后的模型](https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gen_finetuned/ernie_1.0_poetry.pdparams)。您可以下载该模型并通过`init_checkpoint`加载其参数进行增量训练、评估或预测。
+训练会持续很长的时间，为此我们提供了[微调后的模型](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gen_finetuned/ernie_1.0_poetry.pdparams)。您可以下载该模型并通过`init_checkpoint`加载其参数进行增量训练、评估或预测。
 
 #### 多卡训练
 

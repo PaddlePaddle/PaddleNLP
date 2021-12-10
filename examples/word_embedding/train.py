@@ -40,7 +40,7 @@ parser.add_argument("--vdl_dir", type=str, default="vdl_dir/", help="VisualDL lo
 args = parser.parse_args()
 # yapf: enable
 
-WORD_DICT_URL = "https://paddlenlp.bj.bcebos.com/data/dict.txt"
+WORD_DICT_URL = "https://bj.bcebos.com/paddlenlp/data/dict.txt"
 
 
 def create_dataloader(dataset,
