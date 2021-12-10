@@ -42,7 +42,7 @@ class NLPCC13EVSAM05THU(DatasetBuilder):
         '''
     """
 
-    URL = 'https://paddlenlp.bj.bcebos.com/datasets/nlpcc13_evsam05_thu.tar.gz'
+    URL = 'https://bj.bcebos.com/paddlenlp/datasets/nlpcc13_evsam05_thu.tar.gz'
     MD5 = '297ad22217ba4668d49580009810446e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

@@ -30,7 +30,7 @@ class PeoplesDailyNER(DatasetBuilder):
     Chinese Named Entity Recognition dataset published by People's Daily.
     The dataset is in the BIO scheme with tags: LOC, ORG and PER.
     """
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/peoples_daily_ner.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/peoples_daily_ner.tar.gz"
     MD5 = 'a44ff9c4b37b48add9ddc17994d5620c'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
