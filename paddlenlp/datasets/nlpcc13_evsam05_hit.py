@@ -44,7 +44,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         '''
     """
 
-    URL = 'https://paddlenlp.bj.bcebos.com/datasets/nlpcc13_evsam05_hit.tar.gz'
+    URL = 'https://bj.bcebos.com/paddlenlp/datasets/nlpcc13_evsam05_hit.tar.gz'
     MD5 = '5988ede79690dc87aa6e4343b5299944'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

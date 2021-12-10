@@ -26,7 +26,7 @@ __all__ = ['Poetry']
 
 
 class Poetry(DatasetBuilder):
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/poetry.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/poetry.tar.gz"
     MD5 = '8edd7eda1b273145b70ef29c82cd622b'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
