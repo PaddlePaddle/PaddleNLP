@@ -441,44 +441,33 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             An instance of :class:`ErnieCtmModel`.
         num_tag (int):
             The number of different tags.
-        num_cls_label (int):
-            The number of sentence classification labels.
         crf_lr (float):
             The learning rate of the crf. Defaults to `100`.
-        ignore_index (`index`):
-            The ignore prediction index when calculating the cross entropy loss.
     """
 
     def __init__(self,
                  ernie_ctm,
                  num_tag,
-                 num_cls_label,
-                 crf_lr=100,
-                 ignore_index=0):
+                 crf_lr=100):
         super(ErnieCtmWordtagModel, self).__init__()
         self.num_tag = num_tag
-        self.num_cls_label = num_cls_label
         self.ernie_ctm = ernie_ctm
         self.tag_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                         self.num_tag)
-        self.sent_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
-                                         self.num_cls_label)
         self.crf = LinearChainCrf(
             self.num_tag, crf_lr, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
-        self.ignore_index = ignore_index
 
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids=None,
                 token_type_ids=None,
+                lengths=None,
                 position_ids=None,
                 attention_mask=None,
-                lengths=None,
-                tag_labels=None,
-                cls_label=None):
+                tag_labels=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -496,10 +485,6 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 The input predicted tensor.
                 Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
                 Defaults to `None`.
-            cls_labels (Tensor, optional):
-                The input predicted tensor.
-                Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_cls_labels]`.
-                Defaults to `None`.
 
         Returns:
             tuple: Returns tuple (`seq_logits`, `cls_logits`).
@@ -510,11 +495,6 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 A tensor of next sentence prediction logits.
                 Its data type should be float32 and its shape is [batch_size, sequence_length, num_tag].
 
-            - `cls_logits` (Tensor):
-                A tensor of the sentence classification logits.
-                Its data type should be float32 and its shape is [batch_size, num_cls_labels].
-
-
         Example:
             .. code-block::
 
@@ -522,7 +502,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 
                 tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
-                model = ErnieCtmWordtagModel.from_pretrained('ernie-ctm', num_tag=2, num_cls_label=2)
+                model = ErnieCtmWordtagModel.from_pretrained('ernie-ctm', num_tag=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -533,23 +513,16 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids, )
-        sequence_output, pooled_output = outputs[0], outputs[1]
-
-        cls_logits = self.sent_classifier(pooled_output)
-
+            position_ids=position_ids)
+        sequence_output = outputs[0]
         seq_logits = self.tag_classifier(sequence_output)
-
-        total_loss = None
-        if tag_labels is not None and cls_label is not None:
-            loss_fct = nn.loss.CrossEntropyLoss(ignore_index=self.ignore_index)
-            cls_loss = loss_fct(cls_logits, cls_label.reshape([-1]))
+        if tag_labels is not None:
             seq_crf_loss = self.crf_loss(seq_logits, lengths, tag_labels)
-            total_loss = cls_loss + seq_crf_loss
-            return total_loss, seq_logits, cls_logits
+            return seq_crf_loss, seq_logits
         else:
-            return seq_logits, cls_logits
-     
+            _, prediction = self.viterbi_decoder(seq_logits, lengths)
+            return prediction
+
 
 class ErnieCtmMLMHead(Layer):
     def __init__(self,

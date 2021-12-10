@@ -36,17 +36,70 @@
 # SOFTWARE.
 
 from functools import lru_cache
-from pypinyin import NORMAL, Style, pinyin
+
+from paddle.utils import try_import
 
 from paddlenlp.transformers import BertTokenizer
 
 
 class ChineseBertTokenizer(BertTokenizer):
     """
-    Construct a ChineseBert tokenizer. `ChineseBertTokenizer` is identical to `BertTokenizerr`.
+    Construct a ChineseBert tokenizer. `ChineseBertTokenizer` is similar to `BertTokenizerr`.
     The difference between them is that ChineseBert has the extra process about pinyin id.
     For more information regarding those methods, please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
+        do_lower_case (bool):
+            Whether or not to lowercase the input when tokenizing.
+            Defaults to `True`.
+        pinyin_map (dict):
+            A dict of pinyin map, the map between pinyin char and id. pinyin char is 26 Romanian characters and 0-5 numbers.
+            Defaults to None.
+        id2pinyin (dict):
+            A dict of char id map tensor.
+            Defaults to None.
+        pinyin2tensor (dict):
+            A dict of pinyin map tensor.
+            Defaults to None.
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            Defaults to "[UNK]".
+        sep_token (str):
+            A special token separating two different sentences in the same input.
+            Defaults to "[SEP]".
+        pad_token (str):
+            A special token used to make arrays of tokens the same size for batching purposes.
+            Defaults to "[PAD]".
+        cls_token (str):
+            A special token used for sequence classification. It is the last token
+            of the sequence when built with special tokens. Defaults to "[CLS]".
+        mask_token (str):
+            A special token representing a masked token. This is the token used
+            in the masked language modeling task which the model tries to predict the original unmasked ones.
+            Defaults to "[MASK]".
+
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import ChineseBertTokenizer
+            tokenizer = ChineseBertTokenizer.from_pretrained('ChineseBERT-base')
+
+            inputs = tokenizer('欢迎使用飞桨！')
+            print(inputs)
+
+            '''
+            {'input_ids': [101, 3614, 6816, 886, 4500, 7607, 3444, 8013, 102], 
+            'pinyin_ids': [0, 0, 0, 0, 0, 0, 0, 0, 13, 26, 6, 19, 1, 0, 0, 0, 30, 14, 19, 12, 2, 0, 0, 0, 24, 13, 14, 3, 0, 0, 0, 0, 30, 20, 19, 12, 4, 0, 0, 0, 11, 10, 14, 1, 0, 0, 0, 0, 15, 14, 6, 19, 12, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            '''
+
     """
+
     pretrained_resource_files_map = {
         "vocab_file": {
             "ChineseBERT-base":
@@ -108,6 +161,95 @@ class ChineseBertTokenizer(BertTokenizer):
                return_length=False,
                return_overflowing_tokens=False,
                return_special_tokens_mask=False):
+        """
+        Performs tokenization and uses the tokenized tokens to prepare model
+        inputs. It supports sequence or sequence pair as input, and batch input
+        is not allowed.
+
+        Args:
+            text (str, List[str] or List[int]):
+                The sequence to be processed. One sequence is a string, a list
+                of strings, or a list of integers depending on whether it has
+                been pretokenized and converted to ids. 
+            text_pair (str, List[str] or List[List[str]]):
+                Same as `text` argument, while it represents for the latter
+                sequence of the sequence pair.
+            max_seq_len (int, optional):
+                If set to a number, will limit the total sequence returned so
+                that it has a maximum length. If there are overflowing tokens,
+                those overflowing tokens will be added to the returned dictionary
+                when `return_overflowing_tokens` is `True`. Defaults to `None`.
+            stride (int, optional):
+                Only available for batch input of sequence pair and mainly for
+                question answering usage. When for QA, `text` represents questions
+                and `text_pair` represents contexts. If `stride` is set to a
+                positive number, the context will be split into multiple spans
+                where `stride` defines the number of (tokenized) tokens to skip
+                from the start of one span to get the next span, thus will produce
+                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
+                and 'offset_mapping' preserving the original example and position
+                information will be added to the returned dictionary. Defaults to 0.
+            pad_to_max_seq_len (bool, optional):
+                If set to `True`, the returned sequences would be padded up to
+                `max_seq_len` specified length according to padding side
+                (`self.padding_side`) and padding token id. Defaults to `False`.
+            truncation_strategy (str, optional):
+                String selected in the following options:
+
+                - 'longest_first' (default) Iteratively reduce the inputs sequence
+                until the input is under `max_seq_len` starting from the longest
+                one at each token (when there is a pair of input sequences).
+                - 'only_first': Only truncate the first sequence.
+                - 'only_second': Only truncate the second sequence.
+                - 'do_not_truncate': Do not truncate (raise an error if the input
+                sequence is longer than `max_seq_len`).
+
+                Defaults to 'longest_first'.
+            return_position_ids (bool, optional):
+                Whether to include tokens position ids in the returned dictionary.
+                Defaults to `False`.
+            return_token_type_ids (bool, optional):
+                Whether to include token type ids in the returned dictionary.
+                Defaults to `True`.
+            return_attention_mask (bool, optional):
+                Whether to include the attention mask in the returned dictionary.
+                Defaults to `False`.
+            return_length (bool, optional):
+                Whether to include the length of each encoded inputs in the
+                returned dictionary. Defaults to `False`.
+            return_overflowing_tokens (bool, optional):
+                Whether to include overflowing token information in the returned
+                dictionary. Defaults to `False`.
+            return_special_tokens_mask (bool, optional):
+                Whether to include special tokens mask information in the returned
+                dictionary. Defaults to `False`.
+
+        Returns:
+            dict:
+                The dict has the following optional items:
+
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **pinyin_ids** (list[int]): List of pinyin ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
+                  fed to a model. Included when `return_position_ids` is `True`
+                - **token_type_ids** (list[int], optional): List of token type ids to be
+                  fed to a model. Included when `return_token_type_ids` is `True`.
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
+                  where 0 specifies paddings and should not be attended to by the
+                  model. Included when `return_attention_mask` is `True`.
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
+                  is `True`.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
+                  with 0 specifying special added tokens and 1 specifying sequence tokens.
+                  Included when `return_special_tokens_mask` is `True`.
+        """
+
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self._tokenize(text)
@@ -246,6 +388,99 @@ class ChineseBertTokenizer(BertTokenizer):
                      return_length=False,
                      return_overflowing_tokens=False,
                      return_special_tokens_mask=False):
+        """
+        Performs tokenization and uses the tokenized tokens to prepare model
+        inputs. It supports batch inputs of sequence or sequence pair.
+
+        Args:
+            batch_text_or_text_pairs (list):
+                The element of list can be sequence or sequence pair, and the
+                sequence is a string or a list of strings depending on whether
+                it has been pretokenized. If each sequence is provided as a list
+                of strings (pretokenized), you must set `is_split_into_words` as
+                `True` to disambiguate with a sequence pair.
+            max_seq_len (int, optional):
+                If set to a number, will limit the total sequence returned so
+                that it has a maximum length. If there are overflowing tokens,
+                those overflowing tokens will be added to the returned dictionary
+                when `return_overflowing_tokens` is `True`. Defaults to `None`.
+            stride (int, optional):
+                Only available for batch input of sequence pair and mainly for
+                question answering usage. When for QA, `text` represents questions
+                and `text_pair` represents contexts. If `stride` is set to a
+                positive number, the context will be split into multiple spans
+                where `stride` defines the number of (tokenized) tokens to skip
+                from the start of one span to get the next span, thus will produce
+                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
+                and 'offset_mapping' preserving the original example and position
+                information will be added to the returned dictionary. Defaults to 0.
+            pad_to_max_seq_len (bool, optional):
+                If set to `True`, the returned sequences would be padded up to
+                `max_seq_len` specified length according to padding side
+                (`self.padding_side`) and padding token id. Defaults to `False`.
+            truncation_strategy (str, optional):
+                String selected in the following options:
+
+                - 'longest_first' (default) Iteratively reduce the inputs sequence
+                until the input is under `max_seq_len` starting from the longest
+                one at each token (when there is a pair of input sequences).
+                - 'only_first': Only truncate the first sequence.
+                - 'only_second': Only truncate the second sequence.
+                - 'do_not_truncate': Do not truncate (raise an error if the input
+                sequence is longer than `max_seq_len`).
+
+                Defaults to 'longest_first'.
+            return_position_ids (bool, optional):
+                Whether to include tokens position ids in the returned dictionary.
+                Defaults to `False`.
+            return_token_type_ids (bool, optional):
+                Whether to include token type ids in the returned dictionary.
+                Defaults to `True`.
+            return_attention_mask (bool, optional):
+                Whether to include the attention mask in the returned dictionary.
+                Defaults to `False`.
+            return_length (bool, optional):
+                Whether to include the length of each encoded inputs in the
+                returned dictionary. Defaults to `False`.
+            return_overflowing_tokens (bool, optional):
+                Whether to include overflowing token information in the returned
+                dictionary. Defaults to `False`.
+            return_special_tokens_mask (bool, optional):
+                Whether to include special tokens mask information in the returned
+                dictionary. Defaults to `False`.
+
+        Returns:
+            list[dict]:
+                The dict has the following optional items:
+
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **pinyin_ids** (list[int]): List of pinyin ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
+                  fed to a model. Included when `return_position_ids` is `True`
+                - **token_type_ids** (list[int], optional): List of token type ids to be
+                  fed to a model. Included when `return_token_type_ids` is `True`.
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
+                  where 0 specifies paddings and should not be attended to by the
+                  model. Included when `return_attention_mask` is `True`.
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
+                  is `True`.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
+                  with 0 specifying special added tokens and 1 specifying sequence tokens.
+                  Included when `return_special_tokens_mask` is `True`.
+                - **offset_mapping** (list[int], optional): list of pair preserving the
+                  index of start and end char in original input for each token.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when
+                  `stride` works.
+                - **overflow_to_sample** (int, optional): Index of example from which this
+                  feature is generated. Included when `stride` works.
+        """
+
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self._tokenize(text)
@@ -298,9 +533,6 @@ class ChineseBertTokenizer(BertTokenizer):
 
                     offset_mapping = self.build_offset_mapping_with_special_tokens(
                         mapping, pair_mapping)
-                    # add_pinyin_ids
-                    encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(
-                        text, text_pair, offset_mapping)
 
                     sequence = self.build_inputs_with_special_tokens(ids,
                                                                      pair_ids)
@@ -309,6 +541,9 @@ class ChineseBertTokenizer(BertTokenizer):
 
                     # Build output dictionnary
                     encoded_inputs["input_ids"] = sequence
+                    # add_pinyin_ids
+                    encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(
+                        text, text_pair, offset_mapping)
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids
                     if return_special_tokens_mask:
@@ -420,6 +655,30 @@ class ChineseBertTokenizer(BertTokenizer):
                            num_tokens_to_remove=0,
                            truncation_strategy='longest_first',
                            stride=0):
+        """
+        Truncates a sequence pair in place to the maximum length.
+
+        Args:
+            ids: list of tokenized input ids. Can be obtained from a string by chaining the
+                `tokenize` and `convert_tokens_to_ids` methods.
+            pair_ids: Optional second list of input ids. Can be obtained from a string by chaining the
+                `tokenize` and `convert_tokens_to_ids` methods.
+            token_offset_mapping (list): The map of tokens and the start and end index of their start and end character
+            token_pair_offset_mapping(list): The map of token pairs and the start and end index of their start and end character
+            num_tokens_to_remove (:obj:`int`, `optional`, defaults to ``0``):
+                number of tokens to remove using the truncation strategy
+            truncation_strategy: string selected in the following options:
+                - 'longest_first' (default) Iteratively reduce the inputs sequence until the input is under max_seq_len
+                    starting from the longest one at each token (when there is a pair of input sequences).
+                    Overflowing tokens only contains overflow from the first sequence.
+                - 'only_first': Only truncate the first sequence. raise an error if the first sequence is shorter or equal to than num_tokens_to_remove.
+                - 'only_second': Only truncate the second sequence
+                - 'do_not_truncate': Does not truncate (raise an error if the input sequence is longer than max_seq_len)
+            stride (:obj:`int`, `optional`, defaults to ``0``):
+                If set to a number along with max_seq_len, the overflowing tokens returned will contain some tokens
+                from the main sequence returned. The value of this argument defines the number of additional tokens.
+        """
+
         if num_tokens_to_remove <= 0:
             return ids, pair_ids, []
 
@@ -462,6 +721,18 @@ class ChineseBertTokenizer(BertTokenizer):
 
     @lru_cache(9999)
     def pinyin_locs_map(self, text):
+        """
+        Get the map of pinyin locations and pinyin tensor.
+
+        Args:
+            text (str):
+                The sequence to be processed.
+ 
+        Returns:
+            dict: the map of pinyin locations and pinyin tensor.
+        """
+        pinyin = try_import("pypinyin.pinyin")
+        Style = try_import("pypinyin.Style")
         pinyin_list = pinyin(
             text,
             style=Style.TONE3,
@@ -487,6 +758,22 @@ class ChineseBertTokenizer(BertTokenizer):
         return pinyin_locs
 
     def get_pinyin_ids(self, text, text_pair=None, offset_mapping=None):
+        """
+        Find chinese character location, and generate pinyin ids.
+
+        Args:
+            text (str):
+                The sequence to be processed.
+            text_pair (str, optional): 
+                Same as `text` argument, while it represents for the latter sequence of the sequence pair.
+                Defaults to `None`.
+            offset_mapping (list, optional):
+                A list of wordpiece offsets with the appropriate offsets of special tokens.
+                Defaults to `None`.
+                
+        Returns:
+            list: The list of pinyin id tensor.
+        """
 
         text_pinyin_locs = self.pinyin_locs_map(text)
         if text_pair:

@@ -26,7 +26,7 @@ class THUCNews(DatasetBuilder):
     See descrition about this subset version at https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86
     The whole dataset can be downloaded at https://thunlp.oss-cn-qingdao.aliyuncs.com/THUCNews.zip
     """
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/thucnews.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/thucnews.zip"
     MD5 = "97626b2268f902662a29aadf222f22cc"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     LABEL_PATH = os.path.join('thucnews', 'label.txt')

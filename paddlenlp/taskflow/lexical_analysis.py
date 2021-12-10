@@ -94,8 +94,8 @@ class LacTask(Task):
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self._custom_vocab = self.kwargs[
-            'custom_vocab'] if 'custom_vocab' in self.kwargs else None
+        self._user_dict = self.kwargs[
+            'user_dict'] if 'user_dict' in self.kwargs else None
         word_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "word.dic",
             URLS['lac_params'][0], URLS['lac_params'][1])
@@ -113,9 +113,9 @@ class LacTask(Task):
         self._id2tag_dict = dict(
             zip(self._tag_vocab.values(), self._tag_vocab.keys()))
         self._get_inference_model()
-        if self._custom_vocab:
+        if self._user_dict:
             self._custom = Customization()
-            self._custom.load_customization(self._custom_vocab)
+            self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
 

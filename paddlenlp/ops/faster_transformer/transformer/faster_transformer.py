@@ -676,7 +676,7 @@ class FasterGPT(GPTPretrainedModel):
                                  dtype="int32")
 
             if bos_token_id == pad_token_id and paddle.sum(
-                    paddle.any(input_ids == pad_token_id)) > 0:
+                    paddle.any(input_ids == pad_token_id), dtype="int64") > 0:
                 seq_len = seq_len + 1
 
         if num_return_sequences > 1:
