@@ -105,11 +105,11 @@ class ChineseBertTokenizer(BertTokenizer):
             "ChineseBERT-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/vocab.txt",
             "ChineseBERT-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/tokenizer_config.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/vocab.txt",
         },
         "tokenizer_config_file": {
             "ChineseBERT-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/tokenizer_config.json",
             "ChineseBERT-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/tokenizer_config.json",
         },
