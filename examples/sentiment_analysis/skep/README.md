@@ -7,7 +7,7 @@
 论文地址：https://arxiv.org/abs/2005.05635
 
 <p align="center">
-<img src="https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
+<img src="https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
 </p>
 
 百度研究团队在三个典型情感分析任务，句子级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，以通用预训练模型ERNIE作为初始化，具体效果如下表：

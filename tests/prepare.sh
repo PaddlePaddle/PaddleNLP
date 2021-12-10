@@ -18,7 +18,7 @@ if [ ${MODE} = "lite_train_infer" ]; then
     sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
     # Data set prepared. 
     if [ ! -f WMT14.en-de.partial.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.partial.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.partial.tar.gz
         tar -zxf WMT14.en-de.partial.tar.gz
     fi
     # Set soft link.
@@ -73,18 +73,18 @@ elif [ ${MODE} = "whole_infer" ]; then
     # Trained transformer base model checkpoint. 
     # For infer. 
     if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
         tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
     fi
     # For train. 
     if [ ! -f WMT14.en-de.partial.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.partial.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.partial.tar.gz
         tar -zxf WMT14.en-de.partial.tar.gz
     fi
     # Whole data set prepared. 
     if [ ! -f WMT14.en-de.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz
         tar -zxf WMT14.en-de.tar.gz
     fi
     # Set soft link.
@@ -138,7 +138,7 @@ elif [ ${MODE} = "whole_train_infer" ]; then
 
     # Whole data set prepared. 
     if [ ! -f WMT14.en-de.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz
         tar -zxf WMT14.en-de.tar.gz
     fi
     # Set soft link. 
@@ -192,13 +192,13 @@ else # infer
 
     # Trained transformer base model checkpoint. 
     if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
         tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
     fi
     # Whole data set prepared. 
     if [ ! -f WMT14.en-de.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz
+        wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz
         tar -zxf WMT14.en-de.tar.gz
     fi
     # Set soft link.
