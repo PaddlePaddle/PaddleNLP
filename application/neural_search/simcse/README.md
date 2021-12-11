@@ -114,14 +114,8 @@ simcse/
 地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较      地西他滨与HA方案治疗骨髓增生异常综合征转化的急性髓系白血病患者近期疗效比较
 ```
 
-#### 构造数据集
+召回集，验证集，测试集与inbatch-negative实验的数据保持一致
 
-用下面的脚本构建无监督训练集
-
-```
-python process_data.py
-```
-召回集和测试集合与inbatch-negative实验的数据保持一致
 
 ### 数据集下载
 
@@ -138,7 +132,7 @@ python process_data.py
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|7c46d9b15a214292e3897c0eb70d0c9f|
 
 ### 训练环境说明
 
@@ -372,6 +366,13 @@ sh deploy.sh
 ```
 最终输出的是256维度的特征向量
 
+```
+(1, 256)
+[[-6.70653731e-02 -6.46873191e-03 -6.78317575e-03  1.66618153e-02
+   7.20006898e-02 -9.79136024e-03 -1.38439541e-03  4.37440872e-02
+   4.78115827e-02  1.33881137e-01  1.82927139e-02  3.23656537e-02
+   .......
+```
 
 
 ## Reference

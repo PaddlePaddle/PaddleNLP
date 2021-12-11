@@ -29,7 +29,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from visualdl import LogWriter
-
+import time
 
 from model import SimCSE
 from data import read_simcse_text, read_text_pair, convert_example, create_dataloader
@@ -166,6 +166,7 @@ def do_train():
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
+    time_start=time.time()
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
@@ -191,12 +192,14 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir,'dropout_%f_batch_size_%d' % (args.dropout,args.batch_size), "model_%d" % (global_step))
+                save_dir = os.path.join(args.save_dir, "model_%d" % (global_step))
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
+    time_end=time.time()
+    print('totally cost',time_end-time_start)
 
 
 if __name__ == "__main__":

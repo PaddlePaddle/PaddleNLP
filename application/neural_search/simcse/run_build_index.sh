@@ -1,4 +1,4 @@
-# gpu version
+# gpu
 python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
@@ -14,10 +14,9 @@ python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
         --similar_text_pair "recall/dev.csv" \
         --corpus_file "recall/corpus.csv" 
 
-# cpu version
-
-# python recall.py \
-#         --device gpu \
+# cpu
+# python  recall.py \
+#         --device cpu \
 #         --recall_result_dir "recall_result_dir" \
 #         --recall_result_file "recall_result.txt" \
 #         --params_path "checkpoints/model_20000/model_state.pdparams" \

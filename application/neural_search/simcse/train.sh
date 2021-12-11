@@ -12,9 +12,9 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--infer_with_fc_pooler \
 	--dropout 0.2 \
     --output_emb_size 256 \
-	--train_set_file "./data/train_unsupervised.csv" \
-	--test_set_file "./data/test.csv" 
-	--model_name_or_path "post_ernie"
+	--train_set_file "./recall/train_unsupervised.csv" \
+	--test_set_file "./recall/dev.csv" 
+	--model_name_or_path "ernie-1.0"
 
 # post training + simcse
 # python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
@@ -30,8 +30,8 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 # 	--infer_with_fc_pooler \
 # 	--dropout 0.2 \
 #     --output_emb_size 256 \
-# 	--train_set_file "./data/train_unsupervised.csv" \
-# 	--test_set_file "./data/test.csv" 
+# 	--train_set_file "./recall/train_unsupervised.csv" \
+# 	--test_set_file "./recall/dev.csv" 
 # 	--model_name_or_path "post_ernie"
 
 
