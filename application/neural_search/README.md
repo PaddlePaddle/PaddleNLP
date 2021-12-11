@@ -162,6 +162,8 @@ pip install -r requirements.txt
 [ernie-1.0](./ernie-1.0/)
 
 
+ernie预训练时间：16hour54min30s
+
 第二步：无监督预训练
 
 
@@ -169,7 +171,8 @@ pip install -r requirements.txt
 
 [simcse](./simcse/)
 
-无监督预训练：16hour54min30s
+
+无监督预训练时间：16hour52min48s
 
 
 第三步：有监督训练

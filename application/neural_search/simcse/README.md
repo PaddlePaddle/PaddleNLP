@@ -170,13 +170,15 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--dropout 0.2 \
     --output_emb_size 256 \
 	--train_set_file "./recall/train_unsupervised.csv" \
-	--test_set_file "./recall/test.csv" 
+	--test_set_file "./recall/dev.csv" 
 ```
 也可以使用bash脚本：
 
 ```
 sh train.sh
 ```
+
+4卡的训练的时长在16个小时左右
 
 可支持配置的参数：
 
