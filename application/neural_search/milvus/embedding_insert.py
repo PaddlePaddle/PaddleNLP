@@ -25,7 +25,7 @@ embedding_ids = [i for i in range(embeddings.shape[0])]
 # print(len(embed_list))
 print(len(embedding_ids))
 client = VecToMilvus()
-collection_name = 'wanfang1'
+collection_name = 'literature_search'
 partition_tag = 'partition_2'
 data_size=len(embedding_ids)
 batch_size=100000

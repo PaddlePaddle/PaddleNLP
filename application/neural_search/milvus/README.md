@@ -1,6 +1,65 @@
+ **目录**
+
+* [背景介绍](#背景介绍)
+* [MilVus召回](#MilVus召回)
+    * [1. 技术方案和评估指标](#技术方案)
+    * [2. 环境依赖](#环境依赖)  
+    * [3. 代码结构](#代码结构)
+    * [4. 数据准备](#数据准备)
+    * [5. 模型训练](#模型训练)
+    * [6. 模型转换](#模型转换)
+
+
+<a name="背景介绍"></a>
+
+# 背景介绍
+
+基于某检索平台开源的数据集构造生成了面向语义索引的召回库。
+
+<a name="MilVus召回"></a>
+
 # MilVus召回
 
-基于万方和开源的数据集构造生成了面向语义索引的召回库。
+<a name="技术方案"></a>
+
+## 1. 技术方案和评估指标
+
+### 技术方案
+
+<a name="环境依赖"></a>
+
+## 2. 环境依赖和安装说明
+
+**环境依赖**
+* python >= 3.x
+* paddlepaddle >= 2.1.3
+* paddlenlp >= 2.1
+* milvus >=1.1.1
+* pymilvus >= 1.1.2
+
+<a name="代码结构"></a>
+
+## 3. 代码结构
+
+## 代码结构：
+
+```
+
+├── base_model.py
+├── config.py
+├── data.py
+├── embedding_insert.py
+├── embedding_recall.py
+├── inference.py
+├── milvus_demo.py
+├── milvus_insert.py
+├── milvus_recall.py
+├── README.md
+└── server_config.yml
+```
+<a name="数据准备"></a>
+
+## 4. 数据准备
 
 数据集的样例如下，有两种，第一种是title+keywords进行拼接；第二种是一句话。
 
@@ -38,8 +97,8 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --output_emb_size 256\
         --max_seq_length 60 \
         --recall_num 50 \
-        --similar_text_pair "data/test.csv" \
-        --corpus_file "data/milvus_data.csv" 
+        --similar_text_pair "recall/test.csv" \
+        --corpus_file "milvus/milvus_data.csv" 
 ```
 
 |  数据量 |  时间 | 

@@ -22,13 +22,13 @@ from milvus_recall import RecallByMilvus
 
 
 def search_in_milvus(text_embedding):
-    collection_name = 'wanfang1'
+    collection_name = 'literature_search'
     partition_tag = 'partition_2'
     client = RecallByMilvus()
     status, results = client.search(collection_name=collection_name, vectors=text_embedding.tolist(), partition_tag=partition_tag)
     # print(status)
     # print(resultes)
-    corpus_file="data/milvus_data.csv"
+    corpus_file="milvus/milvus_data.csv"
     id2corpus = gen_id2corpus(corpus_file)
     # print(status)
     # print(results)
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     max_seq_length=64
     output_emb_size=256
     batch_size=1
-    params_path='checkpoints/train_0.001/model_40/model_state.pdparams'
+    params_path='checkpoints/inbatch/model_40/model_state.pdparams'
     paddle.set_device(device)
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
