@@ -51,6 +51,8 @@
 * python >= 3.x
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.1
+* pandas >= 0.25.1
+* scipy >=1.3.1
 
 <a name="代码结构"></a>
 
@@ -63,12 +65,17 @@ ernie_matching/
 ├── deply # 部署
 |   └── python
 |       └── predict.py # python 预测部署示例
+├── deploy.sh # 预测部署bash脚本
 ├── export_model.py # 动态图参数导出静态图参数脚本
+├── export_model.sh # 动态图参数导出静态图参数的bash文件
 ├── model.py #  Pair-wise 匹配模型组网
 ├── data.py #  Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pairwise.py # Pair-wise 单塔匹配模型训练脚本
-├── predict_pointwise.py # Pair-wise 单塔匹配模型预测脚本，输出文本对是否相似: 0、1 分类
-└── train.py # 模型训练评估
+├── train_pairwise.sh # Pair-wise 单塔匹配模型训练的bash文件
+├── evaluate.py # 评估验证文件
+├── evaluate.sh # 评估验证文件bash脚本
+├── predict_pairwise.py # Pair-wise 单塔匹配模型预测脚本，输出文本对是相似度
+├── predict_pairwise.sh # Pair-wise 单塔匹配模型预测脚本的bash文件
 ```
 
 <a name="数据准备"></a>
@@ -84,18 +91,27 @@ ernie_matching/
 迟发性血管痉挛  西洛他唑治疗动脉瘤性蛛网膜下腔出血后脑血管痉挛的Meta分析西洛他唑,蛛网膜下腔出血,脑血管痉挛,Meta分析     西洛他唑治疗动脉瘤性蛛网膜下腔出血后脑血管痉挛的Meta分析西洛他唑,蛛网膜下腔出血,脑血管痉挛,Meta分析
 氧化亚硅        复合溶胶-凝胶一锅法制备锂离子电池氧化亚硅/碳复合负极材料氧化亚硅,溶胶-凝胶法,纳米颗粒,负极,锂离子电池   负载型聚酰亚胺-二氧化硅-银杂化膜的制备和表征聚酰亚胺,二氧化硅,银,杂化膜,促进传输
 ```
-#### 构造数据集
 
-用下面的脚本构建排序数据集
-
-```
-python generate_data.py
-```
 
 ### 数据集下载
 
 
 - [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
+
+```
+├── milvus # milvus建库数据集
+    ├── milvus_data.csv.  # 构建召回库的数据
+├── recall  # 召回（语义索引）数据集
+    ├── corpus.csv # 用于测试的召回库
+    ├── dev.csv  # 召回验证集
+    ├── test.csv # 召回测试集
+    ├── train.csv  # 召回训练集
+    ├── train_unsupervised.csv # 无监督训练集
+├── sort # 排序数据集
+    ├── test_pairwise.csv   # 排序测试集
+    └── train_pairwise.csv  # 排序训练集
+    
+```
 
 <a name="模型训练"></a>
 
@@ -208,12 +224,11 @@ sh predict_pairwise.sh
 得到下面的输出：
 
 ```
-中西方语言与文化的差异  中西方文化差异以及语言体现中西方文化,差异,语言体现      0.999848484992981
-中西方语言与文化的差异  论中西方语言与文化差异的历史渊源中西方语言,中西方文化,差异,历史渊源     0.9998375177383423
-中西方语言与文化的差异  从日常生活比较中西方语言与文化的差异中西方,语言,文化,比较       0.9985846281051636
-中西方语言与文化的差异  试论中西方语言文化教育的差异比较与融合中西方,语言文化教育,差异  0.9972485899925232
-中西方语言与文化的差异  中西方文化差异对英语学习的影响中西方文化,差异,英语,学习 0.9831035137176514
-中西方语言与文化的差异  跨文化视域下的中西文化差异研究跨文化,中西,文化差异      0.9781349897384644
+{'query': '中西方语言与文化的差异', 'title': '第二语言习得的一大障碍就是文化差异。', 'pred_prob': 0.85112214}
+{'query': '中西方语言与文化的差异', 'title': '跨文化视角下中国文化对外传播路径琐谈跨文化,中国文化,传播,翻译', 'pred_prob': 0.78629625}
+{'query': '中西方语言与文化的差异', 'title': '从中西方民族文化心理的差异看英汉翻译语言,文化,民族文化心理,思维方式,翻译', 'pred_prob': 0.91767526}
+{'query': '中西方语言与文化的差异', 'title': '中英文化差异对翻译的影响中英文化,差异,翻译的影响', 'pred_prob': 0.8601749}
+{'query': '中西方语言与文化的差异', 'title': '浅谈文化与语言习得文化,语言,文化与语言的关系,文化与语言习得意识,跨文化交际', 'pred_prob': 0.8944413}
 ```
 
 <a name="部署"></a>
@@ -235,6 +250,11 @@ sh export_model.sh
 
 ### Paddle Inference
 
+修改预测文件路径：
+
+```
+input_file='sort/test_pairwise.csv'
+```
 
 然后使用PaddleInference
 
@@ -245,6 +265,15 @@ python deploy/python/predict.py --model_dir=./output
 
 ```
 sh deploy.sh
+```
+得到下面的输出：
+
+```
+Data: {'query': '中西方语言与文化的差异', 'title': '第二语言习得的一大障碍就是文化差异。'}       prob: [0.8511221]
+Data: {'query': '中西方语言与文化的差异', 'title': '跨文化视角下中国文化对外传播路径琐谈跨文化,中国文化,传播,翻译'}      prob: [0.7862964]
+Data: {'query': '中西方语言与文化的差异', 'title': '从中西方民族文化心理的差异看英汉翻译语言,文化,民族文化心理,思维方式,翻译'}   prob: [0.91767514]
+Data: {'query': '中西方语言与文化的差异', 'title': '中英文化差异对翻译的影响中英文化,差异,翻译的影响'}   prob: [0.8601747]
+Data: {'query': '中西方语言与文化的差异', 'title': '浅谈文化与语言习得文化,语言,文化与语言的关系,文化与语言习得意识,跨文化交际'}     prob: [0.8944413]
 ```
 
 ## Reference
