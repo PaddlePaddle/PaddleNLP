@@ -47,7 +47,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 * python >= 3.x
 * paddlepaddle-gpu >= 2.1.3
 * paddlenlp >= 2.1
-* visualdl
+* visualdl >=2.2.2
 * pybind11
 
 安装命令 `pip install visualdl pybind11`
@@ -64,7 +64,6 @@ ernie-1.0/
 ├── run_pretrain_static.py # ernie1.0静态图预训练
 ├── args.py # 预训练的参数配置文件
 └── data_tools # 预训练数据处理文件目录
-        └── python
 ```
 
 <a name="数据准备"></a>
@@ -132,7 +131,7 @@ python -u  -m paddle.distributed.launch \
 也可以直接运行脚本：
 
 ```
-sh run_static.sh
+sh run_pretrain_static.sh
 ```
 
 其中参数释义如下：
