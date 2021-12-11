@@ -1,9 +1,8 @@
-# Faster Tokenizer 性能测试
+# 飞桨FasterTokenizer性能测试
 
-为了进一步对比Faster Tokenizer的性能，我们选取的业界对于Transformer类常用的Tokenizer分词工具进行对比。
-我们以 bert-base-chinese 模型为例，对比的Tokenizer分词工具有以下选择：
+在PaddleNLP v2.2.0版本中PaddleNLP推出了高性能的Transformer类文本分词器，简称飞桨FasterTokenizer。为了验证飞桨FasterTokenizer的性能快的特点，PaddleNLP选取了业内常见的一些文本分词器进行了性能对比比较，主要进行性能参考的是HuggingFace BertTokenizer， Tensorflow-text BertTokenizer. 我们以 bert-base-chinese 模型为例进行了性能实验对比，下面是具体实验设置信息：
 
-* HuggingFace BertTokenizer: 以下简称 HFTokenizer。
+* [HuggingFace Tokenizers(Python)](https://github.com/huggingface/tokenizers): 
 
 ```python
 from transformers import AutoTokenizer
@@ -11,7 +10,7 @@ from transformers import AutoTokenizer
 hf_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese", use_fast=False)
 ```
 
-* [HuggingFace BertTokenizerFast](https://github.com/huggingface/tokenizers): 以下简称 HFFastTokenizer。
+* [HuggingFace Tokenizers(Rust)](https://github.com/huggingface/tokenizers): 
 
 ```python
 from transformers import AutoTokenizer
@@ -19,7 +18,7 @@ from transformers import AutoTokenizer
 hf_tokenizer_fast = AutoTokenizer.from_pretrained("bert-base-chinese", use_fast=True)
 ```
 
-* [TensorFlow-Text BertTokenizer](https://www.tensorflow.org/text/api_docs/python/text/BertTokenizer)：以下简称 TFTokenizer。
+* [TensorFlow-Text](https://www.tensorflow.org/text/api_docs/python/text/BertTokenizer):。
 
 ```python
 import tensorflow_text as tf_text
@@ -28,12 +27,13 @@ import tensorflow_text as tf_text
 tf_tokenizer = tf_text.BertTokenizer(vocab)
 ```
 
-* PaddleNLP BertTokenizer：以下简称 PPNLPTokenizer
+* [飞桨FasterTokenizer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/experimental):
 
 ```python
-from paddlenlp.transformers import BertTokenizer
+from paddlenlp.experimental import FasterTokenizer
 
-py_tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+faster_tokenizer = FasterTokenizer.from_pretrained("bert-base-chinese")
+
 ```
 
 
@@ -64,10 +64,11 @@ python perf.py
 
 - 测试结果：
 
-    文本序列长度为128， 线程数为16，batch_size=32的性能对比结果：
+    中文文本序列长度为128， 线程数为16，batch_size=32的性能对比结果：
 
 
-<center><img src="https://ai-studio-static-online.cdn.bcebos.com/9d46bfe903614444b4cf9e63206b28ee06f06c5d5cb04da58bb206431904af00"  ></center>
-<br> <center> Tokenizer性能对比 </center></br>
+<center><img width="1343" alt="图片" src="https://user-images.githubusercontent.com/16698950/145664356-0b766d5a-9ff1-455a-bb85-1ee51e2ad77d.png"></center>
 
-从以上结果可以看出，FasterTokenizer性能远远超过了其他Tokenizer， 高达HFFastTokenizer性能20倍。
+飞桨FasterTokenizer与其他框架性能的对比，测的是固定文本长度在不同batch size下的分词吞吐量。纵坐标是对数坐标，其中单位是每秒1w tokens。其中可以看到随着batch size的增大，飞桨FasterTokenizer速度会远远超过其他同类产品的实现，尤其是在大batch文本上飞桨框架能充分发挥多核机器的优势，取得领先的效果。
+
+
