@@ -18,7 +18,7 @@ from transformers import AutoTokenizer
 hf_tokenizer_fast = AutoTokenizer.from_pretrained("bert-base-chinese", use_fast=True)
 ```
 
-* [TensorFlow-Text](https://www.tensorflow.org/text/api_docs/python/text/BertTokenizer):。
+* [TensorFlow-Text](https://www.tensorflow.org/text/api_docs/python/text/BertTokenizer):
 
 ```python
 import tensorflow_text as tf_text
@@ -69,6 +69,6 @@ python perf.py
 
 <center><img width="1343" alt="图片" src="https://user-images.githubusercontent.com/16698950/145664356-0b766d5a-9ff1-455a-bb85-1ee51e2ad77d.png"></center>
 
-飞桨FasterTokenizer与其他框架性能的对比，测的是固定文本长度在不同batch size下的分词吞吐量。纵坐标是对数坐标，其中单位是每秒1w tokens。其中可以看到随着batch size的增大，飞桨FasterTokenizer速度会远远超过其他同类产品的实现，尤其是在大batch文本上飞桨框架能充分发挥多核机器的优势，取得领先的效果。
+飞桨FasterTokenizer与其他框架性能的对比，是在固定文本长度在不同batch size下的分词吞吐量。纵坐标是对数坐标，单位是1w tokens/秒。随着batch size的增大，飞桨FasterTokenizer速度会远远超过其他同类产品的实现，尤其是在大batch文本上飞桨框架能充分发挥多核机器的优势，取得领先的效果。
 
 
