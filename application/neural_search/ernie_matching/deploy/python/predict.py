@@ -20,11 +20,17 @@ import pandas as pd
 import paddle
 import paddlenlp as ppnlp
 from scipy.special import softmax
+from scipy.special import expit
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
+import paddle.nn.functional as F
+import sys
 
+sys.path.append('.')
+
+from data import read_text_pair
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
@@ -86,8 +92,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
+        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -151,7 +157,7 @@ class Predictor(object):
                 warmup=0,
                 logger=logger)
 
-    def predict(self, data, tokenizer, label_map):
+    def predict(self, data, tokenizer):
         """
         Predicts the data labels.
 
@@ -188,30 +194,15 @@ class Predictor(object):
         self.input_handles[0].copy_from_cpu(input_ids)
         self.input_handles[1].copy_from_cpu(segment_ids)
         self.predictor.run()
-        probs = self.output_handle.copy_to_cpu()
+        sim_score = self.output_handle.copy_to_cpu()
         if args.benchmark:
             self.autolog.times.stamp()
-
-        #probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-        labels = [label_map[i] for i in idx]
+        sim_score = expit(sim_score)
 
         if args.benchmark:
             self.autolog.times.end(stamp=True)
 
-        return labels
-
-def read(src_path, is_predict=False):
-    data=pd.read_csv(src_path,sep='\t')
-    for index, row in data.iterrows():
-        # print(row)
-        text_a=row['query']
-        text_b=row['title']
-        label=row['label']
-        if(type(text_a)!=str):
-            print(row)
-        yield {"query": text_a, "title": text_b, "label": label}
+        return sim_score
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
@@ -223,8 +214,9 @@ if __name__ == "__main__":
         'ernie-gram-zh')
 
     # test_ds = load_dataset("lcqmc", splits=["test"])
-    input_file='data/test_pairwise.csv'
-    test_ds = load_dataset(read,src_path=input_file, lazy=False)
+    input_file='sort/test_pairwise.csv'
+
+    test_ds = load_dataset(read_text_pair,data_path=input_file, lazy=False)
 
     data = [{'query': d['query'], 'title': d['title']} for d in test_ds]
 
@@ -232,12 +224,11 @@ if __name__ == "__main__":
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
     ]
-    label_map = {0: 'dissimilar', 1: 'similar'}
 
     results = []
     for batch_data in batches:
-        results.extend(predictor.predict(batch_data, tokenizer, label_map))
+        results.extend(predictor.predict(batch_data, tokenizer))
     for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+        print('Data: {} \t prob: {}'.format(text, results[idx]))
     if args.benchmark:
         predictor.autolog.report()

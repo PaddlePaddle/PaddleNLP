@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 
-from model import PointwiseMatching
+from model import PairwiseMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         'ernie-gram-zh')
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
         'ernie-gram-zh')
-    model = PointwiseMatching(pretrained_model)
+    model = PairwiseMatching(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
