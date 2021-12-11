@@ -285,6 +285,8 @@ recall@50=74.848
 
 我们可以基于语义索引模型预测文本的语义向量或者计算文本 Pair 的语义相似度。
 
+### 7.1 功能一：抽取文本的语义向量
+
 修改inference.py文件里面输入文本id2corpus和模型路径；params_path，就可以运行下面的命令抽取向量了：
 
 ```
@@ -365,9 +367,14 @@ python export_model.py --params_path checkpoints/model_20000/model_state.pdparam
 sh export.sh
 ```
 
-### Python服务
+### Paddle Inference预测
 
+修改id2corpus的样本：
 
+```
+id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+
+```
 然后使用PaddleInference
 
 ```
