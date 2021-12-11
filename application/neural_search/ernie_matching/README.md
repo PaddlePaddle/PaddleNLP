@@ -106,7 +106,7 @@ python generate_data.py
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE-Gram-Sort](https://bj.bcebos.com/v1/paddlenlp/models/ernie_gram_sort.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|-|
+|[ERNIE-Gram-Sort](https://bj.bcebos.com/v1/paddlenlp/models/ernie_gram_sort.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|d24ece68b7c3626ce6a24baa58dd297d|
 
 
 ### 训练环境说明
@@ -137,7 +137,7 @@ python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
 也可以运行bash脚本：
 
 ```
-sh train.sh
+sh train_pairwise.sh
 ```
 
 <a name="评估"></a>
@@ -154,6 +154,12 @@ python -u -m paddle.distributed.launch --gpus "0" evaluate.py \
         --init_from_ckpt "./checkpoints/model_30000/model_state.pdparams" \
         --test_file data/test_pairwise.csv
 ```
+也可以运行bash脚本：
+
+```
+sh evaluate.sh
+```
+
 
 成功运行后会输出下面的指标：
 
@@ -192,12 +198,12 @@ python -u -m paddle.distributed.launch --gpus "0" \
         --params_path "./checkpoints/model_30000/model_state.pdparams"\
         --batch_size 128 \
         --max_seq_length 64 \
-        --input_file 'data/recall_predict.csv'
+        --input_file 'sort/recall_predict.csv'
 ```
 也可以直接执行下面的命令：
 
 ```
-sh predict.sh
+sh predict_pairwise.sh
 ```
 得到下面的输出：
 
@@ -224,10 +230,10 @@ python export_model.py --params_path checkpoints/model_30000/model_state.pdparam
 也可以运行下面的bash脚本：
 
 ```
-sh export.sh
+sh export_model.sh
 ```
 
-### Python服务
+### Paddle Inference
 
 
 然后使用PaddleInference
