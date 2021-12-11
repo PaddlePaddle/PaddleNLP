@@ -75,7 +75,6 @@
 
 ## 5. 向量检索
 
-**排序模型下载链接：**
 
 数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1版本，搭建完以后启动milvus
 
