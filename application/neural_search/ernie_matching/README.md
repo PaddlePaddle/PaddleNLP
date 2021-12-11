@@ -28,8 +28,8 @@
 ## 1. 技术方案和评估指标
 
 ### 技术方案
-双塔模型，采用ERNIE1.0热启
-在...阶段引入SimCSE 策略...
+
+双塔模型，使用ERNIE-Gram预训练模型，使用margin_ranking_loss训练模型。
 
 
 ### 评估指标
@@ -47,8 +47,9 @@
 ## 2. 环境依赖和安装说明
 
 **环境依赖**
+
 * python >= 3.x
-* paddlepaddle-gpu >= 2.1.3
+* paddlepaddle >= 2.1.3
 * paddlenlp >= 2.1
 
 <a name="代码结构"></a>
@@ -63,10 +64,10 @@ ernie_matching/
 |   └── python
 |       └── predict.py # python 预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
-├── model.py # Point-wise & Pair-wise 匹配模型组网
-├── data.py # Point-wise & Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
-├── train_pointwise.py # Point-wise 单塔匹配模型训练脚本
-├── predict_pointwise.py # Point-wise 单塔匹配模型预测脚本，输出文本对是否相似: 0、1 分类
+├── model.py #  Pair-wise 匹配模型组网
+├── data.py #  Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
+├── train_pairwise.py # Pair-wise 单塔匹配模型训练脚本
+├── predict_pointwise.py # Pair-wise 单塔匹配模型预测脚本，输出文本对是否相似: 0、1 分类
 └── train.py # 模型训练评估
 ```
 

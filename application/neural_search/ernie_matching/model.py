@@ -17,30 +17,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-class PointwiseMatching(nn.Layer):
-    def __init__(self, pretrained_model, dropout=None):
-        super().__init__()
-        self.ptm = pretrained_model
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-
-        # num_labels = 2 (similar or dissimilar)
-        self.classifier = nn.Linear(self.ptm.config["hidden_size"], 2)
-
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
-
-        _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
-                                    attention_mask)
-
-        cls_embedding = self.dropout(cls_embedding)
-        logits = self.classifier(cls_embedding)
-
-        return logits
-
-
 class PairwiseMatching(nn.Layer):
     def __init__(self, pretrained_model, dropout=None, margin=0.1):
         super().__init__()
