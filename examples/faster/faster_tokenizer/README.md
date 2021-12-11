@@ -39,7 +39,9 @@ faster_tokenizer = FasterTokenizer.from_pretrained("bert-base-chinese")
 
 ## 环境依赖
 
-* paddlenlp >= 2.2.0
+* paddlepaddle >= 2.2.1
+
+* paddlenlp >= 2.2
 
 * transformers == 4.11.3
 
