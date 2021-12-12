@@ -6,9 +6,9 @@ A PaddlePaddle implementation of CharCNN.
 
 ## 1. Introduction
 
-![](images/model.png)
+![](https://user-images.githubusercontent.com/27690278/145707824-82aff372-5ee8-4724-80e1-3b3b9e16776c.png)
 
-论文: [Character-level Convolutional Networks for Text Classification](https://arxiv.org/pdf/1509.01626v3.pdf)
+Paper: [Character-level Convolutional Networks for Text Classification](https://arxiv.org/pdf/1509.01626v3.pdf)
 
 ## 2. Results
 
@@ -22,7 +22,7 @@ A PaddlePaddle implementation of CharCNN.
 
 ## 3. Dataset
 
-![](images/datasets.png)
+![](https://user-images.githubusercontent.com/27690278/145707817-4a20d611-bb84-4eae-9c33-03f2a05a4ed0.png)
 
 Format:
 ```
@@ -39,14 +39,14 @@ Example:
 
 ## 4. Requirement
 
-- Python >= 3
 - PaddlePaddle >= 2.0.0
 - see `requirements.txt`
 
 ## 5. Usage
 
 ### Train
-1. 下载数据集到 `/data` 文件夹，并将训练集划分为 `train` 和 `dev`集：
+1. download [AG News dataset](https://github.com/paddorch/CharCNN.paddle/tree/main/data/ag_news_csv) to folder `./data`，and then split the training set into `train` and `dev` part:
+
 ```shell
 bash ./scripts/split_data.sh data/ag_news/train.csv
 ```

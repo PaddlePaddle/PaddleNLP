@@ -63,12 +63,10 @@ device.add_argument('--device', type=int, default=None)
 experiment = parser.add_argument_group('Experiment options')
 experiment.add_argument('--verbose', dest='verbose', action='store_true', default=False,
                         help='Turn on progress tracking per iteration for debugging')
-experiment.add_argument('--continue_from', default='', help='Continue from checkpoint model')
+experiment.add_argument('--init_from_ckpt', default='', help='Continue from checkpoint model')
 experiment.add_argument('--checkpoint', dest='checkpoint', default=True, action='store_true',
                         help='Enables checkpoint saving of model')
-experiment.add_argument('--checkpoint_per_batch', default=10000, type=int,
-                        help='Save checkpoint per batch. 0 means never save [default: 10000]')
-experiment.add_argument('--save_folder', default='output/models_AG_NEWS',  # TODO
+experiment.add_argument('--save_folder', default='output/models_AG_NEWS',
                         help='Location to save epoch models, training configurations and results.')
 experiment.add_argument('--log_config', default=True, action='store_true', help='Store experiment configuration')
 experiment.add_argument('--log_result', default=True, action='store_true', help='Store experiment result')
@@ -98,10 +96,10 @@ def train(train_loader, dev_loader, model, args):
         optim = optimizer.AdamW(parameters=model.parameters(), learning_rate=args.lr, grad_clip=clip)
 
     # continue training from checkpoint model
-    if args.continue_from:
-        print("=> loading checkpoint from '{}'".format(args.continue_from))
-        assert os.path.isfile(args.continue_from), "=> no checkpoint found at '{}'".format(args.continue_from)
-        checkpoint = paddle.load(args.continue_from)
+    if args.init_from_ckpt:
+        print("=> loading checkpoint from '{}'".format(args.init_from_ckpt))
+        assert os.path.isfile(args.init_from_ckpt), "=> no checkpoint found at '{}'".format(args.init_from_ckpt)
+        checkpoint = paddle.load(args.init_from_ckpt)
         start_epoch = checkpoint['epoch']
         start_iter = checkpoint.get('iter', None)
         best_acc = checkpoint.get('best_acc', None)
@@ -156,8 +154,6 @@ def train(train_loader, dev_loader, model, args):
                                                                                                   ))
                 sys.stdout.flush()
 
-            # if i_batch % args.val_interval == 0:
-            #     val_loss, val_acc = eval(dev_loader, model, epoch, i_batch, optim, args)
 
         if args.checkpoint and epoch % args.save_interval == 0:
             file_path = '%s/CharCNN_epoch_%d.pth.tar' % (args.save_folder, epoch)
@@ -236,7 +232,6 @@ def make_data_loader(dataset_path, alphabet_path, l0, batch_size, num_workers, d
 
 
 def main():
-    print(paddle.__version__)
     # parse arguments
     args = parser.parse_args()
     # gpu

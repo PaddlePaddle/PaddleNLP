@@ -5,4 +5,4 @@ python train.py \
   --data_augment=True \
   --is_small=True \
 #  --geo_aug=True
-#  --continue_from output/models_ag_news/CharCNN_best.pth.tar
+#  --init_from_ckpt output/models_ag_news/CharCNN_best.pth.tar

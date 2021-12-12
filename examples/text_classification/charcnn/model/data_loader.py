@@ -27,9 +27,6 @@ class AGNEWs(Dataset):
         self.load(label_data_path)
         self.data_augment = data_augment
         if self.data_augment:
-        #     import nltk
-        #     nltk.download('wordnet')
-        #     nltk.download('averaged_perceptron_tagger')
             self.aug = GeometricSynonymAug(aug_src='wordnet') if geo_aug else SynonymAug(aug_src='wordnet')
 
     def __len__(self):
@@ -92,12 +89,6 @@ def _test():
 
     train_dataset = AGNEWs(label_data_path, alphabet_path, data_augment=True, geo_aug=True)
     train_loader = DataLoader(train_dataset, batch_size=64, num_workers=4, drop_last=False)
-
-    for i_batch, sample_batched in enumerate(train_loader):
-        if i_batch == 0:
-            pass
-            # print(sample_batched)
-            # print(sample_batched[0][0][0].shape)
 
 
 if __name__ == '__main__':

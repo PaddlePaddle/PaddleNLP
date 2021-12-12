@@ -16,28 +16,28 @@ from model.metric import print_f_score
 parser = argparse.ArgumentParser(description='Character level CNN text classifier testing',
                                  formatter_class=argparse.RawTextHelpFormatter)
 # model
-parser.add_argument('--model-path', default=None,
+parser.add_argument('--model_path', default=None,
                     help='Path to pre-trained acouctics model created by DeepSpeech training')
 parser.add_argument('--dropout', type=float, default=0.5, help='the probability for dropout [default: 0.5]')
 parser.add_argument('--l0', type=int, default=1014, help='maximum length of input sequence to CNNs [default: 1014]')
-parser.add_argument('--kernel-num', type=int, default=100, help='number of each kind of kernel')
-parser.add_argument('--kernel-sizes', type=str, default='3,4,5',
+parser.add_argument('--kernel_num', type=int, default=100, help='number of each kind of kernel')
+parser.add_argument('--kernel_sizes', type=str, default='3,4,5',
                     help='comma-separated kernel size to use for convolution')
 parser.add_argument('--is_small', type=bool, default=False, help='use small CharCNN model')
 
 # data
-parser.add_argument('--test-path', metavar='DIR',
+parser.add_argument('--test_path', metavar='DIR',
                     help='path to testing data csv', default='data/ag_news_csv/test.csv')
-parser.add_argument('--batch-size', type=int, default=128, help='batch size for training [default: 128]')
-parser.add_argument('--alphabet-path', default='config/alphabet.json', help='Contains all characters for prediction')
+parser.add_argument('--batch_size', type=int, default=128, help='batch size for training [default: 128]')
+parser.add_argument('--alphabet_path', default='config/alphabet.json', help='Contains all characters for prediction')
 
 # device
-parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in data-loading')
+parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in data-loading')
 parser.add_argument('--cuda', action='store_true', default=True, help='enable the gpu')
 parser.add_argument('--device', type=str, default='gpu:0')
 
 # logging options
-parser.add_argument('--save-folder', default='Results/', help='Location to save epoch models')
+parser.add_argument('--save_folder', default='Results/', help='Location to save epoch models')
 args = parser.parse_args()
 
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     model.eval()
     corrects, avg_loss, accumulated_loss, size = 0, 0, 0, 0
     predicates_all, target_all = [], []
-    print('\nTesting...')
+    print('\nEvaluating...')
     for i_batch, (data) in enumerate(tqdm(test_loader)):
         inputs, target = data
         inputs = paddle.to_tensor(inputs)
