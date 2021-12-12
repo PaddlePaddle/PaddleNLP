@@ -25,7 +25,7 @@ __all__ = ['SIGHAN_CN']
 
 
 class SIGHAN_CN(DatasetBuilder):
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/sighan-cn.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/sighan-cn.zip"
     MD5 = "cd67b9b36a5908f848cbf04b5d83c005"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

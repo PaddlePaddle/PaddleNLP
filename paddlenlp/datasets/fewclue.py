@@ -57,7 +57,7 @@ class FewCLUE(DatasetBuilder):
     BUILDER_CONFIGS = {
         'bustm': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_bustm.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_bustm.tar.gz",
             'md5': '206e037a88a57a8ca1ea157fdb756b14',
             'splits': {
                 'train_0': [
@@ -125,7 +125,7 @@ class FewCLUE(DatasetBuilder):
         },
         'chid': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_chid.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_chid.tar.gz",
             'md5': '31d209e1bda2703708f2a53da66ca6ef',
             'splits': {
                 'train_0': [
@@ -193,7 +193,7 @@ class FewCLUE(DatasetBuilder):
         },
         'iflytek': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_iflytek.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_iflytek.tar.gz",
             'md5': '6f60fd6e0ab35c934732e41b7b7489b7',
             'splits': {
                 'train_0': [
@@ -261,7 +261,7 @@ class FewCLUE(DatasetBuilder):
         },
         'tnews': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_tnews.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_tnews.tar.gz",
             'md5': 'c1682c753e504fdba28328c0c9298e84',
             'splits': {
                 'train_0': [
@@ -329,7 +329,7 @@ class FewCLUE(DatasetBuilder):
         },
         'eprstmt': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_eprstmt.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_eprstmt.tar.gz",
             'md5': '016091564b689fd36f52eab5e1e5407c',
             'splits': {
                 'train_0': [
@@ -397,7 +397,7 @@ class FewCLUE(DatasetBuilder):
         },
         'ocnli': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_ocnli.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_ocnli.tar.gz",
             'md5': 'a49a160987d67d26e217b98edeee44a9',
             'splits': {
                 'train_0': [
@@ -465,7 +465,7 @@ class FewCLUE(DatasetBuilder):
         },
         'csldcp': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_csldcp.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_csldcp.tar.gz",
             'md5': '5ce33afe9b4b8104e028e04a97e70d5c',
             'splits': {
                 'train_0': [
@@ -533,7 +533,7 @@ class FewCLUE(DatasetBuilder):
         },
         'cluewsc': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_cluewsc.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_cluewsc.tar.gz",
             'md5': '328e60d2ac14aaa6ecf255a9546e538d',
             'splits': {
                 'train_0': [
@@ -601,7 +601,7 @@ class FewCLUE(DatasetBuilder):
         },
         'csl': {
             'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_csl.tar.gz",
+            "https://bj.bcebos.com/paddlenlp/datasets/FewCLUE/fewclue_csl.tar.gz",
             'md5': '434f3bad2958bba763506e9af8bf0419',
             'splits': {
                 'train_0': [

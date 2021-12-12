@@ -30,7 +30,7 @@ class YahooAnswer100K(DatasetBuilder):
     The data is from https://arxiv.org/pdf/1702.08139.pdf, which samples 100k
     documents from original Yahoo Answer data, and vocabulary size is 200k.
     """
-    URL = 'https://paddlenlp.bj.bcebos.com/datasets/yahoo-answer-100k.tar.gz'
+    URL = 'https://bj.bcebos.com/paddlenlp/datasets/yahoo-answer-100k.tar.gz'
     MD5 = "68b88fd3f2cc9918a78047d99bcc6532"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

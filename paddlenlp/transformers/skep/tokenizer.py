@@ -225,23 +225,23 @@ class SkepTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "skep_ernie_1.0_large_ch":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
             "skep_ernie_2.0_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.txt",
         },
         "bpe_vocab_file": {
             "skep_ernie_1.0_large_ch": None,
             "skep_ernie_2.0_large_en": None,
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
         },
         "bpe_json_file": {
             "skep_ernie_1.0_large_ch": None,
             "skep_ernie_2.0_large_en": None,
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.encoder.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
         }
     }
 

@@ -132,7 +132,7 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 在模型训练之前，需要先下载词汇表文件word_dict.txt，用于构造词-id映射关系。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 ```
 
 **NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。

@@ -2,7 +2,7 @@
 
 FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
 
-功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为开启状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。下图展示了FasterGeneration的启动流程：
+功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为关闭状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。下图展示了FasterGeneration的启动流程：
 
 
 <p align="center">
@@ -13,7 +13,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
-- 解码速度快。最高可达非加速版generate函数的**10倍**。HuggingFace generate函数的**5倍**。**并支持FP16混合精度计算**。
+- 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
 
 ### Inference Model Support
@@ -34,12 +34,28 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 ## Performence
 
-FasterGeneration的高性能解码相比原版generate方法加速明显，并且与竞品相比有也有极大的速度优势。测试设备为Tesla V100-SXM2-16GB，精度为FP32。
+FasterGeneration的高性能解码相比原版generate方法加速明显，并且与竞品相比有也有极大的速度优势。以下为性能对比图：
 
-- **BART** (bart-base, batch_size=4, max_length=32) 图片
-- **GPT** (gpt2, batch_size=4, max_length=32) 图片
+- **batch_size = 4, out_seq_len = 32**
+- Device: Tesla V100-SXM2-16GB
+- CUDA version 11.2
+- cudnn version 8
+- torch version 1.10.0+cu113
+- transformers version 4.12.5
 
-更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/perf)
+**BART** (bart-base, batch_size=4, max_length=32)
+
+<p align="left">
+  <img src="../../../docs/imgs/bart_perf.png" width="800" height ="400" />
+</p>
+
+**GPT** (gpt2, batch_size=4, max_length=32)
+
+<p align="left">
+  <img src="../../../docs/imgs/gpt_perf.png" width="800" height ="400" />
+</p>
+
+更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/faster/faster_generation/perf)
 
 ## Quick Start
 
@@ -85,7 +101,8 @@ Result: 对影成三人。
 model = GPTLMHeadModel.from_pretrained(model_name)
 ...
 outputs, _ = model.generate(
-    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search')
+    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
+    use_faster=True)
 ...
 ```
 
@@ -98,7 +115,7 @@ outputs, _ = model.generate(
 ...
 ```
 
-**NOTE:** 需要注意的是，如果传入 `model.generate()` 的参数不满足高性能版本的要求。程序会做出提示并自动切换为非加速版本，例如我们传入 `min_length=1` ，会得到如下提示：
+**NOTE:** 需要注意的是，如果传入 `model.generate()` 的参数不满足高性能版本的要求。程序会做出提示并自动切换为非加速版本，例如我们在上面的例子中传入 `min_length=1` ，会得到如下提示：
 
 ```
 ...
@@ -137,6 +154,7 @@ export CUDA_VISIBLE_DEVICES=0
     --num_return_sequences=1 \
     --decode_strategy=sampling \
     --top_k=5 \
+    --faster
     --device=gpu
 ```
 
@@ -177,7 +195,7 @@ step 30 - 1.435s/step
 
 可以看到，非加速版 `generate()` 方法的预测速度为每个step耗时1.5秒左右。
 
-下面我们在启动脚本中传入 `--faster` 参数，这会让 `generate()` 方法传入 `use_faster=True` ，启动加速模式。同时我们需要设置 `--min_dec_len=0` ，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下：
+下面我们在启动脚本中传入 `--faster` 参数，该参数会向 `generate()` 方法传入 `use_faster=True` ，启动加速模式。同时我们需要设置 `--min_dec_len=0` ，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下：
 
 ```sh
 export CUDA_VISIBLE_DEVICES=0
@@ -202,9 +220,9 @@ export CUDA_VISIBLE_DEVICES=0
 
 ```sh
 [2021-11-23 13:38:09,200] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
-step 10 - 0.511s/step
-step 20 - 0.343s/step
-step 30 - 0.419s/step
+step 10 - 0.250s/step
+step 20 - 0.156s/step
+step 30 - 0.141s/step
 ```
 
-可以看到，FasterGeneration的预测速度为每个step耗时0.4秒左右，提速超过三倍。如果减少 `num_return_sequences` ，可以得到更高的加速比。
+可以看到，FasterGeneration的预测速度为每个step耗时0.15秒左右，相比非加速版提速超过9倍。

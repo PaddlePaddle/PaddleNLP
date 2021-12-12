@@ -30,6 +30,8 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BlenderbotSmallTokenizer", "blenderbot_small"),
     ("BlenderbotTokenizer", "blenderbot"),
     ("ConvBertTokenizer", "convbert"),
+    ("MobileBertTokenizer", "mobilebert"),
+    ("ChineseBertTokenizer", "chinesebert"),
     ("CTRLTokenizer", "ctrl"),
     ("DistilBertTokenizer", "distilbert"),
     ("ElectraTokenizer", "electra"),
@@ -40,11 +42,14 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ErnieTokenizer", "ernie"),
     ("GPTTokenizer", "gpt"),
     ("LayoutXLMTokenizer", "layoutxlm"),
+    ("LayoutLMv2Tokenizer", "layoutlmv2"),
+    ("LayoutLMTokenizer", "layoutlm"),
     ("MBartTokenizer", "mbart"),
     ("MPNetTokenizer", "mpnet"),
     ("NeZhaTokenizer", "nezha"),
     ("RobertaTokenizer", "roberta"),
     ("RoFormerTokenizer", "roformer"),
+    ("ReformerTokenizer", "reformer"),
     ("SqueezeBertTokenizer", "squeezebert"),
     ("T5Tokenizer", 't5'),
     ("TinyBertTokenizer", "tinybert"),
@@ -117,12 +122,18 @@ class AutoTokenizer():
 
                  # Name of built-in pretrained model
                  tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+                 print(type(tokenizer))
+                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
 
                  # Name of community-contributed pretrained model
                  tokenizer = AutoTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+                 print(type(tokenizer))
+                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
 
                  # Load from local directory path
                  tokenizer = AutoTokenizer.from_pretrained('./my_bert/')
+                 print(type(tokenizer))
+                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
          """
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():

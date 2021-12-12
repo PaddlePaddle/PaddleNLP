@@ -98,8 +98,8 @@ class SemanticIndexingPredictor(nn.Layer):
                              input_ids,
                              token_type_ids=None,
                              position_ids=None):
-        src_mask = (input_ids != self.bos_id
-                    ).astype(self.ptm.encoder.layers[0].norm1.bias.dtype)
+        src_mask = input_ids == self.bos_id
+        src_mask = paddle.cast(src_mask, "float32")
         # [bs, 1, 1, max_len]
         src_mask = paddle.unsqueeze(src_mask, axis=[1, 2])
         src_mask.stop_gradient = True
@@ -116,7 +116,6 @@ class SemanticIndexingPredictor(nn.Layer):
 
         if self.use_fp16:
             embedding_output = paddle.cast(embedding_output, 'float16')
-            src_mask = paddle.cast(src_mask, 'float16')
 
         sequence_output = self.ptm.encoder(embedding_output, src_mask)
 

@@ -31,7 +31,7 @@ class ChnSentiCorp(DatasetBuilder):
 
     """
 
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/ChnSentiCorp.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/ChnSentiCorp.zip"
     MD5 = "7ef61b08ad10fbddf2ba97613f071561"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

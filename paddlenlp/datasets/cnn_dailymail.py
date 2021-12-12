@@ -50,27 +50,27 @@ class CnnDailymail(DatasetBuilder):
     SPLITS = {
         "train": META_INFO(
             "all_train.txt",
-            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/all_train.txt",
+            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
             "c8ca98cfcb6cf3f99a404552568490bc"),
         "dev": META_INFO(
             "all_val.txt",
-            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/all_val.txt",
+            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
             "83a3c483b3ed38b1392285bed668bfee"),
         "test": META_INFO(
             "all_test.txt",
-            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/all_test.txt",
+            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
             "4f3ac04669934dbc746b7061e68a0258")
     }
     cnn_dailymail = {
         "cnn": {
             "url":
-            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/cnn_stories.tgz",
+            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/cnn_stories.tgz",
             "md5": "85ac23a1926a831e8f46a6b8eaf57263",
             "file_num": 92579
         },
         "dailymail": {
             "url":
-            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/dailymail_stories.tgz",
+            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/dailymail_stories.tgz",
             "md5": "f9c5f565e8abe86c38bfa4ae8f96fd72",
             "file_num": 219506
         }

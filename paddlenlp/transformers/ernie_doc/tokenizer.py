@@ -69,7 +69,7 @@ class ErnieDocTokenizer(ErnieTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-doc-base-zh":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-zh/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -145,15 +145,15 @@ class ErnieDocBPETokenizer(BPETokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-doc-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/vocab.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.txt"
         },
         "encoder_json_path": {
             "ernie-doc-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/encoder.json"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/encoder.json"
         },
         "vocab_bpe_path": {
             "ernie-doc-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/vocab.bpe"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.bpe"
         }
     }
     pretrained_init_configuration = {

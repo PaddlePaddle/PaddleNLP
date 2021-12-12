@@ -35,16 +35,16 @@ class SQuAD(DatasetBuilder):
     SPLITS = {
         'train_v1': META_INFO(
             os.path.join('train-v1.1.json'), '981b29407e0affa3b1b156f72073b945',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/train-v1.1.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/squad/train-v1.1.json'),
         'dev_v1': META_INFO(
             os.path.join('dev-v1.1.json'), '3e85deb501d4e538b6bc56f786231552',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/dev-v1.1.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/squad/dev-v1.1.json'),
         'train_v2': META_INFO(
             os.path.join('train-v2.0.json'), '62108c273c268d70893182d5cf8df740',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/train-v2.0.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/squad/train-v2.0.json'),
         'dev_v2': META_INFO(
             os.path.join('dev-v2.0.json'), '246adae8b7002f8679c027697b0b7cf8',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/dev-v2.0.json')
+            'https://bj.bcebos.com/paddlenlp/datasets/squad/dev-v2.0.json')
     }
 
     def _get_data(self, mode, **kwargs):
