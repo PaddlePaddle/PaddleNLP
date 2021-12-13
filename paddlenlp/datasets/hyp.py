@@ -31,7 +31,7 @@ class HYP(DatasetBuilder):
     
     More detail at https://pan.webis.de/semeval19/semeval19-web/
     """
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/hyp.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/hyp.zip"
     MD5 = "125c504b4da6882c2d163ae9962b6220"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

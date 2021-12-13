@@ -31,7 +31,7 @@ class LCQMC(DatasetBuilder):
 
     """
 
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/lcqmc.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/lcqmc.zip"
     MD5 = "7069fa0cffbd2110845869c61f83814a"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

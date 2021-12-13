@@ -25,15 +25,15 @@ class MBartTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-en-ro":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
             "mbart-large-cc25":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
             "mbart-large-50-one-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
             "mbart-large-50-many-to-one-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
             "mbart-large-50-many-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model"
         }
     }
     pretrained_init_configuration = {
@@ -170,9 +170,9 @@ class _MBartTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-en-ro":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
             "mbart-large-cc25":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {
@@ -424,11 +424,11 @@ class _MBart50Tokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-50-one-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
             "mbart-large-50-many-to-one-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
             "mbart-large-50-many-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model"
         }
     }
     pretrained_init_configuration = {

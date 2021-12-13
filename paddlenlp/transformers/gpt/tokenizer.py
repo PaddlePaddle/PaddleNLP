@@ -105,7 +105,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         "model_file": "sentencepiece.model"
     }  # for save_pretrained
 
-    cpm_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
+    cpm_model_link = "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
     pretrained_resource_files_map = {
         "model_file": {
             "gpt-cpm-large-cn": cpm_model_link,
@@ -332,8 +332,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
-    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-en-vocab.json"
-    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-en-merges.txt"
+    gpt_vocab_link = "http://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-en-vocab.json"
+    gpt_merges_link = "http://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
             "gpt3-13B-en": gpt_vocab_link,

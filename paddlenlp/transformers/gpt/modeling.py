@@ -584,17 +584,17 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
             "gpt2-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-large-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
             "gpt2-xl-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-xl-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
         }
     }
     base_model_prefix = "gpt"

@@ -49,7 +49,8 @@ outputs, _ = model.generate(
     attention_mask=inputs_ids['attention_mask'],
     max_length=64,
     decode_strategy='beam_search',
-    num_beams=2)
+    num_beams=2,
+    use_faster=True)
 
 result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)
