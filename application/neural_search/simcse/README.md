@@ -302,8 +302,13 @@ recall@50=74.848
 
 ### 7.1 功能一：抽取文本的语义向量
 
-修改inference.py文件里面输入文本id2corpus和模型路径；params_path，就可以运行下面的命令抽取向量了：
+修改inference.py文件里面输入文本id2corpus和模型路径；params_path:
 
+```
+params_path='checkpoints/model_20000/model_state.pdparams'
+id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+```
+然后运行
 ```
 python inference.py
 ```
