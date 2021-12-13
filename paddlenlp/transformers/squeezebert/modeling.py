@@ -412,7 +412,7 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "squeezebert"
-    model__file = "model_json"
+    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "squeezebert-uncased": {
