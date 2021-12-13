@@ -46,15 +46,15 @@
 
 ```
 
-├── base_model.py
-├── config.py
-├── data.py
-├── embedding_insert.py
-├── embedding_recall.py
-├── inference.py
-├── milvus_demo.py
-├── milvus_insert.py
-├── milvus_recall.py
+├── base_model.py # 语义索引模型基类
+├── config.py  # milvus配置文件
+├── data.py # 数据处理函数
+├── embedding_insert.py # 插入向量
+├── embedding_recall.py # 检索
+├── inference.py # 动态图模型向量抽取脚本
+├── feature_extract.py # 批量抽取向量脚本
+├── milvus_insert.py # 插入向量
+├── milvus_recall.py # 召回脚本
 ├── README.md
 └── server_config.yml
 ```

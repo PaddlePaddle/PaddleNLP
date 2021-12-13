@@ -46,7 +46,7 @@ if __name__ == "__main__":
     max_seq_length=64
     output_emb_size=256
     batch_size=1
-    params_path='checkpoints/inbatch/model_40/model_state.pdparams'
+    params_path='checkpoints/model_40/model_state.pdparams'
     id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
