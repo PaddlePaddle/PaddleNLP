@@ -267,7 +267,7 @@ python deploy/python/predict.py --model_dir=./output
 ```
 sh deploy.sh
 ```
-得到下面的输出：
+得到下面的输出，输出的是样本的query，title以及对应的概率：
 
 ```
 Data: {'query': '中西方语言与文化的差异', 'title': '第二语言习得的一大障碍就是文化差异。'}       prob: [0.8511221]
