@@ -27,9 +27,6 @@ from paddlenlp.utils.log import logger
 
 sys.path.append('.')
 
-from base_model import SemanticIndexBase,SemanticIndexBaseStatic
-from data import convert_example
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
@@ -60,6 +57,41 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
 args = parser.parse_args()
 # yapf: enable
 
+
+def convert_example(example,
+                    tokenizer,
+                    max_seq_length=512,
+                    pad_to_max_seq_len=False):
+    """
+    Builds model inputs from a sequence.
+        
+    A BERT sequence has the following format:
+
+    - single sequence: ``[CLS] X [SEP]``
+
+    Args:
+        example(obj:`list(str)`): The list of text to be converted to ids.
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+            Sequences longer than this will be truncated, sequences shorter will be padded.
+        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
+
+    Returns:
+        input_ids(obj:`list[int]`): The list of query token ids.
+        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
+    """
+
+    result = []
+    for key, text in example.items():
+        encoded_inputs = tokenizer(
+            text=text,
+            max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len)
+        input_ids = encoded_inputs["input_ids"]
+        token_type_ids = encoded_inputs["token_type_ids"]
+        result += [input_ids, token_type_ids]
+    return result
 
 class Predictor(object):
     def __init__(self,

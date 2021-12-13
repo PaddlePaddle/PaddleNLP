@@ -28,8 +28,6 @@ from paddlenlp.utils.log import logger
 
 sys.path.append('.')
 
-# print(sys.path)
-from model import SimCSE
 
 # yapf: disable
 parser = argparse.ArgumentParser()
