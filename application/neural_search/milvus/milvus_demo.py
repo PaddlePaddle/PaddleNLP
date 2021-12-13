@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     all_embeddings = []
 
-    for text_embeddings in tqdm(inner_model.get_semantic_embedding(corpus_data_loader):
+    for text_embeddings in tqdm(inner_model.get_semantic_embedding(corpus_data_loader)):
         all_embeddings.append(text_embeddings.numpy())
 
     all_embeddings = np.concatenate(all_embeddings, axis=0)
