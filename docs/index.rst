@@ -6,7 +6,7 @@
 
 - **易用的文本领域API**
 
-  - 提供丰富的产业级预置任务能力**Taskflow**和全流程的文本领域API：支持丰富中文数据集加载的 **Dataset API**，可灵活高效地完成数据预处理的**Data API**，预置60+预训练词向量的 **Embedding API**; 提供100+预训练模型的 **Transformer API**等，可大幅提升NLP任务建模的效率。
+  - 提供丰富的产业级预置任务能力 **Taskflow** 和全流程的文本领域API：支持丰富中文数据集加载的 **Dataset API**，可灵活高效地完成数据预处理的 **Data API** ，预置60+预训练词向量的 **Embedding API** ，提供100+预训练模型的 **Transformer API** 等，可大幅提升NLP任务建模的效率。
 
 - **多场景的应用示例**
 
