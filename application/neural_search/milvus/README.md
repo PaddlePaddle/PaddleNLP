@@ -56,7 +56,7 @@
 ├── milvus_insert.py # 插入向量
 ├── milvus_recall.py # 召回脚本
 ├── README.md
-└── server_config.yml
+└── server_config.yml # milvus的config文件，本项目所用的配置
 ```
 <a name="数据准备"></a>
 
