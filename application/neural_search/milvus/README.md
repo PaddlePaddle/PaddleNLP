@@ -90,9 +90,9 @@ cd scripts
 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
-root_dir="checkpoints/train_0.001" 
+root_dir="checkpoints/inbatch" 
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
-        milvus_demo.py \
+        feature_extract.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
