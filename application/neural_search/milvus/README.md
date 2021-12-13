@@ -71,6 +71,27 @@
 ....
 ```
 
+### 数据集下载
+
+
+- [literature_search_data](https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip)
+
+```
+├── milvus # milvus建库数据集
+    ├── milvus_data.csv.  # 构建召回库的数据
+├── recall  # 召回（语义索引）数据集
+    ├── corpus.csv # 用于测试的召回库
+    ├── dev.csv  # 召回验证集
+    ├── test.csv # 召回测试集
+    ├── train.csv  # 召回训练集
+    ├── train_unsupervised.csv # 无监督训练集
+├── sort # 排序数据集
+    ├── test_pairwise.csv   # 排序测试集
+    ├── dev_pairwise.csv    # 排序验证集
+    └── train_pairwise.csv  # 排序训练集
+    
+```
+
 <a name="向量检索"></a>
 
 ## 5. 向量检索
