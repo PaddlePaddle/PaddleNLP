@@ -151,10 +151,11 @@ python3 embedding_recall.py
 |100条|0.15351247787475586|
 
 
-输入一条文本进行召回,输入的样本为：
+修改代码的模型路径和样本：
 
 ```
-{0:'中西方语言与文化的差异'}
+params_path='checkpoints/model_40/model_state.pdparams'
+id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
 ```
 
 运行命令
