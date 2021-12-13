@@ -165,7 +165,7 @@ sh run_pretrain_static.sh
 
 <a name="模型转换"></a>
 
-## 7. 模型转换
+## 6. 模型转换
 
 ### 静态图转动态图
 
