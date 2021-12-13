@@ -25,6 +25,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
     Constructs a SqueezeBert tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
     Args:
         vocab_file (str): file path of the vocabulary
         do_lower_case (bool): Whether the text strips accents and convert to
@@ -35,6 +36,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
         pad_token (str): The special token for padding. Default: "[PAD]".
         cls_token (str): The special token for cls. Default: "[CLS]".
         mask_token (str): The special token for mask. Default: "[MASK]".
+
     Examples:
         .. code-block:: python
             from paddlenlp.transformers import SqueezeBertTokenizer
@@ -47,9 +49,12 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "squeezebert-uncased": "squeezebert-uncased-vocab.txt",
-            "squeezebert-mnli": "squeezebert-mnli-vocab.txt",
-            "queezebert-mnli-headless": "queezebert-mnli-headless-vocab.txt",
+            "squeezebert-uncased":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-uncased/vocab.txt",
+            "squeezebert-mnli":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli/vocab.txt",
+            "squeezebert-mnli-headless":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/squeezebert/squeezebert-mnli-headless/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -59,7 +64,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
         "squeezebert-mnli": {
             "do_lower_case": True
         },
-        "queezebert-mnli-headless": {
+        "squeezebert-mnli-headless": {
             "do_lower_case": True
         }
     }
