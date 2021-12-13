@@ -16,7 +16,6 @@ from paddlenlp.utils.log import logger
 from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
-from ann_util import build_index
 from tqdm import tqdm 
 from milvus_recall import RecallByMilvus
 
