@@ -66,8 +66,6 @@ sh run_eval_ext.sh
 
 **分类模型训练**
 
-**分类模型训练**
-
 ```shell
 sh run_train_cls.sh
 ```
