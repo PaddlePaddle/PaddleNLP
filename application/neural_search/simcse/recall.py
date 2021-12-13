@@ -108,7 +108,7 @@ if __name__ == "__main__":
     final_index = build_index(args, corpus_data_loader, inner_model)
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
-    print(text_list[:5])
+    # print(text_list[:5])
 
     query_ds = MapDataset(text_list)
 

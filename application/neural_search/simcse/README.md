@@ -159,7 +159,7 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 ### 单机单卡训练/单机多卡训练
 
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，无监督的数据量比较大，4卡的训练的时长在16个小时左右。如果采用单机单卡训练，只需要把`--gpu`参数设置成单卡的卡号即可。
 
 训练的命令如下：
 
@@ -187,7 +187,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 sh train.sh
 ```
 
-4卡的训练的时长在16个小时左右
+
 
 可支持配置的参数：
 
@@ -379,7 +379,7 @@ python export_model.py --params_path checkpoints/model_20000/model_state.pdparam
 也可以运行下面的bash脚本：
 
 ```
-sh export.sh
+sh export_model.sh
 ```
 
 ### Paddle Inference预测
