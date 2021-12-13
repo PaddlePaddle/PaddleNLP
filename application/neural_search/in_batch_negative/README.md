@@ -97,8 +97,9 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
+        |—— deploy.sh # Paddle Inference部署脚本
 |—— inference.py # 动态图抽取向量
-|—— deploy.sh # Paddle Inference部署脚本
+
 ```
 
 <a name="数据准备"></a>

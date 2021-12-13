@@ -80,7 +80,7 @@ simcse/
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
-├── deploy.sh # Paddle Inference的bash脚本
+        ├── deploy.sh # Paddle Inference的bash脚本
 |—— ann_util.py # Ann 建索引库相关函数
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
 ├── export_model.py # 动态图转静态图
