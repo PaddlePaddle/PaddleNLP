@@ -166,14 +166,14 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | Trained on 22 million pairs of similar  |
 |                    |                                                                                  |              | sentences crawed from Baidu Know.       |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``huhuiwen/mengzi-bert-base``                                                     | Chinese      | 12-layer, 768-hidden,                   |
+|                    |``Langboat/mengzi-bert-base``                                                     | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on 300G Chinese Corpus Datasets.|
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``huhuiwen/mengzi-bert-base-fin``                                                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |``Langboat/mengzi-bert-base-fin``                                                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on 20G Finacial Corpus,         |
-|                    |                                                                                  |              | based on ``huhuiwen/mengzi-bert-base``. |
+|                    |                                                                                  |              | based on ``Langboat/mengzi-bert-base``. |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |BERT-Japanese_      |``iverxin/bert-base-japanese``                                                    | Japanese     | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 110M parameters.              |
