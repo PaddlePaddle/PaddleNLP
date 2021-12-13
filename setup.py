@@ -58,7 +58,9 @@ setuptools.setup(
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
             'patches', 'optimizer'
-        ])
+        ]),
+        'paddlenlp.transformers.layoutxlm': get_package_data_files(
+            'paddlenlp.transformers.layoutxlm', ['visual_backbone.yaml']),
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
