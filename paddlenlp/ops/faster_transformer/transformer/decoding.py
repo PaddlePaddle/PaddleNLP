@@ -715,11 +715,25 @@ class InferTransformerDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        for mod in decoder.layers:
+        for i, mod in enumerate(decoder.layers):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
-            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
-            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
+            weight_shape = mod.self_attn.q_proj.weight.shape
+            q_weights = self.create_parameter(
+                shape=[weight_shape[0], weight_shape[1] * 3],
+                dtype="float16" if use_fp16_decoding else "float32")
+            setattr(self, "slf_q_weight_" + str(i), q_weights)
+            self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
+
+            bias_shape = mod.self_attn.q_proj.bias.shape
+            q_biases = self.create_parameter(
+                shape=[bias_shape[0] * 3],
+                dtype="float16" if use_fp16_decoding else "float32",
+                is_bias=True)
+            setattr(self, "slf_q_bias_" + str(i), q_biases)
+            self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
+
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_weight.append(mod.self_attn.v_proj.weight)
