@@ -289,7 +289,7 @@ class FasterTransformer(TransformerModel):
 
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item or "decoding" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
@@ -409,7 +409,7 @@ class FasterTransformer(TransformerModel):
 
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item or "decoding" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
