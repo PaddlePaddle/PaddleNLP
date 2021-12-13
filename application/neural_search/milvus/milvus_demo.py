@@ -103,7 +103,6 @@ if __name__ == "__main__":
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
 
-    # final_index = build_index(args, corpus_data_loader, inner_model)
 
     all_embeddings = []
 

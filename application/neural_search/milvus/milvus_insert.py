@@ -87,4 +87,4 @@ if __name__ == '__main__':
     embeddings = [[random.random() for _ in range(128)] for _ in range(100)]
     status, ids = client.insert(collection_name=collection_name, vectors=embeddings, ids=ids,partition_tag=partition_tag)
     print(status)
-    # print(ids)
+    print(ids)

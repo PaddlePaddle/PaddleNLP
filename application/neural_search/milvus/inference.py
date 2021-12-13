@@ -102,8 +102,6 @@ if __name__ == "__main__":
                     input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
 
-    # for text_embeddings in tqdm(model.get_semantic_embedding(corpus_data_loader)):
-    #     all_embeddings.append(text_embeddings.numpy())
 
     text_embedding=all_embeddings[0]
     print(text_embedding.shape)

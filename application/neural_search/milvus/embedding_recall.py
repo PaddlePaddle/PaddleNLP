@@ -23,8 +23,6 @@ embeddings=np.load('corpus_embedding.npy')
 print(embeddings.shape)
 
 embedding_ids = [i for i in range(embeddings.shape[0])]
-# embed_list=[embeddings[i].tolist() for i in range(embeddings.shape[0])]
-# print(len(embed_list))
 print(len(embedding_ids))
 client = VecToMilvus()
 collection_name = 'literature_search'
