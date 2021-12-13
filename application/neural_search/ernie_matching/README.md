@@ -63,9 +63,9 @@
 ```
 ernie_matching/
 ├── deply # 部署
-|   └── python
-|       └── predict.py # python 预测部署示例
-├── deploy.sh # 预测部署bash脚本
+    └── python
+        ├── deploy.sh # 预测部署bash脚本
+        └── predict.py # python 预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── export_model.sh # 动态图参数导出静态图参数的bash文件
 ├── model.py #  Pair-wise 匹配模型组网
@@ -109,6 +109,7 @@ ernie_matching/
     ├── train_unsupervised.csv # 无监督训练集
 ├── sort # 排序数据集
     ├── test_pairwise.csv   # 排序测试集
+    ├── dev_pairwise.csv    # 排序验证集
     └── train_pairwise.csv  # 排序训练集
     
 ```
@@ -135,7 +136,7 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 ### 单机单卡训练/单机多卡训练
 
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于ERNIE-Gram训练模型，数据量比较大，需要20小时10分钟左右。如果采用单机单卡训练，只需要把`--gpu`参数设置成单卡的卡号即可
 
 训练的命令如下：
 
@@ -221,7 +222,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 ```
 sh predict_pairwise.sh
 ```
-得到下面的输出：
+得到下面的输出，分别是query，title和对应的预测概率：
 
 ```
 {'query': '中西方语言与文化的差异', 'title': '第二语言习得的一大障碍就是文化差异。', 'pred_prob': 0.85112214}

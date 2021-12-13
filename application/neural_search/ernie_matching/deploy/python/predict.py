@@ -30,7 +30,6 @@ import sys
 
 sys.path.append('.')
 
-from data import read_text_pair
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
@@ -60,6 +59,15 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
     help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
+
+def read_text_pair(data_path):
+    """Reads data."""
+    with open(data_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            data = line.rstrip().split("\t")
+            if len(data) != 3:
+                continue
+            yield {'query': data[0], 'title': data[1]}
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
