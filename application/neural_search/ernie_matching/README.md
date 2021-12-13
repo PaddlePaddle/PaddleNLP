@@ -149,7 +149,7 @@ python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
         --margin 0.1 \
         --eval_step 100 \
         --train_file data/train_pairwise.csv \
-        --test_file data/test_pairwise.csv
+        --test_file data/dev_pairwise.csv
 ```
 也可以运行bash脚本：
 
@@ -169,7 +169,7 @@ python -u -m paddle.distributed.launch --gpus "0" evaluate.py \
         --batch_size 32 \
         --learning_rate 2E-5 \
         --init_from_ckpt "./checkpoints/model_30000/model_state.pdparams" \
-        --test_file data/test_pairwise.csv
+        --test_file data/dev_pairwise.csv
 ```
 也可以运行bash脚本：
 
@@ -202,8 +202,6 @@ eval_dev auc:0.796
 
 
 
-
-
 ### 开始预测
 
 以上述 demo 数据为例，运行如下命令基于我们开源的 ERNIE-Gram模型开始计算文本 Pair 的语义相似度:
@@ -215,7 +213,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
         --params_path "./checkpoints/model_30000/model_state.pdparams"\
         --batch_size 128 \
         --max_seq_length 64 \
-        --input_file 'sort/recall_predict.csv'
+        --input_file 'sort/test_pairwise.csv'
 ```
 也可以直接执行下面的命令：
 
@@ -254,13 +252,13 @@ sh export_model.sh
 修改预测文件路径：
 
 ```
-input_file='sort/test_pairwise.csv'
+input_file='../../sort/test_pairwise.csv'
 ```
 
 然后使用PaddleInference
 
 ```
-python deploy/python/predict.py --model_dir=./output
+python predict.py --model_dir=../../output
 ```
 也可以运行下面的bash脚本：
 
