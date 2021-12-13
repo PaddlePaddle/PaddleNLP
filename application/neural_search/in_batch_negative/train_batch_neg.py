@@ -73,15 +73,10 @@ def do_train():
     train_ds = load_dataset(
         read_text_pair, data_path=args.train_set_file, lazy=False)
 
-    # If you wanna use bert/roberta pretrained model,
-    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
-    # pretrained_model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
+
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')
 
-    # If you wanna use bert/roberta pretrained model,
-    # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
