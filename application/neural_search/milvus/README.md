@@ -90,7 +90,7 @@ cd scripts
 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
-root_dir="checkpoints/inbatch" 
+root_dir="checkpoints" 
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         feature_extract.py \
         --device gpu \
@@ -110,6 +110,8 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 |  数据量 |  时间 | 
 | ------------ | ------------ |
 |1000万条|5hour50min03s|
+
+运行结束后会生成 corpus_embedding.npy
 
 生成了向量后，需要把数据抽炒入到Milvus库中，首先修改配置：
 

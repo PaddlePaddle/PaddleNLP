@@ -1,6 +1,6 @@
-root_dir="checkpoints/inbatch" 
+root_dir="checkpoints" 
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
-        milvus_demo.py \
+        feature_extract.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
