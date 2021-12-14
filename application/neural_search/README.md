@@ -51,14 +51,14 @@
 |  无监督数据 |  有监督数据 | 召回方案 |
 | ------------ | ------------ | ------------ | 
 |  多 |  无 | SimCSE | 
-|  无 |  多 | InBatchNegative|
-|  有 | 有  | SimCSE+ InBatchNegative |
+|  无 |  多 | In-batch Negatives|
+|  有 | 有  | SimCSE+ In-batch Negatives |
 
-最基本的情况是只有无监督数据，我们推荐您使用SimCSE进行无监督训练；另一种方案是只有有监督数据，我们推荐您使用InBatchNegative的方法进行有监督训练。
+最基本的情况是只有无监督数据，我们推荐您使用SimCSE进行无监督训练；另一种方案是只有有监督数据，我们推荐您使用In-batch Negatives的方法进行有监督训练。
 
-如果想进一步提升模型效果：还可以使用大规模业务数据，对预训练模型进行Post-Training，训练完以后得到预训练模型，再进行无监督的SimCSE。
+如果想进一步提升模型效果：还可以使用大规模业务数据，对预训练模型进行Domain-adaptive Pretraining，训练完以后得到预训练模型，再进行无监督的SimCSE。
 
-此外，如果您同时拥有监督数据和无监督数据，我们推荐将两种方案结合使用，这样能训练出更加强大的语义索引模型。对SimCSE之后的模型，通过in-batch negative方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，利用milvus就可以很高效的实现召回了。
+此外，如果您同时拥有监督数据和无监督数据，我们推荐将两种方案结合使用，这样能训练出更加强大的语义索引模型。对SimCSE之后的模型，通过In-batch Negatives方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，利用milvus就可以很高效的实现召回了。
 
 ![](./img/recall_pipeline.png)
 
@@ -79,12 +79,12 @@
 ```
 
 
-Post-Training的时候使用的是全量的数据，使用了文本的query,title,abstract三个字段的内容。
+Domain-adaptive Pretraining的时候使用的是全量的数据，使用了文本的query,title,abstract三个字段的内容。
 
 
 |  阶段 |模型 |   测试集 | 召回集 |训练集 |
 | ------------ | ------------ |------------ | ------------ | ------------ |
-|  召回 |  Post-Training |  - | - |20097095 |
+|  召回 |  Domain-adaptive Pretraining |  - | - |20097095 |
 |  召回 |  无监督预训练 |  20000 | 300000 |7984598 |
 |  召回 |  有监督训练 | 20000  | 300000 |3998 |
 |  排序 |  - | 37862  | - |1874103 |
@@ -98,11 +98,11 @@ Post-Training的时候使用的是全量的数据，使用了文本的query,titl
 
 #### 3.2.1 技术方案
 
-**语义索引**：结合SimCSE和In-batch Negative方案，并采取Post-Training优化模型效果
+**语义索引**：结合SimCSE和In-batch Negatives方案，并采取Domain-adaptive Pretraining优化模型效果
 
 **排序**：使用ERNIE-Gram的单塔结构对召回后的数据精排序。
 
-首先是利用Ernie模型进行Post-Training，训练完以后得到预训练模型，然后再进行无监督的SimCSE进行无监督训练，最后利用in-batch negative方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，然后利用milvus就可以很方便的实现召回了。
+首先是利用ERNIE 1.0模型进行Domain-adaptive Pretraining，训练完以后得到预训练模型，然后再进行无监督的SimCSE进行无监督训练，最后利用In-batch Negatives方法进行微调，就可以得到语义索引模型。得到语义匹配的模型后，就可以把建库的文本放入模型中抽取特征向量，然后把抽取后的向量放到语义索引引擎milvus中，然后利用milvus就可以很方便的实现召回了。
 
 #### 3.2.2 评估指标
 
@@ -169,7 +169,7 @@ ernie预训练时间：16hour54min30s
 
 无监督预训练的教程请参考SimCSE的文档：
 
-[simcse](./simcse/)
+[SimCSE](./SimCSE/)
 
 
 无监督预训练时间：16hour52min48s
@@ -177,7 +177,7 @@ ernie预训练时间：16hour54min30s
 
 第三步：有监督训练
 
-有监督训练的教程请参考InbatchNegative的文档：
+有监督训练的教程请参考In-batch Negatives的文档：
 
 [in_batch_negative](./in_batch_negative/)
 
@@ -188,11 +188,11 @@ ernie预训练时间：16hour54min30s
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
 |  Baseline | 30.077| 43.513| 48.633 | 53.448 |59.632| 标准 pair-wise 训练范式，通过随机采样产生负样本|
-|  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
+|  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| In-batch Negatives有监督训练|
 |  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
-|  SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，Inbatch-negative有监督训练|
-|  Post Training+SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie预训练，SimCSE无监督训练|
-|  Post Training+SimCSE+Inbatch-negative|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，simcse无监督训训练，Inbatch-negative有监督训练|
+|  SimCSE+In-batch Negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives有监督训练|
+|  Domain-adaptive Pretraining+SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie预训练，SimCSE无监督训练|
+|  Domain-adaptive Pretraining+SimCSE+In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE无监督训练，In-batch Negatives有监督训练|
 
 
 **召回系统搭建**

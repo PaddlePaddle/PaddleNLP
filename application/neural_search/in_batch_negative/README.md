@@ -1,9 +1,9 @@
-# In-batch negatives
+# In-batch Negatives
 
  **目录**
 
 * [背景介绍](#背景介绍)
-* [In-batch negatives](#In-batch)
+* [# In-batch Negatives](## In-batch Negatives)
     * [1. 技术方案和评估指标](#技术方案)
     * [2. 环境依赖](#环境依赖)  
     * [3. 代码结构](#代码结构)
@@ -19,7 +19,7 @@
 
 语义索引（可通俗理解为向量索引）技术是搜索引擎、推荐系统、广告系统在召回阶段的核心技术之一。语义索引模型的目标是：给定输入文本，模型可以从海量候选召回库中**快速、准确**地召回一批语义相关文本。语义索引模型的效果直接决定了语义相关的物料能否被成功召回进入系统参与上层排序，从基础层面影响整个系统的效果。
 
-在召回阶段，最常见的方式是通过双塔模型，学习Document(简写为Doc)的向量表示，对Doc端建立索引，用ANN召回。我们在这种方式的基础上，引入语义索引策略 [In-batch negatives](https://arxiv.org/abs/2004.04906)，以如下Batch size=4的训练数据为例：
+在召回阶段，最常见的方式是通过双塔模型，学习Document(简写为Doc)的向量表示，对Doc端建立索引，用ANN召回。我们在这种方式的基础上，引入语义索引策略 [In-batch Negatives](https://arxiv.org/abs/2004.04906)，以如下Batch size=4的训练数据为例：
 
 
 ```
@@ -29,12 +29,12 @@
 侠盗飞车罪恶都市怎样改车     侠盗飞车罪恶都市怎么改车
 ```
 
-In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核心是在 1 个 Batch 内同时基于 N 个负例进行梯度更新，将Batch 内除自身之外其它所有 Source Text 的相似文本 Target Text 作为负例，例如: 上例中“我手机丢了，我想换个手机” 有 1 个正例(”我想买个新手机，求推荐“)，3 个负例(1.求秋色之空全集漫画，2.手机学日语的软件，3.侠盗飞车罪恶都市怎么改车)。
+In-batch Negatives 策略的训练数据为语义相似的 Pair 对，策略核心是在 1 个 Batch 内同时基于 N 个负例进行梯度更新，将Batch 内除自身之外其它所有 Source Text 的相似文本 Target Text 作为负例，例如: 上例中“我手机丢了，我想换个手机” 有 1 个正例(”我想买个新手机，求推荐“)，3 个负例(1.求秋色之空全集漫画，2.手机学日语的软件，3.侠盗飞车罪恶都市怎么改车)。
 
 
-<a name="In-batch"></a>
+<a name="In-batch Negatives"></a>
 
-# In-batch negatives 
+# In-batch Negatives 
 
 <a name="技术方案"></a>
 
@@ -42,7 +42,7 @@ In-batch negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 ### 技术方案
 
-双塔模型，采用ERNIE1.0热启，在召回训练阶段引入In-batch negatives 策略，使用hnswlib建立索引库，进行召回测试。
+双塔模型，采用ERNIE1.0热启，在召回训练阶段引入In-batch Negatives  策略，使用hnswlib建立索引库，进行召回测试。
 
 
 ### 评估指标
@@ -55,7 +55,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  In-batch negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
+|  In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
 
 
 
@@ -79,10 +79,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 ```
 |—— data.py # 数据读取、数据转换等预处理逻辑
 |—— base_model.py # 语义索引模型基类
-|—— train_batch_neg.py # In-batch negatives 策略的训练主脚本
+|—— train_batch_neg.py # In-batch Negatives 策略的训练主脚本
 |—— train_batch_neg.sh  # 同上，bash版本
 |—— batch_negative
-    |—— model.py # In-batch negatives 策略核心网络结构
+    |—— model.py # In-batch Negatives 策略核心网络结构
 |—— ann_util.py # Ann 建索引库相关函数
 
 
@@ -171,7 +171,7 @@ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 ### 单机单卡训练/单机多卡训练
 
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可。
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch Negatives 策略训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可。
 
 如果使用CPU进行训练，则需要吧`--gpus`参数去除，然后吧`device`设置成cpu即可，详细请参考train_batch_neg.sh文件的训练设置
 
@@ -357,7 +357,7 @@ python inference.py
 
 ### 开始预测
 
-以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
+以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch Negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
 ```
 root_dir="checkpoints/inbatch" 
 
