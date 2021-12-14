@@ -2,7 +2,7 @@
  **目录**
 
 * [背景介绍](#背景介绍)
-* [Ernie-1.0](#Ernie-1.0)
+* [ERNIE 1.0](#ERNIE 1.0)
     * [1. 技术方案和评估指标](#技术方案)
     * [2. 环境依赖](#环境依赖)  
     * [3. 代码结构](#代码结构)
@@ -26,9 +26,9 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
 
 
-<a name="Ernie-1.0"></a>
+<a name="ERNIE 1.0"></a>
 
-# Ernie-1.0
+# ERNIE 1.0
 
 
 <a name="技术方案"></a>
@@ -59,7 +59,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 以下是本项目主要代码结构及说明：
 
 ```
-ernie-1.0/
+ERNIE 1.0/
 ├── ernie_static_to_dynamic.py # 静态图转动态图
 ├── run_pretrain_static.py # ernie1.0静态图预训练
 ├── args.py # 预训练的参数配置文件
@@ -78,7 +78,7 @@ ernie-1.0/
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE-1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|-|
+|[ERNIE 1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|-|
 
 ### 训练环境说明
 
@@ -103,7 +103,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name/log" \
     run_pretrain_static.py \
     --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
+    --model_name_or_path "ERNIE 1.0" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 512 \
@@ -172,7 +172,7 @@ sh run_pretrain_static.sh
 修改代码中的路径：
 
 ```
-static_model_path="./output/ernie-1.0-dp8-gb1024/model_last/static_vars"
+static_model_path="./output/ERNIE 1.0-dp8-gb1024/model_last/static_vars"
 ```
 然后运行
 ```

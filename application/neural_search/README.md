@@ -192,7 +192,7 @@ ernie预训练时间：16hour54min30s
 |  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
 |  SimCSE+In-batch Negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives有监督训练|
 |  Domain-adaptive Pretraining+SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie预训练，SimCSE无监督训练|
-|  Domain-adaptive Pretraining+SimCSE+In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE无监督训练，In-batch Negatives有监督训练|
+|  Domain-adaptive Pretraining+SimCSE+In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| ERNIE 1.0预训练，SimCSE无监督训练，In-batch Negatives有监督训练|
 
 
 **召回系统搭建**
