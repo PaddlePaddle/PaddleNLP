@@ -131,7 +131,7 @@ python -u  -m paddle.distributed.launch \
 也可以直接运行脚本：
 
 ```
-sh run_pretrain_static.sh
+sh scripts/run_pretrain_static.sh
 ```
 
 其中参数释义如下：

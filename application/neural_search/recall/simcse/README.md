@@ -185,7 +185,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 也可以使用bash脚本：
 
 ```
-sh train.sh
+sh scripts/train.sh
 ```
 
 
@@ -260,7 +260,7 @@ python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
 也可以使用下面的bash脚本：
 
 ```
-sh run_build_index.sh
+sh scripts/run_build_index.sh
 ```
 
 run_build_index.sh还包含cpu和gpu运行的脚本，默认是gpu的脚本
@@ -276,7 +276,7 @@ python -u evaluate.py \
 也可以使用下面的bash脚本：
 
 ```
-bash evaluate.sh
+bash scripts/evaluate.sh
 ```
 
 参数含义说明
@@ -360,7 +360,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
 也可以运行下面的bash脚本：
 
 ```
-sh predict.sh
+sh scripts/predict.sh
 ```
 
 产出如下结果
@@ -385,7 +385,7 @@ python export_model.py --params_path checkpoints/model_20000/model_state.pdparam
 也可以运行下面的bash脚本：
 
 ```
-sh export_model.sh
+sh scripts/export_model.sh
 ```
 
 ### Paddle Inference预测

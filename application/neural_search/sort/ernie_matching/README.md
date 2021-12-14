@@ -154,7 +154,7 @@ python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
 也可以运行bash脚本：
 
 ```
-sh train_pairwise.sh
+sh scripts/train_pairwise.sh
 ```
 
 <a name="评估"></a>
@@ -174,7 +174,7 @@ python -u -m paddle.distributed.launch --gpus "0" evaluate.py \
 也可以运行bash脚本：
 
 ```
-sh evaluate.sh
+sh scripts/evaluate.sh
 ```
 
 
@@ -218,7 +218,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 也可以直接执行下面的命令：
 
 ```
-sh predict_pairwise.sh
+sh scripts/predict_pairwise.sh
 ```
 得到下面的输出，分别是query，title和对应的预测概率：
 
@@ -244,7 +244,7 @@ python export_model.py --params_path checkpoints/model_30000/model_state.pdparam
 也可以运行下面的bash脚本：
 
 ```
-sh export_model.sh
+sh scripts/export_model.sh
 ```
 
 ### Paddle Inference
