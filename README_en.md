@@ -34,7 +34,7 @@ English | [简体中文](./README.md)
 ### Prerequisites
 
 * python >= 3.6
-* paddlepaddle >= 2.1
+* paddlepaddle >= 2.2
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 

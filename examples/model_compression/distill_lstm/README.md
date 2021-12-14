@@ -38,7 +38,7 @@
 在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[文本分类项目](../../text_classification/rnn)的词表，可通过运行以下命令进行下载：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 ```
 
 为了节省显存和运行时间，可以对ChnSentiCorp中未出现的词先进行过滤，并将最后的词表文件名和词表大小配置在下面的参数中。

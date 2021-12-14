@@ -89,7 +89,7 @@ class PretrainedModel(Layer, GenerationMixin):
       It has the same key as resource_files_names (that is "model_state"),
       and the corresponding value is a dict with specific model name to model weights URL mapping
       (such as "bert-base-uncased" ->
-      "https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams").
+      "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams").
     - **base_model_prefix** (str): Represents the attribute associated to the
       base model in derived classes of the same architecture adding layers on
       top of the base model. Note: A base model class is pretrained model class

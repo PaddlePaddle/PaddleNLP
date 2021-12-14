@@ -66,10 +66,10 @@ PaddleNLP目前支持的预训练模型结构类型汇总可见
 .. code:: python
 
   {
-    "model_config_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/model_config.json",
-    "model_state": "https://paddlenlp.bj.bcebos.com/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/model_state.pdparams",
-    "tokenizer_config_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/tokenizer_config.json",
-    "vocab_file": "https://paddlenlp.bj.bcebos.com/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/vocab.txt"
+    "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/model_config.json",
+    "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/model_state.pdparams",
+    "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/tokenizer_config.json",
+    "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yingyibiao/bert-base-uncased-sst-2-finetuned/vocab.txt"
   }
 
 4.5 在github上提PR进行贡献

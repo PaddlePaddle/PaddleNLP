@@ -18,6 +18,12 @@ FasterTokenizer底层为C++实现，同时提供了python接口调用。其可�
 
 以下示例展示FasterERNIE用于序列标注任务。
 
+## 环境依赖
+
+* paddlepaddle >= 2.2.1
+
+* paddlenlp >= 2.2
+
 ## 代码结构说明
 
 以下是本项目主要代码结构及说明：
