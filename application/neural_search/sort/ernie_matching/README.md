@@ -66,16 +66,18 @@ ernie_matching/
     └── python
         ├── deploy.sh # 预测部署bash脚本
         └── predict.py # python 预测部署示例
+|—— scripts
+    ├── export_model.sh # 动态图参数导出静态图参数的bash文件
+    ├── train_pairwise.sh # Pair-wise 单塔匹配模型训练的bash文件
+    ├── evaluate.sh # 评估验证文件bash脚本
+    ├── predict_pairwise.sh # Pair-wise 单塔匹配模型预测脚本的bash文件
 ├── export_model.py # 动态图参数导出静态图参数脚本
-├── export_model.sh # 动态图参数导出静态图参数的bash文件
 ├── model.py #  Pair-wise 匹配模型组网
 ├── data.py #  Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pairwise.py # Pair-wise 单塔匹配模型训练脚本
-├── train_pairwise.sh # Pair-wise 单塔匹配模型训练的bash文件
 ├── evaluate.py # 评估验证文件
-├── evaluate.sh # 评估验证文件bash脚本
 ├── predict_pairwise.py # Pair-wise 单塔匹配模型预测脚本，输出文本对是相似度
-├── predict_pairwise.sh # Pair-wise 单塔匹配模型预测脚本的bash文件
+
 ```
 
 <a name="数据准备"></a>

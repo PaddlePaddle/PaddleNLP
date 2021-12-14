@@ -80,20 +80,21 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— data.py # 数据读取、数据转换等预处理逻辑
 |—— base_model.py # 语义索引模型基类
 |—— train_batch_neg.py # In-batch Negatives 策略的训练主脚本
-|—— train_batch_neg.sh  # 同上，bash版本
 |—— batch_negative
     |—— model.py # In-batch Negatives 策略核心网络结构
 |—— ann_util.py # Ann 建索引库相关函数
 
 
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
-|—— run_build_index.sh # 同上，bash版本
 |—— evaluate.py # 根据召回结果和评估集计算评估指标
-|—— evaluate.sh # 同上，bash版本
 |—— predict.py # 给定输入文件，计算文本 pair 的相似度
-|—— predict.sh  # 同上，bash版本
 |—— export_model.py # 动态图转换成静态图
-|—— export_model.sh  # 动态图转换成静态图脚本
+|—— scripts
+    |—— export_model.sh  # 动态图转换成静态图脚本
+    |—— predict.sh  # 预测bash版本
+    |—— evaluate.sh # 评估bash版本
+    |—— run_build_index.sh # 构建索引bash版本
+    |—— train_batch_neg.sh  # 训练bash版本
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference

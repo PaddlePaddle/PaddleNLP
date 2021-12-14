@@ -81,19 +81,21 @@ simcse/
     |—— python
         |—— predict.py # PaddleInference
         ├── deploy.sh # Paddle Inference的bash脚本
+|—— scripts
+    ├── export_model.sh # 动态图转静态图bash脚本
+    ├── predict.sh # 预测的bash脚本
+    ├── evaluate.sh # 召回评估bash脚本
+    ├── run_build_index.sh  # 索引的构建脚本
+    ├── train.sh # 训练的bash脚本
 |—— ann_util.py # Ann 建索引库相关函数
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
 ├── export_model.py # 动态图转静态图
-├── export_model.sh # 动态图转静态图bash脚本
 ├── predict.py # 基于训练好的无监督语义匹配模型计算文本 Pair 相似度
-├── predict.sh # 预测的bash脚本
 ├── evaluate.py # 根据召回结果和评估集计算评估指标
-├── evaluate.sh # 召回评估bash脚本
 |—— inference.py # 动态图抽取向量
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
-├── run_build_index.sh  # 索引的构建脚本
-├── train.py # SimCSE 模型训练、评估逻辑
-└── train.sh # 训练的bash脚本
+└── train.py # SimCSE 模型训练、评估逻辑
+
 ```
 
 <a name="数据准备"></a>

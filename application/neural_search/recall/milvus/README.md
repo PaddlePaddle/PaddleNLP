@@ -45,7 +45,8 @@
 ## 代码结构：
 
 ```
-
+|—— scripts
+    |—— feature_extract.sh  提取特征向量的bash脚本
 ├── base_model.py # 语义索引模型基类
 ├── config.py  # milvus配置文件
 ├── data.py # 数据处理函数

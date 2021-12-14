@@ -60,6 +60,8 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 
 ```
 ERNIE 1.0/
+|—— scripts
+    |—— run_pretrain_static.sh # 静态图与训练bash脚本
 ├── ernie_static_to_dynamic.py # 静态图转动态图
 ├── run_pretrain_static.py # ernie1.0静态图预训练
 ├── args.py # 预训练的参数配置文件
