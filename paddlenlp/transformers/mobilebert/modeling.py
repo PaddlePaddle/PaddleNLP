@@ -762,7 +762,7 @@ class MobileBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "mobilebert-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mobilebert/mobilebert-uncased/model_state.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mobilebert/mobilebert-uncased/model_state.pdparams"
         }
     }
     base_model_prefix = "mobilebert"

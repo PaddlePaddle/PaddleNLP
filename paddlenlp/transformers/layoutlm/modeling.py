@@ -180,9 +180,9 @@ class LayoutLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlm-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-base-uncased/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-base-uncased/model_state.pdparams",
             "layoutlm-large-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutlm/layoutlm-large-uncased/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-large-uncased/model_state.pdparams",
         },
     }
     base_model_prefix = "layoutlm"
