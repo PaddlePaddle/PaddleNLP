@@ -3,7 +3,7 @@
  **目录**
 
 * [背景介绍](#背景介绍)
-* [# In-batch Negatives](## In-batch Negatives)
+* [In-batch Negatives](#In-batchNegatives)
     * [1. 技术方案和评估指标](#技术方案)
     * [2. 环境依赖](#环境依赖)  
     * [3. 代码结构](#代码结构)
@@ -68,7 +68,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 **环境依赖**
 * python >= 3.x
 * paddlepaddle >= 2.1.3
-* paddlenlp >= 2.1
+* paddlenlp >= 2.2
 * [hnswlib](https://github.com/nmslib/hnswlib) >=0.5.2
 * visualdl >= 2.2.2
 

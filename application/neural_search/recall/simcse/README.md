@@ -62,7 +62,7 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 **环境依赖**
 * python >= 3.x
 * paddlepaddle >= 2.1.3
-* paddlenlp >= 2.1
+* paddlenlp >= 2.2
 * [hnswlib](https://github.com/nmslib/hnswlib) >=0.5.2
 * visualdl >= 2.2.2
 

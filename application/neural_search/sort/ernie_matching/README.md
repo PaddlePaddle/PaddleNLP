@@ -50,7 +50,7 @@
 
 * python >= 3.x
 * paddlepaddle >= 2.1.3
-* paddlenlp >= 2.1
+* paddlenlp >= 2.2
 * pandas >= 0.25.1
 * scipy >=1.3.1
 

@@ -34,7 +34,7 @@
 **环境依赖**
 * python >= 3.x
 * paddlepaddle >= 2.1.3
-* paddlenlp >= 2.1
+* paddlenlp >= 2.2
 * milvus >=1.1.1
 * pymilvus >= 1.1.2
 

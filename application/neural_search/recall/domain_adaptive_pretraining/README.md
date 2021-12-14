@@ -46,7 +46,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 **环境依赖**
 * python >= 3.x
 * paddlepaddle >= 2.1.3
-* paddlenlp >= 2.1
+* paddlenlp >= 2.2
 * visualdl >=2.2.2
 * pybind11
 
