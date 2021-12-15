@@ -75,6 +75,10 @@ def parse_args():
         action='store_true',
         help="Whether to use inference engin TensorRT.", )
     parser.add_argument(
+        "--perf",
+        action='store_true',
+        help="Whether to test performance.", )
+    parser.add_argument(
         "--collect_shape",
         action='store_true',
         help="Whether collect shape range info.", )
@@ -120,7 +124,6 @@ class Predictor(object):
         elif args.device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
-        config.switch_use_feed_fetch_ops(False)  # could be deleted
         if args.use_trt:
             if args.int8:
                 config.enable_tensorrt_engine(
@@ -140,16 +143,16 @@ class Predictor(object):
                     use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
-            if args.collect_shape:
-                config.collect_shape_range_info(
-                    os.path.join(
-                        os.path.dirname(args.model_path), args.task_name +
-                        '_shape_range_info.pbtxt'))
-            else:
-                config.enable_tuned_tensorrt_dynamic_shape(
-                    os.path.join(
-                        os.path.dirname(args.model_path),
-                        args.task_name + "_shape_range_info.pbtxt"), True)
+        if args.collect_shape:
+            config.collect_shape_range_info(
+                os.path.join(
+                    os.path.dirname(args.model_path), args.task_name +
+                    '_shape_range_info.pbtxt'))
+        else:
+            config.enable_tuned_tensorrt_dynamic_shape(
+                os.path.join(
+                    os.path.dirname(args.model_path),
+                    args.task_name + "_shape_range_info.pbtxt"), True)
         predictor = paddle.inference.create_predictor(config)
         input_handles = [
             predictor.get_input_handle(name)
@@ -200,6 +203,24 @@ class Predictor(object):
 
         return outputs
 
+    def predict_perf(self, dataset, collate_fn, args, batch_size=1):
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=False)
+        data_loader = paddle.io.DataLoader(
+            dataset=dataset,
+            batch_sampler=batch_sampler,
+            collate_fn=collate_fn,
+            num_workers=0,
+            return_list=True)
+        time1 = time.time()
+        for i, data in enumerate(data_loader):
+            if i < 20:  # skip warmup steps.
+                continue
+            output = self.predict_batch([data[0], data[1]])
+            logits = paddle.to_tensor(output)
+
+        print("time: ", time.time() - time1)
+
 
 def main():
     paddle.seed(42)
@@ -227,8 +248,18 @@ def main():
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
     ): fn(samples)
-    outputs = predictor.predict(
-        dev_ds, batch_size=args.batch_size, collate_fn=batchify_fn, args=args)
+    if args.perf:
+        outputs = predictor.predict_perf(
+            dev_ds,
+            batch_size=args.batch_size,
+            collate_fn=batchify_fn,
+            args=args)
+    else:
+        outputs = predictor.predict(
+            dev_ds,
+            batch_size=args.batch_size,
+            collate_fn=batchify_fn,
+            args=args)
 
 
 if __name__ == "__main__":

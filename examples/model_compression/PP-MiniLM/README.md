@@ -348,7 +348,7 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 
 测试性能环境同上。本案例测试采用的是 CLUE TNEWS 数据集下量化方法为 `mse`、校准集数量为 4 得到的量化模型，在 TNEWS 的验证集上统计 5 次端到端预测的总耗时（前 20 个 steps 作为 warmup steps 跳过）并求平均。下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况，加速倍数列是较 `bert-base-chinese` 的推理加速倍数。
 
-运行性能测试脚本可以得到 PP-MiniLM、PP-MiniLM 裁剪后、PP-MiniLM 量化后模型预测的耗时：
+启动性能测试需要对 `infer.py` 脚本传入参数 `--perf`，运行性能测试脚本可以得到 PP-MiniLM、PP-MiniLM 裁剪后、PP-MiniLM 量化后模型预测的耗时：
 
 ```shell
 
