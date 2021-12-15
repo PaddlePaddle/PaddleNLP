@@ -4,7 +4,7 @@
 
 检索系统存在于我们日常使用的很多产品中，比如商品搜索系统、学术文献检索系等等，本方案提供了检索系统完整实现。限定场景是用户通过输入检索词 Query，快速在海量数据中查找相似文档。
 
-所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户 Query 字面本身，而是能精准捕捉到用户 Query 后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语言模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
+所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户 Query 字面本身，而是能精准捕捉到用户 Query 后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语义索引模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
 
 例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。    
 
@@ -34,7 +34,7 @@
     + 进一步优化方案: 面向领域的预训练 Domain-adaptive Pretraining 
 + 性能快
     + 基于 Paddle Inference 快速抽取向量
-    + 建库性能和 ANN 查询性能快
+    + 基于 Milvus 快速查询和高性能建库
 
 ###  2.2 功能架构
 
@@ -50,7 +50,7 @@
 
 #### 2.2.2 召回模块
 
-召回模块需要从千亿、万亿等海量数据中快速召回候选数据。首先需要抽取语料库中文本的 Embedding，然后借助向量搜索引擎实现高效 ANN，从而实现候选集召回。
+召回模块需要从千万量级数据中快速召回候选数据。首先需要抽取语料库中文本的 Embedding，然后借助向量搜索引擎实现高效 ANN，从而实现候选集召回。
 
 我们针对不同的数据情况推出三种语义索引方案，如下图所示，您可以参照此方案，快速建立语义索引：
 
@@ -134,25 +134,28 @@
 
 ### 3.3 运行环境和安装说明
 
+
 （1）运行环境
+
+本实验采用了一下的运行环境进行，详细说明如下：
 
 a. 软件环境：
 
-```
-python >= 3.x
-paddlenlp >= 2.2.1        
-paddlepaddle-gpu >=2.2
-CUDA Version: 10.2
-NVIDIA Driver Version: 440.64.00 
-Ubuntu 16.04.6 LTS (Docker)
-```
+
+- python >= 3.6
+- paddlenlp >= 2.2.1        
+- paddlepaddle-gpu >=2.2
+- CUDA Version: 10.2
+- NVIDIA Driver Version: 440.64.00 
+- Ubuntu 16.04.6 LTS (Docker)
+
 
 b. 硬件环境：
 
-```
-NVIDIA Tesla V100 16GB x4卡
-Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
-```
+
+- NVIDIA Tesla V100 16GB x4卡
+- Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+
 
 c. 依赖安装:
 
@@ -162,7 +165,7 @@ pip install -r requirements.txt
 
 ## 4. 动手实践——搭建自己的检索系统
 
-这里展示了能够从头至尾跑通的完整代码，您使用自己的业务数据，照着跑，能搭建出一个给定 Query，返回 topK 相关文档的小型检索系统。您可以参照我们给出的效果、性能数据，check 自己的运行过程是否正确。
+这里展示了能够从头至尾跑通的完整代码，您使用自己的业务数据，照着跑，能搭建出一个给定 Query，返回 topK 相关文档的小型检索系统。您可以参照我们给出的效果和性能数据来检查自己的运行过程是否正确。
 
 ### 4.1 召回阶段
 
@@ -172,11 +175,11 @@ pip install -r requirements.txt
 
 第一步：无监督训练 Domain-adaptive Pretraining
 
-训练用时16hour55min，可参考：[ERNIE 1.0](./recall/domain_adaptive_pretraining/)  
+训练用时 16hour55min，可参考：[ERNIE 1.0](./recall/domain_adaptive_pretraining/)  
 
 第二步：无监督训练 SimCSE
 
-训练用时16hour53min，可参考：[SimCSE](./recall/simcse/)   
+训练用时 16hour53min，可参考：[SimCSE](./recall/simcse/)   
 
 第三步：有监督训练
 
@@ -191,9 +194,10 @@ pip install -r requirements.txt
 |  有监督训练 In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| In-batch Negatives 有监督训练|
 |  无监督训练 SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
 |  无监督 + 有监督训练 SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
-|  Post Training + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie 预训练，SimCSE 无监督训练|
-|  Post Training + SimCSE +Inbatch-negative|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
+|  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie 预训练，SimCSE 无监督训练|
+|  Domain-adaptive Pretraining + SimCSE +Inbatch-negative|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
 
+从上述表格可以看出，首先利用ERNIE 1.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到SimCSE上进行无监督训练，最后利用In-batch Negatives在有监督数据上进行训练能够获得最佳的性能。
 
 **召回系统搭建**
 

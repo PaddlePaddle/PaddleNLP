@@ -66,10 +66,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 推荐使用GPU进行训练，在预测阶段使用CPU或者GPU均可。
 
 **环境依赖**
-* python >= 3.x
+* python >= 3.6
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.2
-* [hnswlib](https://github.com/nmslib/hnswlib) >=0.5.2
+* [hnswlib](https://github.com/nmslib/hnswlib) >= 0.5.2
 * visualdl >= 2.2.2
 
 <a name="代码结构"></a>
@@ -164,11 +164,11 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 ### 训练环境说明
 
-```
-NVIDIA Driver Version: 440.64.00 
-Ubuntu 16.04.6 LTS (Docker)
-Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
-```
+
+- NVIDIA Driver Version: 440.64.00 
+- Ubuntu 16.04.6 LTS (Docker)
+- Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+
 
 ### 单机单卡训练/单机多卡训练
 

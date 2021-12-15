@@ -52,7 +52,7 @@
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.2
 * pandas >= 0.25.1
-* scipy >=1.3.1
+* scipy >= 1.3.1
 
 <a name="代码结构"></a>
 
@@ -130,11 +130,11 @@ ernie_matching/
 
 ### 训练环境说明
 
-```
-NVIDIA Driver Version: 440.64.00 
-Ubuntu 16.04.6 LTS (Docker)
-Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
-```
+
+- NVIDIA Driver Version: 440.64.00 
+- Ubuntu 16.04.6 LTS (Docker)
+- Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+
 
 ### 单机单卡训练/单机多卡训练
 
