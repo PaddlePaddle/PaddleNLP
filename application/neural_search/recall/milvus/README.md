@@ -1,7 +1,7 @@
  **目录**
 
 * [背景介绍](#背景介绍)
-* [MilVus召回](#MilVus召回)
+* [Milvus召回](#Milvus召回)
     * [1. 技术方案和评估指标](#技术方案)
     * [2. 环境依赖](#环境依赖)  
     * [3. 代码结构](#代码结构)
@@ -15,9 +15,9 @@
 
 基于某检索平台开源的数据集构造生成了面向语义索引的召回库。
 
-<a name="MilVus召回"></a>
+<a name="Milvus召回"></a>
 
-# MilVus召回
+# Milvus召回
 
 <a name="技术方案"></a>
 
@@ -25,7 +25,7 @@
 
 ### 技术方案
 
-使用milvus搭建召回系统，然后使用训练好的语义索引模型，抽取向量，插入到milvus中，然后进行检索。
+使用 Milvus 搭建召回系统，然后使用训练好的语义索引模型，抽取向量，插入到 Milvus 中，然后进行检索。
 
 <a name="环境依赖"></a>
 
@@ -35,7 +35,7 @@
 * python >= 3.x
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.2
-* milvus >=1.1.1
+* milvus >= 1.1.1
 * pymilvus >= 1.1.2
 
 <a name="代码结构"></a>
@@ -51,11 +51,11 @@
 ├── config.py  # milvus配置文件
 ├── data.py # 数据处理函数
 ├── embedding_insert.py # 插入向量
-├── embedding_recall.py # 检索
+├── embedding_recall.py # 检索topK相似结果 / ANN
 ├── inference.py # 动态图模型向量抽取脚本
 ├── feature_extract.py # 批量抽取向量脚本
-├── milvus_insert.py # 插入向量
-├── milvus_recall.py # 召回脚本
+├── milvus_insert.py # 插入向量工具类
+├── milvus_recall.py # 向量召回工具类
 ├── README.md
 └── server_config.yml # milvus的config文件，本项目所用的配置
 ```

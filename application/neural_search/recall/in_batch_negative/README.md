@@ -298,7 +298,7 @@ python -u evaluate.py \
 也可以使用下面的bash脚本：
 
 ```
-bash scripts/evaluate.sh
+sh scripts/evaluate.sh
 ```
 
 参数含义说明
@@ -324,7 +324,7 @@ recall@50=78.84
 
 ### 7.1 功能一：抽取文本的语义向量
 
-修改inference.py文件里面输入文本id2corpus和模型路径；params_path：
+修改 inference.py 文件里面输入文本 id2corpus 和模型路径 params_path ：
 
 ```
 params_path='checkpoints/inbatch/model_40/model_state.pdparams'
@@ -334,7 +334,7 @@ id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基
 ```
 python inference.py
 ```
-预测结果位256维的向量：
+预测结果为256维的向量：
 
 ```
 [1, 256]

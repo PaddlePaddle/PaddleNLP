@@ -44,7 +44,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 ## 2. 环境依赖和安装说明
 
 **环境依赖**
-* python >= 3.x
+* python >= 3.6
 * paddlepaddle >= 2.1.3
 * paddlenlp >= 2.2
 * visualdl >=2.2.2
@@ -84,11 +84,11 @@ ERNIE 1.0/
 
 ### 训练环境说明
 
-```
-NVIDIA Driver Version: 440.64.00 
-Ubuntu 16.04.6 LTS (Docker)
-Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
-```
+
+- NVIDIA Driver Version: 440.64.00 
+- Ubuntu 16.04.6 LTS (Docker)
+- Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+
 
 ### 单机单卡训练/单机多卡训练
 

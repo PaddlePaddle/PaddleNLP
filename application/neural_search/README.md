@@ -57,10 +57,10 @@
 |  ⭐️ 无监督数据 |  ⭐️ 有监督数据 | **召回方案** |
 | ------------ | ------------ | ------------ | 
 |  多 |  无 | SimCSE | 
-|  无 |  多 | InBatchNegative|
-|  有 | 有  | SimCSE+ InBatchNegative |
+|  无 |  多 | In-batch Negatives|
+|  有 | 有  | SimCSE+ In-batch Negatives |
 
-最基本的情况是只有无监督数据，我们推荐您使用 SimCSE 进行无监督训练；另一种方案是只有有监督数据，我们推荐您使用 In-batch Negative 的方法进行有监督训练。
+最基本的情况是只有无监督数据，我们推荐您使用 SimCSE 进行无监督训练；另一种方案是只有有监督数据，我们推荐您使用 In-batch Negatives 的方法进行有监督训练。
 
 如果想进一步提升模型效果：还可以使用大规模业务数据，对预训练模型进行 Domain-adaptive Pretraining，训练完以后得到预训练模型，再进行无监督的 SimCSE。
 
@@ -233,7 +233,7 @@ pip install -r requirements.txt
 
 排序阶段使用的模型是 ERNIE-Gram，用时20h，可参考：
 
-[ernie_matching](./sort/ernie_matching/)
+[ernie_matching](./ranking/ernie_matching/)
 
 排序阶段的效果评估：
 
@@ -245,10 +245,9 @@ pip install -r requirements.txt
 同样输入文本：
 
 ```
-{0:'中西方语言与文化的差异'}
-
+中西方语言与文化的差异
 ```
-排序阶段的结果展示如下，第一个是title，第二个数字是计算的概率，显然经排序阶段筛选的文档与 Query 更相关：
+排序阶段的结果展示如下，第一个是 Title ，第二个数字是计算的概率，显然经排序阶段筛选的文档与 Query 更相关：
 
 ```
 中西方文化差异以及语言体现中西方文化,差异,语言体现	0.999848484992981

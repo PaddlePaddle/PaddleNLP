@@ -25,7 +25,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 
 # Used to load data_tools path.
-sys.path.insert(0, "../")
+sys.path.insert(0, "../../")
 
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
@@ -329,7 +329,8 @@ def create_pretrained_dataset(
             sample_ids=sample_ids,
             sample_lens=sample_lens,
             eos_id=eos_id,
-            seed=args.seed)
+            seed=args.seed,
+            use_pure_fp16= args.use_amp and args.amp_level=="O2")
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
@@ -355,9 +356,9 @@ def create_pretrained_dataset(
                 places=places,
                 feed_list=data_holders,
                 batch_sampler=batch_sampler,
-                num_workers=0,
+                num_workers=1,
                 worker_init_fn=worker_init,
-                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack()),
                 return_list=False)
         return data_loader
 
@@ -389,7 +390,8 @@ class GPTDataset(paddle.io.Dataset):
                  build_data_file=False,
                  name="gpt",
                  max_seq_len=1024,
-                 seed=1234):
+                 seed=1234,
+                 use_pure_fp16=False):
         self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
@@ -397,6 +399,7 @@ class GPTDataset(paddle.io.Dataset):
         self.sample_ids = sample_ids
         self.sample_lens = sample_lens
         self.micro_batch_size = micro_batch_size
+        self.use_pure_fp16 = use_pure_fp16
 
         if documents is None:
             document_ids = np.arange(0, self.sample_lens.shape[0])
@@ -415,19 +418,17 @@ class GPTDataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # Attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-                                                                 seq_length))
 
         # The pad and eos tokens do not contribute the loss
-        loss_mask = np.ones(seq_length, dtype="float32")
+        if self.use_pure_fp16:
+            loss_mask = np.ones(seq_length, dtype="float16")
+        else:
+            loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
-        attention_mask = (attention_mask - 1.0) * 1e9
-        attention_mask = attention_mask.astype("float32")
         labels = np.array(labels, dtype="int64")
-        return [tokens, loss_mask, attention_mask, position_ids, labels]
+        return [tokens, loss_mask, position_ids, labels]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,
                                     offset_l):
@@ -474,3 +475,4 @@ class GPTDataset(paddle.io.Dataset):
 
     def __len__(self):
         return self.sample_idx.shape[0] - 1
+        
