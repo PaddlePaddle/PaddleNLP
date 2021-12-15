@@ -196,9 +196,10 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    test_ds = load_dataset("fewclue", name="tnews", splits=["test"])
-    processor = processor_dict["tnews"](9)
-    test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC["tnews"])
+    test_ds = load_dataset("fewclue", name=args.task_name, splits=["test"])
+    processor = processor_dict[args.task_name]()
+    test_ds = processor.get_test_datasets(test_ds,
+                                          TASK_LABELS_DESC[args.task_name])
 
     batches = [
         test_ds[idx:idx + args.batch_size]
