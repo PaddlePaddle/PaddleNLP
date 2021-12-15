@@ -27,16 +27,15 @@
 <a name="PP-MiniLM中文小模型"></a>
 
 # PP-MiniLM中文小模型
+[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度比 BERT(12L768H) 快 4.2 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 [CLUE](https://github.com/CLUEbenchmark/CLUE) 高 0.23。
 
-PP-MiniLM 中文特小模型案例旨在提供训推一体的高精度、高性能小模型及解决方案。
+当前解决方案以面向预训练模型的任务无关知识蒸馏(Task-agnostic Distillation)技术、裁剪(Pruning)技术、量化(Quantization)技术为核心，使 PP-MiniLM 兼具推理速度快、模型效果好、参数规模小的三大特点。
 
-当前解决方案依托业界领先的 Task Agnostic 模型蒸馏技术、裁剪技术、量化技术，使得小模型兼具推理速度快、模型效果好、参数规模小的三大特点。
+- 推理速度快: 依托 PaddleSlim 的裁剪、量化技术对 PP-MiniLM 小模型进行压缩、加速, 使得 PP-MiniLM 量化后模型 GPU 推理速度相比 BERT base 加速比高达 4.2；
 
-- 推理速度快: 依托 PaddleSlim 的裁剪、量化技术进一步对小模型进行压缩, 使得 PP-MiniLM 量化模型 GPU 推理速度相比 BERT base 加速比高达 4.15；
+- 精度高: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.23%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.66%、1.51%；
 
-- 精度高: 我们以 MiniLMv2 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6 层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.23%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.66%、1.51%；
-
-- 参数规模小：依托 PaddleSlim 裁剪技术，在精度几乎无损(-0.15%)条件下将模型隐层宽度压缩 1/4，模型参数量减少 28%。
+- 参数规模小：依托 Task-agnostic Distillation 技术和 PaddleSlim 裁剪技术，模型参数量相比 BERT 减少 52%。
 
 **整体效果**
 
