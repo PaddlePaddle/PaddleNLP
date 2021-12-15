@@ -397,27 +397,26 @@ Transformer预训练模型汇总
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |MBart_              |``mbart-large-cc25``                                                              | English      | 12-layer, 1024-hidden,                  |
 |                    |                                                                                  |              | 12-heads, 1123M parameters.             |
-|                    |                                                                                  |              | The MBart large model cc25.             |
+|                    |                                                                                  |              | The ``mbart-large-cc25`` model.         |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``mbart-large-en-ro``                                                             | English      | 6-layer, 768-hidden,                    |
-|                    |                                                                                  |              | 12-heads, 67M parameters.               |
-|                    |                                                                                  |              | The TinyBert model distilled from       |
-|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    |``mbart-large-en-ro``                                                             | English      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 16-heads, 1123M parameters.             |
+|                    |                                                                                  |              | The ``mbart-large rn-ro`` model .       |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``mbart-large-50-one-to-many-mmt``                                                | English      | 4-layer, 312-hidden,                    |
-|                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
-|                    |                                                                                  |              | The TinyBert model distilled from       |
-|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    |``mbart-large-50-one-to-many-mmt``                                                | English      | 12-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 1123M parameters.             |
+|                    |                                                                                  |              | ``mbart-large-50-one-to-many-mmt``      |
+|                    |                                                                                  |              | model.                                  |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``mbart-large-50-many-to-one-mmt``                                                | English      | 6-layer, 768-hidden,                    |
-|                    |                                                                                  |              | 12-heads, 67M parameters.               |
-|                    |                                                                                  |              | The TinyBert model distilled from       |
-|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    |``mbart-large-50-many-to-one-mmt``                                                | English      | 12-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 1123M parameters.             |
+|                    |                                                                                  |              | ``mbart-large-50-many-to-one-mmt``      |
+|                    |                                                                                  |              | model.                                  |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``mbart-large-50-many-to-many-mmt``                                               | Chinese      | 4-layer, 312-hidden,                    |
-|                    |                                                                                  |              | 12-heads, 14.5M parameters.             |
-|                    |                                                                                  |              | The TinyBert model distilled from       |
-|                    |                                                                                  |              | the BERT model ``bert-base-uncased``    |
+|                    |``mbart-large-50-many-to-many-mmt``                                               | English      | 12-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 16-heads, 1123M parameters.             |
+|                    |                                                                                  |              | ``mbart-large-50-many-to-many-mmt``     |
+|                    |                                                                                  |              | model.                                  |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |Mobilebert_         |``mobilebert-uncased``                                                            | English      | 24-layer, 512-hidden,                   |
 |                    |                                                                                  |              | 4-heads, 24M parameters.                |
@@ -442,6 +441,12 @@ Transformer预训练模型汇总
 |                    |``nezha-large-wwm-chinese``                                                       | Chinese      | 24-layer, 1024-hidden,                  |
 |                    |                                                                                  |              | 16-heads, 336M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
++--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|Reformer_           |``reformer-enwik8``                                                               | English      | 12-layer, 1024-hidden,                  |
+|                    |                                                                                  |              | 8-heads, 148M parameters.               |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``reformer-crime-and-punishment``                                                 | English      | 6-layer, 256-hidden,                    |
+|                    |                                                                                  |              | 2-heads, 3M parameters.                 |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |RoBERTa_            |``roberta-wwm-ext``                                                               | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
@@ -685,7 +690,7 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |LayoutXLM_          | ❌                      | ✅                   | ❌                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
-|Mbart_              | ✅                      | ✅                   | ✅                 | ❌              | ✅              |
+|Mbart_              | ✅                      | ❌                   | ✅                 | ❌              | ✅              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
 |MobileBert_         | ✅                      | ❌                   | ✅                 | ❌              | ❌              |
 +--------------------+-------------------------+----------------------+--------------------+-----------------+-----------------+
