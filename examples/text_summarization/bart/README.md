@@ -187,7 +187,7 @@ python generate.py \
 
 |   model_name_or_path    |     Rouge-1     |     Rouge-2     |    Rouge-L    |
 | :----------------------: | :-------------: | :-------------: |:-------------: |
-|        [bart-base-cnndm-model](https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-cnndm-model.tar.gz )      | 43.6446 | 20.1447 | 41.0132 |
+|        [bart-base-cnndm-model](https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-cnndm-model.tar.gz )      | 43.6446 | 20.1447 | 41.0132 |
 
 **NOTE:** `bart-base-cnndm-model`是按本项目中的超参finetune得到的结果。
 

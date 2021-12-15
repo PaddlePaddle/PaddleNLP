@@ -63,7 +63,7 @@ wordtag/
 我们提供了少数样本用以示例增量训练。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset_v2.tar.gz && tar -zxvf wordtag_dataset_v2.tar.gz
+wget https://bj.bcebos.com/paddlenlp/paddlenlp/datasets/wordtag_dataset_v2.tar.gz && tar -zxvf wordtag_dataset_v2.tar.gz
 ```
 解压之后
 
@@ -79,15 +79,6 @@ data/
 ```text
 砚台/物体类 与/连词 笔/物体类 、/w 墨/物体类 、/w 纸/物体类 是/肯定词 中国/世界地区类 传统/修饰词 的/助词 文房四宝/词汇用语 。/w
 《/w 全球化与中国：理论与发展趋势/作品类_实体 》/w 是/肯定词 2010年/时间类 经济管理出版社/组织机构类 出版/场景事件 的/助词 图书/作品类_概念 ，/w 作者/人物类_概念 是/肯定词 余永定/人物类_实体 、/w 路爱国/人物类_实体 、/w 高海红/人物类_实体 。/w
-```
-
-WordTag模型使用了**BIOES标注体系**，用户可以在标签文件中（该示例为`tags.txt`）按照该标注体系自定义添加词性或命名实体类别，标签文件示例：
-
-```text
-B-组织机构类_企事业单位
-I-组织机构类_企事业单位
-E-组织机构类_企事业单位
-S-组织机构类_企事业单位
 ```
 
 #### 模型训练

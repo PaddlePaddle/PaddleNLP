@@ -32,7 +32,7 @@ class IWSLT15(DatasetBuilder):
     file format.
     '''
 
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/iwslt15.en-vi.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/iwslt15.en-vi.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
                                                      'src_md5', 'tgt_md5'))
     MD5 = 'aca22dc3f90962e42916dbb36d8f3e8e'

@@ -31,7 +31,7 @@ class DuConv(DatasetBuilder):
     the response of the conversation but test_2 not. More information please 
     refer to `https://arxiv.org/abs/1503.02364`.
     """
-    URL = 'https://paddlenlp.bj.bcebos.com/datasets/DuConv.tar.gz'
+    URL = 'https://bj.bcebos.com/paddlenlp/datasets/DuConv.tar.gz'
     MD5 = 'ef496871787f66718e567d62bd8f3546'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

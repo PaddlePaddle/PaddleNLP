@@ -22,10 +22,8 @@ from paddle.nn import CrossEntropyLoss, MSELoss
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'CTRLModel',
-    "CTRLLMHeadModel",
-    'CTRLForSequenceClassification',
-    'SinusoidalPositionalEmbedding',
+    'CTRLModel', "CTRLLMHeadModel", 'CTRLForSequenceClassification',
+    'SinusoidalPositionalEmbedding', 'CTRLForCausalLM'
 ]
 
 
@@ -241,9 +239,9 @@ class CTRLPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ctrl":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ctrl/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ctrl/model_state.pdparams",
             "sshleifer-tiny-ctrl":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/sshleifer-tiny-ctrl/model_state.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/model_state.pdparams"
         }
     }
 
@@ -866,3 +864,6 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
 
         output = (pooled_logits, ) + ctrl_outputs[1:]
         return ((loss, ) + output) if loss is not None else output
+
+
+CTRLForCausalLM = CTRLLMHeadModel
