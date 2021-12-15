@@ -28,6 +28,7 @@ from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
+from .text_similarity import TextSimilarityTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -166,6 +167,17 @@ TASKS = {
             "model": "csc-ernie-1.0"
         }
     },
+    'text_similarity': {
+        "models": {
+            "simbert-base-chinese": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-simbert-base-chinese"
+            },
+        },
+        "default": {
+            "model": "simbert-base-chinese"
+        }
+    },
 }
 
 
@@ -231,3 +243,7 @@ class Taskflow(object):
         """
         task_list = list(TASKS.keys())
         return task_list
+
+    def from_segments(self, *inputs):
+        results = self.task_instance.from_segments(inputs)
+        return results

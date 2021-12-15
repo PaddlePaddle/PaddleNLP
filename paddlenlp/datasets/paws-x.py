@@ -30,7 +30,7 @@ class PAWSX(DatasetBuilder):
     More information please refer to `https://arxiv.org/abs/1908.11828`
     Here we only store simplified Chinese(zh) version.
     """
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/paws-x-zh.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/paws-x-zh.zip"
     MD5 = "f1c6f2ab8afb1f29fe04a0c929e3ab1c"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

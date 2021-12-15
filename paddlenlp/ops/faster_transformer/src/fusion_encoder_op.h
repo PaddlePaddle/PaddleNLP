@@ -17,7 +17,7 @@ limitations under the License. */
 #include <vector>
 
 #include "fastertransformer/bert_encoder_transformer.h"
-#include "fastertransformer/common.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
@@ -51,7 +51,7 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     paddle::Tensor& encoder_out,
     int64_t head_num_,
     int64_t size_per_head_,
-    bool is_gelu,
+    bool use_gelu,
     bool remove_padding,
     int64_t int8_mode,  // no support now
     int64_t num_layer_,

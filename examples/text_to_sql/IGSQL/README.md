@@ -45,7 +45,7 @@ Text2SQL 是语义解析技术中的一类任务，让机器自动将用户输�
 ```bash
 # 下载模型训练、测试数据
 # 得到的sparc，cosql 两个数据集
-wget https://paddlenlp.bj.bcebos.com/paddlenlp/resource/igsql_data.tar.gz
+wget https://bj.bcebos.com/paddlenlp/paddlenlp/resource/igsql_data.tar.gz
 tar xzvf igsql_data.tar.gz
 # 下载glove词向量
 wget http://nlp.stanford.edu/data/glove.840B.300d.zip

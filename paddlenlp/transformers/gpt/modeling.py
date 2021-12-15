@@ -33,6 +33,7 @@ __all__ = [
     'GPTLMHeadModel',
     'GPTForTokenClassification',
     'GPTForSequenceClassification',
+    'GPTForCausalLM',
 ]
 
 
@@ -583,17 +584,17 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
             "gpt2-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-large-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
             "gpt2-xl-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-xl-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -1126,6 +1127,13 @@ class GPTLMHeadModel(GPTPretrainedModel):
             raise AttributeError(
                 "'beam_search' is not supported yet in the faster version of GPT"
             )
+        # Currently, FasterTransformer only support restricted size_per_head.
+        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config[
+            "num_attention_heads"]
+        if size_per_head not in [32, 64, 128]:
+            raise AttributeError(
+                "'size_per_head = %d' is not supported yet in the faster version of GPT"
+                % size_per_head)
         self._faster_entry = FasterGPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
@@ -1298,3 +1306,6 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 axis=-1))
 
         return pooled_logits
+
+
+GPTForCausalLM = GPTLMHeadModel

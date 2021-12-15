@@ -45,7 +45,7 @@ Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻�
 
 ### 数据分词
 中文需要首先经过jieba分词，然后经过BPE分词(Byte Pair Encoding)；英文仅需要经过BPE分词。
-BPE分词需要对应的BPE词典，这里提供下载链接：[中文BPE词典](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.zh) ，[英文BPE词典](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.en) 。
+BPE分词需要对应的BPE词典，这里提供下载链接：[中文BPE词典](https://bj.bcebos.com/paddlenlp/models/stacl/2M.zh2en.dict4bpe.zh) ，[英文BPE词典](https://bj.bcebos.com/paddlenlp/models/stacl/2M.zh2en.dict4bpe.en) 。
 
 我们提供分词的接口，下面给出分词的具体操作：
 ```python
@@ -135,12 +135,12 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 我们提供基于NIST（中->英，共2M中英句对）预训练模型，供大家下载，下载后需解压使用。
 | Wait-k策略     | 模型连接     | 4-ref BLEU on NIST 2008|
 | ------------ | --------------- |---------|
-| Wait-1 | [下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_w1.tar.gz) |30.94|
-| Wait-3   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_w3.tar.gz) |34.24 |
-| Wait-5   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_w5.tar.gz) |36.30 |
-| Wait-7   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_w7.tar.gz) |37.84 |
-| Wait_-1(整句模型)   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_sent.tar.gz) |41.41 |
-词表下载：[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
+| Wait-1 | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w1.tar.gz) |30.94|
+| Wait-3   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w3.tar.gz) |34.24 |
+| Wait-5   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w5.tar.gz) |36.30 |
+| Wait-7   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w7.tar.gz) |37.84 |
+| Wait_-1(整句模型)   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_sent.tar.gz) |41.41 |
+词表下载：[source vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.10k.en.vocab)
 
 ## Demo展示
 通过GUI界面的Demo来模拟STACL实时翻译的效果，下图为Demo示例，实现细节可查看[demo](./demo)

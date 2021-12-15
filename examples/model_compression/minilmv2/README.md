@@ -74,7 +74,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" general_distill.py 
 
 ### 评价方法
 
-假设预训练完成后的模型存储在`${pretrained_models}`下，这里也提供了我们已经预训练完成的一版[模型](https://paddlenlp.bj.bcebos.com/models/general_distill/minilmv2_6l_768d_ch.tar.gz)可供参考，模型与`tinybert-6l-768d-zh`结构相同，因此可以使用`TinyBertForSequenceClassification.from_pretrained()`对模型直接进行加载。
+假设预训练完成后的模型存储在`${pretrained_models}`下，这里也提供了我们已经预训练完成的一版[模型](https://bj.bcebos.com/paddlenlp/models/general_distill/minilmv2_6l_768d_ch.tar.gz)可供参考，模型与`tinybert-6l-768d-zh`结构相同，因此可以使用`TinyBertForSequenceClassification.from_pretrained()`对模型直接进行加载。
 本示例训练出的通用模型需要在下游任务上Fine-tuning，利用下游任务上的指标进行评价。
 我们可以运行如下脚本在单卡上进行Fine-tuning：
 

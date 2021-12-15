@@ -1,0 +1,11 @@
+python train_xnli.py \
+--data_path './data/XNLI' \
+--device 'gpu' \
+--epochs 5 \
+--max_seq_len 256 \
+--batch_size 16 \
+--learning_rate 1.3e-5 \
+--weight_decay 0.001 \
+--warmup_proportion 0.1 \
+--seed 2333 \
+--save_dir outputs/xnli | tee outputs/train_xnli.log
