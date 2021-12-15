@@ -24,9 +24,9 @@
             * [性能测试](#性能测试)
     * [参考文献](#参考文献)
 
-<a name="PP-MiniLM 中文小模型"></a>
+<a name="PP-MiniLM中文小模型"></a>
 
-# PP-MiniLM中文小模型
+# PP-MiniLM 中文小模型
 [PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度比 BERT(12L768H) 快 4.2 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 [CLUE](https://github.com/CLUEbenchmark/CLUE) 高 0.23。
 
 PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-agnostic Distillation)技术、裁剪(Pruning)技术、量化(Quantization)技术为核心，使得 PP-MiniLM **又快**、**又准**、**又小**。
@@ -98,7 +98,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型，在[中文任务测评基准 CLUE](https://github.com/CLUEbenchmark/CLUE)上七个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型，在[中文任务测评基准 CLUE](https://github.com/CLUEbenchmark/CLUE) 上七个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
@@ -118,9 +118,9 @@ PP-MiniLM是一个 6 层的预训练模型，使用`from_pretrained`导入 PP-Mi
 
 ## 在下游任务上使用 PP-MiniLM
 
-PP-MiniLM 预训练小模型在[CLUE](https://github.com/CLUEbenchmark/CLUE)中的 7 个分类数据集的平均精度上比 12 层 `bert-base-chinese` 高 0.23%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.66%、1.51%，因此我们推荐将 PP-MiniLM 运用在中文下游任务上。当然，如果想对已有模型进一步压缩，也可以参考这里的压缩方案，因为压缩方案是通用的。
+PP-MiniLM 预训练小模型在 [CLUE](https://github.com/CLUEbenchmark/CLUE) 中的 7 个分类数据集的平均精度上比 12 层 `bert-base-chinese` 高 0.23%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.66%、1.51%，因此我们推荐将 PP-MiniLM 运用在中文下游任务上。当然，如果想对已有模型进一步压缩，也可以参考这里的压缩方案，因为压缩方案是通用的。
 
-本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于TensorRT的[Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html)预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达`bert-base-chinese`的 1.66 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 4.15 倍。
+本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于 TensorRT 的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达`bert-base-chinese`的 1.66 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 4.15 倍。
 
 <a name="数据介绍"></a>
 
