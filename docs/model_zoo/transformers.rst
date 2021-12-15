@@ -834,12 +834,19 @@ Reference
 - Xiao, Dongling, et al. "Ernie-gen: An enhanced multi-flow pre-training and fine-tuning framework for natural language generation." arXiv preprint arXiv:2001.11314 (2020).
 - Xiao, Dongling, et al. "ERNIE-Gram: Pre-Training with Explicitly N-Gram Masked Language Modeling for Natural Language Understanding." arXiv preprint arXiv:2010.12148 (2020).
 - Radford, Alec, et al. "Language models are unsupervised multitask learners." OpenAI blog 1.8 (2019): 9.
+- Xu, Yiheng, et al. "LayoutLM: Pre-training of Text and Layout for Document Image Understanding." arXiv preprint arXiv:1912.13318 (2019).
+- Xu, Yang, et al. "LayoutLMv2: Multi-modal Pre-training for Visually-Rich Document Understanding" arXiv preprint arXiv:2012.14740 (2020).
+- Xu, Yiheng, et al. "LayoutXLM: Multimodal Pre-training for Multilingual Visually-rich Document Understanding" arXiv preprint arXiv:2104.08836 (2021).
+- Liu, Yinhan, et al. "MBart: Multilingual Denoising Pre-training for Neural Machine Translation" arXiv preprint arXiv:2001.08210 (2020).
+- Sun, Zhiqing, et al. "MobileBERT: a Compact Task-Agnostic BERT for Resource-Limited Devices" arXiv preprint arXiv:2004.02984 (2020).
 - Song, Kaitao, et al. "MPNet: Masked and Permuted Pre-training for Language Understanding." arXiv preprint arXiv:2004.09297 (2020).
 - Wei, Junqiu, et al. "NEZHA: Neural contextualized representation for chinese language understanding." arXiv preprint arXiv:1909.00204 (2019).
+- Kitaev, Nikita, et al. "Reformer: The efficient Transformer." arXiv preprint arXiv:2001.04451 (2020).
 - Liu, Yinhan, et al. "Roberta: A robustly optimized bert pretraining approach." arXiv preprint arXiv:1907.11692 (2019).
 - Su Jianlin, et al. "RoFormer: Enhanced Transformer with Rotary Position Embedding." arXiv preprint arXiv:2104.09864 (2021).
 - Tian, Hao, et al. "SKEP: Sentiment knowledge enhanced pre-training for sentiment analysis." arXiv preprint arXiv:2005.05635 (2020).
 - Forrest, ALbert, et al. "SqueezeBERT: What can computer vision teach NLP about efficient neural networks?" arXiv preprint arXiv:2006.11316 (2020).
+- Raffel, Colin, et al. "T5: Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer." arXiv preprint arXiv:1910.10683 (2019).
 - Vaswani, Ashish, et al. "Attention is all you need." arXiv preprint arXiv:1706.03762 (2017).
 - Jiao, Xiaoqi, et al. "Tinybert: Distilling bert for natural language understanding." arXiv preprint arXiv:1909.10351 (2019).
 - Bao, Siqi, et al. "Plato-2: Towards building an open-domain chatbot via curriculum learning." arXiv preprint arXiv:2006.16779 (2020).
