@@ -16,6 +16,8 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
+#include "cublas_handle.h"
+
 #include "fastertransformer/decoding_beamsearch.h"
 #include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/open_decoder.h"
