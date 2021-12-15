@@ -1,4 +1,5 @@
-MODEL_DIR=../ofa/ofa_models/
+MODEL_DIR=../pruning/pruned_models/
+
 for task in AFQMC TNEWS IFLYTEK CMNLI OCNLI CLUEWSC2020 CSL
 
 do

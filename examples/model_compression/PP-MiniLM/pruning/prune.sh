@@ -7,7 +7,7 @@ export CUDA_VISIBLE_DEVICES=$6
 export STUDENT_DIR=$7
 export WIDTH_LIST=$8
 
-python -u ./run_ofa.py --model_type ernie \
+python -u ./prune.py --model_type ernie \
           --model_name_or_path ${STUDENT_DIR} \
           --task_name $TASK_NAME --max_seq_length ${SEQ_LEN}     \
           --batch_size ${BATCH_SIZE}       \
@@ -15,7 +15,7 @@ python -u ./run_ofa.py --model_type ernie \
           --num_train_epochs ${PRE_EPOCHS}     \
           --logging_steps 100     \
           --save_steps 100     \
-          --output_dir ./ofa_models/$TASK_NAME/0.75/best_model/ \
+          --output_dir ./pruned_models/$TASK_NAME/0.75/best_model/ \
           --device gpu  \
           --width_mult_list ${WIDTH_LIST}
 
