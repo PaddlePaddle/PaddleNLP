@@ -210,8 +210,6 @@ class PretrainedConfig(dict):
         - **bos_token_id** (:obj:`int`, `optional`)) -- The id of the `beginning-of-stream` token.
         - **pad_token_id** (:obj:`int`, `optional`)) -- The id of the `padding` token.
         - **eos_token_id** (:obj:`int`, `optional`)) -- The id of the `end-of-stream` token.
-        - **decoder_start_token_id** (:obj:`int`, `optional`)) -- If an encoder-decoder model starts decoding with a
-          different token than `bos`, the id of that token.
         - **sep_token_id** (:obj:`int`, `optional`)) -- The id of the `separation` token.
 
     PyTorch specific parameters
@@ -299,7 +297,7 @@ class PretrainedConfig(dict):
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
 
-        self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
+
 
         # task specific arguments
         self.task_specific_params = kwargs.pop("task_specific_params", None)
@@ -982,7 +980,7 @@ def uniform_(x, a=0, b=1.):
     return x
 
 def constant_(x, val):
-    temp_value=paddle.zeros_like(x)+val
+    temp_value=paddle.full_like(x,fill_value=val)
     x.set_value(temp_value)
     return x
 
@@ -1020,21 +1018,8 @@ def quick_gelu(x):
     return x * paddle.sigmoid(1.702 * x)
 
 
-def _silu_python(x):
-    """
-    See Gaussian Error Linear Units (Hendrycks et al., https://arxiv.org/abs/1606.08415) where the SiLU (Sigmoid Linear
-    Unit) was originally introduced and coined, and see Sigmoid-Weighted Linear Units for Neural Network Function
-    Approximation in Reinforcement Learning (Elfwing et al., https://arxiv.org/abs/1702.03118) and Swish: a Self-Gated
-    Activation Function (Ramachandran et al., https://arxiv.org/abs/1710.05941v1) where the SiLU was experimented with
-    later.
-    """
-    return x * paddle.sigmoid(x)
 
-
-if version.parse(paddle.__version__) < version.parse("1.7"):
-    silu = _silu_python
-else:
-    silu = nn.functional.silu
+silu = nn.functional.silu
 
 
 def _mish_python(x):
@@ -1100,85 +1085,6 @@ INF = 1e6
 from collections import Iterable
 
 
-
-def expand(self, *sizes):
-    if isinstance(sizes[0], Iterable):
-        sizes = sizes[0]
-    ##handle -1 case
-    if len(sizes) > len(self.shape):
-        for _ in range(len(sizes) - len(self.shape)):
-            self = self.unsqueeze(axis=0)
-    expand_times = [x // y if x >= y else 1 for x, y in zip(sizes, self.shape)]
-    x = paddle.expand(self, sizes, name=None)
-    return x
-
-
-def repeat_interleave(x, repeats, dim=None):
-    orig_shape = list(x.shape)
-    if dim is None:
-        dim = 1
-        x = paddle.reshape(x, (-1, 1))  # x.reshape(-1,1)
-        size = [1] * len(x.shape)
-        size[dim] = repeats
-        x = paddle.tile(x, size)
-        return paddle.reshape(x, (-1))
-    else:
-        if len(orig_shape) == dim + 1:
-            x = x.unsqueeze(-1)
-        # x=x.reshape(-1,1)
-        size = [1] * len(orig_shape)
-        size[-1] = repeats
-        x = paddle.tile(x, size)
-        orig_shape[dim] = -1
-        return paddle.reshape(x, orig_shape)
-
-
-def gather(x, dim, index):
-    index_shape = index.shape
-    index_flatten = index.flatten()
-    if dim < 0:
-        dim = len(x.shape) + dim
-    nd_index = []
-    for k in range(len(x.shape)):
-        if k == dim:
-            nd_index.append(index_flatten)
-        else:
-            reshape_shape = [1] * len(x.shape)
-            reshape_shape[k] = x.shape[k]
-            dim_index = paddle.expand(paddle.reshape(paddle.arange(x.shape[k], dtype=index.dtype), reshape_shape),
-                                      index_shape).flatten()
-            nd_index.append(dim_index)
-
-    ind2 = paddle.transpose(paddle.stack(nd_index), [1, 0])
-    paddle_out = paddle.gather_nd(x, ind2).reshape(index_shape)
-    return paddle_out
-
-
-def split(x, batch_size, dim=0):
-    if isinstance(batch_size, int):
-        if batch_size > x.shape[dim]:
-            return [x]  # do nothing
-        return [y for y in paddle.split(x, x.shape[dim] // batch_size, dim)]
-    else:
-        return [y for y in paddle.split(x, batch_size, dim)]
-
-
-def normal_(x, m=0, std=1):
-    y = paddle.randn(x.shape) * std + m
-    paddle.assign(y, x)
-    return x
-
-
-def uniform_(x, a=0, b=1.):
-    temp_value = paddle.uniform(min=a, max=b, shape=x.shape)
-    x.set_value(temp_value)
-    return x
-
-
-def constant_(x, val):
-    temp_value = paddle.zeros_like(x) + val
-    x.set_value(temp_value)
-    return x
 
 
 
