@@ -61,8 +61,6 @@ device.add_argument('--device', type=int, default=None)
 
 # experiment options
 experiment = parser.add_argument_group('Experiment options')
-experiment.add_argument('--verbose', dest='verbose', action='store_true', default=False,
-                        help='Turn on progress tracking per iteration for debugging')
 experiment.add_argument('--init_from_ckpt', default='', help='Continue from checkpoint model')
 experiment.add_argument('--checkpoint', dest='checkpoint', default=True, action='store_true',
                         help='Enables checkpoint saving of model')
@@ -133,13 +131,6 @@ def train(train_loader, dev_loader, model, args):
             loss.backward()
             optim.step()
             optim.clear_grad()
-
-            if args.verbose:
-                print('\nTargets, Predicates')
-                print(paddle.concat(
-                    (target.unsqueeze(1), paddle.unsqueeze(paddle.argmax(logit, 1).reshape(target.shape), 1)), 1))
-                print('\nLogit')
-                print(logit)
 
             if i_batch % args.log_interval == 0:
                 corrects = paddle.to_tensor((paddle.argmax(logit, 1) == target), dtype='int64').sum().numpy()[0]

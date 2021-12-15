@@ -88,24 +88,3 @@ class GeometricSynonymAug(SynonymAug):
             return self.reverse_tokenizer(doc.get_augmented_tokens()), doc.get_change_logs()
         else:
             return self.reverse_tokenizer(doc.get_augmented_tokens())
-
-
-def _test():
-    import time
-    print("=" * 20, "GeometricSynonymAug")
-    start_time = time.time()
-    geo_aug = GeometricSynonymAug()
-    for _ in range(10):
-        print(geo_aug.substitute("The quick brown fox jumps over the lazy dog"))
-    print("--- %s seconds ---" % (time.time() - start_time))
-
-    print()
-    print("=" * 20, "SynonymAug")
-    start_time = time.time()
-    syn_aug = SynonymAug()
-    for _ in range(10):
-        print(syn_aug.substitute("The quick brown fox jumps over the lazy dog"))
-    print("--- %s seconds ---" % (time.time() - start_time))
-
-if __name__ == '__main__':
-    _test()

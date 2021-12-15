@@ -81,15 +81,3 @@ class AGNEWs(Dataset):
         if random.random() > 0.5:  # synonyms replace with p = 0.5
             text = self.aug.augment(text)[:self.l0]  # can't exceed l0
         return text
-
-
-def _test():
-    label_data_path = '../data/ag_news_csv/test.csv'
-    alphabet_path = '../config/alphabet.json'
-
-    train_dataset = AGNEWs(label_data_path, alphabet_path, data_augment=True, geo_aug=True)
-    train_loader = DataLoader(train_dataset, batch_size=64, num_workers=4, drop_last=False)
-
-
-if __name__ == '__main__':
-    _test()

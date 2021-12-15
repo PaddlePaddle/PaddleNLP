@@ -76,11 +76,3 @@ class CharCNN(paddle.nn.Layer):
         # output layer
         x = self.log_softmax(x)
         return x
-
-
-def _test():
-    model = CharCNN(1, 1, 1, False)
-
-
-if __name__ == "__main__":
-    _test()
