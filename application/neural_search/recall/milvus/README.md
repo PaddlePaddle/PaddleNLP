@@ -63,7 +63,7 @@
 
 ## 4. 数据准备
 
-数据集的样例如下，有两种，第一种是title+keywords进行拼接；第二种是一句话。
+数据集的样例如下，有两种，第一种是 title+keywords 进行拼接；第二种是一句话。
 
 ```
 煤矸石-污泥基活性炭介导强化污水厌氧消化煤矸石,污泥,复合基活性炭,厌氧消化,直接种间电子传递
@@ -156,7 +156,7 @@ python3 embedding_insert.py
 
 另外，milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
 
-![](../img/mem.png)
+![](../../img/mem.png)
 
 
 运行召回脚本：
