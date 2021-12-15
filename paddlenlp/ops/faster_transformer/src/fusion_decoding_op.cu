@@ -77,6 +77,7 @@ std::vector<paddle::Tensor> decoding_kernel(
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
     const float& alpha,
+    const bool& fuse_qkv,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2")
@@ -262,7 +263,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
-        true);  // is_fuse_qkv
+        fuse_qkv);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -284,7 +285,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,   // is_fuse_topk_softMax
-        true,  // is_fuse_qkv
+        fuse_qkv,
         true,   // keep_alive_beam
         alpha);
 
@@ -308,7 +309,8 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       start_id_,
                                                       end_id_,
                                                       candidate_num_,
-                                                      probability_threshold_);
+                                                      probability_threshold_,
+                                                      fuse_qkv);
 
     decoding_sampling_->forward(params, decoding_params);
 
@@ -372,7 +374,8 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const float& alpha) {
+    const float& alpha,
+    const bool& fuse_qkv) {
   auto stream = input.stream();
 
   cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
@@ -431,6 +434,7 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
+          fuse_qkv,
           stream);
       break;
     }
@@ -485,6 +489,7 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
+          fuse_qkv,
           stream);
       break;
     }

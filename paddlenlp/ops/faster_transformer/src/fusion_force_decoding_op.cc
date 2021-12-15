@@ -66,7 +66,8 @@ std::vector<paddle::Tensor> DecodingForward(
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
     const bool& rel_len,
-    const float& alpha) {
+    const float& alpha,
+    const bool& fuse_qkv) {
   int batch_size = input.shape()[0];
   int max_out_len = rel_len ? max_len + input.shape()[1] : max_len;
 
@@ -159,7 +160,8 @@ std::vector<paddle::Tensor> DecodingForward(
                                eos_id,
                                max_out_len,
                                beam_search_diversity_rate,
-                               alpha);
+                               alpha,
+                               fuse_qkv);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -213,7 +215,8 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
     const bool& rel_len,
-    const float& alpha) {
+    const float& alpha,
+    const bool& fuse_qkv) {
   int batch_size = input_shape[0];
 
   std::vector<int64_t> output_dims;
@@ -334,7 +337,8 @@ PD_BUILD_OP(fusion_force_decoding)
             "max_len: int64_t",
             "beam_search_diversity_rate: float",
             "rel_len: bool",
-            "alpha: float"})
+            "alpha: float",
+            "fuse_qkv: bool"})
     .SetKernelFn(PD_KERNEL(DecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(DecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(DecodingInferDtype));

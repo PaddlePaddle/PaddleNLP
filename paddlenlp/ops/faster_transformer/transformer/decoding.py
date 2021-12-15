@@ -38,7 +38,7 @@ def infer_transformer_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
-        _alpha):
+        _alpha, _fuse_qkv):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -91,7 +91,8 @@ def infer_transformer_decoding(
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
-        "alpha": _alpha
+        "alpha": _alpha,
+        "fuse_qkv": _fuse_qkv
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -121,7 +122,7 @@ def infer_force_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb, trg_word,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
-        _alpha):
+        _alpha, _fuse_qkv):
     helper = LayerHelper('fusion_force_decoding', **locals())
 
     inputs = {
@@ -177,7 +178,8 @@ def infer_force_decoding(
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
-        "alpha": _alpha
+        "alpha": _alpha,
+        "fuse_qkv": _fuse_qkv
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -619,6 +621,13 @@ class InferTransformerDecoding(nn.Layer):
                 )
             load("FasterTransformer", verbose=True)
 
+        size_per_head = d_model / n_head
+        # fuse_qkv can only support size_per_head is one of [32, 64, 128].
+        if size_per_head in [32, 64, 128]:
+            self._fuse_qkv = True
+        else:
+            self._fuse_qkv = False
+
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
             if arg not in [
@@ -719,29 +728,36 @@ class InferTransformerDecoding(nn.Layer):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
 
-            q_weight_shape = mod.self_attn.q_proj.weight.shape
-            k_weight_shape = mod.self_attn.k_proj.weight.shape
-            v_weight_shape = mod.self_attn.v_proj.weight.shape
+            if self._fuse_qkv:
+                q_weight_shape = mod.self_attn.q_proj.weight.shape
+                k_weight_shape = mod.self_attn.k_proj.weight.shape
+                v_weight_shape = mod.self_attn.v_proj.weight.shape
 
-            q_weights = self.create_parameter(
-                shape=[
-                    q_weight_shape[0],
-                    q_weight_shape[1] + k_weight_shape[1] + v_weight_shape[1]
-                ],
-                dtype="float16" if use_fp16_decoding else "float32")
-            setattr(self, "slf_q_weight_" + str(i), q_weights)
-            self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
+                q_weights = self.create_parameter(
+                    shape=[
+                        q_weight_shape[0], q_weight_shape[1] + k_weight_shape[1]
+                        + v_weight_shape[1]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32")
+                setattr(self, "slf_q_weight_" + str(i), q_weights)
+                self.slf_q_weight.append(
+                    getattr(self, "slf_q_weight_" + str(i)))
 
-            q_bias_shape = mod.self_attn.q_proj.bias.shape
-            k_bias_shape = mod.self_attn.k_proj.bias.shape
-            v_bias_shape = mod.self_attn.v_proj.bias.shape
+                q_bias_shape = mod.self_attn.q_proj.bias.shape
+                k_bias_shape = mod.self_attn.k_proj.bias.shape
+                v_bias_shape = mod.self_attn.v_proj.bias.shape
 
-            q_biases = self.create_parameter(
-                shape=[q_bias_shape[0] + k_bias_shape[0] + v_bias_shape[0]],
-                dtype="float16" if use_fp16_decoding else "float32",
-                is_bias=True)
-            setattr(self, "slf_q_bias_" + str(i), q_biases)
-            self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
+                q_biases = self.create_parameter(
+                    shape=[
+                        q_bias_shape[0] + k_bias_shape[0] + v_bias_shape[0]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32",
+                    is_bias=True)
+                setattr(self, "slf_q_bias_" + str(i), q_biases)
+                self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
+            else:
+                self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+                self.slf_q_bias.append(mod.self_attn.q_proj.bias)
 
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
@@ -825,7 +841,8 @@ class InferTransformerDecoding(nn.Layer):
                 _max_out_len=self._max_out_len,
                 _diversity_rate=self._diversity_rate,
                 _rel_len=self._rel_len,
-                _alpha=self._alpha)
+                _alpha=self._alpha,
+                _fuse_qkv=self._fuse_qkv)
 
         if self._decoding_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
