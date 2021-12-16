@@ -71,6 +71,11 @@ def parse_args():
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument(
+        "--perf_warmup_steps",
+        default=20,
+        type=int,
+        help="Warmup steps for performance test.", )
+    parser.add_argument(
         "--use_trt",
         action='store_true',
         help="Whether to use inference engin TensorRT.", )
@@ -214,7 +219,7 @@ class Predictor(object):
             return_list=True)
         time1 = time.time()
         for i, data in enumerate(data_loader):
-            if i < 20:  # skip warmup steps.
+            if i < args.perf_warmup_steps:  # skip warmup steps.
                 continue
             output = self.predict_batch([data[0], data[1]])
             logits = paddle.to_tensor(output)

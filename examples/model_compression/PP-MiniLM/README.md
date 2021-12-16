@@ -52,6 +52,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 
 **NOTE：** 说明：
+
 1.上表所有模型的精度测试均是基于下方超参数范围进行的 Grid Search 超参寻优。在每个配置下训练时，每隔 100 个 steps 在验证集上评估一次，取验证集上最佳准确率作为当前超参数配置下的准确率；
 - batch sizes: 16, 32, 64;
 - learning rates: 3e-5, 5e-5, 1e-4
@@ -102,7 +103,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上七个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
@@ -114,7 +115,7 @@ model = ErnieModel.from_pretrained('ppminilm-6l-768h')
 model = ErnieForSequenceClassification.from_pretrained('ppminilm-6l-768h') # 用于分类任务
 ```
 
-PP-MiniLM是一个 6 层的预训练模型，使用`from_pretrained`导入 PP-MiniLM 之后，就可以在自己的数据集上进行 fine-tuning。接下来会介绍如何用下游任务数据在导入的 PP-MiniLM 上进行微调、进一步压缩及推理部署。
+PP-MiniLM 是一个 6 层的预训练模型，使用 `from_pretrained`导入 PP-MiniLM 之后，就可以在自己的数据集上进行 fine-tuning。接下来会介绍如何用下游任务数据在导入的 PP-MiniLM 上进行微调、进一步压缩及推理部署。
 
 **NOTE：** 如果对 PP-MiniLM 的训练过程感兴趣，可以查看[任务无关蒸馏文档](general_distill/README.md)了解相关细节。
 
@@ -130,7 +131,7 @@ PP-MiniLM 预训练小模型在 CLUE 中的 7 个分类数据集的平均精度�
 
 ### 数据介绍
 
-本案例中下游任务使用的数据是 CLUE 中 7 个分类数据集，包括 AFQMC、TNEWS、IFKYTEK、OCNLI、CMNLI、CSL、CLUEWSC2020。在 Linux 环境下，运行 `run_clue.py` 这个 fine-tuning 脚本会将该数据集自动下载到`~/.paddlenlp/datasets/Clue/`目录下。
+本案例中下游任务使用的数据是 CLUE 中 7 个分类数据集，包括 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL、CLUEWSC2020。在 Linux 环境下，运行 `run_clue.py` 这个 fine-tuning 脚本会将该数据集自动下载到`~/.paddlenlp/datasets/Clue/`目录下。
 
 <a name="环境依赖"></a>
 
@@ -227,7 +228,7 @@ sh prune.sh CLUEWSC2020 5e-5 16 50 128 4 ${FT_MODELS} 0.75
 
 #### 裁剪后模型精度
 
-经过裁剪后，CLUE 上各个任务上的精度如下表所示。相比起裁剪前，CLUE 数据集上平均值下降 0.15。模型的参数量由 59.7M 下降到 49.1M。
+经过裁剪后，CLUE 上各个任务上的精度如下表所示。相比起裁剪前，CLUE 数据集上平均值下降 0.09。模型的参数量由 59.7M 下降到 49.1M。
 
 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
 | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ----------- |
@@ -273,7 +274,7 @@ cd quantization
 
 这里的量化采用的是静态离线量化方法，即不需要训练，只使用少量校准数据计算量化因子，就可快速得到量化模型。这一步需要有训练好的预测（静态图）模型。因此，需要对前序步骤产出的模型进行导出（参考上方导出模型的运行方式）。
 
-量化我们可以借助 PaddleSlim 提供的离线量化 API `paddleslim.quant.quant_post_static`实现，我们这一步使用了`mse`、`avg`、`abs_max`、`hist` 四种策略，并使用 4、8 两种校准集数量，对 `matmul/matmul_v2` 算子进行`channel_wise_abs_max` 类型的量化。
+量化我们可以借助 PaddleSlim 提供的离线量化 API `paddleslim.quant.quant_post_static` 实现，我们这一步使用了 `mse`、`avg`、`abs_max`、`hist` 四种策略，并使用 4、8 两种校准集数量，对 `matmul/matmul_v2` 算子进行`channel_wise_abs_max` 类型的量化。
 
 <a name="运行方式"></a>
 
@@ -297,7 +298,7 @@ cd ..
 
 #### 量化后模型精度
 
-经过量化后，CLUE 上各个任务上的精度如下表，比上一步（裁剪后）平均精度下降了 0.4：
+经过量化后，CLUE 上各个任务上的精度如下表，比上一步（裁剪后）平均精度下降了 0.26：
 
 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
 | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ----------- |
@@ -317,9 +318,9 @@ cd ..
 
 这一步依赖安装有预测库的 PaddlePaddle 2.2.1。可以在 [PaddlePaddle 官网](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#python) 根据机器环境选择合适的 Python 预测库进行安装。
 
-想要得到更明显的加速效果，推荐在NVIDA Tensor Core GPU（如T4、A10、A100)上进行测试，本案例基于 T4 测试。若在V系列GPU卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
+想要得到更明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100)上进行测试，本案例基于 T4 测试。若在V系列GPU卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
 
-本案例是在NVIDIA Tesla T4 单卡上，使用cuda 11.1、cudnn 8.1、TensorRT 7.2进行预测。
+本案例是在 NVIDIA Tesla T4 单卡上，使用 cuda 11.1、cudnn 8.1、TensorRT 7.2 进行预测。
 
 <a name="运行方式"></a>
 
