@@ -107,9 +107,9 @@ class DistilBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "distilbert-base-uncased":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-uncased.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-uncased.pdparams",
             "distilbert-base-cased":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-cased.pdparams",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-cased.pdparams",
         }
     }
     base_model_prefix = "distilbert"

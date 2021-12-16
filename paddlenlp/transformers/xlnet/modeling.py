@@ -549,15 +549,15 @@ class XLNetPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "xlnet-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-base-cased.pdparams",
             "xlnet-large-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-large-cased.pdparams",
             "chinese-xlnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-base.pdparams",
             "chinese-xlnet-mid":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-mid.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-mid.pdparams",
             "chinese-xlnet-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-large.pdparams",
         }
     }
     base_model_prefix = "transformer"

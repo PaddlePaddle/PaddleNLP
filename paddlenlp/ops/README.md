@@ -172,12 +172,6 @@ model = model_class.from_pretrained(args.model_name)
 # Define model
 gpt = FasterGPT(
     model=model,
-    topk=args.topk,
-    topp=args.topp,
-    max_out_len=args.max_out_len,
-    bos_id=bos_id,
-    eos_id=eos_id,
-    temperature=args.temperature,
     decoding_lib=args.decoding_lib,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
@@ -194,7 +188,7 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
+python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_length 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
@@ -203,7 +197,7 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 * `--batch_size`: 一个 batch 内，样本数目的大小。
 * `--topk`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
 * `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
-* `--max_out_len`: 最长的生成长度。
+* `--max_length`: 最长的生成长度。
 * `--start_token`: 字符串，表示任意生成的时候的开始 token。
 * `--end_token`: 字符串，生成的结束 token。
 * `--temperature`: temperature 的设定。

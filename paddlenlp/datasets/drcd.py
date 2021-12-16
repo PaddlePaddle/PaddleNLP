@@ -37,13 +37,13 @@ class DRCD(DatasetBuilder):
         'train': META_INFO(
             os.path.join('DRCD_training.json'),
             'bbeefc8ad7585ea3e4fef8c677e7643e',
-            'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_training.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/DRCD/DRCD_training.json'),
         'dev': META_INFO(
             os.path.join('DRCD_dev.json'), '42c2f2bca84fc36cf65a86563b0540e6',
-            'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_dev.json'),
+            'https://bj.bcebos.com/paddlenlp/datasets/DRCD/DRCD_dev.json'),
         'test': META_INFO(
             os.path.join('DRCD_test.json'), 'e36a295c1cb8c6b9fb28015907a42d9e',
-            'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_test.json')
+            'https://bj.bcebos.com/paddlenlp/datasets/DRCD/DRCD_test.json')
     }
 
     def _get_data(self, mode, **kwargs):

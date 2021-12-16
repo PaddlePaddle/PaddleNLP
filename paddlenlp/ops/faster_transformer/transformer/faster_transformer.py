@@ -23,14 +23,16 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
-                           InferUnifiedDecoding, InferBartDecoding)
+                           InferUnifiedDecoding, InferBartDecoding,
+                           InferMBartDecoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import (
-    GPTChineseTokenizer, GPTTokenizer, UnifiedTransformerPretrainedModel,
-    UNIMOPretrainedModel, BartPretrainedModel, GPTPretrainedModel)
+from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
+                                    UnifiedTransformerPretrainedModel,
+                                    UNIMOPretrainedModel, BartPretrainedModel,
+                                    GPTPretrainedModel, MBartPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -98,7 +100,14 @@ class FasterTransformer(TransformerModel):
             for details. Bigger `diversity_rate` would lead to more diversity.
             if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
             to 0 if not set.
-        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        use_fp16_decoding(bool, optional):
+            Whether to use fp16 for decoding. 
+        enable_faster_encoder(bool, optional):
+            Whether to use the faster version of encoder. This is experimental option for now.
+            Defaults to False.
+        use_fp16_encoder(bool, optional):
+            Whether to use fp16 for encoder. Only works when enable_faster_encoder is True.
+            Defaults to False.
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
             of source text. Only works in `v2` temporarily. It is suggest to set
@@ -133,6 +142,8 @@ class FasterTransformer(TransformerModel):
                  diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
+                 enable_faster_encoder=False,
+                 use_fp16_encoder=False,
                  rel_len=False,
                  alpha=0.6):
         # if decoding_lib is None:
@@ -152,6 +163,8 @@ class FasterTransformer(TransformerModel):
         self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.enable_faster_encoder = args.pop("enable_faster_encoder")
+        self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
         self.dropout = dropout
@@ -161,6 +174,13 @@ class FasterTransformer(TransformerModel):
         self.bos_id = bos_id
         self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
+
+        if self.enable_faster_encoder:
+            logger.warning(
+                "enable_faster_encoder is an experimental option and subject to change."
+            )
+        elif self.use_fp16_encoder:
+            self.use_fp16_encoder = False
 
         self.decoding_linear = nn.Linear(
             in_features=d_model, out_features=trg_vocab_size)
@@ -208,10 +228,16 @@ class FasterTransformer(TransformerModel):
         enc_input = F.dropout(
             src_emb, p=self.dropout,
             training=False) if self.dropout else src_emb
+
+        if self.enable_faster_encoder and self.use_fp16_encoder:
+            enc_input = paddle.cast(enc_input, dtype="float16")
+
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
-        if self.use_fp16_decoding:
+        if self.use_fp16_decoding and enc_output.dtype != paddle.float16:
             enc_output = paddle.cast(enc_output, dtype="float16")
+        elif not self.use_fp16_decoding and enc_output.dtype != paddle.float32:
+            enc_output = paddle.cast(enc_output, dtype="float32")
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
@@ -674,13 +700,17 @@ class FasterGPT(GPTPretrainedModel):
                                  dtype="int32")
 
             if bos_token_id == pad_token_id and paddle.sum(
-                    paddle.any(input_ids == pad_token_id)) > 0:
+                    paddle.any(input_ids == pad_token_id), dtype="int64") > 0:
                 seq_len = seq_len + 1
 
         if num_return_sequences > 1:
             input_ids, model_kwargs = self.expand_inputs_for_generation(
-                input_ids, expand_size=num_return_sequences, seq_len=seq_len)
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
             seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
 
         return self.decoding(
             input_ids,
@@ -1098,11 +1128,12 @@ class FasterBART(BartPretrainedModel):
                 forced_eos_token_id=None,
                 **model_kwargs):
 
-        self.encoder = enable_faster_encoder(self.encoder, need_build=False)
         if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
-            encoder_output = self.encoder(input_ids)
-        self.encoder = disable_faster_encoder(self.encoder)
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
+            self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(
@@ -1139,5 +1170,124 @@ class FasterBART(BartPretrainedModel):
             alpha=length_penalty,
             early_stopping=early_stopping,
             forced_eos_token_id=forced_eos_token_id)
+
+    generate = forward
+
+
+class FasterMBART(MBartPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterMBART, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
+                model.mbart.encoder.embed_tokens.weight))
+            model.mbart.encoder.embed_tokens = nn.Embedding(
+                *model.mbart.encoder.embed_tokens.weight.shape,
+                weight_attr=weight_attr)
+        self.encoder = model.mbart.get_encoder()
+        self.decoder = model.mbart.get_decoder()
+        self.pad_token_id = model.mbart.config['pad_token_id']
+
+        self.decoding = InferMBartDecoding(
+            model=self._model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            hidden_act=model.mbart.config['activation_function'])
+
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
+
+    def forward(self,
+                input_ids=None,
+                encoder_output=None,
+                seq_len=None,
+                forced_bos_token_id=None,
+                num_beams=4,
+                top_k=1,
+                top_p=0.0,
+                decode_strategy="beam_search_v3",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                max_length=256,
+                diversity_rate=0.0,
+                length_penalty=0.6,
+                temperature=1.0,
+                num_return_sequences=1,
+                early_stopping=False,
+                **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self._model, 'decoder_start_token_id', None)
+
+        #(gongenlei) Not enable_faster_encoder temporarily
+        if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
+            self.encoder = disable_faster_encoder(self.encoder)
+        batch_size = paddle.shape(encoder_output)[0]
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        if decode_strategy.startswith("beam_search") and num_beams > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        elif decode_strategy == "sampling" and num_return_sequences > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output,
+                expand_size=num_return_sequences,
+                seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        if decoder_start_token_id is not None:
+            bos_token_id = decoder_start_token_id
+
+        if forced_bos_token_id is not None:
+            if decode_strategy == "sampling":
+                trg_word = paddle.full(
+                    [batch_size * num_return_sequences, 1],
+                    forced_bos_token_id,
+                    dtype="int32")
+            else:
+                trg_word = paddle.full(
+                    [batch_size, 1], forced_bos_token_id, dtype="int32")
+        else:
+            trg_word = paddle.zeros([0])
+
+        return self.decoding(
+            enc_output=encoder_output,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            trg_word=trg_word,
+            top_k=top_k,
+            top_p=top_p,
+            decoding_strategy=decode_strategy,
+            diversity_rate=diversity_rate,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            alpha=length_penalty,
+            temperature=temperature,
+            early_stopping=early_stopping)
 
     generate = forward

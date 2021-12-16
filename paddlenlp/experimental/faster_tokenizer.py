@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib
+
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
@@ -19,7 +21,7 @@ from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
-from paddle import _C_ops
+from paddlenlp.utils.log import logger
 
 __all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
 
@@ -77,6 +79,15 @@ class FasterTokenizer(nn.Layer):
 
     def __init__(self, vocab, do_lower_case=False, is_split_into_words=False):
         super(FasterTokenizer, self).__init__()
+
+        try:
+            self.mod = importlib.import_module("paddle._C_ops")
+        except Exception as e:
+            logger.warning(
+                f"The paddlepaddle version is {paddle.__version__}, not the latest. "
+                "Please upgrade the paddlepaddle package (>= 2.2.1).")
+            self.mod = importlib.import_module("paddle.fluid.core.ops")
+
         vocab_buffer = to_vocab_buffer(vocab, "vocab")
         self.register_buffer("vocab", vocab_buffer, persistable=True)
 
@@ -94,11 +105,12 @@ class FasterTokenizer(nn.Layer):
             if text_pair is not None:
                 if isinstance(text_pair, list) or isinstance(text_pair, tuple):
                     text_pair = to_tensor(list(text_pair))
-            input_ids, seg_ids = _C_ops.faster_tokenizer(
+            input_ids, seg_ids = self.mod.faster_tokenizer(
                 self.vocab, text, text_pair, "do_lower_case",
                 self.do_lower_case, "max_seq_len", max_seq_len,
                 "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",
                 self.is_split_into_words)
+
             return input_ids, seg_ids
 
         attrs = {

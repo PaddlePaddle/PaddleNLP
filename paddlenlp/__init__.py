@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.0.0'  # Maybe dev is better
+__version__ = '2.2.0'  # Maybe dev is better
 
 from . import data
 from . import datasets

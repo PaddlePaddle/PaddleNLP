@@ -66,8 +66,8 @@ python -u  create_pretraining_data.py \
 
 为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
 ```shell
-wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
 ```
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：

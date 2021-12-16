@@ -268,11 +268,11 @@ class ErnieGenPretrainedModel(object):
     ernie_gen_pretrained_resource_files_map = {
         "model_state": {
             "ernie-gen-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
             "ernie-gen-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
             "ernie-gen-large-430g-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
         }
     }
 
