@@ -1,6 +1,6 @@
 # 千言-问题匹配鲁棒性评测基线
 
-我们基于预训练模型 ERNIE-Gram 结合正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 在 [2021 CCF BDCI 千言-问题匹配鲁棒性评测](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/question_matching) 竞赛上建立了 Baseline 方案和评测结果。
+我们基于预训练模型 ERNIE-Gram 结合正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 在 [2021 CCF BDCI 千言-问题匹配鲁棒性评测](https://aistudio.baidu.com/aistudio/competition/detail/116/0/introduction) 竞赛上建立了 Baseline 方案和评测结果。
 
 ## 赛题背景
 
