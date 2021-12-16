@@ -12,14 +12,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import paddle
-from .. import PretrainedModel, register_base_model
+
+from .. import   register_base_model
 import math
-
-import  paddle
 from packaging import version
+from dataclasses import dataclass
+from dataclasses import fields
+from collections import OrderedDict
+import numpy as np
 from paddle import nn
+from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss, LayerNorm
+from paddlenlp.ops.einsum import einsum
+from .. import PretrainedModel  as PreTrainedModel
+import paddle
+import os
+import json
+import copy
+import logging
+from collections import Iterable
 
+
+FUNNEL_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "funnel-transformer/small",  # B4-4-4H768
+    "funnel-transformer/small-base",  # B4-4-4H768, no decoder
+    "funnel-transformer/medium",  # B6-3x2-3x2H768
+    "funnel-transformer/medium-base",  # B6-3x2-3x2H768, no decoder
+    "funnel-transformer/intermediate",  # B6-6-6H768
+    "funnel-transformer/intermediate-base",  # B6-6-6H768, no decoder
+    "funnel-transformer/large",  # B8-8-8H1024
+    "funnel-transformer/large-base",  # B8-8-8H1024, no decoder
+    "funnel-transformer/xlarge-base",  # B10-10-10H1024
+    "funnel-transformer/xlarge",  # B10-10-10H1024, no decoder
+]
 
 __all__ = [
     "FunnelModel",
@@ -28,34 +52,9 @@ __all__ = [
     "FunnelForQuestionAnswering"
 ]
 dtype_float = paddle.get_default_dtype()
-
-import logging
-
-
 logger = logging.getLogger(__name__)
-
-
-from paddle import nn
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss,LayerNorm
-from paddlenlp.ops.einsum import einsum
-
-
-
-from .. import PretrainedModel  as PreTrainedModel
-import paddle
-
-
-
-""" Funnel Transformer model configuration """
-
-import logging
-import os
-import json
-import copy
 CONFIG_NAME = "model_config.json"
-logger = logging.getLogger(__name__)
-
-
+INF = 1e6
 
 
 class PretrainedConfig(dict):
@@ -168,7 +167,7 @@ class PretrainedConfig(dict):
         - **output_scores** (:obj:`bool`, `optional`, defaults to :obj:`False`) -- Whether the model should return the
           logits when used for generation
         - **return_dict_in_generate** (:obj:`bool`, `optional`, defaults to :obj:`False`) -- Whether the model should
-          return a :class:`~hf_paddle.file_utils.ModelOutput` instead of a :obj:`torch.LongTensor`
+          return a :class:`~hf_paddle.file_utils.ModelOutput` instead of a :obj:`paddle.Tensor`
         - **forced_bos_token_id** (:obj:`int`, `optional`) -- The id of the token to force as the first generated token
           after the :obj:`decoder_start_token_id`. Useful for multilingual models like :doc:`mBART
           <../model_doc/mbart>` where the first generated token needs to be the target language token.
@@ -212,24 +211,6 @@ class PretrainedConfig(dict):
         - **eos_token_id** (:obj:`int`, `optional`)) -- The id of the `end-of-stream` token.
         - **sep_token_id** (:obj:`int`, `optional`)) -- The id of the `separation` token.
 
-    PyTorch specific parameters
-
-        - **torchscript** (:obj:`bool`, `optional`, defaults to :obj:`False`) -- Whether or not the model should be
-          used with Torchscript.
-        - **tie_word_embeddings** (:obj:`bool`, `optional`, defaults to :obj:`True`) -- Whether the model's input and
-          output word embeddings should be tied. Note that this is only relevant if the model has a output word
-          embedding layer.
-        - **torch_dtype** (:obj:`str`, `optional`) -- The :obj:`dtype` of the weights. This attribute can be used to
-          initialize the model to a non-default ``dtype`` (which is normally ``float32``) and thus allow for optimal
-          storage allocation. For example, if the saved model is ``float16``, ideally we want to load it back using the
-          minimal amount of memory needed to load ``float16`` weights. Since the config object is stored in plain text,
-          this attribute contains just the floating type string without the ``torch.`` prefix. For example, for
-          ``torch.float16`` ``torch_dtype`` is the ``"float16"`` string.
-
-    TensorFlow specific parameters
-
-        - **use_bfloat16** (:obj:`bool`, `optional`, defaults to :obj:`False`) -- Whether or not the model should use
-          BFloat16 scalars (only used by some TensorFlow models).
     """
     model_type: str = ""
     is_composition: bool = False
@@ -239,8 +220,6 @@ class PretrainedConfig(dict):
         self.return_dict = kwargs.pop("return_dict", True)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
-        self.torchscript = kwargs.pop("torchscript", False)  # Only used by PyTorch models
-        self.torch_dtype = kwargs.pop("torch_dtype", None)  # Only used by PyTorch models
         self.use_bfloat16 = kwargs.pop("use_bfloat16", False)
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -297,8 +276,6 @@ class PretrainedConfig(dict):
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
 
-
-
         # task specific arguments
         self.task_specific_params = kwargs.pop("task_specific_params", None)
 
@@ -345,8 +322,7 @@ class PretrainedConfig(dict):
         """
         :obj:`bool`: Whether or not return :class:`~hf_paddle.file_utils.ModelOutput` instead of tuples.
         """
-        # If torchscript is set, force `return_dict=False` to avoid jit errors
-        return self.return_dict and not self.torchscript
+        return self.return_dict
 
     @property
     def num_labels(self) -> int:
@@ -361,7 +337,7 @@ class PretrainedConfig(dict):
             self.id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
             self.label2id = dict(zip(self.id2label.values(), self.id2label.keys()))
 
-    def save_pretrained(self, save_directory , push_to_hub: bool = False, **kwargs):
+    def save_pretrained(self, save_directory, push_to_hub: bool = False, **kwargs):
         """
         Save a configuration object to the directory ``save_directory``, so that it can be re-loaded using the
         :func:`~hf_paddle.PretrainedConfig.from_pretrained` class method.
@@ -386,9 +362,6 @@ class PretrainedConfig(dict):
         if os.path.isfile(save_directory):
             raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
 
-        if push_to_hub:
-            commit_message = kwargs.pop("commit_message", None)
-            repo = self._create_or_get_repo(save_directory, **kwargs)
 
         os.makedirs(save_directory, exist_ok=True)
         # If we save using the predefined names, we can load using `from_pretrained`
@@ -397,12 +370,9 @@ class PretrainedConfig(dict):
         self.to_json_file(output_config_file, use_diff=True)
         logger.info(f"Configuration saved in {output_config_file}")
 
-        if push_to_hub:
-            url = self._push_to_hub(repo, commit_message=commit_message)
-            logger.info(f"Configuration pushed to the hub in this commit: {url}")
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path , **kwargs) -> "PretrainedConfig":
+    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs) -> "PretrainedConfig":
         r"""
         Instantiate a :class:`~hf_paddle.PretrainedConfig` (or a derived class) from a pretrained model
         configuration.
@@ -480,22 +450,20 @@ class PretrainedConfig(dict):
 
         return cls.from_dict(config_dict, **kwargs)
 
-
     def items(self):
-        A=self.to_dict()
+        A = self.to_dict()
         for key in A:
-            self[key]=A[key]
+            self[key] = A[key]
         return A.items()
         # return self.to_dict().items()
 
     def __str__(self):
         return self.to_json_string()
 
-
     @classmethod
     def get_config_dict(
-        cls, pretrained_model_name_or_path , **kwargs
-    )  :
+            cls, pretrained_model_name_or_path, **kwargs
+    ):
         """
         From a ``pretrained_model_name_or_path``, resolve to a dictionary of parameters, to be used for instantiating a
         :class:`~hf_paddle.PretrainedConfig` using ``from_dict``.
@@ -524,20 +492,19 @@ class PretrainedConfig(dict):
         if from_pipeline is not None:
             user_agent["using_pipeline"] = from_pipeline
 
-        if   not local_files_only:
+        if not local_files_only:
             logger.info("Offline mode: forcing local_files_only=True")
             local_files_only = True
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path, CONFIG_NAME)
-        elif os.path.isfile(pretrained_model_name_or_path)  :
+        elif os.path.isfile(pretrained_model_name_or_path):
             config_file = pretrained_model_name_or_path
-
 
         try:
             # Load from URL or cache if already cached
-            resolved_config_file = cache_dir+"/model_config.json"
+            resolved_config_file = cache_dir + "/model_config.json"
             # Load config dict
             config_dict = cls._dict_from_json_file(resolved_config_file)
 
@@ -566,7 +533,7 @@ class PretrainedConfig(dict):
         return config_dict, kwargs
 
     @classmethod
-    def from_dict(cls, config_dict , **kwargs) -> "PretrainedConfig":
+    def from_dict(cls, config_dict, **kwargs) -> "PretrainedConfig":
         """
         Instantiates a :class:`~hf_paddle.PretrainedConfig` from a Python dictionary of parameters.
 
@@ -604,7 +571,7 @@ class PretrainedConfig(dict):
             return config
 
     @classmethod
-    def from_json_file(cls, json_file ) -> "PretrainedConfig":
+    def from_json_file(cls, json_file) -> "PretrainedConfig":
         """
         Instantiates a :class:`~hf_paddle.PretrainedConfig` from the path to a JSON file of parameters.
 
@@ -620,7 +587,7 @@ class PretrainedConfig(dict):
         return cls(**config_dict)
 
     @classmethod
-    def _dict_from_json_file(cls, json_file ):
+    def _dict_from_json_file(cls, json_file):
         with open(json_file, "r", encoding="utf-8") as reader:
             text = reader.read()
         return json.loads(text)
@@ -631,7 +598,7 @@ class PretrainedConfig(dict):
     def __repr__(self):
         return f"{self.__class__.__name__} {self.to_json_string()}"
 
-    def to_diff_dict(self)  :
+    def to_diff_dict(self):
         """
         Removes all attributes from config which correspond to the default config attributes for better readability and
         serializes to a Python dictionary.
@@ -652,16 +619,16 @@ class PretrainedConfig(dict):
         # only serialize values that differ from the default config
         for key, value in config_dict.items():
             if (
-                key not in default_config_dict
-                or key == "hf_paddle_version"
-                or value != default_config_dict[key]
-                or (key in class_config_dict and value != class_config_dict[key])
+                    key not in default_config_dict
+                    or key == "hf_paddle_version"
+                    or value != default_config_dict[key]
+                    or (key in class_config_dict and value != class_config_dict[key])
             ):
                 serializable_config_dict[key] = value
 
         return serializable_config_dict
 
-    def to_dict(self)  :
+    def to_dict(self):
         """
         Serializes this instance to a Python dictionary.
 
@@ -695,7 +662,7 @@ class PretrainedConfig(dict):
             config_dict = self.to_dict()
         return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
 
-    def to_json_file(self, json_file_path , use_diff: bool = True):
+    def to_json_file(self, json_file_path, use_diff: bool = True):
         """
         Save this instance to a JSON file.
 
@@ -709,7 +676,7 @@ class PretrainedConfig(dict):
         with open(json_file_path, "w", encoding="utf-8") as writer:
             writer.write(self.to_json_string(use_diff=use_diff))
 
-    def update(self, config_dict ):
+    def update(self, config_dict):
         """
         Updates attributes of this class with attributes from ``config_dict``.
 
@@ -756,6 +723,7 @@ class PretrainedConfig(dict):
                 )
 
             setattr(self, k, v)
+
 
 class FunnelConfig(PretrainedConfig):
     r"""
@@ -827,30 +795,30 @@ class FunnelConfig(PretrainedConfig):
     model_type = "funnel"
 
     def __init__(
-        self,
-        vocab_size=30522,
-        block_sizes=[4, 4, 4],
-        block_repeats=None,
-        num_decoder_layers=2,
-        d_model=768,
-        n_head=12,
-        d_head=64,
-        d_inner=3072,
-        hidden_act="gelu_new",
-        hidden_dropout=0.1,
-        attention_dropout=0.1,
-        activation_dropout=0.0,
-        max_position_embeddings=512,
-        type_vocab_size=3,
-        initializer_range=0.1,
-        initializer_std=None,
-        layer_norm_eps=1e-9,
-        pooling_type="mean",
-        attention_type="relative_shift",
-        separate_cls=True,
-        truncate_seq=True,
-        pool_q_only=True,
-        **kwargs
+            self,
+            vocab_size=30522,
+            block_sizes=[4, 4, 4],
+            block_repeats=None,
+            num_decoder_layers=2,
+            d_model=768,
+            n_head=12,
+            d_head=64,
+            d_inner=3072,
+            hidden_act="gelu_new",
+            hidden_dropout=0.1,
+            attention_dropout=0.1,
+            activation_dropout=0.0,
+            max_position_embeddings=512,
+            type_vocab_size=3,
+            initializer_range=0.1,
+            initializer_std=None,
+            layer_norm_eps=1e-9,
+            pooling_type="mean",
+            attention_type="relative_shift",
+            separate_cls=True,
+            truncate_seq=True,
+            pool_q_only=True,
+            **kwargs
     ):
         super().__init__(**kwargs)
 
@@ -888,7 +856,7 @@ class FunnelConfig(PretrainedConfig):
         self.truncate_seq = truncate_seq
         self.pool_q_only = pool_q_only
 
-        self.items() ##strange way to initialize the dict
+        self.items()  ##strange way to initialize the dict
 
     @property
     def hidden_size(self):
@@ -907,9 +875,6 @@ class FunnelConfig(PretrainedConfig):
         return len(self.block_sizes)
 
 
-
-
-
 def expand(self, *sizes):
     if isinstance(sizes[0], Iterable):
         sizes = sizes[0]
@@ -917,59 +882,62 @@ def expand(self, *sizes):
     if len(sizes) > len(self.shape):
         for _ in range(len(sizes) - len(self.shape)):
             self = self.unsqueeze(axis=0)
-    x =  paddle.expand(self, sizes, name=None)
+    x = paddle.expand(self, sizes, name=None)
     return x
 
+
 def repeat_interleave(x, repeats, dim=None):
-    orig_shape=list(x.shape)
+    orig_shape = list(x.shape)
     if dim is None:
-        dim=1
-        x=paddle.reshape(x,(-1,1)) #x.reshape(-1,1)
-        size=[1]*len(x.shape)
-        size[dim]=repeats
+        dim = 1
+        x = paddle.reshape(x, (-1, 1))  # x.reshape(-1,1)
+        size = [1] * len(x.shape)
+        size[dim] = repeats
         x = paddle.tile(x, size)
-        return  paddle.reshape(x,(-1))
+        return paddle.reshape(x, (-1))
     else:
-        if len(orig_shape)==dim+1:
-            x=x.unsqueeze(-1)
+        if len(orig_shape) == dim + 1:
+            x = x.unsqueeze(-1)
         # x=x.reshape(-1,1)
-        size=[1]*len(orig_shape)
-        size[-1]=repeats
+        size = [1] * len(orig_shape)
+        size[-1] = repeats
         x = paddle.tile(x, size)
-        orig_shape[dim]=-1
-        return paddle.reshape(x,orig_shape)
+        orig_shape[dim] = -1
+        return paddle.reshape(x, orig_shape)
 
 
-def gather(x,dim,index):
-    index_shape=index.shape
-    index_flatten=index.flatten()
-    if dim<0:
-        dim=len(x.shape)+dim
-    nd_index=[]
+def gather(x, dim, index):
+    index_shape = index.shape
+    index_flatten = index.flatten()
+    if dim < 0:
+        dim = len(x.shape) + dim
+    nd_index = []
     for k in range(len(x.shape)):
-        if k==dim:
+        if k == dim:
             nd_index.append(index_flatten)
         else:
-            reshape_shape=[1]*len(x.shape)
-            reshape_shape[k]=x.shape[k]
-            dim_index=paddle.expand( paddle.reshape(paddle.arange(x.shape[k],dtype=index.dtype), reshape_shape), index_shape).flatten()
+            reshape_shape = [1] * len(x.shape)
+            reshape_shape[k] = x.shape[k]
+            dim_index = paddle.expand(paddle.reshape(paddle.arange(x.shape[k], dtype=index.dtype), reshape_shape),
+                                      index_shape).flatten()
             nd_index.append(dim_index)
 
-    ind2 = paddle.transpose(paddle.stack(nd_index),[1, 0])
+    ind2 = paddle.transpose(paddle.stack(nd_index), [1, 0])
     paddle_out = paddle.gather_nd(x, ind2).reshape(index_shape)
     return paddle_out
 
-def split(x,batch_size,dim=0):
-    if isinstance(batch_size,int):
-        if batch_size>x.shape[dim]:
-            return  [x] #do nothing
-        return [y for y in paddle.split(x,x.shape[dim]//batch_size,dim)]
+
+def split(x, batch_size, dim=0):
+    if isinstance(batch_size, int):
+        if batch_size > x.shape[dim]:
+            return [x]  # do nothing
+        return [y for y in paddle.split(x, x.shape[dim] // batch_size, dim)]
     else:
-        return [y for y in paddle.split(x,  batch_size, dim)]
+        return [y for y in paddle.split(x, batch_size, dim)]
 
 
-def normal_(x,m=0,std=1):
-    y=paddle.randn(x.shape)*std+m
+def normal_(x, m=0, std=1):
+    y = paddle.randn(x.shape) * std + m
     paddle.assign(y, x)
     return x
 
@@ -979,11 +947,11 @@ def uniform_(x, a=0, b=1.):
     x.set_value(temp_value)
     return x
 
+
 def constant_(x, val):
-    temp_value=paddle.full_like(x,fill_value=val)
+    temp_value = paddle.full_like(x, fill_value=val)
     x.set_value(temp_value)
     return x
-
 
 
 def _gelu_python(x):
@@ -1018,7 +986,6 @@ def quick_gelu(x):
     return x * paddle.sigmoid(1.702 * x)
 
 
-
 silu = nn.functional.silu
 
 
@@ -1028,8 +995,6 @@ def _mish_python(x):
     visit the official repository for the paper: https://github.com/digantamisra98/Mish
     """
     return x * paddle.tanh(nn.functional.softplus(x))
-
-
 
 
 def linear_act(x):
@@ -1060,40 +1025,12 @@ def get_activation(activation_string):
 
 
 
-
-
-
-
-
-
-FUNNEL_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "funnel-transformer/small",  # B4-4-4H768
-    "funnel-transformer/small-base",  # B4-4-4H768, no decoder
-    "funnel-transformer/medium",  # B6-3x2-3x2H768
-    "funnel-transformer/medium-base",  # B6-3x2-3x2H768, no decoder
-    "funnel-transformer/intermediate",  # B6-6-6H768
-    "funnel-transformer/intermediate-base",  # B6-6-6H768, no decoder
-    "funnel-transformer/large",  # B8-8-8H1024
-    "funnel-transformer/large-base",  # B8-8-8H1024, no decoder
-    "funnel-transformer/xlarge-base",  # B10-10-10H1024
-    "funnel-transformer/xlarge",  # B10-10-10H1024, no decoder
-]
-
-INF = 1e6
-
-
-from collections import Iterable
-
-
-
-
-
 class FunnelEmbeddings(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
-        self.layer_norm =  LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
-        self.dropout =nn.Dropout(config.hidden_dropout)
+        self.layer_norm = LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout)
 
     def forward(self, input_ids=None, inputs_embeds=None):
         if inputs_embeds is None:
@@ -1103,14 +1040,17 @@ class FunnelEmbeddings(nn.Layer):
 
         return embeddings
 
+
 def pad(input, pad, mode='constant', value=0):
-    pad2=[]
-    for _ in range(len(input.shape)*2-len(pad)):
+    pad2 = []
+    for _ in range(len(input.shape) * 2 - len(pad)):
         pad2.append(0)
     if isinstance(pad, tuple):
-        pad=list(pad)
-    pad2=pad2+pad
-    return paddle.nn.functional.pad(input,pad2,mode=mode,value=value)
+        pad = list(pad)
+    pad2 = pad2 + pad
+    return paddle.nn.functional.pad(input, pad2, mode=mode, value=value)
+
+
 class FunnelAttentionStructure(nn.Layer):
     """
     Contains helpers for `FunnelRelMultiheadAttention `.
@@ -1133,10 +1073,11 @@ class FunnelAttentionStructure(nn.Layer):
         # attention_mask and token_type_ids have shape batch_size x seq_len
         self.pooling_mult = 1
         self.seq_len = seq_len = inputs_embeds.shape[1]
-        position_embeds = self.get_position_embeds(seq_len, inputs_embeds.dtype )
+        position_embeds = self.get_position_embeds(seq_len, inputs_embeds.dtype)
         token_type_mat = self.token_type_ids_to_mat(token_type_ids) if token_type_ids is not None else None
         cls_mask = (
-             pad(paddle.ones([seq_len - 1, seq_len - 1],dtype=inputs_embeds.dtype), (1, 0, 1, 0))  #nn.functional.pad(inputs_embeds.new_ones([seq_len - 1, seq_len - 1]), (1, 0, 1, 0))
+            pad(paddle.ones([seq_len - 1, seq_len - 1], dtype=inputs_embeds.dtype),
+                (1, 0, 1, 0))  # nn.functional.pad(inputs_embeds.new_ones([seq_len - 1, seq_len - 1]), (1, 0, 1, 0))
             if self.config2.separate_cls
             else None
         )
@@ -1150,9 +1091,9 @@ class FunnelAttentionStructure(nn.Layer):
         cls_ids = token_type_ids == self.cls_token_type_id
         # cls_mat = cls_ids[:, :, None] | cls_ids[:, None]
         cls_mat = paddle.logical_or(cls_ids.unsqueeze(2), cls_ids.unsqueeze(1))
-        return paddle.logical_or(cls_mat , token_type_mat)
+        return paddle.logical_or(cls_mat, token_type_mat)
 
-    def get_position_embeds(self, seq_len, dtype ):
+    def get_position_embeds(self, seq_len, dtype):
         """
         Create and cache inputs related to relative position encoding. Those are very different depending on whether we
         are using the factorized or the relative shift attention:
@@ -1169,8 +1110,8 @@ class FunnelAttentionStructure(nn.Layer):
         if self.config2.attention_type == "factorized":
             # Notations from the paper, appending A.2.2, final formula.
             # We need to create and return the matrices phi, psi, pi and omega.
-            pos_seq = paddle.arange(0, seq_len, 1.0, dtype=dtype )
-            freq_seq = paddle.arange(0, d_model // 2, 1.0, dtype=dtype )
+            pos_seq = paddle.arange(0, seq_len, 1.0, dtype=dtype)
+            freq_seq = paddle.arange(0, d_model // 2, 1.0, dtype=dtype)
             inv_freq = 1 / (10000 ** (freq_seq / (d_model // 2)))
             sinusoid = pos_seq.unsqueeze(1) * inv_freq.unsqueeze(0)
             sin_embed = paddle.sin(sinusoid)
@@ -1186,17 +1127,17 @@ class FunnelAttentionStructure(nn.Layer):
         else:
             # Notations from the paper, appending A.2.1, final formula.
             # We need to create and return all the possible vectors R for all blocks and shifts.
-            freq_seq = paddle.arange(0, d_model // 2, 1, dtype=dtype )
+            freq_seq = paddle.arange(0, d_model // 2, 1, dtype=dtype)
             inv_freq = 1 / (10000 ** (freq_seq / (d_model // 2)))
             # Maximum relative positions for the first input
-            rel_pos_id = paddle.arange(-seq_len * 2, seq_len * 2, 1, dtype=dtype )
+            rel_pos_id = paddle.arange(-seq_len * 2, seq_len * 2, 1, dtype=dtype)
             zero_offset = seq_len * 2
             sinusoid = rel_pos_id.unsqueeze(1) * inv_freq.unsqueeze(0)
             sin_embed = self.sin_dropout(paddle.sin(sinusoid))
             cos_embed = self.cos_dropout(paddle.cos(sinusoid))
             pos_embed = paddle.concat([sin_embed, cos_embed], axis=-1)
 
-            pos = paddle.arange(0, seq_len, dtype=dtype )
+            pos = paddle.arange(0, seq_len, dtype=dtype)
             pooled_pos = pos
             position_embeds_list = []
             for block_index in range(0, self.config2.num_blocks):
@@ -1214,8 +1155,8 @@ class FunnelAttentionStructure(nn.Layer):
                     # construct rel_pos_id
                     stride = 2 ** (block_index - 1)
                     rel_pos = self.relative_pos(pos, stride, pooled_pos, shift=2)
-                    rel_pos = rel_pos.unsqueeze(1)+ zero_offset
-                    rel_pos = expand(rel_pos,(rel_pos.shape[0], d_model))
+                    rel_pos = rel_pos.unsqueeze(1) + zero_offset
+                    rel_pos = expand(rel_pos, (rel_pos.shape[0], d_model))
                     position_embeds_pooling = gather(pos_embed, 0, rel_pos)
 
                 # Second type
@@ -1224,7 +1165,7 @@ class FunnelAttentionStructure(nn.Layer):
                 rel_pos = self.relative_pos(pos, stride)
 
                 rel_pos = rel_pos.unsqueeze(1) + zero_offset
-                rel_pos = expand(rel_pos,(rel_pos.shape[0], d_model))
+                rel_pos = expand(rel_pos, (rel_pos.shape[0], d_model))
                 position_embeds_no_pooling = gather(pos_embed, 0, rel_pos)
 
                 position_embeds_list.append([position_embeds_no_pooling, position_embeds_pooling])
@@ -1257,7 +1198,7 @@ class FunnelAttentionStructure(nn.Layer):
         max_dist = ref_point + num_remove * stride
         min_dist = pooled_pos[0] - pos[-1]
 
-        return paddle.arange(max_dist, min_dist - 1, -stride, dtype=paddle.int64 )
+        return paddle.arange(max_dist, min_dist - 1, -stride, dtype=paddle.int64)
 
     def stride_pool(self, tensor, axis):
         """
@@ -1265,7 +1206,7 @@ class FunnelAttentionStructure(nn.Layer):
         """
         if tensor is None:
             return None
-        tensor=tensor.astype("float32")
+        tensor = tensor.astype("float32")
         # Do the stride pool recursively if axis is a list or a tuple of ints.
         if isinstance(axis, (list, tuple)):
             for ax in axis:
@@ -1286,18 +1227,18 @@ class FunnelAttentionStructure(nn.Layer):
         if self.config2.separate_cls:
             cls_slice = [slice(None)] * axis + [slice(None, 1)]
             # tensor = paddle.cat([tensor[cls_slice], tensor], axis=axis)
-            if axis==1:
-                tensor = paddle.concat([tensor[:,:1], tensor], axis=axis)
-            if axis==2:
-                tensor = paddle.concat([tensor[:,:,:1], tensor], axis=axis)
-            if axis==0:
+            if axis == 1:
+                tensor = paddle.concat([tensor[:, :1], tensor], axis=axis)
+            if axis == 2:
+                tensor = paddle.concat([tensor[:, :, :1], tensor], axis=axis)
+            if axis == 0:
                 tensor = paddle.concat([tensor[:1], tensor], axis=axis)
-        if axis==1:
-            return tensor[:,0:-1:2].astype("bool")
-        if axis==0:
-            return tensor[ 0:-1:2].astype("bool")
-        if axis==2:
-            return tensor[:,:,0:-1:2].astype("bool")
+        if axis == 1:
+            return tensor[:, 0:-1:2].astype("bool")
+        if axis == 0:
+            return tensor[0:-1:2].astype("bool")
+        if axis == 2:
+            return tensor[:, :, 0:-1:2].astype("bool")
 
     def pool_tensor(self, tensor, mode="mean", stride=2):
         """Apply 1D pooling to a tensor of size [B x T (x H)]."""
@@ -1314,9 +1255,9 @@ class FunnelAttentionStructure(nn.Layer):
 
         ndim = tensor.ndim
         if ndim == 2:
-            tensor = tensor.unsqueeze(1).unsqueeze(3) #[:, None, :, None]
+            tensor = tensor.unsqueeze(1).unsqueeze(3)  # [:, None, :, None]
         elif ndim == 3:
-            tensor = tensor.unsqueeze(1) #[:, None, :, :]
+            tensor = tensor.unsqueeze(1)  # [:, None, :, :]
         # Stride is applied on the second-to-last dimension.
         stride = (stride, 1)
 
@@ -1383,26 +1324,27 @@ def _relative_shift_gather(positional_attn, context_len, shift):
     positional_attn = paddle.reshape(positional_attn, [batch_size, n_head, max_rel_len, seq_len])
     positional_attn = positional_attn[:, :, shift:, :]
     positional_attn = paddle.reshape(positional_attn, [batch_size, n_head, seq_len, max_rel_len - shift])
-    positional_attn = positional_attn[:,:,:, :context_len]
+    positional_attn = positional_attn[:, :, :, :context_len]
     return positional_attn
 
 
 def Parameter(shape_or_tensor, fill_value=None, requires_grad=True):
     if isinstance(shape_or_tensor, paddle.Tensor):
-        X=Parameter(shape_or_tensor.shape, 0.0)
+        X = Parameter(shape_or_tensor.shape, 0.0)
         paddle.assign(shape_or_tensor.astype("float32"), X)
     else:
         if isinstance(shape_or_tensor, int):
-            shape_or_tensor=[shape_or_tensor]
+            shape_or_tensor = [shape_or_tensor]
 
-        X= paddle.create_parameter(
-                        shape=shape_or_tensor,dtype="float32",
-                        attr=paddle.ParamAttr(name=None, initializer=paddle.nn.initializer.Constant(value=fill_value)),
-                        is_bias=False)
+        X = paddle.create_parameter(
+            shape=shape_or_tensor, dtype="float32",
+            attr=paddle.ParamAttr(name=None, initializer=paddle.nn.initializer.Constant(value=fill_value)),
+            is_bias=False)
     if not requires_grad:
-        X.stop_gradient=True
+        X.stop_gradient = True
 
     return X
+
 
 class FunnelRelMultiheadAttention(nn.Layer):
     def __init__(self, config, block_index):
@@ -1425,7 +1367,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         self.seg_embed = Parameter(paddle.zeros([2, n_head, d_head]))
 
         self.post_proj = nn.Linear(n_head * d_head, d_model)
-        self.layer_norm =  LayerNorm(d_model, epsilon=config.layer_norm_eps)
+        self.layer_norm = LayerNorm(d_model, epsilon=config.layer_norm_eps)
         self.scale = 1.0 / (d_head ** 0.5)
 
     def relative_positional_attention(self, position_embeds, q_head, context_len, cls_mask=None):
@@ -1441,12 +1383,12 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape batch_size x sea_len x n_head x d_model
-            q_r_attention =  einsum("binh,dnh->bind", q_head + u, w_r)
-            q_r_attention_1 = q_r_attention * phi.unsqueeze(1) #[:, None]
-            q_r_attention_2 = q_r_attention * pi.unsqueeze(1) #[:, None]
+            q_r_attention = einsum("binh,dnh->bind", q_head + u, w_r)
+            q_r_attention_1 = q_r_attention * phi.unsqueeze(1)  # [:, None]
+            q_r_attention_2 = q_r_attention * pi.unsqueeze(1)  # [:, None]
 
             # Shape batch_size x n_head x seq_len x context_len
-            positional_attn =  einsum("bind,jd->bnij", q_r_attention_1, psi) +  einsum(
+            positional_attn = einsum("bind,jd->bnij", q_r_attention_1, psi) + einsum(
                 "bind,jd->bnij", q_r_attention_2, omega
             )
         else:
@@ -1460,9 +1402,9 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape max_rel_len x n_head x d_model
-            r_head =  einsum("td,dnh->tnh", r, w_r)
+            r_head = einsum("td,dnh->tnh", r, w_r)
             # Shape batch_size x n_head x seq_len x max_rel_len
-            positional_attn =  einsum("binh,tnh->bnit", q_head + v, r_head)
+            positional_attn = einsum("binh,tnh->bnit", q_head + v, r_head)
             # Shape batch_size x n_head x seq_len x context_len
             positional_attn = _relative_shift_gather(positional_attn, context_len, shift)
 
@@ -1484,12 +1426,13 @@ class FunnelRelMultiheadAttention(nn.Layer):
 
         # Shape batch_size x n_head x seq_len x context_len
         # token_type_mat = token_type_mat[:, None].expand([batch_size, q_head.shape[2], seq_len, context_len])
-        token_type_mat = expand(token_type_mat.unsqueeze(1),([batch_size, q_head.shape[2], seq_len, context_len]))
+        token_type_mat = expand(token_type_mat.unsqueeze(1), ([batch_size, q_head.shape[2], seq_len, context_len]))
         # Shapes batch_size x n_head x seq_len
         diff_token_type, same_token_type = split(token_type_bias, 1, dim=-1)
         # Shape batch_size x n_head x seq_len x context_len
         token_type_attn = paddle.where(
-            token_type_mat, expand(same_token_type,(token_type_mat.shape)), expand(diff_token_type,(token_type_mat.shape))
+            token_type_mat, expand(same_token_type, (token_type_mat.shape)),
+            expand(diff_token_type, (token_type_mat.shape))
         )
 
         if cls_mask is not None:
@@ -1506,17 +1449,19 @@ class FunnelRelMultiheadAttention(nn.Layer):
         n_head, d_head = self.config2.n_head, self.config2.d_head
 
         # Shape batch_size x seq_len x n_head x d_head
-        q_head =paddle.reshape(self.q_head(query),(batch_size, seq_len, n_head, d_head)) #self.q_head(query).reshape(batch_size, seq_len, n_head, d_head)
+        q_head = paddle.reshape(self.q_head(query), (
+        batch_size, seq_len, n_head, d_head))  # self.q_head(query).reshape(batch_size, seq_len, n_head, d_head)
         # Shapes batch_size x context_len x n_head x d_head
-        k_head =paddle.reshape(self.k_head(key), (batch_size, context_len, n_head, d_head) ) # self.k_head(key).reshape(batch_size, context_len, n_head, d_head)
-        v_head = paddle.reshape(self.v_head(value),(batch_size, context_len, n_head, d_head))
+        k_head = paddle.reshape(self.k_head(key), (
+        batch_size, context_len, n_head, d_head))  # self.k_head(key).reshape(batch_size, context_len, n_head, d_head)
+        v_head = paddle.reshape(self.v_head(value), (batch_size, context_len, n_head, d_head))
 
         q_head = q_head * self.scale
         # Shape n_head x d_head
         r_w_bias = self.r_w_bias * self.scale
         # Shapes batch_size x n_head x seq_len x context_len
 
-        content_score =  einsum("bind,bjnd->bnij", q_head + r_w_bias, k_head)
+        content_score = einsum("bind,bjnd->bnij", q_head + r_w_bias, k_head)
 
         positional_attn = self.relative_positional_attention(position_embeds, q_head, context_len, cls_mask)
         token_type_attn = self.relative_token_type_attention(token_type_mat, q_head, cls_mask)
@@ -1536,7 +1481,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         attn_prob = self.attention_dropout(attn_prob)
 
         # attention output, shape batch_size x seq_len x n_head x d_head
-        attn_vec =  einsum("bnij,bjnd->bind", attn_prob, v_head)
+        attn_vec = einsum("bnij,bjnd->bind", attn_prob, v_head)
 
         # Shape shape batch_size x seq_len x d_model
         attn_out = self.post_proj(attn_vec.reshape((batch_size, seq_len, n_head * d_head)))
@@ -1554,7 +1499,7 @@ class FunnelPositionwiseFFN(nn.Layer):
         self.activation_dropout = nn.Dropout(config.activation_dropout)
         self.linear_2 = nn.Linear(config.d_inner, config.d_model)
         self.dropout = nn.Dropout(config.hidden_dropout)
-        self.layer_norm =  LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
+        self.layer_norm = LayerNorm(config.d_model, epsilon=config.layer_norm_eps)
 
     def forward(self, hidden):
         h = self.linear_1(hidden)
@@ -1590,13 +1535,13 @@ class FunnelEncoder(nn.Layer):
         )
 
     def forward(
-        self,
-        inputs_embeds,
-        attention_mask=None,
-        token_type_ids=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=True,
+            self,
+            inputs_embeds,
+            attention_mask=None,
+            token_type_ids=None,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=True,
     ):
         # The pooling is not implemented on long tensors, so we convert this mask.
         attention_mask = attention_mask.astype(inputs_embeds.dtype)
@@ -1671,14 +1616,14 @@ class FunnelDecoder(nn.Layer):
         self.layers = nn.LayerList([FunnelLayer(config, 0) for _ in range(config.num_decoder_layers)])
 
     def forward(
-        self,
-        final_hidden,
-        first_block_hidden,
-        attention_mask=None,
-        token_type_ids=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=True,
+            self,
+            final_hidden,
+            first_block_hidden,
+            attention_mask=None,
+            token_type_ids=None,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=True,
     ):
         upsampled_hidden = upsample(
             final_hidden,
@@ -1735,7 +1680,6 @@ class FunnelPreTrainedModel(PreTrainedModel):
     """
 
     config_class = FunnelConfig
-    # load_tf_weights = load_tf_weights_in_funnel
     base_model_prefix = "funnel"
 
     def _init_weights(self, module):
@@ -1778,7 +1722,7 @@ class FunnelPreTrainedModel(PreTrainedModel):
             # since from_pretrained(...) calls tie weights anyways
             # self.tie_weights()
 
-    def prune_heads(self, heads_to_prune  ):
+    def prune_heads(self, heads_to_prune):
         """
         Prunes heads of the base model.
 
@@ -1795,6 +1739,7 @@ class FunnelPreTrainedModel(PreTrainedModel):
 
         self.base_model._prune_heads(heads_to_prune)
 
+
 class FunnelClassificationHead(nn.Layer):
     def __init__(self, config, n_labels):
         super().__init__()
@@ -1808,44 +1753,46 @@ class FunnelClassificationHead(nn.Layer):
         hidden = self.dropout(hidden)
         return self.linear_out(hidden)
 
-from collections import OrderedDict
+
+
+
+
 class FunnelForPreTrainingOutput(OrderedDict):
     """
     Output type of :class:`~hf_paddle.FunnelForPreTraining`.
 
     Args:
-        loss (`optional`, returned when ``labels`` is provided, ``paddle.FloatTensor`` of shape :obj:`(1,)`):
+        loss (`optional`, returned when ``labels`` is provided, ``paddle.Tensor`` of shape :obj:`(1,)`):
             Total loss of the ELECTRA-style objective.
-        logits (:obj:`paddle.FloatTensor` of shape :obj:`(batch_size, sequence_length)`):
+        logits (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length)`):
             Prediction scores of the head (scores for each token before SoftMax).
-        hidden_states (:obj:`tuple(paddle.FloatTensor)`, `optional`, returned when ``output_hidden_states=True`` is passed or when ``config.output_hidden_states=True``):
-            Tuple of :obj:`paddle.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
+        hidden_states (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_hidden_states=True`` is passed or when ``config.output_hidden_states=True``):
+            Tuple of :obj:`paddle.Tensor` (one for the output of the embeddings + one for the output of each layer)
             of shape :obj:`(batch_size, sequence_length, hidden_size)`.
 
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (:obj:`tuple(paddle.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or when ``config.output_attentions=True``):
-            Tuple of :obj:`paddle.FloatTensor` (one for each layer) of shape :obj:`(batch_size, num_heads,
+        attentions (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_attentions=True`` is passed or when ``config.output_attentions=True``):
+            Tuple of :obj:`paddle.Tensor` (one for each layer) of shape :obj:`(batch_size, num_heads,
             sequence_length, sequence_length)`.
 
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
             heads.
     """
 
-    loss  = None
+    loss = None
     logits = None
-    hidden_states  = None
-    attentions  = None
-
+    hidden_states = None
+    attentions = None
 
 
 class FunnelBaseModel(FunnelPreTrainedModel):
     def __init__(self, config):
         super().__init__()
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
-        self.config2=config
+            config = FunnelConfig(**config)
+        self.config2 = config
         self.embeddings = FunnelEmbeddings(config)
         self.encoder = FunnelEncoder(config)
 
@@ -1857,18 +1804,17 @@ class FunnelBaseModel(FunnelPreTrainedModel):
     def set_input_embeddings(self, new_embeddings):
         self.embeddings.word_embeddings = new_embeddings
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config2.output_attentions
         output_hidden_states = (
@@ -1885,12 +1831,10 @@ class FunnelBaseModel(FunnelPreTrainedModel):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-
-
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape )
+            attention_mask = paddle.ones(input_shape)
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64 )
+            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
 
         # TODO: deal with head_mask
         if inputs_embeds is None:
@@ -1911,12 +1855,13 @@ class FunnelBaseModel(FunnelPreTrainedModel):
 @register_base_model
 class FunnelModel(FunnelPreTrainedModel):
     base_model_prefix = "model"
+
     def __init__(self, **config):
-        super().__init__( )
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        super().__init__()
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
+            config = FunnelConfig(**config)
         self.config2 = config
         # self.config2.hidden_dropout=0
         # self.config2.attention_dropout=0
@@ -1933,16 +1878,15 @@ class FunnelModel(FunnelPreTrainedModel):
     def set_input_embeddings(self, new_embeddings):
         self.embeddings.word_embeddings = new_embeddings
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
 
         output_attentions = output_attentions if output_attentions is not None else self.config2.output_attentions
@@ -1960,26 +1904,24 @@ class FunnelModel(FunnelPreTrainedModel):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-
-
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape )
+            attention_mask = paddle.ones(input_shape)
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64 )
+            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
         else:
-            token_type_ids=token_type_ids.astype("int64")
+            token_type_ids = token_type_ids.astype("int64")
 
         # TODO: deal with head_mask
         if inputs_embeds is None:
             inputs_embeds = self.embeddings(input_ids)
             encoder_outputs = self.encoder(
-            inputs_embeds,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            output_attentions=output_attentions,
-            output_hidden_states=True,
-            return_dict=return_dict,
-        )
+                inputs_embeds,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                output_attentions=output_attentions,
+                output_hidden_states=True,
+                return_dict=return_dict,
+            )
 
         decoder_outputs = self.decoder(
             final_hidden=encoder_outputs.last_hidden_state,
@@ -1999,7 +1941,7 @@ class FunnelModel(FunnelPreTrainedModel):
                 outputs = outputs + (encoder_outputs.hidden_states + decoder_outputs[idx],)
             if output_attentions:
                 idx += 1
-                outputs = outputs + (encoder_outputs.attentions+ decoder_outputs[idx],)
+                outputs = outputs + (encoder_outputs.attentions + decoder_outputs[idx],)
             return outputs
 
         return BaseModelOutput(
@@ -2011,8 +1953,6 @@ class FunnelModel(FunnelPreTrainedModel):
         )
 
 
-
-
 class FunnelForPreTraining(FunnelPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
@@ -2022,18 +1962,18 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
         self.init_weights()
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        labels (``paddle.LongTensor`` of shape ``(batch_size, sequence_length)``, `optional`):
+        labels (``paddle.Tensor`` of shape ``(batch_size, sequence_length)``, `optional`):
             Labels for computing the ELECTRA-style loss. Input should be a sequence of tokens (see :obj:`input_ids`
             docstring) Indices should be in ``[0, 1]``:
 
@@ -2085,10 +2025,10 @@ class FunnelForPreTraining(FunnelPreTrainedModel):
 class FunnelForMaskedLM(FunnelPreTrainedModel):
     def __init__(self, config):
         super().__init__()
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
+            config = FunnelConfig(**config)
 
         self.funnel = FunnelModel(config)
         self.lm_head = nn.Linear(config.d_model, config.vocab_size)
@@ -2101,20 +2041,19 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        labels (:obj:`paddle.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
+        labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
             Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ...,
             config.vocab_size]`` (see ``input_ids`` docstring) Tokens with indices set to ``-100`` are ignored
             (masked), the loss is only computed for the tokens with labels in ``[0, ..., config.vocab_size]``
@@ -2147,17 +2086,17 @@ class FunnelForMaskedLM(FunnelPreTrainedModel):
         return prediction_logits
 
 
-
 class FunnelForSequenceClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
+
     def __init__(self, basemodel, num_classes=2):
         super().__init__()
-        config=basemodel.init_config
+        config = basemodel.init_config
         self.num_classes = num_classes
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
+            config = FunnelConfig(**config)
         self.num_labels = config.num_labels
         self.config2 = config
         # self.config2.hidden_dropout=0
@@ -2168,20 +2107,19 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
         self.classifier = FunnelClassificationHead(config, config.num_labels)
         self.init_weights()
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        labels (:obj:`paddle.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+        labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for computing the sequence classification/regression loss. Indices should be in :obj:`[0, ...,
             config.num_labels - 1]`. If :obj:`config.num_labels == 1` a regression loss is computed (Mean-Square loss),
             If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
@@ -2208,7 +2146,7 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
             if self.config2.problem_type is None:
                 if self.num_labels == 1:
                     self.config2.problem_type = "regression"
-                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int):
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
                     self.config2.problem_type = "single_label_classification"
                 else:
                     self.config2.problem_type = "multi_label_classification"
@@ -2236,29 +2174,28 @@ class FunnelForSequenceClassification(FunnelPreTrainedModel):
 class FunnelForMultipleChoice(FunnelPreTrainedModel):
     def __init__(self, config):
         super().__init__()
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
+            config = FunnelConfig(**config)
 
         self.funnel = FunnelBaseModel(config)
         self.classifier = FunnelClassificationHead(config, 1)
         self.init_weights()
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        labels (:obj:`paddle.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+        labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for computing the multiple choice classification loss. Indices should be in ``[0, ...,
             num_choices-1]`` where :obj:`num_choices` is the size of the second dimension of the input tensors. (See
             :obj:`input_ids` above)
@@ -2303,16 +2240,16 @@ class FunnelForMultipleChoice(FunnelPreTrainedModel):
         return reshaped_logits
 
 
-
 class FunnelForTokenClassification(FunnelPreTrainedModel):
     base_model_class = FunnelModel
-    def __init__(self, basemodel, num_classes=2 ):
-        config=basemodel.init_config
+
+    def __init__(self, basemodel, num_classes=2):
+        config = basemodel.init_config
         super().__init__()
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
+            config = FunnelConfig(**config)
         self.num_labels = config.num_labels
 
         self.funnel = FunnelModel(config)
@@ -2321,20 +2258,19 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
         self.num_classes = num_classes
         self.init_weights()
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        labels (:obj:`paddle.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
+        labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
             Labels for computing the token classification loss. Indices should be in ``[0, ..., config.num_labels -
             1]``.
         """
@@ -2367,7 +2303,7 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
                 )
                 loss = loss_fct(active_logits, active_labels)
             else:
-                loss = loss_fct(logits.reshape(-1, self.num_labels),paddle.reshape(labels,-1) )
+                loss = loss_fct(logits.reshape(-1, self.num_labels), paddle.reshape(labels, -1))
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -2378,14 +2314,15 @@ class FunnelForTokenClassification(FunnelPreTrainedModel):
 
 class FunnelForQuestionAnswering(FunnelPreTrainedModel):
     base_model_class = FunnelModel
+
     def __init__(self, basemodel):
-        config=basemodel.init_config
+        config = basemodel.init_config
         super().__init__()
-        if isinstance(config,PreTrainedModel):
-            config=config.config
+        if isinstance(config, PreTrainedModel):
+            config = config.config
         if isinstance(config, dict):
-            config=FunnelConfig(**config)
-        self.config2=config
+            config = FunnelConfig(**config)
+        self.config2 = config
         self.num_labels = config.num_labels
 
         self.funnel = FunnelModel(**config)
@@ -2393,25 +2330,24 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
 
         self.init_weights()
 
-
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        inputs_embeds=None,
-        start_positions=None,
-        end_positions=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            inputs_embeds=None,
+            start_positions=None,
+            end_positions=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         r"""
-        start_positions (:obj:`paddle.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+        start_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for position (index) of the start of the labelled span for computing the token classification loss.
             Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
             sequence are not taken into account for computing the loss.
-        end_positions (:obj:`paddle.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+        end_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for position (index) of the end of the labelled span for computing the token classification loss.
             Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
             sequence are not taken into account for computing the loss.
@@ -2432,7 +2368,7 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
         last_hidden_state = outputs[0]
 
         logits = self.qa_outputs(last_hidden_state)
-        start_logits, end_logits = split(logits,1, dim=-1)
+        start_logits, end_logits = split(logits, 1, dim=-1)
         start_logits = start_logits.squeeze(-1)
         end_logits = end_logits.squeeze(-1)
 
@@ -2457,25 +2393,14 @@ class FunnelForQuestionAnswering(FunnelPreTrainedModel):
             output = (start_logits, end_logits) + outputs[1:]
             return ((total_loss,) + output) if total_loss is not None else output
 
-        return  start_logits, end_logits
+        return start_logits, end_logits
 
 
 
-
-
-
-
-from dataclasses import dataclass
-from typing import Optional, Tuple
-
-import   paddle
-from dataclasses import fields
-from collections import OrderedDict
-import numpy as np
 
 def is_tensor(x):
     """
-    Tests if ``x`` is a :obj:`paddle.Tensor`, :obj:`tf.Tensor`, obj:`jaxlib.xla_extension.DeviceArray` or
+    Tests if ``x`` is a :obj:`paddle.Tensor`,   or
     :obj:`np.ndarray`.
     """
 
@@ -2485,10 +2410,10 @@ def is_tensor(x):
     return isinstance(x, np.ndarray)
 
 
-
 class ModelOutput(OrderedDict):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def __post_init__(self):
         class_fields = fields(self)
 
@@ -2513,9 +2438,9 @@ class ModelOutput(OrderedDict):
             if first_field_iterator:
                 for element in iterator:
                     if (
-                        not isinstance(element, (list, tuple))
-                        or not len(element) == 2
-                        or not isinstance(element[0], str)
+                            not isinstance(element, (list, tuple))
+                            or not len(element) == 2
+                            or not isinstance(element[0], str)
                     ):
                         break
                     setattr(self, element[0], element[1])
@@ -2549,7 +2474,7 @@ class ModelOutput(OrderedDict):
             return self.to_tuple()[k]
 
     def __setattr__(self, name, value):
-        if  value is not None:
+        if value is not None:
             # Don't call self.__setitem__ to avoid recursion errors
             super().__setitem__(name, value)
         super().__setattr__(name, value)
@@ -2560,11 +2485,12 @@ class ModelOutput(OrderedDict):
         # Don't call self.__setattr__ to avoid recursion errors
         super().__setattr__(key, value)
 
-    def to_tuple(self)  :
+    def to_tuple(self):
         """
         Convert self to a tuple containing all the attributes/keys that are not ``None``.
         """
         return tuple(self[k] for k in self.keys())
+
 
 @dataclass
 class BaseModelOutput(ModelOutput):
@@ -2572,24 +2498,24 @@ class BaseModelOutput(ModelOutput):
     Base class for model's outputs, with potential hidden states and attentions.
 
     Args:
-        last_hidden_state (:obj:`paddle.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`):
+        last_hidden_state (:obj:`paddle.Tensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`):
             Sequence of hidden-states at the output of the last layer of the model.
-        hidden_states (:obj:`tuple(paddle.FloatTensor)`, `optional`, returned when ``output_hidden_states=True`` is passed or when ``config.output_hidden_states=True``):
-            Tuple of :obj:`paddle.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
+        hidden_states (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_hidden_states=True`` is passed or when ``config.output_hidden_states=True``):
+            Tuple of :obj:`paddle.Tensor` (one for the output of the embeddings + one for the output of each layer)
             of shape :obj:`(batch_size, sequence_length, hidden_size)`.
 
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (:obj:`tuple(paddle.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or when ``config.output_attentions=True``):
-            Tuple of :obj:`paddle.FloatTensor` (one for each layer) of shape :obj:`(batch_size, num_heads,
+        attentions (:obj:`tuple(paddle.Tensor)`, `optional`, returned when ``output_attentions=True`` is passed or when ``config.output_attentions=True``):
+            Tuple of :obj:`paddle.Tensor` (one for each layer) of shape :obj:`(batch_size, num_heads,
             sequence_length, sequence_length)`.
 
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
             heads.
     """
 
-    last_hidden_state  = None
-    hidden_states  = None
-    attentions  = None
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
+    last_hidden_state = None
+    hidden_states = None
+    attentions = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
