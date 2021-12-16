@@ -76,7 +76,6 @@ std::vector<paddle::Tensor> decoding_kernel(
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
     const float& alpha,
-    const bool& fuse_qkv,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2")
@@ -124,6 +123,10 @@ std::vector<paddle::Tensor> decoding_kernel(
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
+
+  auto q_weight_shape = self_attn_query_weight[0].shape();
+  auto k_weight_shape = self_attn_key_weight[0].shape();
+  bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -373,8 +376,7 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const float& alpha,
-    const bool& fuse_qkv) {
+    const float& alpha) {
   auto stream = input.stream();
 
   cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
@@ -433,7 +435,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          fuse_qkv,
           stream);
       break;
     }
@@ -488,7 +489,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          fuse_qkv,
           stream);
       break;
     }

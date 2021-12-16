@@ -38,7 +38,7 @@ def infer_transformer_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
-        _alpha, _fuse_qkv):
+        _alpha):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -91,8 +91,7 @@ def infer_transformer_decoding(
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
-        "alpha": _alpha,
-        "fuse_qkv": _fuse_qkv
+        "alpha": _alpha
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -122,7 +121,7 @@ def infer_force_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb, trg_word,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
-        _alpha, _fuse_qkv):
+        _alpha):
     helper = LayerHelper('fusion_force_decoding', **locals())
 
     inputs = {
@@ -178,8 +177,7 @@ def infer_force_decoding(
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
-        "alpha": _alpha,
-        "fuse_qkv": _fuse_qkv
+        "alpha": _alpha
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -841,8 +839,7 @@ class InferTransformerDecoding(nn.Layer):
                 _max_out_len=self._max_out_len,
                 _diversity_rate=self._diversity_rate,
                 _rel_len=self._rel_len,
-                _alpha=self._alpha,
-                _fuse_qkv=self._fuse_qkv)
+                _alpha=self._alpha)
 
         if self._decoding_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(

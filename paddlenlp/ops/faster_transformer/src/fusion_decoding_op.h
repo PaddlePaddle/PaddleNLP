@@ -79,5 +79,4 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const float& alpha,
-    const bool& fuse_qkv);
+    const float& alpha);
