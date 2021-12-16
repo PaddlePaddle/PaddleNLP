@@ -154,7 +154,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 ## 5. 模型训练
 
-**语义索引预训练模型下载链接：**
+**语义索引训练模型下载链接：**
 
 以下模型结构参数为: `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
 

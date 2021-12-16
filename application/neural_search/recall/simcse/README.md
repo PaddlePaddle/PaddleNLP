@@ -154,11 +154,10 @@ simcse/
 
 ### 训练环境说明
 
-```
-NVIDIA Driver Version: 440.64.00 
-Ubuntu 16.04.6 LTS (Docker)
-Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
-```
++ NVIDIA Driver Version: 440.64.00 
++ Ubuntu 16.04.6 LTS (Docker)
++ Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
+
 
 ### 单机单卡训练/单机多卡训练
 
@@ -305,7 +304,7 @@ recall@50=74.848
 
 ### 7.1 功能一：抽取文本的语义向量
 
-修改inference.py文件里面输入文本id2corpus和模型路径；params_path:
+修改 inference.py 文件里面输入文本 id2corpus 和模型路径 params_path:
 
 ```
 params_path='checkpoints/model_20000/model_state.pdparams'
