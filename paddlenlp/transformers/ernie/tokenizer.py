@@ -93,6 +93,8 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
             "ernie-gen-large-430g-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
+            "ppminilm-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -118,6 +120,9 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-gen-large-430g-en": {
+            "do_lower_case": True
+        },
+        "ppminilm-6l-768h": {
             "do_lower_case": True
         },
     }
