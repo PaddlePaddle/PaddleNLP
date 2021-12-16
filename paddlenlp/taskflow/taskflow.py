@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+from collections import deque
 import warnings
 import paddle
 from ..utils.tools import get_env_device
@@ -259,3 +261,12 @@ class Taskflow(object):
     def from_segments(self, *inputs):
         results = self.task_instance.from_segments(inputs)
         return results
+
+    def interactive_mode(self, max_turn):
+        with self.task_instance.interactive_mode(max_turn=3):
+            while True:
+                human = input("[Human]:").strip()
+                if human == "exit":
+                    exit()
+                robot = self.task_instance(human)[0]
+                print("[Bot]:%s"%robot)

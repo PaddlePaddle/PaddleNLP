@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+from collections import deque
 import numpy as np
 import paddle
 
@@ -24,29 +26,28 @@ from .task import Task
 usage = r"""
            from paddlenlp import Taskflow 
 
+           # 非交互模式
            dialogue = Taskflow("dialogue")
-           dialogue("吃饭了吗")
-           # 每次执行结果可能不同
+           dialogue(["吃饭了吗"])
            '''
            ['刚吃完饭,你在干什么呢?']
            '''
+           dialogue(["你好", "吃饭了吗"], ["你是谁？"])
+           '''
+           ['吃过了,你呢', '我是李明啊']
+           '''
 
-           # 多轮对话示例
-           dialogue("我们来聊天吧！")
+           dialogue = Taskflow("dialogue")
+           # 进入交互模式 (输入exit退出)
+           dialogue.interactive_mode(max_turn=3)
+
            '''
-           ['好呀!那你想聊些什么?']
-           '''
-           dialogue("都可以呀,你最喜欢什么体育运动？")
-           '''
-           ['我最喜欢的运动就是篮球了,你呢?']
-           '''
-           dialogue("我也是!你最喜欢哪个篮球明星?")
-           '''
-           ['我最喜欢的是姚明,你呢?最喜欢谁?']
-           '''
-           dialogue("我最喜欢的是易建联,他带领广东队拿了很多次总冠军呢!")
-           '''
-           ['我也很喜欢易建联,我最喜欢的是他的扣篮,他的扣篮是很厉害的。']
+           [Human]:你好
+           [Bot]:你好,很高兴认识你,我想问你一下,你喜欢运动吗?
+           [Human]:喜欢
+           [Bot]:那你喜欢什么运动啊?
+           [Human]:篮球,你喜欢篮球吗
+           [Bot]:当然了,我很喜欢打篮球的?
            '''           
          """
 
@@ -70,6 +71,7 @@ class DialogueTask(Task):
         self._construct_tokenizer(model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
+        self._interactive_mode = False
         if self._static_mode:
             self._get_inference_model()
         else:
@@ -125,6 +127,73 @@ class DialogueTask(Task):
 
         return input_ids, token_type_ids, position_ids, attention_mask
 
+    def _check_input_text(self, inputs):
+        if self._interactive_mode:
+            if isinstance(inputs, str):
+                self.context.append(inputs.strip())
+                inputs = [list(self.context)]
+                return inputs
+            else:
+                raise ValueError("In the interactive mode, the input data shold be a string")
+        elif not isinstance(inputs[0], list):
+            raise ValueError("If not in the interactive mode, the input data should be a list.")
+        return inputs
+
+    def _batchify(self, data, max_seq_len, batch_size):
+        """
+        Generate input batches.
+        """
+        padding = False if batch_size == 1 else True
+        pad_func = Pad(pad_val=self._tokenizer.pad_token_id, pad_right=False, dtype=np.int64)
+
+        def pad_mask(batch_attention_mask):
+            batch_size = len(batch_attention_mask)
+            max_len = max(map(len, batch_attention_mask))
+            attention_mask = np.ones((batch_size, max_len, max_len), dtype='float32') * -1e9
+            for i, mask_data in enumerate(attention_mask):
+                seq_len = len(batch_attention_mask[i])
+                mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype='float32')
+            # In order to ensure the correct broadcasting mechanism, expand one
+            # dimension to the second dimension (n_head of Transformer).
+            attention_mask = np.expand_dims(attention_mask, axis=1)
+            return attention_mask
+
+        def _parse_batch(batch_examples):
+            if padding:
+                input_ids = pad_func([example['input_ids'] for example in batch_examples])
+                token_type_ids = pad_func([example['token_type_ids'] for example in batch_examples])
+                position_ids = pad_func([example['position_ids'] for example in batch_examples])
+                attention_mask = pad_mask([example['attention_mask'] for example in batch_examples])
+            else:
+                input_ids = np.asarray([example['input_ids'] for example in batch_examples], dtype=np.int64)
+                token_type_ids = np.asarray([example['token_type_ids'] for example in batch_examples], dtype=np.int64)
+                position_ids = np.asarray([example['position_ids'] for example in batch_examples], dtype=np.int64)
+                attention_mask = np.asarray([example['attention_mask'] for example in batch_examples])
+                attention_mask = np.expand_dims(attention_mask, 0)
+
+            return input_ids, token_type_ids, position_ids, attention_mask
+
+        examples = []
+        for texts in data:
+            examples.append(self._convert_text_to_input(texts, max_seq_len))
+
+        # Seperates data into some batches.
+        one_batch = []
+        for example in examples:
+            one_batch.append(example)
+            if len(one_batch) == batch_size:
+                yield _parse_batch(one_batch)
+                one_batch = []
+        if one_batch:
+            yield _parse_batch(one_batch)
+
+    def _convert_text_to_input(self, texts, max_seq_len):
+        """
+        Convert input strings to tokens.
+        """
+        return self._tokenizer.dialogue_encode(
+            texts, max_seq_len=max_seq_len, add_start_token_as_response=True, is_split_into_words=False)
+
     def _preprocess(self, inputs):
         """
         Transform the raw text to the model inputs, two steps involved:
@@ -138,25 +207,10 @@ class DialogueTask(Task):
         lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
 
-        def read(inputs):
-            for text in inputs:
-                tokenized_output = self._tokenizer.dialogue_encode(
-                    text, 
-                    max_seq_len=self._max_seq_len, 
-                    add_start_token_as_response=True,
-                    is_split_into_words=False)
-                yield tokenized_output
-
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
-
-        infer_data_loader = paddle.io.DataLoader(infer_ds,
-                                                 collate_fn=self._batchify_fn,
-                                                 num_workers=num_workers,
-                                                 batch_size=self._batch_size,
-                                                 return_list=True)
+        batches = self._batchify(inputs, self._max_seq_len, self._batch_size)
 
         outputs = {}
-        outputs['data_loader'] = infer_data_loader
+        outputs['batches'] = batches
         outputs['text'] = inputs
         return outputs
 
@@ -166,26 +220,26 @@ class DialogueTask(Task):
         """
         all_ids = []
         all_scores = []
-        with dygraph_mode_guard():
-            for batch in inputs['data_loader']:
-                input_ids, token_type_ids, position_ids, attention_mask = batch
-                ids, scores = self._model.generate(input_ids=input_ids, 
-                                                   token_type_ids=token_type_ids,
-                                                   position_ids=position_ids,
-                                                   attention_mask=attention_mask,
-                                                   max_length=64,
-                                                   min_length=1,
-                                                   decode_strategy='sampling',
-                                                   temperature=1.0,
-                                                   top_k=5,
-                                                   top_p=1.0,
-                                                   num_beams=0,
-                                                   length_penalty=1.0,
-                                                   early_stopping=False,
-                                                   use_faster=False,
-                                                   num_return_sequences=1)
-                all_ids.extend([ids])
-                all_scores.extend([scores])
+
+        for batch in inputs["batches"]:
+            input_ids, token_type_ids, position_ids, attention_mask = map(paddle.to_tensor, batch)
+            ids, scores = self._model.generate(input_ids=input_ids, 
+                                                token_type_ids=token_type_ids,
+                                                position_ids=position_ids,
+                                                attention_mask=attention_mask,
+                                                max_length=64,
+                                                min_length=1,
+                                                decode_strategy='sampling',
+                                                temperature=1.0,
+                                                top_k=5,
+                                                top_p=1.0,
+                                                num_beams=0,
+                                                length_penalty=1.0,
+                                                early_stopping=False,
+                                                use_faster=False,
+                                                num_return_sequences=1)
+            all_ids.extend([ids])
+            all_scores.extend([scores])
         inputs['ids'] = all_ids
         inputs['scores'] = all_scores
         return inputs
@@ -204,6 +258,17 @@ class DialogueTask(Task):
         tokens = tokenizer.merge_subword(tokens)
         return token_ids, tokens
 
+    @contextlib.contextmanager
+    def interactive_mode(self, max_turn=3):
+        """
+        Enter the interactive mode.
+        """
+        self._interactive_mode = True
+        self.max_turn = max_turn
+        self.context = deque(maxlen=self.max_turn)
+        yield
+        self.context.clear()
+        self._interactive_mode = False
 
     def _get_in_turn_repetition(self, pred, is_cn=False):
         '''
@@ -276,10 +341,13 @@ class DialogueTask(Task):
 
         results = []
         for ids, scores, text in zip(all_ids, all_scores, texts):
-            response = self._select_response(ids, 
-                                             scores, 
-                                             self._tokenizer, 
-                                             num_return_sequences=1,
-                                             keep_space=False)
-            results.append(response[0])
+            results.extend(
+                self._select_response(ids, 
+                                      scores, 
+                                      self._tokenizer, 
+                                      num_return_sequences=1,
+                                      keep_space=False))
+        
+        if self._interactive_mode:
+            self.context.append(results[0].strip())
         return results

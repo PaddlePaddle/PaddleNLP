@@ -455,28 +455,44 @@ poetry(["林密不见人", "举头邀明月"])
 
 ### 开放域对话
 
-通过Taskflow实现交互式聊天：
+非交互模式：
 ```python
 from paddlenlp import Taskflow 
 
-dialogue = Taskflow("diglogue")
-dialogue("我们来聊天吧！")
->>> [{'text': '我们来聊天吧!', 'response': '好呀!那你想聊些什么?'}]
+dialogue = Taskflow("dialogue")
+dialogue(["吃饭了吗"])
+>>> ['刚吃完饭,你在干什么呢?']
 
-dialogue("都可以呀,你最喜欢什么体育运动？")
->>> [{'text': '都可以呀,你最喜欢什么体育运动？', 'response': '我最喜欢的运动就是篮球了,你呢?'}]
-
-dialogue("我也是!你最喜欢哪个篮球明星?")
->>> [{'text': '我也是!你最喜欢哪个篮球明星', 'response': '我最喜欢的是姚明,你呢?最喜欢谁?'}]
-
-dialogue("我最喜欢的是易建联,他带领广东队拿了很多次总冠军呢!")
->>> [{'text': '我最喜欢的是易建联,他带领广东队拿了很多次总冠军呢!', 'response': '我也很喜欢易建联,我最喜欢的是他的扣篮,他的扣篮是很厉害的。'}]  
+dialogue(["你好", "吃饭了吗"], ["你是谁？"])
+>>> ['吃过了,你呢', '我是李明啊']
 ```
 
 可配置参数：
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：最大序列长度，默认为512。
+
+交互模式：
+```python
+from paddlenlp import Taskflow
+
+dialogue = Taskflow("dialogue")
+# 输入`exit`可退出交互模式
+dialogue.interactive_mode(max_turn=3)
+
+'''
+[Human]:你好
+[Bot]:你好,很高兴认识你,我想问你一下,你喜欢运动吗?
+[Human]:喜欢
+[Bot]:那你喜欢什么运动啊?
+[Human]:篮球,你喜欢篮球吗
+[Bot]:当然了,我很喜欢打篮球的?
+'''
+```
+
+交互模式参数：
+
+* `max_turn`：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。
 
 ## FAQ
 
