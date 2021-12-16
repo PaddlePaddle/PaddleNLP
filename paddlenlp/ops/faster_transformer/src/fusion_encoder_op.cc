@@ -11,6 +11,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+
 #include <string>
 #include <vector>
 
@@ -40,7 +41,7 @@ std::vector<paddle::Tensor> EncoderForward(
     // const paddle::Tensor& amax_list,
     const int64_t& head_num,
     const int64_t& size_per_head,
-    const bool& is_gelu,
+    const bool& use_gelu,
     const bool& remove_padding,
     const int64_t& int8_mode,
     const int64_t& num_layer,
@@ -75,7 +76,7 @@ std::vector<paddle::Tensor> EncoderForward(
                               encoder_out,
                               head_num,
                               size_per_head,
-                              is_gelu,
+                              use_gelu,
                               remove_padding,
                               int8_mode,  // no support now
                               num_layer,
@@ -112,7 +113,7 @@ std::vector<std::vector<int64_t>> EncoderInferShape(
     // const std::vector<int64_t>& amax_list_shape,
     const int64_t& head_num,
     const int64_t& size_per_head,
-    const bool& is_gelu,
+    const bool& use_gelu,
     const bool& remove_padding,
     const int64_t& int8_mode,  // no support now
     const int64_t& num_layer,
@@ -176,7 +177,7 @@ PD_BUILD_OP(fusion_encoder)
     .Outputs({"EncoderOut"})
     .Attrs({"head_num: int64_t",
             "size_per_head: int64_t",
-            "is_gelu: bool",
+            "use_gelu: bool",
             "remove_padding: bool",
             "int8_mode: int64_t",
             "num_layer: int64_t",

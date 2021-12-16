@@ -19,7 +19,7 @@ import argparse
 
 from paddle.utils.download import get_path_from_url
 
-URL = "https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/waybill.tar.gz"
+URL = "https://bj.bcebos.com/paddlenlp/paddlenlp/datasets/waybill.tar.gz"
 
 
 def main(arguments):

@@ -55,7 +55,7 @@ from .log import logger
 
 __all__ = ['get_weights_path_from_url']
 
-COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/transformers/community/"
 
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 
@@ -206,10 +206,14 @@ def _download(url, path, md5sum=None):
         total_size = req.headers.get('content-length')
         with open(tmp_fullname, 'wb') as f:
             if total_size:
-                with tqdm(total=(int(total_size) + 1023) // 1024, unit='B', unit_scale=True) as pbar:
+                with tqdm(
+                        total=int(total_size),
+                        unit='B',
+                        unit_scale=True,
+                        unit_divisor=1024) as pbar:
                     for chunk in req.iter_content(chunk_size=1024):
                         f.write(chunk)
-                        pbar.update(1)
+                        pbar.update(len(chunk))
             else:
                 for chunk in req.iter_content(chunk_size=1024):
                     if chunk:

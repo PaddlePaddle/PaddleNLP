@@ -57,7 +57,8 @@ def infer(model, data_loader, tokenizer):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_samples)
+            num_return_sequences=args.num_samples,
+            use_faster=False)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
