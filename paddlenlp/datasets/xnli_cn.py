@@ -39,13 +39,13 @@ class XNLI_CN(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('xnli_cn', 'train', 'part-0'),
+            os.path.join('xnli_cn.tar', 'xnli_cn', 'train', 'part-0'),
             'b0e4df29af8413eb935a2204de8958b7'),
         'dev': META_INFO(
-            os.path.join('xnli_cn', 'dev', 'part-0'),
+            os.path.join('xnli_cn.tar', 'xnli_cn', 'dev', 'part-0'),
             '401a2178e15f4b0c35812ab4a322bd94'),
         'test': META_INFO(
-            os.path.join('xnli_cn', 'test', 'part-0'),
+            os.path.join('xnli_cn.tar', 'xnli_cn', 'test', 'part-0'),
             '71b043be8207e54185e761fca00ba3d7'),
     }
 

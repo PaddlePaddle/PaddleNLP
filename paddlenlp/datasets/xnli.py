@@ -19,7 +19,7 @@ import csv
 from contextlib import ExitStack
 
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url, _decompress
+from paddlenlp.utils.downloader import get_path_from_url, _decompress
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.utils.log import logger
 from . import DatasetBuilder
