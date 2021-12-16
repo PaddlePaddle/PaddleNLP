@@ -1381,7 +1381,7 @@ class InferUnifiedDecoding(nn.Layer):
             _bos_id=bos_token_id,
             _eos_id=eos_token_id,
             _max_out_len=max_out_len,
-            _diversity_rate=diversity_rate,
+            _diversity_rate=-diversity_rate,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
@@ -1625,7 +1625,7 @@ class InferBartDecoding(nn.Layer):
             self.linear_weight, self.linear_bias, self.pos_emb,
             decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
+            bos_token_id, eos_token_id, max_out_len, -diversity_rate, rel_len,
             alpha, early_stopping)
 
         ids = finalize(
@@ -1877,7 +1877,7 @@ class InferMBartDecoding(nn.Layer):
             self.linear_bias, self.pos_emb, trg_word, decoding_strategy,
             beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
+            bos_token_id, eos_token_id, max_out_len, -diversity_rate, rel_len,
             alpha, temperature, early_stopping, self._hidden_act)
 
         ids = finalize(
