@@ -33,7 +33,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 1. **推理速度快**: 依托 PaddleSlim 的裁剪、量化技术对 PP-MiniLM 小模型进行压缩、加速, 使得 PP-MiniLM 量化后模型 GPU 推理速度相比 BERT base 加速比高达 4.2；
 
-2. **精度高**: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.32%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.09%、1.91%；
+2. **精度高**: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6 层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.32%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.09%、1.91%；
 
 3. **参数规模小**：依托 Task-agnostic Distillation 技术和 PaddleSlim 裁剪技术，模型参数量相比 BERT 减少 52%。
 
@@ -102,7 +102,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上七个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上七个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
@@ -201,7 +201,7 @@ cd ..
 
 这一步主要使用 PaddleSlim 对下游任务上的模型宽度进行裁剪，进一步压缩模型的大小。
 
-该过程会以上一步的模型（即 fine-tuning 后得到的最好模型）当作教师模型，蒸馏宽度为 3/4 的学生模型。经过我们的实验，在 6L768H 条件下，模型宽度压缩为原来的 3/4，精度几乎无损（-0.15)。
+该过程会以上一步的模型（即 fine-tuning 后得到的最好模型）当作教师模型，蒸馏宽度为 3/4 的学生模型。经过我们的实验，在 6L768H 条件下，模型宽度压缩为原来的 3/4，精度几乎无损（-0.09)。
 
 <a name="原理简介"></a>
 
@@ -365,7 +365,7 @@ sh infer_perf.sh
 cd ..
 ```
 
-取 5 个非 `--collect_shape` 阶段打印出的时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 4.2 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.00 倍。
+取 5 个非 `--collect_shape` 阶段打印出的时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 4.2 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.0 倍。
 
 |                     | 平均耗时(s) | 加速比 |
 | ------------------- | ----------- | ------ |
