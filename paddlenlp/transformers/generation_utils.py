@@ -501,11 +501,6 @@ class GenerationMixin(object):
             # not support for min_length yet in the faster version
             raise AttributeError(
                 "'min_length != 0' is not supported yet in the faster version")
-        if kwargs['repetition_penalty'] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError(
-                "'repetition_penalty != 1' is not supported yet in the faster version"
-            )
         if kwargs['num_beam_groups'] != 1:
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
@@ -537,6 +532,7 @@ class GenerationMixin(object):
                  diversity_rate=0.0,
                  use_cache=True,
                  use_faster=False,
+                 use_fp16_decoding=False,
                  **model_kwargs):
         r"""
         The interface for generation task. This method can generate sequences 
@@ -605,7 +601,9 @@ class GenerationMixin(object):
             use_cache: (bool, optional): Whether to use the model cache to 
                 speed up decoding. Default to True.
             use_faster: (bool, optional): Whether to use faster entry of model 
-                for generation. Default to False.
+                for FasterGeneration. Default to False.
+            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding. 
+                Only works when faster entry is avalible. Default to False.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
 
