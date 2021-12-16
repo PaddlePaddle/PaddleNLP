@@ -10,13 +10,11 @@ import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
+from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
 
 from model import SimCSE
 from data import create_dataloader
-from data import gen_id2corpus, gen_text_file
-from ann_util import build_index
 from tqdm import tqdm 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
