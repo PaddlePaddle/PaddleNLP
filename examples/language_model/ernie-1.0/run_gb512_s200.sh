@@ -28,7 +28,7 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --use_sharding false \
     --use_amp true \
     --use_recompute false \
-    --max_lr 0.00005 \
+    --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 2000000 \
     --save_steps 50000 \
