@@ -70,10 +70,10 @@ parser.add_argument(
     help="File name of float model's parameters.")
 
 parser.add_argument(
-    "--tokenizer_path",
-    default='../general_distill/ernie-batchbatch-50w_400000/',
+    "--model_name_or_path",
+    default='ppminilm-6l-768h',
     type=str,
-    help="The directory for tokenizer.", )
+    help="Model name or the directory of model directory.", )
 
 args = parser.parse_args()
 
@@ -85,7 +85,7 @@ def quant_post(args, batch_size=8, algo='avg'):
 
     train_ds = load_dataset("clue", args.task_name, splits="dev")
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.tokenizer_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,

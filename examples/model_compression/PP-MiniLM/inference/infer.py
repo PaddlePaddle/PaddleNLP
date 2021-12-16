@@ -44,10 +44,10 @@ def parse_args():
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
-        "--tokenizer_path",
-        default='../general_distill/ernie-batchbatch-50w_400000/',
+        "--model_name_or_path",
+        default='ppminilm-6l-768h',
         type=str,
-        help="The directory for tokenizer.", )
+        help="The directory or name of model.", )
     parser.add_argument(
         "--model_path",
         default='./quant_models/model',
@@ -234,7 +234,7 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
-    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_path)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,

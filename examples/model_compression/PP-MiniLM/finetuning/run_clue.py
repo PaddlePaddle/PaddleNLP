@@ -34,24 +34,12 @@ from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer,
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
+sys.path.append("../")
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
+
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
-
-METRIC_CLASSES = {
-    "afqmc": Accuracy,
-    "tnews": Accuracy,
-    "iflytek": Accuracy,
-    "ocnli": Accuracy,
-    "cmnli": Accuracy,
-    "cluewsc2020": Accuracy,
-    "csl": Accuracy,
-}
-
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-}
 
 
 def parse_args():
@@ -193,57 +181,6 @@ def evaluate(model, loss_fct, metric, data_loader):
     print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
     return res
-
-
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a glue example into necessary features"""
-    if not is_test:
-        # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
-        # Get the label
-        label = example['label']
-        label = np.array([label], dtype=label_dtype)
-    # Convert raw text to feature
-    if 'sentence' in example:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
-    elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
-    elif 'keyword' in example:  # CSL
-        sentence1 = " ".join(example['keyword'])
-        example = tokenizer(
-            sentence1, text_pair=example['abst'], max_seq_len=max_seq_length)
-    elif 'target' in example:  # wsc
-        text, query, pronoun, query_idx, pronoun_idx = example['text'], example[
-            'target']['span1_text'], example['target']['span2_text'], example[
-                'target']['span1_index'], example['target']['span2_index']
-        text_list = list(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
-        if pronoun_idx > query_idx:
-            text_list.insert(query_idx, "_")
-            text_list.insert(query_idx + len(query) + 1, "_")
-            text_list.insert(pronoun_idx + 2, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 2 + 1, "]")
-        else:
-            text_list.insert(pronoun_idx, "[")
-            text_list.insert(pronoun_idx + len(pronoun) + 1, "]")
-            text_list.insert(query_idx + 2, "_")
-            text_list.insert(query_idx + len(query) + 2 + 1, "_")
-        text = "".join(text_list)
-        example = tokenizer(text, max_seq_len=max_seq_length)
-    if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
 
 
 def do_eval(args):
@@ -422,7 +359,7 @@ def do_train(args):
                     output_dir = args.output_dir
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    #Need better way to get inner model of DataParallel
+                    # Need better way to get inner model of DataParallel
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)

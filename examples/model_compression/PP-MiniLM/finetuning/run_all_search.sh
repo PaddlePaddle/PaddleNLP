@@ -9,7 +9,7 @@ bash run_one_search.sh $1 csl 4 &
 bash run_one_search.sh $1 wsc 5 &
 
 # Because the CMNLI data set is significantly larger than other data sets,
-# it needs to be placed on different cards.
+# It needs to be placed on different cards.
 lr=1e-4
 bs=16
 sh run_clue.sh CMNLI $lr $bs 3 128 0 $1  > $1/cmnli/${lr}_${bs}_3_128.log &
