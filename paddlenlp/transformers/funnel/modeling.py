@@ -56,7 +56,6 @@ logger = logging.getLogger(__name__)
 CONFIG_NAME = "model_config.json"
 INF = 1e6
 
-
 class PretrainedConfig(dict):
     r"""
     Base class for all configuration classes. Handles a few parameters common to all models' configurations as well as
@@ -972,10 +971,7 @@ def gelu_new(x):
     return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
 
 
-if version.parse(paddle.__version__) < version.parse("1.4"):
-    gelu = _gelu_python
-else:
-    gelu = nn.functional.gelu
+gelu = nn.functional.gelu
 
 
 def gelu_fast(x):
@@ -1020,9 +1016,6 @@ def get_activation(activation_string):
         return ACT2FN[activation_string]
     else:
         raise KeyError(f"function {activation_string} not found in ACT2FN mapping {list(ACT2FN.keys())}")
-
-
-
 
 
 class FunnelEmbeddings(nn.Layer):
