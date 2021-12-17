@@ -192,10 +192,10 @@ pip install -r requirements.txt
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
 |  有监督训练 Baseline | 30.077| 43.513| 48.633 | 53.448 |59.632| 标准 pair-wise 训练范式，通过随机采样产生负样本|
 |  有监督训练 In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| In-batch Negatives 有监督训练|
-|  无监督训练 SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
-|  无监督 + 有监督训练 SimCSE+Inbatch-negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
-|  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie 预训练，SimCSE 无监督训练|
-|  Domain-adaptive Pretraining + SimCSE + Inbatch-negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
+|  无监督训练 SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE 无监督训练|
+|  无监督 + 有监督训练 SimCSE + In-batch Negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
+|  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| ERNIE 预训练，SimCSE 无监督训练|
+|  Domain-adaptive Pretraining + SimCSE + In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| ERNIE 预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
 
 从上述表格可以看出，首先利用ERNIE 1.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到 SimCSE 上进行无监督训练，最后利用 In-batch Negatives 在有监督数据上进行训练能够获得最佳的性能。
 
