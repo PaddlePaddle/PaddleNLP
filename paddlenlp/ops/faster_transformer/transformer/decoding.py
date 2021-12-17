@@ -619,6 +619,13 @@ class InferTransformerDecoding(nn.Layer):
                 )
             load("FasterTransformer", verbose=True)
 
+        size_per_head = d_model / n_head
+        # fuse_qkv can only support size_per_head is one of [32, 64, 128].
+        if size_per_head in [32, 64, 128]:
+            self._fuse_qkv = True
+        else:
+            self._fuse_qkv = False
+
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
             if arg not in [
@@ -715,11 +722,41 @@ class InferTransformerDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        for mod in decoder.layers:
+        for i, mod in enumerate(decoder.layers):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
-            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
-            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
+            if self._fuse_qkv:
+                q_weight_shape = mod.self_attn.q_proj.weight.shape
+                k_weight_shape = mod.self_attn.k_proj.weight.shape
+                v_weight_shape = mod.self_attn.v_proj.weight.shape
+
+                q_weights = self.create_parameter(
+                    shape=[
+                        q_weight_shape[0], q_weight_shape[1] + k_weight_shape[1]
+                        + v_weight_shape[1]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32")
+                setattr(self, "slf_q_weight_" + str(i), q_weights)
+                self.slf_q_weight.append(
+                    getattr(self, "slf_q_weight_" + str(i)))
+
+                q_bias_shape = mod.self_attn.q_proj.bias.shape
+                k_bias_shape = mod.self_attn.k_proj.bias.shape
+                v_bias_shape = mod.self_attn.v_proj.bias.shape
+
+                q_biases = self.create_parameter(
+                    shape=[
+                        q_bias_shape[0] + k_bias_shape[0] + v_bias_shape[0]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32",
+                    is_bias=True)
+                setattr(self, "slf_q_bias_" + str(i), q_biases)
+                self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
+            else:
+                self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+                self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_weight.append(mod.self_attn.v_proj.weight)
