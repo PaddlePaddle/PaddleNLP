@@ -266,7 +266,7 @@ class Taskflow(object):
         with self.task_instance.interactive_mode(max_turn=3):
             while True:
                 human = input("[Human]:").strip()
-                if human == "exit":
+                if human.lower() == "exit":
                     exit()
                 robot = self.task_instance(human)[0]
                 print("[Bot]:%s"%robot)
