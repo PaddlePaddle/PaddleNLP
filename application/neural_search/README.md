@@ -111,7 +111,7 @@
 |  召回 |  Domain-adaptive Pretraining  |  2kw | - | - | - |
 |  召回 |  无监督预训练 - SimCSE |  798w  | 20000 |  300000| 1000 |
 |  召回 |  有监督训练 - In-batch Negatives | 3998  | 20000 |300000  | 1000 |
-|  排序 |  有监督训练 | 1973538   | 57811 | - | 1000 |
+|  排序 |  有监督训练 - ERNIE-Gram单塔 Pairwise| 1973538   | 57811 | - | 1000 |
 
 我们将除 Domain-adaptive Pretraining 之外的其他数据集全部开源，下载地址：
 
