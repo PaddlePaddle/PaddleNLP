@@ -43,8 +43,8 @@ def convert_example(example,
                     is_test=False):
     text = example
     encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
-    input_ids = np.array(tokenized_input['input_ids'], dtype="int64")
-    token_type_ids = np.array(tokenized_input['token_type_ids'], dtype="int64")
+    input_ids = np.array(encoded_inputs['input_ids'], dtype="int64")
+    token_type_ids = np.array(encoded_inputs['token_type_ids'], dtype="int64")
     return input_ids, token_type_ids
 
 
