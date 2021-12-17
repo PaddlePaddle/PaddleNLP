@@ -86,8 +86,8 @@ class Task(metaclass=abc.ABCMeta):
     @abstractmethod
     def _construct_input_spec(self):
         """
-       Construct the input spec for the convert dygraph model to static model.
-       """
+        Construct the input spec for the convert dygraph model to static model.
+        """
 
     def _prepare_static_mode(self):
         """
