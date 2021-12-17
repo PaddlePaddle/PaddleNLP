@@ -12,7 +12,7 @@
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
-* [2021-12-12] PaddleNLP 2.2版本已发布！新增预训练加速训推一体开发FasterERNIE、面向生成任务的高性能加速组件FasterGeneration正式推出！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
+* [2021-12-12] PaddleNLP 2.2版本已发布！预训练加速训推一体开发FasterERNIE、面向生成任务的高性能加速组件FasterGeneration、中文小模型PP-MiniLM正式推出！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
 * [2021-10-12] PaddleNLP 2.1版本已发布！新增开箱即用的NLP任务能力、Prompt Tuning应用示例与生成任务的高性能推理！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.0)。
 
 
