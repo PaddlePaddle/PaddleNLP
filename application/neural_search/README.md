@@ -98,20 +98,20 @@
 
 数据集来源于某文献检索系统，既有大量无监督数据，又有有监督数据。
 
-（1）我们采用文献的 title,keyword,abstract 三个字段内容，使用全量无标签数据进行 Domain-adaptive Pretraining；
+（1）采用文献的 query, title,keywords,abstract 四个字段内容，构建无标签数据集进行 Domain-adaptive Pretraining；
 
-（2）接着采用文献的 title,keyword 两个字段内容，进行其他召回和排序模型的训练。首先使用部分无监督数据训练SimCSE；
+（2）采用文献的 query,title,keywords 三个字段内容，构造无标签数据集，进行无监督召回训练SimCSE；
 
-（3）使用线上检索系统点击数据构造召回阶段的有监督训练集，基于 In-batch Negatives 策略进行训练；
+（3）使用文献的的query, title, keywords，构造带正标签的数据集，不包含负标签样本，基于 In-batch Negatives 策略进行训练；
 
-（4）使用点击（作为正样本）和展现未点击（作为负样本）数据构造排序阶段的训练集。
+（4）在排序阶段，使用点击（作为正样本）和展现未点击（作为负样本）数据构造排序阶段的训练集，使用ERNIE-Gram模型进行精排训练。
 
-|  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回集 |测试集（demo数据，用于直观展示效果） |
+|  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回库 |测试集 |
 | ------------ | ------------ |------------ | ------------ | ------------ | ------------ |
 |  召回 |  Domain-adaptive Pretraining  |  2kw | - | - | - |
-|  召回 |  无监督预训练 - SimCSE |  798w  | 20000 |  300000| 10 |
-|  召回 |  有监督训练 - In-batch Negatives | 3998  | 20000 |300000  | 10 |
-|  排序 |  有监督训练 | 1973538   | 57811 | 10 |  |
+|  召回 |  无监督预训练 - SimCSE |  798w  | 20000 |  300000| 1000 |
+|  召回 |  有监督训练 - In-batch Negatives | 3998  | 20000 |300000  | 1000 |
+|  排序 |  有监督训练 | 1973538   | 57811 | - | 1000 |
 
 我们将除 Domain-adaptive Pretraining 之外的其他数据集全部开源，下载地址：
 
@@ -137,7 +137,7 @@
 
 （1）运行环境
 
-本实验采用了一下的运行环境进行，详细说明如下：
+本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己带GPU的软硬件环境进行：
 
 a. 软件环境：
 
@@ -193,11 +193,11 @@ pip install -r requirements.txt
 |  有监督训练 Baseline | 30.077| 43.513| 48.633 | 53.448 |59.632| 标准 pair-wise 训练范式，通过随机采样产生负样本|
 |  有监督训练 In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| In-batch Negatives 有监督训练|
 |  无监督训练 SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
-|  无监督 + 有监督训练 SimCSE+Inbatch-negative |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
+|  无监督 + 有监督训练 SimCSE+Inbatch-negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
 |  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| Ernie 预训练，SimCSE 无监督训练|
-|  Domain-adaptive Pretraining + SimCSE +Inbatch-negative|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
+|  Domain-adaptive Pretraining + SimCSE + Inbatch-negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| Ernie预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
 
-从上述表格可以看出，首先利用ERNIE 1.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到SimCSE上进行无监督训练，最后利用In-batch Negatives在有监督数据上进行训练能够获得最佳的性能。
+从上述表格可以看出，首先利用ERNIE 1.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到 SimCSE 上进行无监督训练，最后利用 In-batch Negatives 在有监督数据上进行训练能够获得最佳的性能。
 
 **召回系统搭建**
 
