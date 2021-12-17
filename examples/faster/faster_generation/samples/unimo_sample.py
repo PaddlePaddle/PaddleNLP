@@ -41,7 +41,7 @@ inputs_ids = tokenizer.gen_encode(
     add_start_token_for_decoding=True,
     return_tensors=True,
     is_split_into_words=False)
-model.eval()
+
 outputs, _ = model.generate(
     input_ids=inputs_ids['input_ids'],
     token_type_ids=inputs_ids['token_type_ids'],
