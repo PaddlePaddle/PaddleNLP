@@ -293,8 +293,9 @@ class ErnieModel(ErniePretrainedModel):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
-            mean=0.0, std=self.initializer_range))
+        weight_attr = paddle.ParamAttr(
+            initializer=nn.initializer.TruncatedNormal(
+                mean=0.0, std=self.initializer_range))
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
@@ -683,8 +684,9 @@ class ErnieForPretraining(ErniePretrainedModel):
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
         self.ernie = ernie
-        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
-            mean=0.0, std=self.ernie.initializer_range))
+        weight_attr = paddle.ParamAttr(
+            initializer=nn.initializer.TruncatedNormal(
+                mean=0.0, std=self.ernie.initializer_range))
         self.cls = ErniePretrainingHeads(
             self.ernie.config["hidden_size"],
             self.ernie.config["vocab_size"],
