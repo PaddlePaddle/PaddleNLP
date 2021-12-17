@@ -13,6 +13,7 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-12-12] PaddleNLP 2.2 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.0).
 * [2021-10-12] PaddleNLP 2.1 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0).
 
 ## Introduction
