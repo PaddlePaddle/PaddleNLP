@@ -60,7 +60,7 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metric, data_loader):
+def evaluate(model, criterion, metric, data_loader, mode="valid"):
     """
     Given a dataset, it evals model and computes the metric.
 
@@ -81,7 +81,7 @@ def evaluate(model, criterion, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     accu = metric.accumulate()
-    print("eval loss: %.5f, accuracy: %.5f" % (np.mean(losses), accu))
+    print("%s: eval loss: %.5f, accuracy: %.5f" % (mode, np.mean(losses), accu))
     model.train()
     metric.reset()
 
@@ -143,6 +143,12 @@ def do_train():
     dev_data_loader = create_dataloader(
         dev_ds,
         mode='dev',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
+    test_data_loader = create_dataloader(
+        test_ds,
+        mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
@@ -209,7 +215,8 @@ def do_train():
                 tic_train = time.time()
 
             if global_step % args.valid_steps == 0 and rank == 0:
-                evaluate(model, criterion, metric, dev_data_loader)
+                evaluate(model, criterion, metric, dev_data_loader, "valid")
+                evaluate(model, criterion, metric, test_data_loader, "test")
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0 and rank == 0:
