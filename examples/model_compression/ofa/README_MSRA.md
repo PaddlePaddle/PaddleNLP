@@ -1,5 +1,5 @@
-# 使用PaddleNLP一键启动，完成基于内置数据集msra的中文命名实体识别模型工业化落地训练，并进行模型压缩适用于工业化落地场景
-
+# 基于ofa架构在msra实体识别任务的模型压缩
+## 直接面向工业化落地场景，训练过程保存最优模型
 ### 一、教师模型正常训练
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -89,5 +89,14 @@ python -u ./export_model_msra_ner_ofa.py --model_type bert \
 
 
 ### 四、项目在BML CodeLab运行的链接，
-替换成自己的训练集后，可以一键启动训练，应用在实际的工业化落地场景进行模型部署，在基本无精度损失的情况下，提速相当明显，预测速度提升100%
+替换成自己的训练集后，可以一键启动训练，应用在实际的工业化落地场景进行模型部署，在基本无精度损失的情况下，提速相当明显，预测速度提升100%  
+
+| Task  | Metric                       | Result            | Result with PaddleSlim | 
+|:-----:|:----------------------------:|:-----------------:|:----------------------:|
+| MSRA  | ChunkEvaluator               |      0.94738      |       0.93754          |
+
+| Task  | Latency(s)                   | Result            | Result with PaddleSlim | 
+|:-----:|:----------------------------:|:-----------------:|:----------------------:|
+| MSRA  | 10451个中文字符(i7-10510U CPU) |      18s-19s      |       8-10s            |
+
 地址：https://aistudio.baidu.com/aistudio/projectdetail/2876713?contributionType=1&shared=1

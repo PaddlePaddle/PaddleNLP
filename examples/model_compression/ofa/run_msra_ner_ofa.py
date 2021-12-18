@@ -13,26 +13,21 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import time
 import math
-import json
-from functools import partial
-
 import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddle.io import DataLoader
-from paddle.metric import Accuracy, Precision, Recall
+from functools import partial
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Stack, Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertModel, BertForTokenClassification, BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
-from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
 from paddleslim.nas.ofa.utils import nlp_utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
@@ -212,58 +207,6 @@ def evaluate(epoch, global_step, model, loss_fct, metric, data_loader, width_mul
                         res[1],
                         res[2],
                        ))
-
-        elif isinstance(metric, AccuracyAndF1):
-            print(
-                "teacher model, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-                % (
-                    eval_loss,
-                    res[0],
-                    res[1],
-                    res[2],
-                    res[3],
-                    res[4], ),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, teacher model, eval loss: %f, acc: %s,'
-                    ' precision: %s, recall: %s, f1: %s, acc and f1: %s, \n'
-                    % (
-                        epoch,
-                        global_step,
-                        eval_loss,
-                        res[0],
-                        res[1],
-                        res[2],
-                        res[3],
-                        res[4],))
-        elif isinstance(metric, Mcc):
-            print(
-                "teacher model, eval loss: %f, mcc: %s, " %
-                (eval_loss, res[0]),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, teacher model, eval loss: %f, mcc: %s, \n'
-                    % (epoch, global_step, eval_loss, res[0]))
-        elif isinstance(metric, PearsonAndSpearman):
-            print(
-                "teacher model, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-                % (eval_loss, res[0], res[1], res[2]),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, teacher model, eval loss: %f, '
-                    'pearson: %s, spearman: %s, pearson and spearman: %s, \n'
-                    % (epoch, global_step, eval_loss, res[0], res[1], res[2]))
-        else:
-            print(
-                "teacher model, eval loss: %f, acc: %s, " % (eval_loss, res),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, teacher model, eval loss: %f, acc: %s,  \n'
-                    % (epoch, global_step, eval_loss, res))
     else:
         if isinstance(metric, ChunkEvaluator):
             print(
@@ -288,61 +231,6 @@ def evaluate(epoch, global_step, model, loss_fct, metric, data_loader, width_mul
                         res[1],
                         res[2],
                       ))
-
-        elif isinstance(metric, AccuracyAndF1):
-            print(
-                "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-                % (
-                    width_mult,
-                    eval_loss,
-                    res[0],
-                    res[1],
-                    res[2],
-                    res[3],
-                    res[4], ),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, acc: %s, '
-                    'precision: %s, recall: %s, f1: %s, acc and f1: %s,  \n'
-                    % (
-                        epoch,
-                        global_step,
-                        width_mult,
-                        eval_loss,
-                        res[0],
-                        res[1],
-                        res[2],
-                        res[3],
-                        res[4],))
-        elif isinstance(metric, Mcc):
-            print(
-                "width_mult: %s, eval loss: %f, mcc: %s, " %
-                (str(width_mult), eval_loss, res[0]),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, mcc: %s, \n'
-                    % (epoch, global_step, str(width_mult), eval_loss, res[0]))
-        elif isinstance(metric, PearsonAndSpearman):
-            print(
-                "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-                % (str(width_mult), eval_loss, res[0], res[1], res[2]),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, pearson: %s, '
-                    'spearman: %s, pearson and spearman: %s, \n'
-                    % (epoch, global_step, str(width_mult), eval_loss, res[0], res[1], res[2]))
-        else:
-            print(
-                "width_mult: %s, eval loss: %f, acc: %s, " %
-                (str(width_mult), eval_loss, res),
-                end='')
-            with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                fp.write(
-                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, acc: %s,  \n'
-                    % (epoch, global_step, str(width_mult), eval_loss, res))
     model.train()
     return res, eval_loss
 

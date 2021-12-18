@@ -14,26 +14,19 @@
 
 import argparse
 import os
-import random
 import time
-import math
-from functools import partial
-
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-
-import paddlenlp as ppnlp
+from functools import partial
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
-from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Stack, Pad, Dict
 
 parser = argparse.ArgumentParser()
 
-# yapf: disable
 parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
                     help="Path to pre-trained model or shortcut name selected in the list:"
                          " " + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())))
@@ -56,11 +49,10 @@ parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"],
                     help="The device to select to train the model, is must be cpu/gpu/xpu.")
-# yapf: enable
 
 
 @paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader, label_num):
+def evaluate(model, loss_fct, metric, data_loader):
     """
     pass
     """
@@ -114,7 +106,6 @@ def do_train(args):
         'msra_ner', splits=('train', 'test'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
-    # tokenizer = ErnieCtmTokenizer.from_pretrained("ernie-ctm")
 
     label_list = train_ds.label_list
     label_num = len(label_list)
@@ -159,8 +150,7 @@ def do_train(args):
     # Define the model netword and its loss
     model = BertForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
-    # model = ErnieCtmForTokenClassification.from_pretrained(
-    #    args.model_name_or_path, num_classes=label_num)
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -211,7 +201,7 @@ def do_train(args):
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if paddle.distributed.get_rank() == 0:
                     f1_score, precision, recall, eval_loss = \
-                        evaluate(model, loss_fct, metric, test_data_loader, label_num)
+                        evaluate(model, loss_fct, metric, test_data_loader)
                     if f1_score > best_f1:
                         best_f1 = f1_score
                         save_dir = os.path.join(args.output_dir, "model_best")

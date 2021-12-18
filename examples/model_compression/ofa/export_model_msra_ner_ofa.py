@@ -13,24 +13,14 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import math
-import random
-import time
 import json
-from functools import partial
-
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
 
 from paddlenlp.transformers import BertModel, BertForTokenClassification, BertTokenizer
-from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
-from paddleslim.nas.ofa.layers import BaseBlock
 
 MODEL_CLASSES = {"bert": (BertForTokenClassification, BertTokenizer), }
 
@@ -212,8 +202,6 @@ def do_train(args):
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
 
-    # output_dir = os.path.join(args.sub_model_output_dir,
-    #                           "model_width_%.5f" % args.width_mult)
     output_dir = args.sub_model_output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
