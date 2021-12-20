@@ -35,7 +35,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./sample/config/decoding.sample.yaml",
+        default="./faster_transformer/sample/config/decoding.sample.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
