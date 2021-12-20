@@ -427,6 +427,7 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
                         best_res = res
             if global_step >= num_training_steps:
+                print("best_res: ", best_res)
                 return
     print("best_res: ", best_res)
 
