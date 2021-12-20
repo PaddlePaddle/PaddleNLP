@@ -223,7 +223,7 @@ export FT_MODELS=../finetuning/ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32
 
 sh prune.sh CLUEWSC2020 5e-5 16 50 128 0 ${FT_MODELS} 0.75
 ```
-其中每个参数依次表示：CLUE 中的任务名称、学习率、batch size、epoch 数、最大序列长度、gpu id、学生模型的地址、裁剪后宽度比例列表。执行完成后，模型保存的路径位于 `pruned_models/CLUEWSC2020/0.75/`。
+其中每个参数依次表示：CLUE 中的任务名称、学习率、batch size、epoch 数、最大序列长度、gpu id、学生模型的地址、裁剪后宽度比例列表。执行完成后，模型保存的路径位于 `pruned_models/CLUEWSC2020/0.75/best_model/`。
 
 <a name="裁剪后模型精度"></a>
 
