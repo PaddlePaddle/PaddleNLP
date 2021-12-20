@@ -27,35 +27,36 @@
 <a name="PP-MiniLM中文小模型"></a>
 
 # PP-MiniLM 中文小模型
-[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT(12L768H) 的 4.2 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 CLUE 高 0.32。
+[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT(12L768H) 的 4.2 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 CLUE 高 0.62。
 
 PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-agnostic Distillation)技术、裁剪(Pruning)技术、量化(Quantization)技术为核心，使得 PP-MiniLM **又快**、**又准**、**又小**。
 
 1. **推理速度快**: 依托 PaddleSlim 的裁剪、量化技术对 PP-MiniLM 小模型进行压缩、加速, 使得 PP-MiniLM 量化后模型 GPU 推理速度相比 BERT base 加速比高达 4.2；
 
-2. **精度高**: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6 层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.32%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.09%、1.91%；
+2. **精度高**: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6 层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.62%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.57%、2.24%；
 
 3. **参数规模小**：依托 Task-agnostic Distillation 技术和 PaddleSlim 裁剪技术，模型参数量相比 BERT 减少 52%。
 
 **整体效果**
 
-| Model                   | #Params | #FLOPs | Speedup | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
-| ----------------------- | ------- | ------ | ------- | ----- | ----- | ------- | ----- | ----- | ----- | ----- | ---------- |
-| Bert<sub>base</sub>     | 102.3M  | 10.87B | 1.00x   | 74.14 | 56.81 | 61.10   | 81.19 | 74.85 | 79.93 | 81.47 | 72.78      |
-| TinyBERT<sub>6</sub>    | 59.7M   | 5.44B  | 1.66x   | 72.59 | 55.70 | 57.64   | 79.57 | 73.97 | 77.63 | 80.00 | 71.01      |
-| UER-py RoBERTa L6- H768 | 59.7M   | 5.44B  | 1.66x   | 69.74 | 66.36 | 59.95   | 77.00 | 71.39 | 71.05 | 82.83 | 71.19      |
-| RBT6, Chinese           | 59.7M   | 5.44B  | 1.66x   | 73.93 | 56.63 | 59.79   | 79.28 | 73.12 | 77.30 | 80.80 | 71.55      |
-| ERNIE-Tiny              | 90.7M   | 4.83B  | 1.89x   | 70.67 | 55.60 | 59.91   | 75.74 | 71.36 | 67.11 | 76.70 | 68.16      |
-| PP-MiniLM 6L-768H       | 59.7M   | 5.44B  | 1.66x   | 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18 | 77.47 | 73.45      |
-| PP-MiniLM裁剪后         | 49.1M   | 4.08B  | 2.00x   | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86 | 77.97 | 73.36      |
-| PP-MiniLM量化后         | 49.2M   | 4.08B  | 4.15x   | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85 | 76.53 | 73.10      |
+| Model                   | #Params | #FLOPs | Speedup | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CLUE 平均值 |
+| ----------------------- | ------- | ------ | ------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- |
+| BERT<sub>base</sub>     | 102.3M  | 10.87B | 1.00x   | 74.14 | 56.81 | 61.10   | 81.19 | 74.85 | 79.93       | 81.47 | 72.78       |
+| TinyBERT<sub>6</sub>    | 59.7M   | 5.44B  | 1.66x   | 72.59 | 55.70 | 57.64   | 79.57 | 73.97 | 76.32       | 80.00 | 70.83       |
+| UER-py RoBERTa L6- H768 | 59.7M   | 5.44B  | 1.66x   | 69.62 | 66.45 | 59.91   | 76.89 | 71.36 | 71.05       | 82.87 | 71.16       |
+| RBT6, Chinese           | 59.7M   | 5.44B  | 1.66x   | 73.93 | 56.63 | 59.79   | 79.28 | 73.12 | 77.30       | 80.80 | 71.55       |
+| ERNIE-Tiny              | 90.7M   | 4.83B  | 1.89x   | 70.67 | 55.60 | 59.91   | 75.74 | 71.36 | 67.11       | 76.70 | 68.16       |
+| PP-MiniLM 6L-768H       | 59.7M   | 5.44B  | 1.66x   | 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18       | 79.17 | 73.69       |
+| PP-MiniLM 裁剪后        | 49.1M   | 4.08B  | 2.00x   | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86       | 78.53 | 73.44       |
+| PP-MiniLM 量化后        | 49.2M   | -      | 4.15x   | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40       |
 
 
-**NOTE：** 说明：
+**NOTE：**
 
 1.上表所有模型的精度测试均是基于下方超参数范围进行的 Grid Search 超参寻优。在每个配置下训练时，每隔 100 个 steps 在验证集上评估一次，取验证集上最佳准确率作为当前超参数配置下的准确率；
 - batch sizes: 16, 32, 64;
 - learning rates: 3e-5, 5e-5, 1e-4
+
 2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值。
 
 **方案流程**
@@ -123,9 +124,9 @@ PP-MiniLM 是一个 6 层的预训练模型，使用 `from_pretrained`导入 PP-
 
 ## 在下游任务上使用 PP-MiniLM
 
-PP-MiniLM 预训练小模型在 CLUE 中的 7 个分类数据集的平均精度上比 12 层 `bert-base-chinese` 高 0.32%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.09%、1.91%，因此我们推荐将 PP-MiniLM 运用在中文下游任务上。当然，如果想对已有模型进一步压缩，也可以参考这里的压缩方案，因为压缩方案是通用的。
+PP-MiniLM 预训练小模型在 CLUE 中的 7 个分类数据集的平均精度上比 12 层 `bert-base-chinese` 高 0.62%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.57%、2.24%，因此我们推荐将 PP-MiniLM 运用在中文下游任务上。当然，如果想对已有模型进一步压缩，也可以参考这里的压缩方案，因为压缩方案是通用的。
 
-本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于 TensorRT 的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达`bert-base-chinese`的 1.7 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 4.2 倍。
+本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于 TensorRT 的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达 `bert-base-chinese` 的 1.7 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 4.2 倍。
 
 <a name="数据介绍"></a>
 
@@ -202,7 +203,7 @@ cd ..
 
 这一步主要使用 PaddleSlim 对下游任务上的模型宽度进行裁剪，进一步压缩模型的大小。
 
-该过程会以上一步的模型（即 fine-tuning 后得到的最好模型）当作教师模型，蒸馏宽度为 3/4 的学生模型。经过我们的实验，在 6L768H 条件下，模型宽度压缩为原来的 3/4，精度几乎无损（-0.09)。
+该过程会以上一步的模型（即 fine-tuning 后得到的最好模型）当作教师模型，蒸馏宽度为 3/4 的学生模型。经过我们的实验，在 6L768H 条件下，模型宽度压缩为原来的 3/4，平均精度下降 0.25。
 
 <a name="原理简介"></a>
 
@@ -220,19 +221,19 @@ cd ..
 cd pruning
 export FT_MODELS=../finetuning/ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32
 
-sh prune.sh CLUEWSC2020 5e-5 16 50 128 4 ${FT_MODELS} 0.75
+sh prune.sh CLUEWSC2020 5e-5 16 50 128 0 ${FT_MODELS} 0.75
 ```
-其中每个参数依次表示：CLUE 中的任务名称、学习率、batch size、epoch 数、最大序列长度、gpu id、学生模型的地址、裁剪后宽度比例列表。执行完成后，模型保存的路径位于 `pruned_models/CLUEWSC2020/0.75/best_model/`。
+其中每个参数依次表示：CLUE 中的任务名称、学习率、batch size、epoch 数、最大序列长度、gpu id、学生模型的地址、裁剪后宽度比例列表。执行完成后，模型保存的路径位于 `pruned_models/CLUEWSC2020/0.75/`。
 
 <a name="裁剪后模型精度"></a>
 
 #### 裁剪后模型精度
 
-经过裁剪后，CLUE 上各个任务上的精度如下表所示。相比起裁剪前，CLUE 数据集上平均值下降 0.09。模型的参数量由 59.7M 下降到 49.1M。
+经过裁剪后，CLUE 上各个任务上的精度如下表所示。相比起裁剪前，CLUE 数据集上平均值下降 0.25。模型的参数量由 59.7M 下降到 49.1M。
 
-| AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
-| ----- | ----- | ------- | ----- | ----- | ----- | ----- | ----------- |
-| 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86 | 77.97 | 73.36       |
+| Model            | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CLUE 平均值 |
+| ---------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- |
+| PP-MiniLM 裁剪后 | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86       | 78.53 | 73.44       |
 
 
 <a name="导出裁剪后的模型"></a>
@@ -258,7 +259,9 @@ sh export_all.sh
 cd ..
 ```
 
-导出后的模型位于 `${MODEL_PATH}/${TASK_NAME}/0.75/sub_static/float`。
+导出的静态图模型、参数等文件位于 `${MODEL_PATH}/${TASK_NAME}/0.75/sub_static/` 目录下，有 `float.pdmodel`、`float.pdiparams`、`float.pdiparams.info` 三个文件。
+
+导出的动态图参数等文件位于 `${MODEL_PATH}/${TASK_NAME}/0.75/sub/model_width_0.75000/` 目录下，有 `model_state.pdparams` 和 `model_config.json` 两个文件。需要注意的是，此动态图模型不能通过原始 Transformer API 将参数正确载入，因为裁剪后模型不再符合 Transformer 的组网，例如 q、k、v 的 weight 的 shape 是 `[hidden_size, hidden_size * width_mul]` ，不再是 `[hidden_size, hidden_size]`。
 
 <a name="量化"></a>
 
@@ -274,7 +277,7 @@ cd quantization
 
 这里的量化采用的是静态离线量化方法，即不需要训练，只使用少量校准数据计算量化因子，就可快速得到量化模型。这一步需要有训练好的预测（静态图）模型。因此，需要对前序步骤产出的模型进行导出（参考上方导出模型的运行方式）。
 
-量化我们可以借助 PaddleSlim 提供的离线量化 API `paddleslim.quant.quant_post_static` 实现，我们这一步使用了 `mse`、`avg`、`abs_max`、`hist` 四种策略，并使用 4、8 两种校准集数量，对 `matmul/matmul_v2` 算子进行`channel_wise_abs_max` 类型的量化。
+量化我们可以借助 PaddleSlim 提供的离线量化 API `paddleslim.quant.quant_post_static` 实现，我们这一步使用了 `mse`、`avg`、`abs_max`、`hist` 四种策略，并使用 4、8 两种校准集数量，对 `matmul`、`matmul_v2` 算子进行`channel_wise_abs_max` 类型的量化。
 
 <a name="运行方式"></a>
 
@@ -298,11 +301,12 @@ cd ..
 
 #### 量化后模型精度
 
-经过量化后，CLUE 上各个任务上的精度如下表，比上一步（裁剪后）平均精度下降了 0.26：
+经过量化后，CLUE 上各个任务上的精度如下表，比上一步（裁剪后）精度几乎无损（-0.04）：
 
-| AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
-| ----- | ----- | ------- | ----- | ----- | ----- | ----- | ----------- |
-| 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85 | 76.53 | 73.10       |
+| Model            | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CLUE 平均值 |
+| ---------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- |
+| PP-MiniLM 量化后 | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40       |
+
 
 最后，值得注意的是，PP-MiniLM 是基于 `roberta-wwm-ext-large` 做教师模型蒸馏得到的学生模型，如果你有更好的 24 层中文预训练模型，可以基于[任务无关蒸馏文档](general_distill/README.md)中介绍的蒸馏过程，训练出一个比 PP-MiniLM 精度更高，在下游任务上表现更好的 6 层小模型。
 
@@ -318,7 +322,7 @@ cd ..
 
 这一步依赖安装有预测库的 PaddlePaddle 2.2.1。可以在 [PaddlePaddle 官网](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#python) 根据机器环境选择合适的 Python 预测库进行安装。
 
-想要得到更明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100)上进行测试，本案例基于 T4 测试。若在V系列GPU卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
+想要得到更明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100)上进行测试，本案例基于 T4 测试。若在 V 系列 GPU 卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
 
 本案例是在 NVIDIA Tesla T4 单卡上，使用 cuda 11.1、cudnn 8.1、TensorRT 7.2 进行预测。
 
@@ -356,7 +360,7 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 
 #### 性能测试
 
-测试性能环境同上。本案例测试采用的是 CLUE TNEWS 数据集下量化方法为 `mse`、校准集数量为 4 得到的量化模型，在 TNEWS 的验证集上统计 5 次端到端预测的总耗时（前 20 个 steps 作为 warmup steps 跳过）并求平均。下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况，加速倍数列是较 `bert-base-chinese` 的推理加速倍数。
+测试性能环境同上。本案例测试采用的是 CLUE TNEWS 数据集下量化方法为 `mse`、校准集数量为 4 得到的量化模型，在 TNEWS 的验证集上统计 5 次端到端预测的总耗时（前 20 个 steps 作为 warmup steps 跳过）并求平均。其中 `batch_size` 为 32，`max_seq_len` 为 128。
 
 启动性能测试需要对 `infer.py` 脚本传入参数 `--perf`，运行性能测试脚本可以得到 PP-MiniLM、PP-MiniLM 裁剪后、PP-MiniLM 量化后模型预测的耗时：
 
@@ -366,9 +370,10 @@ sh infer_perf.sh
 cd ..
 ```
 
+下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况。
 取 5 个非 `--collect_shape` 阶段打印出的时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 4.2 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.0 倍。
 
-|                     | 平均耗时(s) | 加速比 |
+|                     | 平均耗时 (s) | 加速比 |
 | ------------------- | ----------- | ------ |
 | BERT<sub>base</sub> | 21.04       | -      |
 | PP-MiniLM           | 12.64       | 1.66x  |
