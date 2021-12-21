@@ -36,29 +36,49 @@ class FunnelTokenizer(BertTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "funnel-transformer/small": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/vocab.txt",
-            "funnel-transformer/small-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/vocab.txt",
-            "funnel-transformer/medium": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/vocab.txt",
-            "funnel-transformer/medium-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/vocab.txt",
-            "funnel-transformer/intermediate": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/vocab.txt",
-            "funnel-transformer/intermediate-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/vocab.txt",
-            "funnel-transformer/large": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/vocab.txt",
-            "funnel-transformer/large-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/vocab.txt",
-            "funnel-transformer/xlarge": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/vocab.txt",
-            "funnel-transformer/xlarge-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/vocab.txt",
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/vocab.txt",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/vocab.txt",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/vocab.txt",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/vocab.txt",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/vocab.txt",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/vocab.txt",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/vocab.txt",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/vocab.txt",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/vocab.txt",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/vocab.txt",
         },
         "tokenizer_file": {
-        "funnel-transformer/small": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/tokenizer.json",
-        "funnel-transformer/small-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/tokenizer.json",
-        "funnel-transformer/medium": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/tokenizer.json",
-        "funnel-transformer/medium-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/tokenizer.json",
-        "funnel-transformer/intermediate": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/tokenizer.json",
-        "funnel-transformer/intermediate-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/tokenizer.json",
-        "funnel-transformer/large": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/tokenizer.json",
-        "funnel-transformer/large-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/tokenizer.json",
-        "funnel-transformer/xlarge": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/tokenizer.json",
-        "funnel-transformer/xlarge-base": "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/tokenizer.json",
-    },
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/tokenizer.json",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/tokenizer.json",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/tokenizer.json",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/tokenizer.json",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/tokenizer.json",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/tokenizer.json",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/tokenizer.json",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/tokenizer.json",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/tokenizer.json",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/tokenizer.json",
+        },
     }
     pretrained_init_configuration = {
         "funnel-transformer/small": {
@@ -93,18 +113,29 @@ class FunnelTokenizer(BertTokenizer):
         },
     }
 
-    def __init__(self, vocab_file, do_lower_case=True, unk_token="<unk>", sep_token="<sep>", pad_token="<pad>",
-                 cls_token="<cls>", mask_token="<mask>", bos_token="<s>", eos_token="</s>", wordpieces_prefix="##", **kwargs):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=True,
+                 unk_token="<unk>",
+                 sep_token="<sep>",
+                 pad_token="<pad>",
+                 cls_token="<cls>",
+                 mask_token="<mask>",
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 wordpieces_prefix="##",
+                 **kwargs):
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                    .format(vocab_file))
+                .format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
             vocab=self.vocab, unk_token=unk_token)
+
     def __call__(self,
                  text,
                  text_pair=None,
@@ -181,18 +212,11 @@ class FunnelTokenizer(BertTokenizer):
         """
 
         out_string = " ".join(tokens).replace(" ##", "").strip()
-        out_string = (
-            out_string.replace(" .", ".")
-            .replace(" ?", "?")
-            .replace(" !", "!")
-            .replace(" ,", ",")
-            .replace(" ' ", "'")
-            .replace(" n't", "n't")
-            .replace(" 'm", "'m")
-            .replace(" 's", "'s")
-            .replace(" 've", "'ve")
-            .replace(" 're", "'re")
-        )
+        out_string = (out_string.replace(" .", ".").replace(" ?", "?")
+                      .replace(" !", "!").replace(" ,", ",").replace(" ' ", "'")
+                      .replace(" n't", "n't").replace(" 'm", "'m")
+                      .replace(" 's", "'s").replace(" 've", "'ve")
+                      .replace(" 're", "'re"))
         return out_string
 
     def num_special_tokens_to_add(self, pair=False):
@@ -214,8 +238,7 @@ class FunnelTokenizer(BertTokenizer):
         token_ids_1 = []
         return len(
             self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-            if pair else None))
-
+                                                  if pair else None))
 
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
@@ -249,8 +272,10 @@ class FunnelTokenizer(BertTokenizer):
         _sep = [self.sep_token_id]
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
-            return len(_cls) * [self.cls_token_type_id] + len(token_ids_0 + _sep) * [0]
-        return len(_cls) * [self.cls_token_type_id] + len(token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
+            return len(_cls) * [self.cls_token_type_id] + len(token_ids_0 +
+                                                              _sep) * [0]
+        return len(_cls) * [self.cls_token_type_id] + len(
+            token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
@@ -282,9 +307,8 @@ class FunnelTokenizer(BertTokenizer):
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + (
-                    [0] * len(token_ids_1)) + [1]
+                [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
-
 
     def truncate_sequences(self,
                            ids,
@@ -462,11 +486,11 @@ class FunnelTokenizer(BertTokenizer):
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
-                text[0], str):
+                                text[0], str):
                 return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
-                text[0], int):
+                                text[0], int):
                 return text
             else:
                 raise ValueError(
@@ -490,8 +514,9 @@ class FunnelTokenizer(BertTokenizer):
 
             if stride > 0 and second_ids is not None:
 
-                max_len_for_pair = max_seq_len - len(first_ids) - self.num_special_tokens_to_add(
-                    pair=True)  # need -4  <sep> A </sep> </sep> B <sep>
+                max_len_for_pair = max_seq_len - len(
+                    first_ids) - self.num_special_tokens_to_add(
+                        pair=True)  # need -4  <sep> A </sep> </sep> B <sep>
 
                 token_offset_mapping = self.rematch(text)
                 token_pair_offset_mapping = self.rematch(text_pair)
@@ -506,7 +531,8 @@ class FunnelTokenizer(BertTokenizer):
                         pair_mapping = token_pair_offset_mapping
                     else:
                         pair_ids = second_ids[:max_len_for_pair]
-                        pair_mapping = token_pair_offset_mapping[:max_len_for_pair]
+                        pair_mapping = token_pair_offset_mapping[:
+                                                                 max_len_for_pair]
 
                     offset_mapping = self.build_offset_mapping_with_special_tokens(
                         mapping, pair_mapping)
@@ -522,14 +548,14 @@ class FunnelTokenizer(BertTokenizer):
                     if return_special_tokens_mask:
                         encoded_inputs[
                             "special_tokens_mask"] = self.get_special_tokens_mask(
-                            ids, pair_ids)
+                                ids, pair_ids)
                     if return_length:
                         encoded_inputs["seq_len"] = len(encoded_inputs[
-                                                            "input_ids"])
+                            "input_ids"])
 
                     # Check lengths
                     assert max_seq_len is None or len(encoded_inputs[
-                                                          "input_ids"]) <= max_seq_len
+                        "input_ids"]) <= max_seq_len
 
                     # Padding
                     needs_to_be_padded = pad_to_max_seq_len and \
@@ -539,7 +565,7 @@ class FunnelTokenizer(BertTokenizer):
 
                     if needs_to_be_padded:
                         difference = max_seq_len - len(encoded_inputs[
-                                                           "input_ids"])
+                            "input_ids"])
                         if self.padding_side == 'right':
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [1] * len(
@@ -548,39 +574,39 @@ class FunnelTokenizer(BertTokenizer):
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
-                                        encoded_inputs["token_type_ids"] +
-                                        [self.pad_token_type_id] * difference)
+                                    encoded_inputs["token_type_ids"] +
+                                    [self.pad_token_type_id] * difference)
                             if return_special_tokens_mask:
                                 encoded_inputs[
                                     "special_tokens_mask"] = encoded_inputs[
-                                                                 "special_tokens_mask"] + [1
-                                                                                           ] * difference
+                                        "special_tokens_mask"] + [1
+                                                                  ] * difference
                             encoded_inputs["input_ids"] = encoded_inputs[
-                                                              "input_ids"] + [self.pad_token_id] * difference
+                                "input_ids"] + [self.pad_token_id] * difference
                             encoded_inputs['offset_mapping'] = encoded_inputs[
-                                                                   'offset_mapping'] + [(0, 0)] * difference
+                                'offset_mapping'] + [(0, 0)] * difference
                         elif self.padding_side == 'left':
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [
-                                                                       0
-                                                                   ] * difference + [1] * len(encoded_inputs[
-                                                                                                  "input_ids"])
+                                    0
+                                ] * difference + [1] * len(encoded_inputs[
+                                    "input_ids"])
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
-                                        [self.pad_token_type_id] * difference +
-                                        encoded_inputs["token_type_ids"])
+                                    [self.pad_token_type_id] * difference +
+                                    encoded_inputs["token_type_ids"])
                             if return_special_tokens_mask:
                                 encoded_inputs["special_tokens_mask"] = [
-                                                                            1
-                                                                        ] * difference + encoded_inputs[
-                                                                            "special_tokens_mask"]
+                                    1
+                                ] * difference + encoded_inputs[
+                                    "special_tokens_mask"]
                             encoded_inputs["input_ids"] = [
-                                                              self.pad_token_id
-                                                          ] * difference + encoded_inputs["input_ids"]
+                                self.pad_token_id
+                            ] * difference + encoded_inputs["input_ids"]
                             encoded_inputs['offset_mapping'] = [
-                                                                   (0, 0)
-                                                               ] * difference + encoded_inputs['offset_mapping']
+                                (0, 0)
+                            ] * difference + encoded_inputs['offset_mapping']
                     else:
                         if return_attention_mask:
                             encoded_inputs["attention_mask"] = [1] * len(
@@ -597,7 +623,8 @@ class FunnelTokenizer(BertTokenizer):
                         break
                     else:
                         second_ids = second_ids[max_len_for_pair - stride:]
-                        token_pair_offset_mapping = token_pair_offset_mapping[max_len_for_pair - stride:]
+                        token_pair_offset_mapping = token_pair_offset_mapping[
+                            max_len_for_pair - stride:]
 
             else:
                 batch_encode_inputs.append(
@@ -628,8 +655,7 @@ class FunnelTokenizer(BertTokenizer):
             if self.basic_tokenizer.do_lower_case:
                 ch = ch.lower()
                 ch = unicodedata.normalize('NFD', ch)
-                ch = ''.join(
-                    [c for c in ch if unicodedata.category(c) != 'Mn'])
+                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
 
             ch = ''.join([
                 c for c in ch
@@ -647,7 +673,8 @@ class FunnelTokenizer(BertTokenizer):
             start = text[offset:].index(token) + offset
             end = start + len(token)
 
-            token_mapping.append((char_mapping[start], char_mapping[end - 1] + 1))
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
             offset = end
 
         return token_mapping
@@ -656,7 +683,6 @@ class FunnelTokenizer(BertTokenizer):
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token if sub_token !=
-                                                 self.unk_token else token)
+                split_tokens.append(sub_token
+                                    if sub_token != self.unk_token else token)
         return split_tokens
-
