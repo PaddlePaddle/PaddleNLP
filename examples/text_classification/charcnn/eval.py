@@ -27,7 +27,7 @@ parser.add_argument('--is_small', type=bool, default=False, help='use small Char
 
 # data
 parser.add_argument('--test_path', metavar='DIR',
-                    help='path to testing data csv', default='data/ag_news_csv/test.csv')
+                    help='path to testing data csv', default='data/ag_news/test.csv')
 parser.add_argument('--batch_size', type=int, default=128, help='batch size for training [default: 128]')
 parser.add_argument('--alphabet_path', default='config/alphabet.json', help='Contains all characters for prediction')
 
@@ -36,8 +36,6 @@ parser.add_argument('--num_workers', default=4, type=int, help='Number of worker
 parser.add_argument('--cuda', action='store_true', default=True, help='enable the gpu')
 parser.add_argument('--device', type=str, default='gpu:0')
 
-# logging options
-parser.add_argument('--save_folder', default='Results/', help='Location to save epoch models')
 args = parser.parse_args()
 
 
@@ -75,7 +73,7 @@ if __name__ == '__main__':
         logit = model(inputs)
         predicates = paddle.argmax(logit, 1)
         accumulated_loss += F.nll_loss(logit, target).numpy()[0]
-        # print(type(target.data))
+
         corrects += paddle.to_tensor((paddle.argmax(logit, 1) == target), dtype='int64').sum().numpy()[0]
         predicates_all += predicates.cpu().numpy().tolist()
         target_all += target.cpu().numpy().tolist()

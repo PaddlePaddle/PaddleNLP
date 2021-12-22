@@ -1,3 +1,3 @@
 python eval.py \
-  --test-path=data/ag_news_csv/test.csv \
-  --model-path=output/models_ag_news/CharCNN_best.pth.tar \
+  --test_path=data/ag_news/test.csv \
+  --model_path=output/models_ag_news/CharCNN_best.pth.tar \

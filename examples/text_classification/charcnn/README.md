@@ -45,7 +45,7 @@ Example:
 ## 5. Usage
 
 ### Train
-1. download [AG News dataset](https://github.com/paddorch/CharCNN.paddle/tree/main/data/ag_news_csv) to folder `./data`，and then split the training set into `train` and `dev` part:
+1. download [AG News dataset](https://github.com/paddorch/CharCNN.paddle/tree/main/data/ag_news_csv) to folder `./data/ag_news`，and then split the training set into `train` and `dev` part:
 
 ```shell
 bash ./scripts/split_data.sh data/ag_news/train.csv

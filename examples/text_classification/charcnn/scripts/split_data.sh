@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Function: split the original training set to train and dev.
-# Usage (eg.): bash split_data.sh data/ag_news_csv/train.csv
+# Usage (eg.): bash split_data.sh data/ag_news/train.csv
 
 set -x
 

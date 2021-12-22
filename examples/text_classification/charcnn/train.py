@@ -19,22 +19,22 @@ set_seed(42)
 parser = argparse.ArgumentParser(description='Character level CNN text classifier training')
 # data 
 parser.add_argument('--train_path', metavar='DIR',
-                    help='path to training data csv [default: data/ag_news_csv/train.csv]',
-                    default='data/ag_news_csv/train.csv')
+                    help='path to training data csv [default: data/ag_news/train.csv]',
+                    default='data/ag_news/train.csv')
 parser.add_argument('--val_path', metavar='DIR',
-                    help='path to validation data csv [default: data/ag_news_csv/test.csv]',
-                    default='data/ag_news_csv/test.csv')
+                    help='path to validation data csv [default: data/ag_news/test.csv]',
+                    default='data/ag_news/test.csv')
 parser.add_argument('--data_augment', type=bool, default=False, help='whether to use data augmentation')
 parser.add_argument('--geo_aug', type=bool, default=False, help='use GeometricSynonymAug in paper')
 
 # learning
 learn = parser.add_argument_group('Learning options')
-learn.add_argument('--lr', type=float, default=0.0003, help='initial learning rate [default: 0.0001]')
-learn.add_argument('--epochs', type=int, default=100, help='number of epochs for train [default: 200]')
+learn.add_argument('--lr', type=float, default=0.0003, help='initial learning rate [default: 0.0003]')
+learn.add_argument('--epochs', type=int, default=100, help='number of epochs for train [default: 100]')
 learn.add_argument('--batch_size', type=int, default=128, help='batch size for training [default: 128]')
 learn.add_argument('--grad_clip', default=5, type=int, help='Norm cutoff to prevent explosion of gradients')
 learn.add_argument('--optimizer', default='AdamW',
-                   help='Type of optimizer. SGD|Adam|AdamW are supported [default: Adam]')
+                   help='Type of optimizer. SGD|Adam|AdamW are supported [default: AdamW]')
 learn.add_argument('--class_weight', default=None, action='store_true',
                    help='Weights should be a 1D Tensor assigning weight to each of the classes.')
 learn.add_argument('--dynamic_lr', action='store_true', default=False, help='Use dynamic learning schedule.')
@@ -64,16 +64,16 @@ experiment = parser.add_argument_group('Experiment options')
 experiment.add_argument('--init_from_ckpt', default='', help='Continue from checkpoint model')
 experiment.add_argument('--checkpoint', dest='checkpoint', default=True, action='store_true',
                         help='Enables checkpoint saving of model')
-experiment.add_argument('--save_folder', default='output/models_AG_NEWS',
+experiment.add_argument('--save_folder', default='output/models_ag_news',
                         help='Location to save epoch models, training configurations and results.')
 experiment.add_argument('--log_config', default=True, action='store_true', help='Store experiment configuration')
 experiment.add_argument('--log_result', default=True, action='store_true', help='Store experiment result')
 experiment.add_argument('--log_interval', type=int, default=100,
-                        help='how many steps to wait before logging training status [default: 1]')
+                        help='how many steps to wait before logging training status [default: 600]')
 experiment.add_argument('--val_interval', type=int, default=600,
-                        help='how many steps to wait before vaidation [default: 400]')
+                        help='how many steps to wait before vaidation [default: 5]')
 experiment.add_argument('--save_interval', type=int, default=5,
-                        help='how many epochs to wait before saving [default:1]')
+                        help='how many epochs to wait before saving [default:5]')
 
 
 def train(train_loader, dev_loader, model, args):
@@ -246,8 +246,6 @@ def main():
     # when you have an unbalanced training set
     if args.class_weight != None:
         args.class_weight = paddle.to_tensor(class_weight, dtype='float32').sqrt_()
-        # if args.cuda:
-        #     args.class_weight = args.class_weight.cuda()
 
     print('\nNumber of training samples: {}'.format(str(train_dataset.__len__())))
     for i, c in enumerate(num_class_train):
@@ -264,7 +262,6 @@ def main():
             print('Directory already exists.')
         else:
             raise
-    # args.save_folder = os.path.join(args.save_folder, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 
     # configuration
     print("\nConfiguration:")
@@ -275,9 +272,9 @@ def main():
     if args.log_result:
         with open(os.path.join(args.save_folder, 'result.csv'), 'w') as r:
             r.write('{:s},{:s},{:s},{:s},{:s}'.format('epoch', 'batch', 'loss', 'acc', 'lr'))
+
     # model
     model = CharCNN(args.num_features, len(num_class_train), args.dropout, is_small=args.is_small)
-    print(model)
 
     # train 
     train(train_loader, dev_loader, model, args)
