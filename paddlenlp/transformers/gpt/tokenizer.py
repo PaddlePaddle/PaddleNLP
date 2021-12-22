@@ -138,6 +138,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         self.sp = mod.SentencePieceProcessor(model_file=model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
 
+    '''
     def tokenize(self, text):
         """
         Converts a string to a list of tokens.
@@ -159,6 +160,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         """
 
         return self._tokenize(text)
+    '''
 
     def _tokenize(self, text):
         """ Tokenize a string. """
@@ -479,6 +481,7 @@ class GPTTokenizer(PretrainedTokenizer):
         self.cache[token] = word
         return word
 
+    '''
     def tokenize(self, text):
         """
         Converts a string to a list of tokens.
@@ -500,6 +503,7 @@ class GPTTokenizer(PretrainedTokenizer):
         """
 
         return self._tokenize(text)
+    '''
 
     def _tokenize(self, text):
         """ Tokenize a string. """

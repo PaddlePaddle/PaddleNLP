@@ -30,6 +30,7 @@ def fn_args_to_dict(func, *args, **kwargs):
     else:
         (spec_args, spec_varargs, spec_varkw,
          spec_defaults) = inspect.getargspec(func)
+    spec_args.remove("self")
     # add positional argument values
     init_dict = dict(zip(spec_args, args))
     # add default argument values

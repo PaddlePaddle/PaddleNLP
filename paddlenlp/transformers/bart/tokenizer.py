@@ -14,7 +14,7 @@
 # limitations under the License.
 import itertools
 from paddle.utils import try_import
-from .. import GPTTokenizer
+from .. import GPTTokenizer, AddedToken
 
 __all__ = ['BartTokenizer']
 
@@ -118,6 +118,40 @@ class BartTokenizer(GPTTokenizer):
             unk_token="<unk>",
             pad_token="<pad>",
             mask_token="<mask>", ):
+
+        bos_token = AddedToken(
+            bos_token, lstrip=False,
+            rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(
+            eos_token, lstrip=False,
+            rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(
+            sep_token, lstrip=False,
+            rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(
+            cls_token, lstrip=False,
+            rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token)
+
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
                                             max_len, special_tokens, pad_token,
                                             eos_token)
@@ -151,6 +185,7 @@ class BartTokenizer(GPTTokenizer):
                 bpe_token for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
+    '''
     def _tokenize(self, text):
         """ Tokenize a string. """
 
@@ -194,9 +229,10 @@ class BartTokenizer(GPTTokenizer):
                     token) if token not in self.all_special_tokens else [
                         token
                     ] for token in tokenized_text)))
-
+        print("self.all_special_tokens",self.all_special_tokens)
         tokenized_text = split_on_tokens(self.all_special_tokens, text)
         return tokenized_text
+    '''
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
