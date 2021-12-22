@@ -78,8 +78,7 @@ def do_predict(data,
         input_ids = paddle.to_tensor(input_ids)
         token_type_ids = paddle.to_tensor(token_type_ids)
         seq_len = paddle.to_tensor(seq_len)
-        logits, _ = model(input_ids, token_type_ids)
-        _, pred_tags = viterbi_decoder(logits, seq_len)
+        pred_tags = model(input_ids, token_type_ids, lengths=seq_len)
         all_pred_tags.extend(pred_tags.numpy().tolist())
     results = decode(data, all_pred_tags, summary_num, idx_to_tags)
     return results
@@ -95,14 +94,9 @@ if __name__ == "__main__":
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
     idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
 
-    crf = LinearChainCrf(len(tags_to_idx), 100, with_start_stop_tag=False)
-    viterbi_decoder = ViterbiDecoder(crf.transitions, False)
-
     model = ErnieCtmWordtagModel.from_pretrained(
         "wordtag",
-        num_tag=len(tags_to_idx),
-        num_cls_label=4,
-        ignore_index=tags_to_idx["O"])
+        num_tag=len(tags_to_idx))
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -113,7 +107,7 @@ if __name__ == "__main__":
     results = do_predict(data, 
                          model, 
                          tokenizer, 
-                         viterbi_decoder, 
+                         model.viterbi_decoder, 
                          tags_to_idx, 
                          idx_to_tags,
                          batch_size=args.batch_size)

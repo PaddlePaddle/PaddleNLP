@@ -39,7 +39,7 @@ class NLPCC14SC(DatasetBuilder):
     data in META_INFO. By Fiyen at Beijing Jiaotong University.
     """
 
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/NLPCC14-SC.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/NLPCC14-SC.zip"
     MD5 = "4792a0982bc64b83d9a76dcce8bc00ad"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

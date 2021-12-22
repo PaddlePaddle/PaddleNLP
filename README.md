@@ -12,17 +12,16 @@
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
-* [2021-10-12] PaddleNLP 2.1版本已发布！新增开箱即用的NLP任务能力、Prompt Tuning应用示例与生成任务的高性能推理！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
-* [2021-09-16][《千言-问题匹配鲁棒性评测》](https://www.datafountain.cn/competitions/516)正式开赛啦🔥🔥🔥，欢迎大家踊跃报名!! [官方基线地址](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/question_matching)。
-* [2021-08-22][《千言：面向事实一致性的生成评测比赛》](https://aistudio.baidu.com/aistudio/competition/detail/105)正式开赛啦🔥🔥🔥，欢迎大家踊跃报名!! [官方基线地址](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text)。
 
+* [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
+* [2021-12-12] 飞桨新产品**端到端问答工具**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA)全新发布！:tada:
 
 ## 简介
 
 PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。
 
 - **易用的文本领域API**
-  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供100+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
+  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供100+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
 
 - **多场景的应用示例**
   - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
@@ -35,7 +34,7 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.1
+- paddlepaddle >= 2.2
 
 ### pip安装
 
@@ -81,7 +80,7 @@ senta("这个产品用起来真的很流畅，我非常喜欢")
 ```
 更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### Transformer API: 强大的预训练模型生态底座
+### Transformers API: 强大的预训练模型生态底座
 
 覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
@@ -119,7 +118,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 
 请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
 
-### Dataset API: 丰富的中文数据集
+### Datasets API: 丰富的中文数据集
 
 Dataset API提供便捷、高效的数据集加载功能；内置[千言数据集](https://www.luge.ai/)，提供丰富的面向自然语言理解与生成场景的中文数据集，为NLP研究人员提供一站式的科研体验。
 
@@ -275,10 +274,11 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 模型                                                       | 简介                                                         |
 | :--------------------------------------------------------- | ------------------------------------------------------------ |
-| [MiniLMv2](examples/model_compression/minilmv2) :star2:    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
+| [MiniLMv2](examples/model_compression/minilmv2)    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
 | [TinyBERT](./examples/model_compression/tinybert)          | 基于论文[TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)的实现，提供了通用蒸馏和下游任务蒸馏的脚本。本实例利用开源模型`tinybert-6l-768d-v2`初始化，在GLUE的7个数据集上进行下游任务的蒸馏，最终模型参数量缩小1/2，预测速度提升2倍，同时保证模型精度几乎无损，其中精度可达教师模型`bert-base-uncased`的 98.90%。 |
-| [OFA-BERT](./examples/model_compression/ofa/) :star2:      | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
+| [OFA-BERT](./examples/model_compression/ofa/)     | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。 |
+| [PP-MiniLM](examples/model_compression/pp-minilm) :star2:    | 基于 PaddleSlim 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT-base 的4.2倍，参数量相比减少52%，模型精度在中文语言理解评测基准 CLUE 高0.32。 |
 
 #### 小样本学习 (Few-Shot Learning)
 

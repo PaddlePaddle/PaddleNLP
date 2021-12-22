@@ -128,7 +128,7 @@ usage = r"""
           from paddlenlp import Taskflow 
 
           # 默认使用WordTag词类知识标注工具
-          wordtag = Taskflow("knowledge_mining")
+          wordtag = Taskflow("knowledge_mining", model="wordtag")
           wordtag("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
           [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
@@ -207,8 +207,6 @@ class WordTagTask(Task):
         self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
                                            self._linking)
         
-        self.crf = LinearChainCrf(len(self._tags_to_index), 100, with_start_stop_tag=False)
-        self._viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
         self._usage = usage
         self._summary_num = 2
 
@@ -510,6 +508,9 @@ class WordTagTask(Task):
             paddle.static.InputSpec(shape=[None, None],
                                     dtype="int64",
                                     name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(shape=[None],
+                                    dtype="int64",
+                                    name="seq_len"),  # seq_len
         ]
 
     def _construct_model(self, model):
@@ -518,9 +519,7 @@ class WordTagTask(Task):
         """
         model_instance = ErnieCtmWordtagModel.from_pretrained(
             model,
-            num_cls_label=4,
-            num_tag=len(self._tags_to_index),
-            ignore_index=self._tags_to_index["O"])
+            num_tag=len(self._tags_to_index))
         config_keys = ErnieCtmWordtagModel.pretrained_init_configuration[
             self.model]
         self.kwargs.update(config_keys)
@@ -554,11 +553,10 @@ class WordTagTask(Task):
             input_ids, token_type_ids, seq_len = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+            self.input_handles[2].copy_from_cpu(seq_len.numpy())
             self.predictor.run()
-            logits = self.output_handle[0].copy_to_cpu()
-            score, pred_tags = self._viterbi_decoder(
-                paddle.to_tensor(logits), seq_len)
-            all_pred_tags.extend(pred_tags.numpy().tolist())
+            pred_tags = self.output_handle[0].copy_to_cpu()
+            all_pred_tags.extend(pred_tags.tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs
 
