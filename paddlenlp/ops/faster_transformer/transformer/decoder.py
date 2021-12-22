@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 from paddle.fluid.layer_helper import LayerHelper
 from paddlenlp.transformers import WordEmbedding, PositionalEmbedding, position_encoding_init
 from paddlenlp.utils.log import logger
-from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops import transfer_param
 
 
@@ -160,8 +160,10 @@ class InferTransformerDecoder(nn.Layer):
 
         if decoder_lib is not None and os.path.isfile(decoder_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoder_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoder_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoder_lib is not None:
                 logger.warning(
