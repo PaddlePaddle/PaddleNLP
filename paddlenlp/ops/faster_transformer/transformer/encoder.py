@@ -282,7 +282,10 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
             # Pass decoding lib to prevent re-building encoder.
             # Todo: check weather decoding lib have contained encoder or not.
             if encoder_lib is not None:
-                load_op_meta_info_and_register_op(encoder_lib)
+                if "FasterTransformer" not in LOADED_EXT.keys():
+                    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                        decoding_lib)
+                    LOADED_EXT["FasterTransformer"] = ops
             else:
                 load("FasterTransformer", verbose=True)
         except Exception:
