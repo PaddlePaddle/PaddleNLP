@@ -23,7 +23,7 @@
 
 PTB数据集由华尔街日报的文章组成，包含929k个训练tokens，词汇量为10k。下载地址为: [PTB](https://dataset.bj.bcebos.com/imikolov%2Fsimple-examples.tgz)。
 
-Yahoo数据集来自[(Yang et al., 2017) Improved Variational Autoencoders for Text Modeling using Dilated Convolutions](https://arxiv.org/pdf/1702.08139.pdf)，该数据集从原始Yahoo Answer数据中采样100k个文档，数据集的平均文档长度为78，词汇量为200k。下载地址为：[YahooAnswer100k](https://paddlenlp.bj.bcebos.com/datasets/yahoo-answer-100k.tar.gz)，运行本例程序后，数据集会自动下载到`~/.paddlenlp/datasets/YahooAnswer100k`目录下。
+Yahoo数据集来自[(Yang et al., 2017) Improved Variational Autoencoders for Text Modeling using Dilated Convolutions](https://arxiv.org/pdf/1702.08139.pdf)，该数据集从原始Yahoo Answer数据中采样100k个文档，数据集的平均文档长度为78，词汇量为200k。下载地址为：[YahooAnswer100k](https://bj.bcebos.com/paddlenlp/datasets/yahoo-answer-100k.tar.gz)，运行本例程序后，数据集会自动下载到`~/.paddlenlp/datasets/YahooAnswer100k`目录下。
 
 
 ## 模型训练

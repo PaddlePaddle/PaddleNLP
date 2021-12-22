@@ -97,7 +97,7 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 **2、优秀奖（开放性项目、指定千言比赛）7月25日截止**
  优秀奖奖励：百度网盘超级会员月卡+100小时GPU算力卡
  评选标准：以下三项内容完成一项即可获得优秀奖，完成多项可累加奖励，上不封顶！
- 基本要求：所有比赛、项目代码**必须开源在AI Studio及Github上，并且在讨论区登记！！！**否则评分的老师们很难找到你的作品哦～ 
+ 基本要求：所有比赛、项目代码**必须开源在AI Studio及Github上，并且在讨论区登记！！！**否则评分的老师们很难找到你的作品哦～
 
  **(1)**课程中任何一次实战题表现突出
 
@@ -110,7 +110,7 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
     以上比赛地址：https://aistudio.baidu.com/aistudio/competition/4/1
    （前300位课程学员，报名即可获得100h算力支持）
 
- 
+
 
 **3、开源贡献奖｜7月25日截止**
  评选标准：为Paddle框架、PaddleNLP开发库贡献 issues、产品建议等｜需在此登记，我们将选出其中最有价值部分予以鼓励（至少10个）
@@ -146,11 +146,11 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 致敬开源、鼓励分享：开课期间发布原创优秀技术经验贴、有价值的开源项目、视频等，即可获得额外加分，加分直接体现在总成绩上。希望你收获更强的自己，如有问题，欢迎加入课程qq群（618354318）交流讨论。
 
 <p align="center">
-  <img src="https://paddlenlp.bj.bcebos.com/images/edu/qq.jpeg" width="170" height ="230" />
+  <img src="https://bj.bcebos.com/paddlenlp/images/edu/qq.jpeg" width="170" height ="230" />
 </p>
 
 
-## 
+##
 
 ## 课程安排
 

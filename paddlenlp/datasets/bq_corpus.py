@@ -20,7 +20,7 @@ class BQCorpus(DatasetBuilder):
 
     """
     lazy = False
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/bq_corpus.zip"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/bq_corpus.zip"
     MD5 = "abe6c480b96cb705b4d24bd522848009"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

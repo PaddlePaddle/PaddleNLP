@@ -118,13 +118,14 @@ def do_predict(args):
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
                 decode_strategy="sampling",
-                use_fp16_decoding=args.use_fp16_decoding)
+                use_fp16_decoding=args.use_fp16_decoding,
+                use_faster=True)
             output_sequence = out_seq.numpy()
 
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
-        output_sequence = out_seq.numpy()
+        output_sequence = out_seq.numpy().tolist()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
         print(tokenizer.convert_ids_to_string(output_sequence[i]))

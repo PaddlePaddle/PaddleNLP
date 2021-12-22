@@ -78,21 +78,23 @@ class ErnieTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
             "ernie-2.0-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-en-finetuned-squad":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
             "ernie-gen-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-base-en/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base-en/vocab.txt",
             "ernie-gen-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
             "ernie-gen-large-430g-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large-430g/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
+            "ppminilm-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -118,6 +120,9 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-gen-large-430g-en": {
+            "do_lower_case": True
+        },
+        "ppminilm-6l-768h": {
             "do_lower_case": True
         },
     }
@@ -391,15 +396,15 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/vocab.txt"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt"
         },
         "sentencepiece_model_file": {
             "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/spm_cased_simp_sampled.model"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/spm_cased_simp_sampled.model"
         },
         "word_dict": {
             "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/dict.wordseg.pickle"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/dict.wordseg.pickle"
         },
     }
     pretrained_init_configuration = {"ernie-tiny": {"do_lower_case": True}}

@@ -18,7 +18,7 @@ class WMT14ende(DatasetBuilder):
     which uses commoncrawl, europarl and news-commentary as train dataset and 
     uses newstest2014 as test dataset.
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz"
+    URL = "https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
                                                      'src_md5', 'tgt_md5'))
     SPLITS = {

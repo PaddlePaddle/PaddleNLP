@@ -24,6 +24,7 @@ __all__ = [
     "UNIMOPretrainedModel",
     'UNIMOModel',
     'UNIMOLMHeadModel',
+    'UNIMOForMaskedLM',
 ]
 
 
@@ -100,11 +101,11 @@ class UNIMOPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "unimo-text-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0.pdparams",
             "unimo-text-1.0-lcsts-new":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
             "unimo-text-1.0-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large.pdparams",
         }
     }
     base_model_prefix = "unimo"
@@ -481,10 +482,18 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             raise AttributeError(
                     "Only topk sampling or topp sampling are supported. " \
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        if kwargs['repetition_penalty'] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
+        if kwargs['forced_bos_token_id'] is not None:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'forced_bos_token_id != None' is not supported yet in the faster version"
+            )
         self._faster_entry = FasterUNIMOText(
-            self,
-            decode_strategy=decode_strategy,
-            use_fp16_decoding=use_fp16_decoding).forward
+            self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
@@ -529,3 +538,6 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+UNIMOForMaskedLM = UNIMOLMHeadModel
