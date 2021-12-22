@@ -34,6 +34,8 @@ if CUDA_HOME and not os.path.exists(CUDA_HOME):
     # Clear it for other non-CUDA situations.
     CUDA_HOME = None
 
+LOADED_EXT = {}
+
 
 def _get_files(path):
     """
@@ -221,6 +223,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         logger.warning("%s is not available because CUDA can not be found." %
                        name)
         raise NotImplementedError
+    if name in LOADED_EXT.keys():
+        return LOADED_EXT[name]
     if build_dir is None:
         # Maybe under package dir is better to avoid cmake source path conflict
         # with different source path.
@@ -247,7 +251,9 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                     ext_sources, ext_filepath, 'newer'):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
-                return load_op_meta_info_and_register_op(ext_filepath)
+                ops = load_op_meta_info_and_register_op(ext_filepath)
+                LOADED_EXT[name] = ops
+                return LOADED_EXT[name]
 
     # write setup file and jit compile
     file_path = os.path.join(build_dir, "{}_setup.py".format(name))
@@ -256,7 +262,9 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     if isinstance(extension, CMakeExtension):
         # Load a shared library (if exists) only to register op.
         if os.path.exists(ext_filepath):
-            load_op_meta_info_and_register_op(ext_filepath)
+            ops = load_op_meta_info_and_register_op(ext_filepath)
+            LOADED_EXT[name] = ops
+            return LOADED_EXT[name]
     else:
         # Import as callable python api
         return _import_module_from_library(name, build_base_dir, verbose)
