@@ -140,7 +140,6 @@ def calc_multi_relation_loss(loss_fct,
 def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
     """
     Calculates loss for Q-Q, K-K, V-V relation from MiniLMv2.
-
     Args:
         loss_fct (callable):
             Loss function for distillation. It only supports kl_div loss now.
@@ -197,7 +196,6 @@ def to_distill(self,
     expose attributes `outputs.q`, `outputs.k`, `outputs.v`,
     `outputs.scaled_qks`, `outputs.hidden_states`and `outputs.attentions` of
     the object for distillation.
-
     It could be returned intermediate tensor using in MiniLM and TinyBERT
     strategy.
     """

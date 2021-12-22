@@ -71,6 +71,7 @@ class FasterTokenizer(nn.Layer):
         "ernie-1.0": ErnieTokenizer,
         "ernie-2.0-en": ErnieTokenizer,
         "ernie-2.0-large-en": ErnieTokenizer,
+        "ppminilm-6l-768h": ErnieTokenizer,
         "roberta-wwm-ext": RobertaTokenizer,
         "roberta-wwm-ext-large": RobertaTokenizer,
         "rbt3": RobertaTokenizer,

@@ -163,8 +163,8 @@ class Predictor(object):
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
 
         if args.benchmark:
@@ -196,9 +196,10 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    test_ds = load_dataset("fewclue", name="tnews", splits=["test"])
-    processor = processor_dict["tnews"](9)
-    test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC["tnews"])
+    test_ds = load_dataset("fewclue", name=args.task_name, splits=["test"])
+    processor = processor_dict[args.task_name]()
+    test_ds = processor.get_test_datasets(test_ds,
+                                          TASK_LABELS_DESC[args.task_name])
 
     batches = [
         test_ds[idx:idx + args.batch_size]
