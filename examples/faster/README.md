@@ -74,4 +74,6 @@ TODO(add training and inference perf data)
 
 ## FasterGeneration：高性能生成任务加速
 
-TBD
+[FasterGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/faster/faster_generation)是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
+
+功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为关闭状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。

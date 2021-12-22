@@ -29,7 +29,7 @@ python -u ./prune.py --model_type ernie \
           --num_train_epochs ${PRE_EPOCHS}     \
           --logging_steps 100     \
           --save_steps 100     \
-          --output_dir ./pruned_models/$TASK_NAME/0.75/ \
+          --output_dir ./pruned_models/$TASK_NAME/0.75/best_model \
           --device gpu  \
           --width_mult_list ${WIDTH_LIST}
 
