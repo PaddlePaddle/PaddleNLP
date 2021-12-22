@@ -88,5 +88,6 @@ from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+
 from .funnel.modeling import *
 from .funnel.tokenizer import *
