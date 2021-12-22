@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import collections
-import json
 import os
 import csv
 from contextlib import ExitStack
@@ -111,25 +110,29 @@ class XNLI(DatasetBuilder):
                         for file in files
                     ]
                     for row_idx, rows in enumerate(zip(*readers)):
-                        yield {
-                            "premise": {
-                                lang: row["premise"]
-                                for lang, row in zip(languages, rows)
-                            },
-                            "hypothesis": {
-                                lang: row["hypo"]
-                                for lang, row in zip(languages, rows)
-                            },
+                        if not rows[0]["label"]:
+                            continue
+                        data = {
+                            "premise": {},
+                            "hypothesis": {},
                             "label": rows[0]["label"].replace("contradictory",
-                                                              "contradiction"),
+                                                              "contradiction")
                         }
+                        for lang, row in zip(languages, rows):
+                            if not row["premise"] or not row["hypo"]:
+                                continue
+                            data["premise"][lang] = row["premise"]
+                            data["hypothesis"][lang] = row["hypo"]
+                        yield data
             else:
                 for idx, file in enumerate(files):
                     f = open(file, 'r', encoding="utf-8")
                     reader = csv.DictReader(
                         f, delimiter="\t", quoting=csv.QUOTE_NONE)
                     for row_idx, row in enumerate(reader):
-                        key = str(idx) + "_" + str(row_idx)
+                        if not row["premise"] or not row["hypo"] or not row[
+                                "label"]:
+                            continue
                         yield {
                             "premise": row["premise"],
                             "hypothesis": row["hypo"],
@@ -146,25 +149,28 @@ class XNLI(DatasetBuilder):
                         rows_per_pair_id[row["pairID"]].append(row)
 
                 for rows in rows_per_pair_id.values():
-                    premise = {
-                        row["language"]: row["sentence1"]
-                        for row in rows
+                    if not rows[0]["gold_label"]:
+                        continue
+                    data = {
+                        "premise": {},
+                        "hypothesis": {},
+                        "label": rows[0]["gold_label"]
                     }
-                    hypothesis = {
-                        row["language"]: row["sentence2"]
-                        for row in rows
-                    }
-                    yield {
-                        "premise": premise,
-                        "hypothesis": hypothesis,
-                        "label": rows[0]["gold_label"],
-                    }
+                    for row in rows:
+                        if not row["sentence1"] or not row["sentence2"]:
+                            continue
+                        data["premise"][row["language"]] = row["sentence1"]
+                        data["hypothesis"][row["language"]] = row["sentence2"]
+                    yield data
             else:
                 with open(filename, encoding="utf-8") as f:
                     reader = csv.DictReader(
                         f, delimiter="\t", quoting=csv.QUOTE_NONE)
                     for row in reader:
                         if row["language"] == language:
+                            if not row["sentence1"] or not row[
+                                    "sentence2"] or not row["gold_label"]:
+                                continue
                             yield {
                                 "premise": row["sentence1"],
                                 "hypothesis": row["sentence2"],
@@ -174,8 +180,5 @@ class XNLI(DatasetBuilder):
     def get_labels(self):
         """
         Return labels of XNLI dataset.
-
-        Note:
-            Contradictory and contradiction are the same label
         """
-        return ["contradiction", "entailment", "neutral"]
+        return ["entailment", "neutral", "contradiction"]
