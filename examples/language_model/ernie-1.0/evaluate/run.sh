@@ -1,5 +1,6 @@
-GPU_NUM=7
-LOG_DIR=../log_clue
+GPU_NUM=0
+TASK_NAME=ernie
+LOG_DIR=../log_$TASK_NAME
 
 # Classification task
 # Dataset: xnli, chnsenticorp
@@ -12,8 +13,9 @@ python -m paddle.distributed.launch \
     --dataset xnli \
     --batch_size 256\
     --learning_rate 1e-4\
+    --epochs 3 \
     --valid_steps 100 \
-    --save_steps 10000000000000000000000 \
+    --save_steps 1e12 \
     --device gpu \
     --use_amp true\
     --save_dir ./checkpoints
@@ -24,11 +26,12 @@ python -m paddle.distributed.launch \
     --gpus $GPU_NUM \
     train.py \
     --device gpu \
-    --learning_rate 1e-4\
+    --learning_rate 5e-5\
     --batch_size 16 \
     --use_amp true\
-    --epochs 6 \
-    --save_steps 1000000000000000000 \
+    --epochs 8 \
+    --valid_steps 100 \
+    --save_steps 1e12 \
     --save_dir ./checkpoints
 
 cd -
@@ -47,10 +50,10 @@ python -m paddle.distributed.launch \
     --max_seq_length 128 \
     --batch_size 16 \
     --learning_rate 5e-5 \
-    --num_train_epochs 5 \
+    --num_train_epochs 8 \
     --logging_steps 10 \
-    --save_steps 200 \
-    --max_steps 50000000 \
+    --save_steps 1e12 \
+    --valid_steps 200 \
     --output_dir ./tmp/msra_ner/ \
     --device gpu
 

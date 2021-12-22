@@ -57,6 +57,7 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
+parser.add_argument("--valid_steps", type=int, default=-1, help="Evaluate for every X updates steps. If not set, it will be equal to save_steps.")
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 # yapf: enable
@@ -175,6 +176,9 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
+    if args.valid_steps < 0:
+        args.valid_steps = args.save_steps
+
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
 
@@ -218,7 +222,7 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+            if global_step % args.valid_steps == 0 or global_step == num_training_steps:
                 if paddle.distributed.get_rank() == 0:
                     if args.dataset == "peoples_daily_ner":
                         evaluate(model, loss_fct, metric, dev_data_loader,
@@ -226,9 +230,12 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, test_data_loader,
                              label_num, "test")
 
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                if paddle.distributed.get_rank() == 0:
                     paddle.save(model.state_dict(),
                                 os.path.join(args.output_dir,
                                              "model_%d.pdparams" % global_step))
+
             if global_step >= num_training_steps:
                 return
 
