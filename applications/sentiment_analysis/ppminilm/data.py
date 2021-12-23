@@ -15,8 +15,6 @@
 
 import json
 from tqdm import tqdm
-from collections import defaultdict
-
 
 def load_dict(dict_path):
     with open(dict_path, "r", encoding="utf-8") as f:
@@ -29,23 +27,17 @@ def load_dict(dict_path):
 def read(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
-            text, label = line.split("\t")
-            text = text[:-1] if text[-1]=="\n" else text
-            label = label[:-1] if label[-1]=="\n" else label
-            label = label.split(" ")
-            text = list(text)
-            assert len(text) == len(label), f"{text},  {label}"
-            example = {"text": text, "label":label}
+            items = line.strip().split("\t")
+            assert len(items) == 3
+            example = {"label":int(items[0]), "target_text": items[1], "text": items[2]}
 
             yield example
 
 def convert_example_to_feature(example, tokenizer, label2id,  max_seq_len=512, is_test=False):
-    encoded_inputs = tokenizer(list(example["text"]), is_split_into_words=True, max_seq_len=max_seq_len, return_length=True)
+    encoded_inputs = tokenizer(example["target_text"], text_pair=example["text"], max_seq_len=max_seq_len, return_length=True)
 
     if not is_test:
-        label = [label2id["O"]]+[label2id[label_term] for label_term in example["label"]][:(max_seq_len-2)]+[label2id["O"]]
-        
-        assert len(encoded_inputs["input_ids"]) == len(label), f"input_ids: {len(encoded_inputs['input_ids'])}, label: {len(label)}"
+        label = example["label"]
         return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"], label
 
     return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"]

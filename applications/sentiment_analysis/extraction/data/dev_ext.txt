@@ -1,0 +1,100 @@
+环境很好，空气很新鲜，天气好的时候来转转挺不错的	B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect O B-Opinion O O B-Aspect I-Aspect B-Opinion O O O O O O O O O O
+味道不错，就是量少了点，朋友感觉还是菜太少，	B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O
+游乐项目太少	B-Aspect I-Aspect B-Aspect I-Aspect O B-Opinion
+吉大这边吃饱了没地方去想起这家有团购很便宜就来了~进去了就知道为什么有团购了因为修路整个2层都没人的9.9的美式和光阴的味道差不多方块的巧克力饼干还挺好吃的服务态度还可以没有因为团购而态度差就是不知道为什么不让拍照why不过我还是拍了扶额因为没人觉得环境真是不错比起光阴 麦粒等狭小的空间我更喜欢这里	O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+第一次来手佳，同事给我推荐的57号按的非常到位，不错	O O O O B-Aspect B-Opinion O O O O O O O O O O O O O O O O O O O O
+还不错&nbsp; 做的很认真&nbsp; 保持效果也不错	O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion
+我去的时候快下班了，吃的东西很好吃，有点了一个焦糖玛奇朵 味道都不错	O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion
+感觉还不错，东西也比较齐全，想买的都买到了	B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O O O B-Opinion I-Opinion O O O O O O O O
+就是文物品类不多…	O O O B-Aspect I-Aspect O B-Opinion I-Opinion O
+觉得抚河还是不错的.，前几年污染比较严重	O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+很幸运抽中了免费体验，地铁很方便，进门先有顾问做皮肤分析，有针对性的提出一些意见和建议，包括去黑头修眉毛什么的，最后当然小推销一下，自己随便在外面吃了点就回家啦	O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+环境很不错，工作人员态度很好，服务很到位，赞	B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O B-Opinion O B-Aspect I-Aspect O O O O O
+店员态度非常冷淡，一副面孔也不是很乐意待见，然后我说要买棕色的，就拿了几张图片给我看，然后我就买了talt的棕色，总之&nbsp;这家服务态度我觉得很差	O O O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion O O O O O O O
+很一般的景点，个人觉的没必要来	O B-Opinion I-Opinion O B-Aspect I-Aspect O O O O O O O O O
+那里环境优美	O O B-Aspect I-Aspect O B-Opinion
+物美价廉 服务态度很好  还会入住	O O O O O B-Aspect I-Aspect O O O B-Opinion O O O O O O
+其实就是看看海而已，但来这吹吹海风倒不错	O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion
+自己开车方便打车就不方便了，店里服务员按摩还欠专业，但是服务还是很热情的	O O B-Aspect I-Aspect B-Opinion I-Opinion B-Aspect I-Aspect O B-Opinion I-Opinion I-Opinion O O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O B-Opinion I-Opinion O
+环境还行，房间整洁	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+服务态度不错，老板娘很热情	B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O B-Opinion I-Opinion
+璧山的滨河公园都有点评的额，其实小地方我满喜欢的，璧山县城的生活气息浓厚，山清水秀也不为过	O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O O O B-Aspect I-Aspect I-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O
+寺院的建筑风格融合了佛教文化、古典建筑、现代建筑艺术的精髓，展现了石油城独具一格的佛教文化特色，	O O O B-Aspect I-Aspect O O O O O O O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+很有意思&nbsp;每天去清健身路过的时候都看见很多家长等在外面&nbsp;小孩子在里面玩&nbsp;以为是小孩玩的&nbsp;后来去咨询&nbsp;说是大人也可以玩&nbsp;然后抱着试试的心态办了张10次卡&nbsp;450元&nbsp;每次都有教练的基础指导&nbsp;&nbsp;因为完全是第一次接触&nbsp;在教练的指导下尝试了很多&nbsp;总的来说感觉非常不错&nbsp;相当的有意思&nbsp;既能锻炼自己的肢体协调性又能活跃思维以及训练自己的忍耐性&nbsp;&nbsp;并不是想象那么简单的哦~&nbsp;有兴趣的朋友可以来试试&nbsp;真的好有意思&nbsp;下次一定要注意自己的肢体&nbsp;还有姿势以及重心的调整&nbsp;~	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+东西比较齐全，停车方便，来这里买过东西的呢，环境不错的，服务不错的哦，质量也是没得说	B-Aspect I-Aspect O O B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O B-Aspect I-Aspect B-Opinion I-Opinion O O O B-Aspect I-Aspect O O B-Opinion I-Opinion I-Opinion
+猫咪真可爱	B-Aspect I-Aspect O B-Opinion I-Opinion
+蛮实惠还可以，东西多，便宜，价格还蛮便宜	O B-Opinion I-Opinion O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+他家的披萨很实在，薯条也很好吃很脆	O O O B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion O O
+服务还是不错的，很及时，就是价格稍贵了些	B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O O O O B-Aspect I-Aspect O B-Opinion O O
+三杯鸡和蟹黄豆腐不错	O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+搓澡的大姐太给力了，不仅搓澡好，洗澡的环境干净，挺温馨的	B-Aspect I-Aspect O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O B-Opinion O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O B-Opinion I-Opinion O
+东西很好哦	B-Aspect I-Aspect O B-Opinion O
+一般的屈臣氏吧，在塘沽好像是最大的一个，服务还凑合，产品很比较多，偶尔还有打折的时候，位置比较好，在塘沽步行街上	B-Opinion I-Opinion O B-Aspect I-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O O B-Opinion O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion O O O O O O O O
+滑雪体验不错，不过还是摔了…	O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O
+环境也可以，空调制冷一点反应没有	B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O
+一个字好两个字好吃，但是口味绝对的赞~	O O B-Aspect O O O O B-Opinion I-Opinion O O O B-Aspect I-Aspect O O O B-Opinion O
+刚从美国回来 以前三十刀剪的也不怎么合心意 亚洲人的头型他们不太会把握 这次找了一号武老师 剪得非常理想 沟通很容易 我说了大概要求然后让他自己发挥 最后效果比我自己想要的还要好 绝对推荐	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O O O O O O O O B-Opinion O O O O O
+味道不错，环境不错，服务也不错，还会再去的，	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O
+刚结束歌诗达邮轮旅游，大多数都是中老年人，素质差到不行，几千个人同时挤在餐厅，到港下岸也毫无秩序，但这超市里面价格都偏贵，我们团里大多数都是老年团肯定不会买的啊	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion O O O O O O O O O O O O O O O O O O O O
+包花手艺确实不错	O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+前台不太热情	B-Aspect I-Aspect B-Opinion I-Opinion I-Opinion I-Opinion
+听同事说这儿性价比很高 发型师技术不错 昨儿带了两朋友来做 给大家瞧瞧 瞬间美爆了 有木有 做过的有史以来最最美的发型了 我图有真相	O O O O O O B-Aspect I-Aspect I-Aspect O B-Opinion O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+山下有停车位，爬上去再爬下来接近两个钟了，也有人卖东西，在山顶可以俯瞰周边环境，天空也很蓝	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion O O O O B-Aspect I-Aspect O B-Aspect I-Aspect O O B-Opinion
+丸子汤味道不错，肉饼也很好吃还会光顾的	O O B-Aspect I-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O
+东西很多，价格实惠，我想应该没有超市是这样的吧~~	O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O
+美女老板娘人很好，环境很好，很干净	B-Aspect I-Aspect I-Aspect I-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion O O B-Opinion I-Opinion
+服务好，环境好，技术好	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion
+附近的大银行，非常方便	O O O B-Opinion B-Aspect I-Aspect O O O B-Opinion I-Opinion
+坑爹的景区居然还是星级的，袖珍小气价格昂贵的花草，大草原还好，各种价格贵的要死	B-Opinion I-Opinion O B-Aspect I-Aspect O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O B-Opinion B-Aspect I-Aspect B-Opinion I-Opinion O O O O O B-Opinion O O O
+女装里质量很棒和款式也文雅，女白领的首选	O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O
+价格公道，老板娘人也很好也真漂亮	B-Aspect I-Aspect B-Opinion I-Opinion O O O O B-Aspect O O B-Opinion O O O O
+牛扒很一般，所谓的自助餐玩文字游戏	B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O
+设施都在维修都不能用： 泳池不能用，桌上足球没有球，推拿的水平很差还要小费，绝对不推荐	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O
+服务太差，刚回到家一点少了一箱，一打电话就不承认，一箱苹果至于吗，	B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+蓝色的水飞流直下别有风情很好的地方	O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect
+就是规模有点小，壁画很不错	O O B-Aspect I-Aspect O O B-Opinion O B-Aspect I-Aspect O B-Opinion I-Opinion
+环境好，服务贴心，	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O
+服务很好就是排队时间太长，环境也好位置也好找	B-Aspect I-Aspect O B-Opinion O O B-Aspect I-Aspect I-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect O B-Opinion B-Aspect I-Aspect O O O
+免费的，景色不错	O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+隔音不好 ，环境可以，网速很好	B-Aspect I-Aspect B-Opinion O O O O O O O O B-Aspect O B-Opinion I-Opinion
+服务态度还可以 就是贵了点 效果还好吧	B-Aspect I-Aspect O O B-Opinion I-Opinion I-Opinion O O O O O O O B-Aspect I-Aspect O B-Opinion O
+也谈不上景色好，是个大房子，参观要登记	O O O O B-Aspect I-Aspect B-Opinion O O O B-Opinion B-Aspect I-Aspect O O O O O O
+服务好，环境好，安静，舒适	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion O B-Opinion I-Opinion O B-Opinion I-Opinion
+店主好漂亮，技术也很熟练啊，这颜色好老的感觉	B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O B-Aspect I-Aspect B-Opinion O O O O
+不错，地理位置好，寺院比较大，历史文化悠久，香火不断	O O O B-Aspect I-Aspect I-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect O O B-Opinion O B-Aspect I-Aspect B-Aspect I-Aspect B-Opinion I-Opinion O O O O O
+面积也大，春天满树桃花连成一片	B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O
+味道很好，服务热情	B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+第一次克丽缇娜做脸 特别喜欢那里的产品 感觉好不错	O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion O O
+年糕量不是很多，炸鸡好吃，薯条特别好吃，猕猴桃汁很好喝	O O B-Aspect O O B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O B-Opinion I-Opinion B-Aspect
+亮哥特别有耐心 提出的建议都很中肯 环境和服务态度很好 烫出的效果很棒 下次做头发还会去哦	O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Aspect I-Aspect O O O B-Opinion O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O
+各方面都挺好的，好评哦	O B-Aspect I-Aspect O O B-Opinion O O O O O
+蛋糕好吃~	B-Aspect I-Aspect B-Opinion I-Opinion O
+店铺较小，可以刷武汉通消费哦~~	B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O
+吃了个石锅拌饭 味道不错 就是没有配汤 还有种类略少…	O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O
+服务环境都不错，态度也很好	B-Aspect I-Aspect B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O B-Opinion
+院落格局是明代的，钟楼、鼓楼在第一进院落，这一片区域外人不能进，曾经来这里听过一回讲座，很虔诚地在听，和尚年龄不大，声音飘忽，笑容轻浮，大意就是世界战乱不休，这就是所谓“职业和尚”吧，出家为僧不过是一种谋生手段罢了，	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+这么大的超市，难道你们冲着赚停车费去的？？我买300块的东西也要在一小时内选完？？去抢可能这么快，？谁规定的，	O O B-Opinion O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+拍摄布宫的好地方	O O O O O B-Opinion B-Aspect I-Aspect
+离家近，味道好	O O O O B-Aspect I-Aspect B-Opinion
+服务很好，服务员也很热情	B-Aspect I-Aspect O B-Opinion O O O O O O B-Opinion I-Opinion
+长沙比较有历史的一条街 化龙池里面有一口井 由一个降龙的故事而命名的很多人拍写真 结婚照都会选择在这里 拍出来效果很不错 比较有特色这条街最多的就是酒吧 小酒吧 小清吧 别有一番韵味 白天酒吧基本没有营业的 所以白天显得比较荒凉但是一到晚上这条街就热闹了 很多外地的朋友来 都会想来这边看看离步行街也比较近 位置还算比较好的	O O O O O O O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect I-Aspect O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect I-Aspect O O O B-Opinion O B-Aspect I-Aspect O O O O B-Opinion O
+里面布置了很多彩灯，游览路线也规划好了，很划算，有些很萌	O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion O O O O O O O O O O
+老山东大学校址历史文化底蕴绝对深厚	O O O O O O O B-Aspect I-Aspect I-Aspect I-Aspect I-Aspect I-Aspect O O B-Opinion I-Opinion
+服务态度好，环境优雅，也许和自己敏感体质有关吧，本人肩周不好	B-Aspect I-Aspect O O B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O
+位置挺好的，卫生也还可以，服务员态度好	B-Aspect I-Aspect B-Opinion I-Opinion O O B-Aspect I-Aspect O B-Opinion I-Opinion I-Opinion O B-Aspect I-Aspect O O O B-Opinion
+经常经过，经常听人开玩笑说如何贵如何环境好，于是，查到电话打过去，对方：我们这里是吃火锅的，主要是吃涮海鲜和牛肉，我：带独立卫生间的有么？对方：都没卫生间，对方：开什么玩笑，还有别的推荐吗？对方：您要是痛风就别来了，	O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+收银的那个女的态度真差，试问这样的女的怎么还会有人聘用？老板你聘用这样的人有木有考虑过你的生意？对于这样的人我只想说两字:呵呵，	O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+只是去看了看，绿化好，太平天国的忠王李秀成在这被发现，后被陶大赖举报给清兵，	O O O O O O O B-Aspect I-Aspect B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+此品牌制衣质地不错的，就只有万象城有，	O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O
+带小朋友去还可以，停车方便	O B-Aspect I-Aspect I-Aspect O B-Opinion I-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+环境干净，采光好，老板人不错	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion O O O O O O
+环境好，没有能走完整圈，不过有许多仍在建设中	B-Aspect I-Aspect B-Opinion O O O O O O O O O O O O O O O O O O O
+去了6个人，加20，但是包厢环境什么都不错，感觉和读书的时候不一样了	O O O O O O O O O O O O O O B-Aspect I-Aspect O O O B-Opinion I-Opinion O O O O O O O O O O O O O
+份量多，环境不怎么好	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect O O O B-Opinion
+茂业，他家妹儿服务还是不错	O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+去年按了，效果真心不错，	O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O
+离公司很近 基本上是看着它造起来的 刚开始的时候绿化周围都不设围栏的 大家吃好午饭也经常去河边走走散散步 但不知是从何时开始 就设起了围栏 人根本就不让人走进去了 也没了以往的人气了 植物重的很好的 环境也很干净	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+炸鸡超级好吃，环境干净，座位少	B-Aspect I-Aspect O O B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion
+环境非常好，服务也好	B-Aspect I-Aspect O O B-Opinion O B-Aspect I-Aspect O B-Opinion
+宁波三江口附近，古朴的建筑，	O O O O O O O O B-Opinion I-Opinion O B-Aspect I-Aspect O
+环境好，价格便宜，好评，	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O O O O

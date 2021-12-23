@@ -1,0 +1,100 @@
+美美哒，看着效果挺好的，很期待成册后的效果，希望美女姐姐尽快哦	O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O
+这里的环境很好，原来剪头时描述我想要的发型都是白说，强烈推荐”	O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O
+环境不好，交通不方便，特别是服务员的态度非常恶劣	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion O O O O O O B-Aspect I-Aspect O O O O O O B-Opinion I-Opinion
+洗得干净，服务贴心	O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+这次刚好乘着美团的机会过来体验一下效果果然不错，洗头的小伙子很帅噢，老板技术又好	O O O B-Opinion O O O O O O O O O O O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion
+记得面积还不算小的，感觉挺不错滴~	O O B-Aspect I-Aspect O B-Opinion I-Opinion I-Opinion O O O O O O O O O
+5分，位置很好，交通方便，设施略陈旧减分0.5	O O O B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O
+服务倒是很好，又是给你喝玫瑰水又是倒粥的，团购的目的也是如此	B-Aspect I-Aspect O O O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O
+交通也不是很方便	B-Aspect I-Aspect O B-Opinion O O O O
+这里自然环境还可以，还可以坐快艇哦，就是交通不太方便	O O B-Aspect I-Aspect I-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O O O O O O O O O O O B-Aspect I-Aspect B-Opinion O O O
+服务超好了，店员很亲切，会听从客人的意见	B-Aspect I-Aspect O B-Opinion O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O
+酒店位置好，环境好，服务好	O O B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion
+设施简单了些 总感觉性价比不高	B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O B-Aspect I-Aspect I-Aspect B-Opinion I-Opinion
+产品不错&nbsp;&nbsp;质量很好&nbsp; 值得保证&nbsp; 感觉比日丰的要好	B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O
+服务质量有待提高，居住环境不错，景观一般，双月湾沙滩的水质一般，沙滩的生活垃圾较多	B-Aspect I-Aspect O O B-Opinion I-Opinion I-Opinion I-Opinion O O O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O B-Aspect I-Aspect B-Aspect I-Aspect O B-Opinion
+沿途景色很美，而且大家要好好看缆车票上的说明，在坐缆车的过程中会有“小猴”给你拍照，下车后即可到服务站打印，令人震撼，宝莲禅寺的斋饭味道很好，	O O B-Aspect I-Aspect O B-Opinion O O O O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O
+环境蛮好的&#039;意大利面也很好吃饭&#039;巧克力蛋糕也不错&#039;就是稍微甜了一点&#039;	B-Aspect I-Aspect O B-Opinion O O O O O O O O O O B-Aspect O O B-Opinion I-Opinion O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O
+味道不好，脸马上不悦，乌烟瘴气	B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O
+服务态度很好，验光很好，金仙桥的服务态度很好	B-Aspect I-Aspect O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O B-Opinion
+小桥流水，古镇的美，古镇的安静，在河水里凸显的更加有味道，一面是风景一面人文	O O O O O B-Aspect I-Aspect O B-Opinion O O O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O
+感觉还是不错滴	B-Aspect I-Aspect O O B-Opinion I-Opinion O
+早晚人气旺	O O B-Aspect I-Aspect B-Opinion
+味道很不错，上菜速度快	B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect B-Aspect I-Aspect B-Opinion
+味道很好，偏辣，味道大，麻辣鲜香，吃着烤鱼就着啤酒	B-Aspect I-Aspect O B-Opinion O O O O O O B-Opinion O B-Opinion I-Opinion O O O O O O O O O O O
+网点面积大，窗口多	O O B-Aspect I-Aspect B-Opinion O O O O
+付款方便，东西品种多	O O O O O B-Aspect I-Aspect B-Aspect I-Aspect B-Opinion
+院里环境清新，竹林的竹叶沙沙作响	O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O
+整个西湖风景名胜区中游客人数最多的路段之一	O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O
+还可以啦 效果也很不错 下次还来的	O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O O
+服务态度极其恶劣，一点也没有处理问题的态度	B-Aspect I-Aspect O O O O B-Opinion I-Opinion O O O O B-Opinion I-Opinion O O O O O O O
+一直都在余师傅买蛋糕 非常实惠好吃	O O O O O O O O B-Aspect I-Aspect O O O B-Opinion I-Opinion O O
+环境几好，味道也不错	B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect O B-Opinion I-Opinion
+像五一第一天，在这里休憩绝对不用担心见到人山人海，可以完全放松身心去亲近大自然~2.这个公园是免费的，但胜在环境清幽，但门票挺贵的，不过附近应该有吃姜撞奶的地方~4.可以在广场打羽毛球，时常会有直升机飞过，所以设施基本没怎样维护，除了门口的广场还可以，往里面走都是泥路，除了个水库就没什么看点了~3.公园里没有餐厅，但卫生条件比较差，如果需要逗留比较久的最好自备干粮~	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion O O O O O O O O O O O O O O O O O O
+但是不适合我的风格，质量还是可以的	O O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O
+心特别静，而且去吃的面也很不错	B-Aspect O O B-Opinion O O O O O O B-Aspect O O B-Opinion I-Opinion
+瀑布非常的壮观，很有气势	B-Aspect I-Aspect O O O B-Opinion I-Opinion O O O O O
+味道不错，价格合理	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+天津水上公园不错	O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+交通很方便，感觉也挺好的	B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O O B-Opinion O
+前台服务超好，卫生间一些设施虽然有点老旧但是很干净	O O B-Aspect I-Aspect O B-Opinion O O O O O O B-Aspect I-Aspect O O O O B-Opinion O O O O O O
+环境干净又大，孩子们玩的很开心	B-Aspect I-Aspect B-Opinion I-Opinion O O O B-Aspect I-Aspect O O O O B-Opinion I-Opinion
+而且房间的床单好像都没有换	O O B-Aspect I-Aspect O O O O O O B-Opinion I-Opinion O
+这个价位很给力	O O B-Aspect I-Aspect O B-Opinion I-Opinion
+只能说没有上次那么满意，我看评价里边晒图水果也还可以的，怎么到我这儿水果就少了一圈呢？？有图为证，左图为评论里别人晒得图，右图为我收到的，我实在不想说什么了	O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion I-Opinion O O O O O O O O O O O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+还好 蛇挺吓人的 猴子好玩	O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+好吃～～服务又好，都11点还开，服务还是很好	B-Opinion O O O B-Aspect I-Aspect O O O O O O O O O O O O O O O B-Opinion
+信誉好，质量保证	B-Aspect I-Aspect B-Opinion O O O O O
+理发师水平太不行了，	O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O
+服务挺热情，地方也不错	O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion
+过年前去做的～小敏很认真～效果也不错滴～过阵子再去	O O O O O O O O O O O O O B-Aspect I-Aspect O O O O O O O O B-Opinion I-Opinion
+ 就是房间太小了	O O O B-Aspect I-Aspect O B-Opinion O
+味道很正点 送货很准点 下次再吃～	B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O
+环境很好，客服服务态度很赞～下次还来～	B-Aspect I-Aspect O B-Opinion O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O
+店面比较小，但是服务人员服务态度特别好，	O O O O O O O O B-Aspect I-Aspect O O O O O O O O B-Opinion O
+不过就这个价格，味道还行	O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+大超市逛起来太累了，而且不方便，是礼盒装的，里面内容很丰富，鸭蛋很好，但是方便面我还是喜欢康师傅的	B-Opinion B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O O O O O O
+酸菜鱼很好吃，餐厅环境也很不错	B-Aspect I-Aspect I-Aspect O B-Opinion I-Opinion O O O B-Aspect I-Aspect O O B-Opinion I-Opinion
+我们是第一波客人，环境很好	O O O O O O O O O B-Aspect I-Aspect O B-Opinion
+师傅技术很不错，服务态度也很好	O O B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect O O O O B-Opinion
+经济实惠，环境好，套餐划算	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+指甲后来断裂的很厉害，做出来的效果可以	O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+团购蛮划算的，服务质量还可以	B-Aspect I-Aspect O B-Opinion I-Opinion O O B-Aspect I-Aspect O O B-Opinion I-Opinion I-Opinion
+空气质量还可以、环境不错	B-Aspect I-Aspect I-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+效果蛮好的，也没不让吃饭，员工也满热情的每次做完都送我到电梯口弄的我都不好意思了	B-Aspect I-Aspect O B-Opinion O O O O O O O O O B-Aspect I-Aspect O O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O
+房间干净，地理位置不错	B-Aspect I-Aspect B-Opinion I-Opinion O O O B-Aspect I-Aspect B-Opinion I-Opinion
+环境不错 修身养性好去处	B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O
+这是其中一个，戏水的以本港人和老外居多，南丫的游客比例居多	O O O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O O O O
+但是服务和态度都很好	O O B-Aspect I-Aspect O O O O O B-Opinion
+服务差，态度差，要啥没啥，一个个看着长的像人却跟疯狗一样，不要再去了，	B-Aspect I-Aspect B-Opinion O O O B-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+环境还可以，水温很好	B-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion
+那时候这里很孤寂，但有一件东西特多，现在热闹多了	O O O O O O O O O O O O O B-Aspect I-Aspect O B-Opinion O O O O O O O
+性价比高，值得推荐	B-Aspect I-Aspect I-Aspect B-Opinion O O O O O
+经济实惠，老板一家人还不错	B-Aspect I-Aspect B-Opinion I-Opinion O O O B-Aspect I-Aspect I-Aspect B-Opinion I-Opinion I-Opinion
+环境还可以&nbsp;味道马马虎虎的&nbsp;态度一般	B-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+小哥很帅，服务快捷热情，价格合理	O O O B-Opinion O B-Aspect I-Aspect O O B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+糟溜鱼片：醪糟味道很重，鱼肉比较嫩，偏咸老爆三：火太大了	O O O O O O O B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect O O B-Opinion O O O O O O O O O B-Opinion O
+房间大，设施一般	B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+垃圾超市，什么服务态度呀，也没有人管	B-Opinion I-Opinion B-Aspect I-Aspect O O O O O O O O O O O O O O
+吃过好几次，其实味道一般	O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+价格便宜，手势很好	B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion
+鸡爪很好吃 服务态度挺好	B-Aspect I-Aspect O B-Opinion I-Opinion O B-Aspect I-Aspect I-Aspect I-Aspect B-Opinion I-Opinion
+后上前下，山不是很高，沿途虽然没有非常秀丽的景色，但是锻炼一下身体还是相当不错的	O O O O O O O O O O O O O O O O O O O B-Opinion I-Opinion O B-Aspect I-Aspect O O O O O O O B-Aspect I-Aspect O O O O B-Opinion I-Opinion O
+老建筑，但是由于门口树木过多	B-Opinion B-Aspect I-Aspect O O O O O O O B-Aspect I-Aspect O B-Opinion
+店主很热情，也不推荐其他的，每天2到3根的速度掉	B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O
+环境超级好，很舒服？	B-Aspect I-Aspect O O B-Opinion O O B-Opinion I-Opinion O
+去的是宜和的蓝港店，环境没得说，缺点是课堂人数多	O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O O O O O O B-Aspect I-Aspect B-Opinion
+环境很好，价格公道，性价比很高	B-Aspect I-Aspect O B-Opinion O O O B-Opinion I-Opinion O B-Aspect I-Aspect I-Aspect O B-Opinion
+以前感觉环境很好，菜的味道也不错;但是最近吃的时候从酸菜鱼中看到一只苍蝇，老板就说退掉或者重新做一份，还说天气热了，那你的意思就是我应该吃到苍蝇喽，我到你们这是来吃饭的，语气还很不友善	O O O O B-Aspect I-Aspect O B-Opinion O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+慕名去吃红烧肉挺难吃的又硬又柴，服务不错	O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+很好希望多做一些这样的优惠，每一款都好吃	O O B-Aspect I-Aspect O O O O O O O O O O O O O O B-Opinion I-Opinion
+虽然是个小地方，风水不错，过年的时候除夕到十五，不可以自带香火，初五烧头香的时候估计也很......	O O O O B-Opinion B-Aspect I-Aspect O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+不错，味道很好，赞一个	O O O B-Aspect I-Aspect O B-Opinion O B-Opinion O O
+第1次去那 看见的都是清一色的小帅哥 6号发型师负责剪发 8号发型师负责烫染 效果还不错 服务客气周到 环境也可以 全5分 只是那烫染的药水有点灼人	O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion I-Opinion O B-Opinion I-Opinion O O O O O B-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O O O O O O O
+水质很好，环境优美	B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect O B-Opinion
+环境还不错，交通也方便	B-Aspect I-Aspect B-Opinion B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion I-Opinion
+因为店在超市一楼，一般女孩子去超市的时后都要去兜兜的当然我也不例外咯，每次去里面的人员都是很热...	O O O O O O O O O B-Opinion I-Opinion O B-Aspect I-Aspect O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O
+个人认为他家的咖啡不错	O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion
+服务技术都还好，卡用完要再考虑一下咯	B-Aspect I-Aspect I-Aspect I-Aspect O B-Opinion I-Opinion O O O O O O O O O O O
+包括婚姻，但不知道为什么就是生意一般，换了好几次装修了	O O O O O O O O O O O O O O B-Aspect I-Aspect B-Opinion I-Opinion O O O O O O O O O
+环境非常好，赞赞赞	B-Aspect I-Aspect O O B-Opinion O B-Opinion O O

@@ -97,8 +97,8 @@ def concate_aspect_and_opinion(text, aspect, opinion_words):
 
 def format_print(results):
     for result in results:
-        aspect, opinions, sentiment = result["aspect"], result["opinions"], result["sentiment"]
-        print(f"aspect: {aspect}, opinions: {opinions}, sentiment: {sentiment}")
+        aspect, opinions, sentiment = result["aspect"], result["opinions"], result["sentiment_polarity"]
+        print(f"aspect: {aspect}, opinions: {opinions}, sentiment_polarity: {sentiment}")
     print()
     
 
@@ -114,7 +114,8 @@ def predict(ext_model, cls_model, tokenizer, ext_id2label, cls_id2label, max_seq
             continue
         if input_text == "quit":
             break
-    
+       
+        input_text = input_text.strip().replace(" ", "") 
         # processing input text
         encoded_inputs = tokenizer(list(input_text), is_split_into_words=True, max_seq_len=max_seq_len,)
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
@@ -140,7 +141,7 @@ def predict(ext_model, cls_model, tokenizer, ext_id2label, cls_id2label, max_seq
             logits = cls_model(input_ids, token_type_ids=token_type_ids)
             prediction = logits.argmax(axis=1).numpy()[0]
 
-            result = {"aspect": aspect, "opinions": opinion_words, "sentiment": cls_id2label[prediction]}
+            result = {"aspect": aspect, "opinions": opinion_words, "sentiment_polarity": cls_id2label[prediction]}
             results.append(result)
 
         # print results
@@ -150,11 +151,11 @@ def predict(ext_model, cls_model, tokenizer, ext_id2label, cls_id2label, max_seq
 if __name__=="__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ext_model_path", type=str, default=None, help="extraction model path that you saved")
-    parser.add_argument("--cls_model_path", type=str, default=None, help="classification model path that you saved")
-    parser.add_argument("--ext_label_path", type=str, default=None, help="extraction label dict path")
-    parser.add_argument("--cls_label_path", type=str, default=None, help="classification label dict path")
-    parser.add_argument("--max_seq_len", type=int, default=512, help="number of words of the longest seqence.")
+    parser.add_argument("--ext_model_path", type=str, default=None, help="The path of extraction model path that you want to load.")
+    parser.add_argument("--cls_model_path", type=str, default=None, help="The path of classification model path that you want to load.")
+    parser.add_argument("--ext_label_path", type=str, default=None, help="The path of extraction label dict.")
+    parser.add_argument("--cls_label_path", type=str, default=None, help="The path of classification label dict.")
+    parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     args = parser.parse_args()
     # yapf: enbale
 

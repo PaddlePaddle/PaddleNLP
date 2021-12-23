@@ -22,9 +22,9 @@ import paddle.nn.functional as F
 from paddlenlp.metrics.glue import AccuracyAndF1
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.transformers import SkepTokenizer, SkepModel, LinearDecayWithWarmup
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel, LinearDecayWithWarmup
 from evaluate import evaluate
-from model import SkepForSequenceClassification
+from model import PPMiniLMForSequenceClassification
 from utils import set_seed
 from data import read, load_dict, convert_example_to_feature
 
@@ -33,8 +33,6 @@ warnings.filterwarnings("ignore")
 
 def train():
     # set running envir
-    model_name = "skep_ernie_1.0_large_ch"
-
     paddle.set_device(args.device)
     set_seed(args.seed)
 
@@ -46,7 +44,7 @@ def train():
     train_ds = load_dataset(read, data_path=args.train_path, lazy=False)
     dev_ds =  load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = SkepTokenizer.from_pretrained(model_name)
+    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
     trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=False)
     dev_ds = dev_ds.map(trans_func, lazy=False)
@@ -64,8 +62,8 @@ def train():
     dev_loader = paddle.io.DataLoader(dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
 
     # configure model training
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForSequenceClassification(skep, num_classes=len(label2id))
+    ppminilm = ErnieModel.from_pretrained(pretrained_model_name_or_path=args.base_model_path)
+    model = PPMiniLMForSequenceClassification(ppminilm, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(learning_rate=args.learning_rate, total_steps=num_training_steps, warmup=args.warmup_proportion)
@@ -98,27 +96,28 @@ def train():
                 if f1 > best_f1:
                     print(f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}")
                     best_f1 = f1
-                    paddle.save(model.state_dict(), f"{args.checkpoints}/best_cls.pdparams")
+                    paddle.save(model.state_dict(), f"{args.checkpoints}/best_mini.pdparams")
                 print(f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
 
             global_step += 1
 
-    paddle.save(model.state_dict(), f"{args.checkpoints}/final_cls.pdparams")
+    paddle.save(model.state_dict(), f"{args.checkpoints}/final_mini.pdparams")
 
 
 if __name__=="__main__":
     # yapf: disable
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("--num_epochs", type=int, default=3, help="Number of epoches for training.")
+    parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
     parser.add_argument("--train_path", type=str, default=None, help="The path of train set.")
     parser.add_argument("--dev_path", type=str, default=None, help="The path of dev set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
+    parser.add_argument("--num_epochs", type=int, default=3, help="Number of epoches for fine-tuning.")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--learning_rate", type=float, default=5e-5, help="The initial learning rate for optimizer.")
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--max_grad_norm", type=float, default=1.0, help="Max grad norm to clip gradient.")
-    parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Linear warmup proption over the training process.")
+    parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Warmup proportion params for warmup strategy")
     parser.add_argument("--log_steps", type=int, default=50, help="Frequency of printing log.")
     parser.add_argument("--eval_steps", type=int, default=500, help="Frequency of performing evaluation.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")

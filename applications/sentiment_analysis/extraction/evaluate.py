@@ -46,11 +46,11 @@ def evaluate(model, data_loader, metric):
 if __name__=="__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, default=None, help="model path that you saved")
-    parser.add_argument('--test_path', type=str, default=None, help="test data path")
-    parser.add_argument("--label_path", type=str, default=None, help="label dict path")
-    parser.add_argument("--batch_size", type=int, default=32, help="total examples' number in batch for training.")
-    parser.add_argument("--max_seq_len", type=int, default=512, help="number of words of the longest seqence.")
+    parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
+    parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
+    parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     args = parser.parse_args()
     # yapf: enbale
 

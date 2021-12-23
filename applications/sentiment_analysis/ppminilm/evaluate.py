@@ -13,21 +13,20 @@
 # limitations under the License.
 
 import argparse
-from tqdm import tqdm
 from functools import partial
 import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics.glue import AccuracyAndF1
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
-from model import SkepForSequenceClassification
+from paddlenlp.transformers import ErnieModel, ErnieTokenizer
+from model import PPMiniLMForSequenceClassification
 from data import read, load_dict, convert_example_to_feature
 
 def evaluate(model, data_loader, metric):
 
     model.eval()
     metric.reset()
-    for batch_data in tqdm(data_loader):
+    for batch_data in data_loader:
         input_ids, token_type_ids, _, labels = batch_data
         logits = model(input_ids, token_type_ids=token_type_ids)        
         correct = metric.compute(logits, labels)
@@ -41,6 +40,7 @@ def evaluate(model, data_loader, metric):
 if __name__=="__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
+    parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
@@ -50,11 +50,10 @@ if __name__=="__main__":
     # yapf: enbale
 
     # load dev data
-    model_name = "skep_ernie_1.0_large_ch"
     label2id, id2label = load_dict(args.label_path)
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
-    tokenizer = SkepTokenizer.from_pretrained(model_name)
+    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
     trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
     test_ds = test_ds.map(trans_func, lazy=False)
 
@@ -70,8 +69,8 @@ if __name__=="__main__":
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForSequenceClassification(skep, num_classes=len(label2id))    
+    ppminilm = ErnieModel.from_pretrained(pretrained_model_name_or_path=args.base_model_path)
+    model = PPMiniLMForSequenceClassification(ppminilm, num_classes=len(label2id))   
     model.load_dict(loaded_state_dict)
 
     metric = AccuracyAndF1()
