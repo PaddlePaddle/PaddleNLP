@@ -254,8 +254,6 @@ class Predictor(object):
         self.predictor.run()
         title_logits = self.output_handle.copy_to_cpu()
 
-        print(query_logits.shape)
-        print(title_logits.shape)
         if args.benchmark:
             self.autolog.times.stamp()
             
