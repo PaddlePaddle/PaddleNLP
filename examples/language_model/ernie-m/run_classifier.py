@@ -155,7 +155,7 @@ def evaluate(model, loss_fct, metric, data_loader, language):
 
 
 def convert_example(example, tokenizer, max_seq_length=256):
-    """convert a glue example into necessary features"""
+    """convert a example into necessary features"""
     # Get the label
     label = example["label"]
     premise = example["premise"]
@@ -183,7 +183,7 @@ def get_test_dataloader(args, language, batchify_fn, trans_func):
 
 class XnliDataset(Dataset):
     """
-    Make all languages datasets be loaded in lazy way.
+    Make all languages datasets be loaded in lazy mode.
     """
 
     def __init__(self, datasets):
