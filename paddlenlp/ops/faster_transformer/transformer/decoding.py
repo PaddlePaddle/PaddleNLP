@@ -23,7 +23,7 @@ from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
 
-from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.utils.log import logger
 
 
@@ -610,14 +610,23 @@ class InferTransformerDecoding(nn.Layer):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
             load("FasterTransformer", verbose=True)
+
+        size_per_head = d_model / n_head
+        # fuse_qkv can only support size_per_head is one of [32, 64, 128].
+        if size_per_head in [32, 64, 128]:
+            self._fuse_qkv = True
+        else:
+            self._fuse_qkv = False
 
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
@@ -715,11 +724,41 @@ class InferTransformerDecoding(nn.Layer):
         self.ffn_out_weight = []
         self.ffn_out_bias = []
 
-        for mod in decoder.layers:
+        for i, mod in enumerate(decoder.layers):
             self.slf_ln_weight.append(mod.norm1.weight)
             self.slf_ln_bias.append(mod.norm1.bias)
-            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
-            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
+            if self._fuse_qkv:
+                q_weight_shape = mod.self_attn.q_proj.weight.shape
+                k_weight_shape = mod.self_attn.k_proj.weight.shape
+                v_weight_shape = mod.self_attn.v_proj.weight.shape
+
+                q_weights = self.create_parameter(
+                    shape=[
+                        q_weight_shape[0], q_weight_shape[1] + k_weight_shape[1]
+                        + v_weight_shape[1]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32")
+                setattr(self, "slf_q_weight_" + str(i), q_weights)
+                self.slf_q_weight.append(
+                    getattr(self, "slf_q_weight_" + str(i)))
+
+                q_bias_shape = mod.self_attn.q_proj.bias.shape
+                k_bias_shape = mod.self_attn.k_proj.bias.shape
+                v_bias_shape = mod.self_attn.v_proj.bias.shape
+
+                q_biases = self.create_parameter(
+                    shape=[
+                        q_bias_shape[0] + k_bias_shape[0] + v_bias_shape[0]
+                    ],
+                    dtype="float16" if use_fp16_decoding else "float32",
+                    is_bias=True)
+                setattr(self, "slf_q_bias_" + str(i), q_biases)
+                self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
+            else:
+                self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+                self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+
             self.slf_k_weight.append(mod.self_attn.k_proj.weight)
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_weight.append(mod.self_attn.v_proj.weight)
@@ -833,8 +872,10 @@ class InferTransformerDecoding(nn.Layer):
 class InferGptDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1041,8 +1082,10 @@ class InferUnifiedDecoding(nn.Layer):
                  hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1381,7 +1424,7 @@ class InferUnifiedDecoding(nn.Layer):
             _bos_id=bos_token_id,
             _eos_id=eos_token_id,
             _max_out_len=max_out_len,
-            _diversity_rate=diversity_rate,
+            _diversity_rate=-diversity_rate,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
@@ -1405,8 +1448,10 @@ class InferBartDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1625,7 +1670,7 @@ class InferBartDecoding(nn.Layer):
             self.linear_weight, self.linear_bias, self.pos_emb,
             decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
+            bos_token_id, eos_token_id, max_out_len, -diversity_rate, rel_len,
             alpha, early_stopping)
 
         ids = finalize(
@@ -1646,8 +1691,10 @@ class InferMBartDecoding(nn.Layer):
                  hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1877,7 +1924,7 @@ class InferMBartDecoding(nn.Layer):
             self.linear_bias, self.pos_emb, trg_word, decoding_strategy,
             beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            bos_token_id, eos_token_id, max_out_len, diversity_rate, rel_len,
+            bos_token_id, eos_token_id, max_out_len, -diversity_rate, rel_len,
             alpha, temperature, early_stopping, self._hidden_act)
 
         ids = finalize(

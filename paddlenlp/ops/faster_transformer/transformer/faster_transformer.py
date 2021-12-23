@@ -272,9 +272,25 @@ class FasterTransformer(TransformerModel):
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
             self.max_length, self.d_model)
 
+        if self.decoding._fuse_qkv:
+            for item in self.state_dict():
+                if "decoder" in item and "self_attn.q_proj" in item:
+                    num_layer = item.split(".")[3]
+                    param_type = item.split(".")[-1]
+
+                    model_dict["decoding.slf_q_" + param_type + "_" +
+                               num_layer] = np.concatenate(
+                                   (model_dict[item], model_dict[
+                                       "transformer.decoder.layers." + num_layer
+                                       + ".self_attn.k_proj." + param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer + ".self_attn.v_proj."
+                                               + param_type]),
+                                   axis=-1)
+
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
@@ -377,9 +393,25 @@ class FasterTransformer(TransformerModel):
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
             self.max_length, self.d_model)
 
+        if self.decoding._fuse_qkv:
+            for item in self.state_dict():
+                if "decoder" in item and "self_attn.q_proj" in item:
+                    num_layer = item.split(".")[3]
+                    param_type = item.split(".")[-1]
+
+                    model_dict["decoding.slf_q_" + param_type + "_" +
+                               num_layer] = np.concatenate(
+                                   (model_dict[item], model_dict[
+                                       "transformer.decoder.layers." + num_layer
+                                       + ".self_attn.k_proj." + param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer + ".self_attn.v_proj."
+                                               + param_type]),
+                                   axis=-1)
+
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
@@ -1129,7 +1161,7 @@ class FasterBART(BartPretrainedModel):
                 **model_kwargs):
 
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
@@ -1233,7 +1265,7 @@ class FasterMBART(MBartPretrainedModel):
 
         #(gongenlei) Not enable_faster_encoder temporarily
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder, need_build=False)
+            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]

@@ -21,7 +21,6 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
-#include "cublas_handle.h"
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fusion_decoding_op.h"
 #include "pd_traits.h"
@@ -124,6 +123,10 @@ std::vector<paddle::Tensor> decoding_kernel(
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
+
+  auto q_weight_shape = self_attn_query_weight[0].shape();
+  auto k_weight_shape = self_attn_key_weight[0].shape();
+  bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -261,7 +264,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true);  // is_fuse_topk_softMax
+        true,  // is_fuse_topk_softMax
+        fuse_qkv);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -283,7 +287,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,   // is_fuse_topk_softMax
-        false,  // is_fuse_qkv
+        fuse_qkv,
         true,   // keep_alive_beam
         alpha);
 
@@ -307,7 +311,8 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       start_id_,
                                                       end_id_,
                                                       candidate_num_,
-                                                      probability_threshold_);
+                                                      probability_threshold_,
+                                                      fuse_qkv);
 
     decoding_sampling_->forward(params, decoding_params);
 

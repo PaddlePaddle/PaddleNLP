@@ -238,10 +238,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self,
-                          need_build=True,
-                          use_fp16=False,
-                          encoder_lib=None):
+def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -281,19 +278,21 @@ def enable_faster_encoder(self,
                 convert_to_fp16(layer)
 
     if not self.training:
-        if need_build:
-            try:
-                # Pass decoding lib to prevent re-building encoder.
-                # Todo: check weather decoding lib have contained encoder or not.
-                if encoder_lib is not None:
-                    load_op_meta_info_and_register_op(encoder_lib)
-                else:
-                    load("FasterTransformer", verbose=True)
-            except Exception:
-                logger.warning(
-                    "Exception occurs when using FasterEncoder. " \
-                    "The original forward will be involved. ")
-                return self
+        try:
+            # Pass decoding lib to prevent re-building encoder.
+            # Todo: check weather decoding lib have contained encoder or not.
+            if encoder_lib is not None:
+                if "FasterTransformer" not in LOADED_EXT.keys():
+                    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                        decoding_lib)
+                    LOADED_EXT["FasterTransformer"] = ops
+            else:
+                load("FasterTransformer", verbose=True)
+        except Exception:
+            logger.warning(
+                "Exception occurs when using FasterEncoder. " \
+                "The original forward will be involved. ")
+            return self
         for layer in self.children():
             layer.apply(init_func)
     return self
