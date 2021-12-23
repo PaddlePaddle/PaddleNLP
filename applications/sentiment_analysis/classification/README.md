@@ -65,5 +65,3 @@ sh run_train.sh
 ```shell
 sh run_evaluate.sh
 ```
-
-

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import copy
 import json
@@ -32,9 +31,9 @@ from classification.data import convert_example_to_feature as convert_example_to
 from seqeval.metrics.sequence_labeling import get_entities
 
 
-
 def decoding(text, tag_seq):
-    assert len(text) == len(tag_seq), f"text len: {len(text)}, tag_seq len: {len(tag_seq)}"
+    assert len(text) == len(
+        tag_seq), f"text len: {len(text)}, tag_seq len: {len(tag_seq)}"
 
     puncs = list(",.?;!，。？；！")
     splits = [idx for idx in range(len(text)) if text[idx] in puncs]
@@ -62,7 +61,7 @@ def decoding(text, tag_seq):
         for ent in ent_list:
             ent_name, start, end = ent
             if ent_name == "Aspect":
-                aspect = sub_tag_seq[start:end+1]
+                aspect = sub_tag_seq[start:end + 1]
                 sub_aps.append([aspect])
                 if len(sub_no_a_words) > 0:
                     sub_aps[-1].extend(sub_no_a_words)
@@ -90,32 +89,36 @@ def decoding(text, tag_seq):
         no_a_words.insert(0, "None")
         aps.append(no_a_words)
 
-    return aps 
-    
+    return aps
+
+
 def is_aspect_first(text, aspect, opinion):
     return text.find(aspect) <= text.find(opinion)
+
 
 def concate_aspect_and_opinion(text, aspect, opinions):
     aspect_text = ""
     for opinion in opinions:
         if is_aspect_first(text, aspect, opinion):
-            aspect_text += aspect+opinion+"，"
+            aspect_text += aspect + opinion + "，"
         else:
-            aspect_text += opinion+aspect+"，"
+            aspect_text += opinion + aspect + "，"
     aspect_text = aspect_text[:-1]
 
     return aspect_text
-    
+
+
 def read_ext(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
             line = line.strip().replace(" ", "")
             yield {"text": line}
 
+
 def read_cls(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
-            example  = json.loads(line)
+            example = json.loads(line)
             yield example
 
 
@@ -126,23 +129,30 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     ori_test_ds = load_dataset(read_ext, data_path=test_path, lazy=False)
-    trans_func = partial(convert_example_to_feature_ext, tokenizer=tokenizer, label2id=ext_label2id, max_seq_len=args.max_seq_len, is_test=True)
+    trans_func = partial(
+        convert_example_to_feature_ext,
+        tokenizer=tokenizer,
+        label2id=ext_label2id,
+        max_seq_len=args.max_seq_len,
+        is_test=True)
     test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(dtype="int64"),
-    ): fn(samples)
+        Stack(dtype="int64"), ): fn(samples)
 
-    test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_ds, batch_size=args.batch_size, shuffle=False)
+    test_loader = paddle.io.DataLoader(
+        test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
     ext_skep = SkepModel.from_pretrained(model_name)
-    ext_model = SkepForTokenClassification(ext_skep, num_classes=len(ext_label2id))    
+    ext_model = SkepForTokenClassification(
+        ext_skep, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
@@ -150,51 +160,63 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
     results = []
     for bid, batch_data in enumerate(test_loader):
         input_ids, token_type_ids, seq_lens = batch_data
-        logits = ext_model(input_ids, token_type_ids=token_type_ids)        
+        logits = ext_model(input_ids, token_type_ids=token_type_ids)
 
         predictions = logits.argmax(axis=2).numpy()
         for eid, (seq_len, prediction) in enumerate(zip(seq_lens, predictions)):
-                idx = bid*args.batch_size + eid
-                tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
-                text = ori_test_ds[idx]["text"]
-                aps = decoding(text, tag_seq)
-                for aid, ap in enumerate(aps):
-                    aspect, opinions = ap[0], list(set(ap[1:]))
-                    aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
-                    results.append({"id": str(idx)+"_"+str(aid), "aspect":aspect, "opinions":opinions, "text":text, "target_text":aspect_text})
+            idx = bid * args.batch_size + eid
+            tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
+            text = ori_test_ds[idx]["text"]
+            aps = decoding(text, tag_seq)
+            for aid, ap in enumerate(aps):
+                aspect, opinions = ap[0], list(set(ap[1:]))
+                aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
+                results.append({
+                    "id": str(idx) + "_" + str(aid),
+                    "aspect": aspect,
+                    "opinions": opinions,
+                    "text": text,
+                    "target_text": aspect_text
+                })
 
     with open(args.save_ext_path, "w", encoding="utf-8") as f:
         for result in results:
-            f.write(json.dumps(result, ensure_ascii=False)+"\n")
-
+            f.write(json.dumps(result, ensure_ascii=False) + "\n")
 
 
 def predict_cls(cls_model_path, cls_label_path, test_path):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
-    cls_label2id, cls_id2label = load_dict(args.cls_label_path)    
-    
+    cls_label2id, cls_id2label = load_dict(args.cls_label_path)
+
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     test_ds = load_dataset(read_cls, data_path=test_path, lazy=False)
     # examples = copy.copy(test_ds)
-    trans_func = partial(convert_example_to_feature_cls, tokenizer=tokenizer, label2id=cls_label2id, max_seq_len=args.max_seq_len, is_test=True)
+    trans_func = partial(
+        convert_example_to_feature_cls,
+        tokenizer=tokenizer,
+        label2id=cls_label2id,
+        max_seq_len=args.max_seq_len,
+        is_test=True)
     test_ds = test_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(dtype="int64"),
-    ): fn(samples)
+        Stack(dtype="int64"), ): fn(samples)
 
     # set shuffle is False
-    test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_ds, batch_size=args.batch_size, shuffle=False)
+    test_loader = paddle.io.DataLoader(
+        test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
     cls_skep = SkepModel.from_pretrained(model_name)
-    cls_model = SkepForSequenceClassification(cls_skep, num_classes=len(cls_label2id))    
+    cls_model = SkepForSequenceClassification(
+        cls_skep, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 
@@ -203,14 +225,20 @@ def predict_cls(cls_model_path, cls_label_path, test_path):
     results = []
     for bid, batch_data in enumerate(test_loader):
         input_ids, token_type_ids, seq_lens = batch_data
-        logits = cls_model(input_ids, token_type_ids=token_type_ids)        
+        logits = cls_model(input_ids, token_type_ids=token_type_ids)
 
         predictions = logits.argmax(axis=1).numpy().tolist()
         results.extend(predictions)
-        
+
     with open(args.save_cls_path, "w", encoding="utf-8") as f:
         for line_id, pred_id in enumerate(results):
-            f.write(json.dumps({"line_id":line_id, "sentiment_polarity": cls_id2label[pred_id]}, ensure_ascii=False)+"\n")
+            f.write(
+                json.dumps(
+                    {
+                        "line_id": line_id,
+                        "sentiment_polarity": cls_id2label[pred_id]
+                    },
+                    ensure_ascii=False) + "\n")
 
 
 def post_process():
@@ -219,7 +247,7 @@ def post_process():
     with open(args.save_ext_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
             ext_results.append(json.loads(line))
-    
+
     with open(args.save_cls_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
             cls_results.append(json.loads(line))
@@ -231,7 +259,7 @@ def post_process():
         ext_result["sentiment_polarity"] = cls_result["sentiment_polarity"]
         eid, _ = ext_result["id"].split("_")
         collect_dict[eid].append(ext_result)
-    
+
     sentiment_results = []
     for eid in collect_dict.keys():
         sentiment_result = {}
@@ -239,16 +267,20 @@ def post_process():
         for idx, single_ap in enumerate(collect_dict[eid]):
             if idx == 0:
                 sentiment_result["text"] = single_ap["text"]
-            ap_list.append({"aspect":single_ap["aspect"], "opinions": single_ap["opinions"], "sentiment_polarity":single_ap["sentiment_polarity"]})
+            ap_list.append({
+                "aspect": single_ap["aspect"],
+                "opinions": single_ap["opinions"],
+                "sentiment_polarity": single_ap["sentiment_polarity"]
+            })
         sentiment_result["ap_list"] = ap_list
-        sentiment_results.append(sentiment_result)          
+        sentiment_results.append(sentiment_result)
 
     with open(args.save_path, "w", encoding="utf-8") as f:
         for sentiment_result in sentiment_results:
-            f.write(json.dumps(sentiment_result, ensure_ascii=False)+"\n")
+            f.write(json.dumps(sentiment_result, ensure_ascii=False) + "\n")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--ext_model_path", type=str, default=None, help="The path of extraction model path that you want to load.")
@@ -279,5 +311,3 @@ if __name__=="__main__":
     # post_process prediction results 
     post_process()
     print(f"sentiment analysis results has been saved to path: {args.save_path}")
-
-

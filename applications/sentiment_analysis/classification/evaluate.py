@@ -23,13 +23,14 @@ from paddlenlp.transformers import SkepModel, SkepTokenizer
 from model import SkepForSequenceClassification
 from data import read, load_dict, convert_example_to_feature
 
+
 def evaluate(model, data_loader, metric):
 
     model.eval()
     metric.reset()
     for batch_data in tqdm(data_loader):
         input_ids, token_type_ids, _, labels = batch_data
-        logits = model(input_ids, token_type_ids=token_type_ids)        
+        logits = model(input_ids, token_type_ids=token_type_ids)
         correct = metric.compute(logits, labels)
         metric.update(correct)
 
@@ -38,7 +39,7 @@ def evaluate(model, data_loader, metric):
     return accuracy, precision, recall, f1
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
@@ -71,12 +72,11 @@ if __name__=="__main__":
     # load model
     loaded_state_dict = paddle.load(args.model_path)
     skep = SkepModel.from_pretrained(model_name)
-    model = SkepForSequenceClassification(skep, num_classes=len(label2id))    
+    model = SkepForSequenceClassification(skep, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = AccuracyAndF1()
- 
+
     # evalute on dev data
     accuracy, precision, recall, f1  = evaluate(model, test_loader,  metric)
     print(f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
-    

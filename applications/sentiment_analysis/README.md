@@ -133,8 +133,3 @@ sh run_static_predict.sh
 [1]  [文本情感分析](https://baike.baidu.com/item/%E6%96%87%E6%9C%AC%E6%83%85%E6%84%9F%E5%88%86%E6%9E%90/19431243?fr=aladdin)
 
 [2] [SKEP论文](https://aclanthology.org/2020.acl-main.374.pdf)
-
-
-
-
-

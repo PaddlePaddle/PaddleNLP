@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import argparse
 import warnings
@@ -42,10 +41,14 @@ def train():
     # load and process data
     label2id, id2label = load_dict(args.label_path)
     train_ds = load_dataset(read, data_path=args.train_path, lazy=False)
-    dev_ds =  load_dataset(read, data_path=args.dev_path, lazy=False)
+    dev_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
-    trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
+    trans_func = partial(
+        convert_example_to_feature,
+        tokenizer=tokenizer,
+        label2id=label2id,
+        max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=False)
     dev_ds = dev_ds.map(trans_func, lazy=False)
 
@@ -56,31 +59,48 @@ def train():
         Stack(dtype="int64")
     ): fn(samples)
 
-    train_batch_sampler = paddle.io.BatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-    dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
-    train_loader = paddle.io.DataLoader(train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
+    train_batch_sampler = paddle.io.BatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
+    dev_batch_sampler = paddle.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
+    train_loader = paddle.io.DataLoader(
+        train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(
+        dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
 
     # configure model training
-    ppminilm = ErnieModel.from_pretrained(pretrained_model_name_or_path=args.base_model_path)
-    model = PPMiniLMForSequenceClassification(ppminilm, num_classes=len(label2id))
+    ppminilm = ErnieModel.from_pretrained(
+        pretrained_model_name_or_path=args.base_model_path)
+    model = PPMiniLMForSequenceClassification(
+        ppminilm, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
-    lr_scheduler = LinearDecayWithWarmup(learning_rate=args.learning_rate, total_steps=num_training_steps, warmup=args.warmup_proportion)
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    lr_scheduler = LinearDecayWithWarmup(
+        learning_rate=args.learning_rate,
+        total_steps=num_training_steps,
+        warmup=args.warmup_proportion)
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
-    optimizer = paddle.optimizer.AdamW(learning_rate=lr_scheduler, parameters=model.parameters(), weight_decay=args.weight_decay, apply_decay_param_fun=lambda x: x in decay_params, grad_clip=grad_clip)
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        grad_clip=grad_clip)
 
     metric = AccuracyAndF1()
 
     # start to train model
     global_step, best_f1 = 1, 0.
     model.train()
-    for epoch in range(1, args.num_epochs+1):
+    for epoch in range(1, args.num_epochs + 1):
         for batch_data in train_loader():
             input_ids, token_type_ids, _, labels = batch_data
             # logits: batch_size, seql_len, num_tags
-            logits = model(input_ids, token_type_ids=token_type_ids)            
+            logits = model(input_ids, token_type_ids=token_type_ids)
             loss = F.cross_entropy(logits, labels)
 
             loss.backward()
@@ -89,22 +109,31 @@ def train():
             optimizer.clear_grad()
 
             if global_step > 0 and global_step % args.log_steps == 0:
-                print(f"epoch: {epoch} - global_step: {global_step}/{num_training_steps} - loss:{loss.numpy().item():.6f}")
-            if (global_step > 0 and global_step % args.eval_steps == 0) or global_step == num_training_steps:
-                accuracy, precision, recall, f1  = evaluate(model, dev_loader,  metric)
+                print(
+                    f"epoch: {epoch} - global_step: {global_step}/{num_training_steps} - loss:{loss.numpy().item():.6f}"
+                )
+            if (global_step > 0 and global_step % args.eval_steps == 0
+                ) or global_step == num_training_steps:
+                accuracy, precision, recall, f1 = evaluate(model, dev_loader,
+                                                           metric)
                 model.train()
                 if f1 > best_f1:
-                    print(f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}")
+                    print(
+                        f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
+                    )
                     best_f1 = f1
-                    paddle.save(model.state_dict(), f"{args.checkpoints}/best_mini.pdparams")
-                print(f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
+                    paddle.save(model.state_dict(),
+                                f"{args.checkpoints}/best_mini.pdparams")
+                print(
+                    f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}'
+                )
 
             global_step += 1
 
     paddle.save(model.state_dict(), f"{args.checkpoints}/final_mini.pdparams")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
@@ -128,4 +157,3 @@ if __name__=="__main__":
     # yapf: enable
 
     train()
-

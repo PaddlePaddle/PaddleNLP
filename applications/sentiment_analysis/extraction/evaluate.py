@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import argparse
 from tqdm import tqdm
 from functools import partial
@@ -31,19 +30,21 @@ def evaluate(model, data_loader, metric):
     metric.reset()
     for idx, batch_data in tqdm(enumerate(data_loader)):
         input_ids, token_type_ids, seq_lens, labels = batch_data
-        logits = model(input_ids, token_type_ids=token_type_ids)        
+        logits = model(input_ids, token_type_ids=token_type_ids)
 
         # count metric
         predictions = logits.argmax(axis=2)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(seq_lens, predictions, labels)
-        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+            seq_lens, predictions, labels)
+        metric.update(num_infer_chunks.numpy(),
+                      num_label_chunks.numpy(), num_correct_chunks.numpy())
 
     precision, recall, f1 = metric.accumulate()
 
     return precision, recall, f1
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
@@ -76,12 +77,11 @@ if __name__=="__main__":
     # load model
     loaded_state_dict = paddle.load(args.model_path)
     skep = SkepModel.from_pretrained(model_name)
-    model = SkepForTokenClassification(skep, num_classes=len(label2id))    
+    model = SkepForTokenClassification(skep, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = ChunkEvaluator(label2id.keys())
- 
+
     # evalute on dev data
     precision, recall, f1  = evaluate(model, test_loader,  metric)
     print(f'evalution result: precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')
-    

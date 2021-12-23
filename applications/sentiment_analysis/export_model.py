@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import argparse
 import paddle
@@ -21,8 +20,7 @@ from extraction.model import SkepForTokenClassification
 from classification.model import SkepForSequenceClassification
 from ppminilm.model import PPMiniLMForSequenceClassification
 
-
-if __name__=="__main__":
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_type", type=str, default="extraction", choices=["extraction", "classification", "ppminilm"], help="The model type that you wanna export.")
@@ -48,7 +46,7 @@ if __name__=="__main__":
     loaded_state_dict = paddle.load(args.model_path)
     model.load_dict(loaded_state_dict)
     print(f"Loaded parameters from {args.model_path}")
-    
+
     model.eval()
     # convert to static graph with specific input description
     model = paddle.jit.to_static(

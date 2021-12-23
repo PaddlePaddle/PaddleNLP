@@ -35,7 +35,11 @@ def quant_post(args):
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
-    trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
+    trans_func = partial(
+        convert_example_to_feature,
+        tokenizer=tokenizer,
+        label2id=label2id,
+        max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():
@@ -81,11 +85,13 @@ if __name__ == '__main__':
     parser.add_argument("--save_params_filename", type=str, default="infer.pdiparams", required=False, help="File name of quantified model's parameters.")
     parser.add_argument("--input_model_filename", type=str, default="infer.pdmodel", required=False, help="File name of float model.")
     parser.add_argument("--input_param_filename", type=str, default="infer.pdiparams", required=False, help="File name of float model's parameters.")
-    
+
     args = parser.parse_args()
     # yapf: enable
 
     # start quantize model
     paddle.enable_static()
     quant_post(args)
-    print(f"quantize model done. the quantized model has been saved to {args.quant_model_dir}")
+    print(
+        f"quantize model done. the quantized model has been saved to {args.quant_model_dir}"
+    )

@@ -30,8 +30,8 @@ from data import read, load_dict, convert_example_to_feature
 
 class Predictor(object):
     def __init__(self, args):
-        self.predictor, self.input_handles, self.output_handles = self.create_predictor(args)
-        
+        self.predictor, self.input_handles, self.output_handles = self.create_predictor(
+            args)
 
     def create_predictor(self, args):
         config = paddle.inference.Config(args.model_path + ".pdmodel",
@@ -102,7 +102,7 @@ class Predictor(object):
         return output
 
     def predict(self, data_loader, metric):
-        
+
         outputs = []
         metric.reset()
         for i, data in enumerate(data_loader):
@@ -111,7 +111,7 @@ class Predictor(object):
             correct = metric.compute(logits, paddle.to_tensor(data[3]))
             metric.update(correct)
             outputs.append(output)
-        
+
         accuracy, precision, recall, F1, _ = metric.accumulate()
         return outputs, accuracy, precision, recall, F1
 
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     # yapf: enable
-    
+
     # set running environnent
     paddle.seed(42)
 
@@ -154,24 +154,35 @@ if __name__ == "__main__":
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
     tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
-    trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len, is_test=False)
+    trans_func = partial(
+        convert_example_to_feature,
+        tokenizer=tokenizer,
+        label2id=label2id,
+        max_seq_len=args.max_seq_len,
+        is_test=False)
     test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-            Stack(dtype="int64"), # seq_len
-            Stack(dtype="int64") # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        Stack(dtype="int64"),  # seq_len
+        Stack(dtype="int64")  # label
     ): fn(samples)
 
-    batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    data_loader = paddle.io.DataLoader(dataset=test_ds, batch_sampler=batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True)
+    batch_sampler = paddle.io.BatchSampler(
+        test_ds, batch_size=args.batch_size, shuffle=False)
+    data_loader = paddle.io.DataLoader(
+        dataset=test_ds,
+        batch_sampler=batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
 
     predictor = Predictor(args)
     if args.perf:
         print("start to do performance task.")
         times = []
-        for epoch_id in range(1, args.num_epochs+1):
+        for epoch_id in range(1, args.num_epochs + 1):
             used_time = predictor.predict_perf(args, data_loader)
             times.append(used_time)
             print(f"epoch {epoch_id}, used_time: {used_time}")
@@ -179,6 +190,8 @@ if __name__ == "__main__":
     else:
         print("start to do evaluate task.")
         metric = AccuracyAndF1()
-        outputs, accuracy, precision, recall, F1 = predictor.predict(data_loader, metric)
-        print(f"evalute results - accuracy: {accuracy: .4f}, precision: {precision: .4f}, recall: {recall: .4f}, F1: {F1: .4f}")
-
+        outputs, accuracy, precision, recall, F1 = predictor.predict(
+            data_loader, metric)
+        print(
+            f"evalute results - accuracy: {accuracy: .4f}, precision: {precision: .4f}, recall: {recall: .4f}, F1: {F1: .4f}"
+        )

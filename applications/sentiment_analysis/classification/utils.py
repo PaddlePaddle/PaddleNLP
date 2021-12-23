@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import hashlib
 import paddle
 import random
 import numpy as np
 
+
 def set_seed(seed):
     paddle.seed(seed)
     random.seed(seed)
     np.random.seed(seed)
+
 
 def compute_md5(file_path):
     with open(file_path, "rb") as f:
