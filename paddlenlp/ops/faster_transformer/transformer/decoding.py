@@ -23,7 +23,7 @@ from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
 
-from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.utils.log import logger
 
 
@@ -610,8 +610,10 @@ class InferTransformerDecoding(nn.Layer):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -870,8 +872,10 @@ class InferTransformerDecoding(nn.Layer):
 class InferGptDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1078,8 +1082,10 @@ class InferUnifiedDecoding(nn.Layer):
                  hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1442,8 +1448,10 @@ class InferBartDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(
@@ -1683,8 +1691,10 @@ class InferMBartDecoding(nn.Layer):
                  hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                decoding_lib)
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning(

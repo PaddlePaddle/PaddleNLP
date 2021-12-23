@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import numpy as np
+import paddle
+from .log import logger
 
 
 def static_params_to_dygraph(model, static_tensor_dict):
@@ -34,6 +35,9 @@ def static_params_to_dygraph(model, static_tensor_dict):
 
     ret_dict = dict()
     for n, p in state_dict.items():
+        if p.name not in static_tensor_dict:
+            logger.info("%s paramter is missing from you state dict." % n)
+            continue
         ret_dict[n] = static_tensor_dict[p.name]
 
     return ret_dict
@@ -56,7 +60,7 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
     ret_dict = dict()
     for name, parm in state_dict.items():
         if name not in dygraph_tensor_dict:
-            print("Miss \t\t", name)
+            logger.info("%s paramter is missing from you state dict." % name)
             continue
 
         tensor = dygraph_tensor_dict[name]
