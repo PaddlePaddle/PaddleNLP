@@ -189,10 +189,9 @@ def evaluate(model, loss_fct, metric, data_loader):
                 sentence = to_tensor(sentence, "sentence")
                 logits, _ = model(sentence)
             else:
-                sentence1, sentence2, labels = batch['sentence1'], batch[
-                    'sentence2'], batch['label']
-                sentence1 = to_tensor(sentence1, "sentence1")
-                sentence2 = to_tensor(sentence2, "sentence2")
+                labels = batch['label']
+                sentence1 = to_tensor(batch['sentence1'], "sentence1")
+                sentence2 = to_tensor(batch['sentence2'], "sentence2")
                 logits, _ = model(sentence1, sentence2)
         else:
             input_ids, segment_ids, labels = batch
