@@ -2,7 +2,7 @@
 
 ## 1. 场景概述
 
-文本情感分析：又称意见挖掘、倾向性分析等。简单而言,是对带有情感色彩的主观性文本进行分析、处理、归纳和推理的过程。互联网(如博客和论坛以及社会服务网络如大众点评)上产生了大量的用户参与的、对于诸如人物、事件、产品等有价值的评论信息。这些评论信息表达了人们的各种情感色彩和情感倾向性,如喜、怒、哀、乐和批评、赞扬等。基于此,潜在的用户就可以通过浏览这些主观色彩的评论来了解大众舆论对于某一事件或产品的看法。[1]
+文本情感分析：又称意见挖掘、倾向性分析等。简单而言,是对带有情感色彩的主观性文本进行分析、处理、归纳和推理的过程。互联网(如博客和论坛以及社会服务网络如大众点评)上产生了大量的用户参与的、对于诸如人物、事件、产品等有价值的评论信息。这些评论信息表达了人们的各种情感色彩和情感倾向性,如喜、怒、哀、乐和批评、赞扬等。基于此,潜在的用户就可以通过浏览这些主观色彩的评论来了解大众舆论对于某一事件或产品的看法。
 
 根据分析粒度的不同，情感分析往往可以被分为篇章级、语句级和词语级别，其分别主要分析文章，语句和词语中所蕴含的感情色彩。一般来讲，被人们所熟知的情感分析任务是语句级别的情感分析，例如下边这句话。
 
@@ -26,7 +26,7 @@
     - 手把手搭建起 细粒度 情感分析系统：抽取语句中评论维度以及相应观点，并基于评价维度的粒度进行情感分析。
     - 提供训练、预测、部署一站式能力。
 - 效果好
-    - 基于情感分析建模的专属模型SKEP，解决通用模型对情感信息不敏感的痛点。
+    - 基于情感分析建模的专属模型 SKEP，解决通用模型对情感信息不敏感的痛点。
 - 性能优
     - 提供开源小模型以及配套优化策略，以解决大模型预测效率问题。
 
@@ -34,9 +34,9 @@
 
 针对以上提到的细粒度情感分析，我们提出的解决方案如下图所示。整个情感分析的过程包含两个阶段，依次是评论维度和观点抽取模型，细粒度情感分类模型。对于给定的一段文本，首先基于前者抽取出文本语句中潜在的评论维度以及该维度相应的评论观点，然后将评论维度、观点以及原始文本进行拼接，传给细粒度情感分类模型以识别出该评论维度的情感色彩。
 
-这里需要提到的是，由于目前市面上的大多数模型是基于通用语料训练出来的，这些模型可能并不会对情感信息那么敏感。基于这样的考量，本项目使用了百度自研的SKEP预训练模型，其在预训练阶段便设计了多种情感信息相关的预训练目标进行训练。作为一种情感专属的模型，其更适合用来做上边提到的评论维度和观点抽取任务，以及细粒度情感分类任务。
+这里需要提到的是，由于目前市面上的大多数模型是基于通用语料训练出来的，这些模型可能并不会对情感信息那么敏感。基于这样的考量，本项目使用了百度自研的 SKEP 预训练模型，其在预训练阶段便设计了多种情感信息相关的预训练目标进行训练。作为一种情感专属的模型，其更适合用来做上边提到的评论维度和观点抽取任务，以及细粒度情感分类任务。
 
-另外，本项目使用的是Large版的SKEP模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型[PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM)以及一套量化策略，用户可以使用相应情感数据集对PP-MinLM进行微调，然后进行量化，以达到更快的使用效率。
+另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
 
 <center> <img src="./imgs/sentiment_system.png" /></center>
 <center>图1 情感分析系统图 </center>
@@ -82,9 +82,9 @@ pip install -r requirements.txt
 ```
 
 ### 3.2 数据说明
-本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了Deomo数据：[data_ext](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz)和[data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_cls.tar.gz)。
+本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [data_ext](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz)和[data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_cls.tar.gz)。
 
-用户可分别点击下载，解压后将数据文件依次放入`./extraction/data`和`./classification/data`目录下即可。
+用户可分别点击下载，解压后将数据文件依次放入 `./extraction/data` 和 `./classification/data` 目录下即可。
 
 ### 3.3 评论维度和观点抽取模型
 关于评论维度和观点抽取模型的原理和使用方式，请参考[这里](extraction/README.md)。
@@ -94,7 +94,7 @@ pip install -r requirements.txt
 
 
 ### 3.5 全流程细粒度情感分析推理
-在训练完成评论维度和观点模型，细粒度情感分类模型后，默认会将训练过程中最好的模型保存在`./extraction/checkpoints`和`./classification/checkpoints`目录下。接下来，便可以根据保存好的模型进行全流程的模型推理：给定一句评论文本，首先使用抽取模型进行抽取评论维度和观点，然后使用细粒度情感分类模型以评论维度级别进行情感极性分类。
+在训练完成评论维度和观点模型，细粒度情感分类模型后，默认会将训练过程中最好的模型保存在 `./extraction/checkpoints` 和 `./classification/checkpoints` 目录下。接下来，便可以根据保存好的模型进行全流程的模型推理：给定一句评论文本，首先使用抽取模型进行抽取评论维度和观点，然后使用细粒度情感分类模型以评论维度级别进行情感极性分类。
 
 本项目将提供两套全流程预测方案：动态图预测和静态图高性能预测，其中动态图预测支持单条和批量预测两种方式。
 
@@ -108,7 +108,7 @@ sh run_dynamic_predict.sh
 ```shell
 sh run_dynamic_predict_by_batch.sh
 ```
-**备注**：动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的`data`文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
+**备注**：动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的 `data` 文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
 ```
 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
 酒店干净整洁，性价比很高
@@ -117,7 +117,7 @@ sh run_dynamic_predict_by_batch.sh
 ```
 
 #### 3.5.2 静态图高性能预测
-在基于静态图进行高性能预测过程中，首先需要将动态图模型转换为静态图模型，然后基于Paddle Inference 高性能推理引擎进行预测。
+在基于静态图进行高性能预测过程中，首先需要将动态图模型转换为静态图模型，然后基于 Paddle Inference 高性能推理引擎进行预测。
 
 通过以下命令将动态图转为静态图：
 ```shell
@@ -130,13 +130,11 @@ sh run_static_predict.sh
 ```
 
 ### 3.6 小模型优化策略
-本项目提供了一套基于[PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM)中文特色小模型的细粒度情感分类解决方案。PP-MiniLM提供了一套完整的小模型优化方案：首先使用Task-agnostic的方式进行模型蒸馏、然后依托于[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
+本项目提供了一套基于 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 中文特色小模型的细粒度情感分类解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
 
-本项目基于PP-MiniLM中文特色小模型进行fine-tune细粒度情感分类模型，然后使用PaddleSlim对训练好的模型进行量化操作。详细信息请参考[这里](./ppminilm/README.md)。
+本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。详细信息请参考[这里](./ppminilm/README.md)。
 
 
 ## 4. 引用
 
-[1]  [文本情感分析](https://baike.baidu.com/item/%E6%96%87%E6%9C%AC%E6%83%85%E6%84%9F%E5%88%86%E6%9E%90/19431243?fr=aladdin)
-
-[2] [SKEP论文](https://aclanthology.org/2020.acl-main.374.pdf)
+[1] H. Tian et al., “SKEP: Sentiment Knowledge Enhanced Pre-training for Sentiment Analysis,” arXiv:2005.05635 [cs], May 2020, Accessed: Nov. 11, 2021.

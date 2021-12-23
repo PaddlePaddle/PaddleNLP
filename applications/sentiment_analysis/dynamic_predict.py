@@ -47,7 +47,6 @@ def decoding(text, tag_seq):
     for sub_tag_seq, ent_list in ents_list:
         sub_aps = []
         sub_no_a_words = []
-        # print(ent_list)
         for ent in ent_list:
             ent_name, start, end = ent
             if ent_name == "Aspect":
@@ -167,7 +166,6 @@ def predict(ext_model,
             }
             results.append(result)
 
-        # print results
         format_print(results)
 
 
