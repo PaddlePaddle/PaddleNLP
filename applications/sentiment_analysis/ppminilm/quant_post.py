@@ -67,6 +67,7 @@ def quant_post(args):
 
 
 if __name__ == '__main__':
+    # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model_path", type=str, default="./checkpoints/ppminilm", help="The path of ppminilm model.")
     parser.add_argument("--static_model_dir", type=str, default="./checkpoints/static", help="Directory of static model that will be quantized.")
@@ -80,8 +81,9 @@ if __name__ == '__main__':
     parser.add_argument("--save_params_filename", type=str, default="infer.pdiparams", required=False, help="File name of quantified model's parameters.")
     parser.add_argument("--input_model_filename", type=str, default="infer.pdmodel", required=False, help="File name of float model.")
     parser.add_argument("--input_param_filename", type=str, default="infer.pdiparams", required=False, help="File name of float model's parameters.")
-
+    
     args = parser.parse_args()
+    # yapf: enable
 
     # start quantize model
     paddle.enable_static()

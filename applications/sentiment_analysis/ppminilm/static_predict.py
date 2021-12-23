@@ -128,22 +128,24 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
+    # yapf: disable
     parser = argparse.ArgumentParser()
-    # Required parameters
     parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
-    parser.add_argument("--model_path", default='./checkpoints/quant/infer', type=str, required=True, help="The path prefix of inference model to be used.", )
+    parser.add_argument("--model_path", default='./checkpoints/quant/infer', type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of epoches for training.")
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.", )
+    parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--perf_warmup_steps", default=1, type=int, help="Warmup steps for performance test.", )
-    parser.add_argument("--use_tensorrt", action='store_true', help="Whether to use inference engin TensorRT.", )
-    parser.add_argument("--perf",action='store_true', help="Whether to test performance.", )
-    parser.add_argument("--collect_shape", action='store_true', help="Whether collect shape range info.", )
-    parser.add_argument("--int8", action='store_true', help="Whether to use int8 inference.", )
-    parser.add_argument("--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.", )
+    parser.add_argument("--perf_warmup_steps", default=1, type=int, help="Warmup steps for performance test.")
+    parser.add_argument("--use_tensorrt", action='store_true', help="Whether to use inference engin TensorRT.")
+    parser.add_argument("--perf",action='store_true', help="Whether to test performance.")
+    parser.add_argument("--collect_shape", action='store_true', help="Whether collect shape range info.")
+    parser.add_argument("--int8", action='store_true', help="Whether to use int8 inference.")
+    parser.add_argument("--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.")
+
     args = parser.parse_args()
+    # yapf: enable
     
     # set running environnent
     paddle.seed(42)
