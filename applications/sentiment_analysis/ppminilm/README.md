@@ -132,10 +132,10 @@ python  static_predict.py \
 
 ## 4. PP-MiniLM模型效果展示
 
-关于SKEP-Large、PP-MiniLM，量化PP-MiniLM三个模型在性能和效果方面的对比如下表所示。可以看到PP-MiniLM模型在细粒度情感分类任务上效果逼近SKEP-Large，同时预测速度加快了4倍。在PP-MiniLM量化之后，从评估指标上来看，效果几乎无损，同时预测速度较SKEP-Large加快了8倍。
+关于SKEP-Large、PP-MiniLM，量化PP-MiniLM三个模型在性能和效果方面的对比如下表所示。可以看到，三者在本任务数据集上的评估指标几乎相等，但是PP-MiniLM小模型运行速度较SKEP-Large提高了4倍，量化后的PP-MiniLM运行速度较SKEP-Large提高了近8倍。
 
 |Model|运行时间(s)|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
 |SKEP-Large|1.00x|0.98497|0.99139|0.98817|
 |PP-MiniLM|4.95x|0.98379|0.98859|0.98618|
-|量化 PP-MiniLM|8.93x|0.97741|0.98720|0.98228|
+|量化 PP-MiniLM|8.93x|0.98312|0.98953|0.98631|
