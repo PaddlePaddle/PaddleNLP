@@ -82,7 +82,7 @@ pip install -r requirements.txt
 ```
 
 ### 3.2 数据说明
-本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了Deomo数据：[data_ext](https://bj.bcebos.com/v1/paddlenlp/data/data_cls.tar.gz)和[data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz)。
+本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了Deomo数据：[data_ext](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz)和[data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_cls.tar.gz)。
 
 用户可分别点击下载，解压后将数据文件依次放入`./extraction/data`和`./classification/data`目录下即可。
 
