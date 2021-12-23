@@ -101,7 +101,7 @@ class Predictor(object):
 
         return output
 
-    def predict(self, dataset, collate_fn, args, batch_size=1):
+    def predict(self, data_loader, metric):
         
         outputs = []
         metric.reset()
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
     trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len, is_test=False)
-    test_ds = test_ds.map(trans_func, lazy=False)
+    test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
@@ -164,7 +164,6 @@ if __name__ == "__main__":
 
     batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
     data_loader = paddle.io.DataLoader(dataset=test_ds, batch_sampler=batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True)
-
 
     predictor = Predictor(args)
     if args.perf:
@@ -178,6 +177,6 @@ if __name__ == "__main__":
     else:
         print("start to do evaluate task.")
         metric = AccuracyAndF1()
-        outputs, accuracy, precision, recall, F1 = predictor.predict(args, data_loader, metric)
+        outputs, accuracy, precision, recall, F1 = predictor.predict(data_loader, metric)
         print(f"evalute results - accuracy: {accuracy: .4f}, precision: {precision: .4f}, recall: {recall: .4f}, F1: {F1: .4f}")
 
