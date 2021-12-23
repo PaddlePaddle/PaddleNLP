@@ -302,12 +302,14 @@ if __name__ == "__main__":
 
     # predict with ext model
     predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
-    print(f"ext prediction results has been saved to path: {args.save_ext_path}")
 
     # predict with cls model
     predict_cls(args.cls_model_path, args.cls_label_path, args.save_ext_path)
-    print(f"cls prediction results has been saved to path: {args.save_cls_path}")
 
     # post_process prediction results 
     post_process()
     print(f"sentiment analysis results has been saved to path: {args.save_path}")
+
+    # delete tmp files: ext prediction results and cls prediction results
+    os.remove(args.save_ext_path)
+    os.remove(args.save_cls_path)
