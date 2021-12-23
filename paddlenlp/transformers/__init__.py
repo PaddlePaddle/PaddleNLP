@@ -88,3 +88,5 @@ from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .ernie_m.modeling import *
+from .ernie_m.tokenizer import *
