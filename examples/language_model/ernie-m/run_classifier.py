@@ -15,6 +15,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddle.metric import Accuracy
+from paddlenlp.ops.optimizer import AdamWDL
 
 all_languages = [
     "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
@@ -38,8 +39,7 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model",
-        choices=["ernie-m-base", "ernie-m-large"])
+        help="Path to pre-trained model")
     parser.add_argument(
         "--output_dir",
         default=None,
@@ -84,6 +84,11 @@ def parse_args():
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
+        "--layerwise_decay",
+        default=0.8,
+        type=float,
+        help="Layerwise decay ratio.")
+    parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
@@ -96,7 +101,7 @@ def parse_args():
         help="Linear warmup proportion over total steps.")
     parser.add_argument(
         "--adam_epsilon",
-        default=1e-6,
+        default=1e-8,
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
@@ -267,14 +272,22 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    optimizer = paddle.optimizer.AdamW(
+
+    # Construct dict
+    name_dict = dict()
+    for n, p in model.named_parameters():
+        name_dict[p.name] = n
+    optimizer = AdamWDL(
         learning_rate=lr_scheduler,
         beta1=0.9,
         beta2=0.999,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        n_layers=model.ernie_m.config['num_hidden_layers'],
+        layerwise_decay=args.layerwise_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        name_dict=name_dict)
 
     loss_fct = nn.CrossEntropyLoss()
     if args.use_amp:
