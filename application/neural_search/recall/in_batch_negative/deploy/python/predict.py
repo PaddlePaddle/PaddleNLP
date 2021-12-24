@@ -262,7 +262,7 @@ class Predictor(object):
             
         if args.benchmark:
             self.autolog.times.end(stamp=True)
-        result = 1 - spatial.distance.cosine(query_logits, title_logits)
+        result=[float(1 - spatial.distance.cosine(arr1, arr2)) for arr1, arr2 in zip(query_logits, title_logits)]
         return result
 
 
@@ -280,6 +280,7 @@ if __name__ == "__main__":
     res=predictor.extract_embedding(corpus_list, tokenizer)
     print(res.shape)
     print(res)
-    corpus_list=[['中西方语言与文化的差异','中西方文化差异以及语言体现中西方文化,差异,语言体现']]
+    corpus_list=[['中西方语言与文化的差异','中西方文化差异以及语言体现中西方文化,差异,语言体现'],
+                    ['中西方语言与文化的差异','飞桨致力于让深度学习技术的创新与应用更简单']]
     res=predictor.predict(corpus_list,tokenizer)
     print(res)
