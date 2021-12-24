@@ -58,7 +58,7 @@
 ├── utils.py                           # 工具函数脚本
 ├── run_dynamic_predict.sh             # 全流程动态图单条预测命令
 ├── run_dynamic_predict_by_batch.sh    # 全流程动态图批量预测命令
-├── run_export.sh                      # 动转静模型导出命令
+├── run_export_model.sh                # 动转静模型导出命令
 ├── run_static_predict.sh              # 全流程静态图单条预测命令
 ├── requirements.txt                   # 环境依赖
 └── README.md
@@ -159,9 +159,10 @@ sh run_dynamic_predict_by_batch.sh
 #### 3.5.2 静态图高性能预测
 在基于静态图进行高性能预测过程中，首先需要将动态图模型转换为静态图模型，然后基于 Paddle Inference 高性能推理引擎进行预测。
 
-通过以下命令将动态图转为静态图：
+通过以下命令分别将抽取模型和分类模型，从动态图转为静态图：
 ```shell
-sh run_export.sh
+sh run_export_model.sh extraction
+sh run_export_model.sh classification
 ```
 
 基于Paddle Inference 进行动态图高性能预测：

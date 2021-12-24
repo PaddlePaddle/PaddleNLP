@@ -67,7 +67,7 @@ sh run_evaluate.sh
 首先，需要先将训练好的动态图模型，转为静态图模型，注意这里需要跳到父目录进行操作：
 ```shell
 cd ..
-sh run_export.sh speedup
+sh run_export_model.sh speedup
 ```
 
 然后，使用如下命令进行量化生成的静态图模型：
