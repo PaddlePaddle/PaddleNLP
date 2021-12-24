@@ -37,52 +37,43 @@ class XNLI(DatasetBuilder):
 
     For more information, please visit https://github.com/facebookresearch/XNLI
     """
-    META_INFO_ZIP = collections.namedtuple('META_INFO', ('url', 'md5'))
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    ZIP_FILES = {
-        'train': META_INFO_ZIP(
-            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-MT-1.0.zip',
-            'fa3d8d6c3d1866cedc45680ba93c296e'),
-        'dev':
-        META_INFO_ZIP('https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
-                      '53393158739ec671c34f205efc7d1666'),
-        'test':
-        META_INFO_ZIP('https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
-                      '53393158739ec671c34f205efc7d1666'),
-    }
+    META_INFO = collections.namedtuple('META_INFO', ('file', 'data_md5', 'url',
+                                                     'zipfile_md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('XNLI-MT-1.0', 'XNLI-MT-1.0', 'multinli'), ''),
+            os.path.join('XNLI-MT-1.0', 'XNLI-MT-1.0', 'multinli'), '',
+            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-MT-1.0.zip',
+            'fa3d8d6c3d1866cedc45680ba93c296e'),
         'dev': META_INFO(
             os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.dev.tsv'),
-            '4c23601abba3e3e222e19d1c6851649e'),
+            '4c23601abba3e3e222e19d1c6851649e',
+            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
+            '53393158739ec671c34f205efc7d1666'),
         'test': META_INFO(
             os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.test.tsv'),
-            'fbc26e90f7e892e24dde978a2bd8ece6'),
+            'fbc26e90f7e892e24dde978a2bd8ece6',
+            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
+            '53393158739ec671c34f205efc7d1666'),
     }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash = self.SPLITS[mode]
+        filename, data_hash, url, zipfile_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if mode == 'train':
             if not os.path.exists(fullname):
-                get_path_from_url(self.ZIP_FILES[mode][0], default_root,
-                                  self.ZIP_FILES[mode][1])
+                get_path_from_url(url, default_root, zipfile_hash)
             file_num = len(os.listdir(fullname))
             if file_num != 15:
                 logger.warning(
                     "Number of train files is %d != %d, decompress again." %
                     (file_num, 15))
-                _decompress(
-                    os.path.join(default_root,
-                                 os.path.basename(self.ZIP_FILES[mode][0])))
+                _decompress(os.path.join(default_root, os.path.basename(url)))
         else:
             if not os.path.exists(fullname) or (
                     data_hash and not md5file(fullname) == data_hash):
-                get_path_from_url(self.ZIP_FILES[mode][0], default_root,
-                                  self.ZIP_FILES[mode][1])
+                get_path_from_url(url, default_root, zipfile_hash)
 
         return fullname
 
