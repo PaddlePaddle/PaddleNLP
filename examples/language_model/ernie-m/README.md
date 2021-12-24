@@ -2,8 +2,8 @@
 
 * [模型简介](#模型简介)
 * [快速开始](#快速开始)
-    * [通用参数释义](#通用参数释义)
-    * [文本蕴含任务](#文本蕴含任务)
+  * [通用参数释义](#通用参数释义)
+  * [文本蕴含任务](#文本蕴含任务)
 * [致谢](#致谢)
 * [参考论文](#参考论文)
 
@@ -34,7 +34,7 @@
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔步数。
 - `save_steps` 表示模型保存及评估间隔步数。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `batch_size` 表示每次迭代**每张**卡上的样本数目。
 - `weight_decay` 表示AdamW的权重衰减系数。
 - `layerwise_decay` 表示 AdamW with Layerwise decay 的逐层衰减系数。
 - `adam_epsilon` 表示AdamW优化器的 epsilon。
@@ -46,6 +46,9 @@
 - `scale_loss` 表示自动混合精度训练的参数。
 
 ### 文本蕴含任务
+
+#### 数据集介绍
+XNLI 是 MNLI 的子集，并且已被翻译成14种不同的语言（包含一些较低资源语言）。与 MNLI 一样，目标是预测文本蕴含（句子 A 是否暗示/矛盾/都不是句子 B ）。
 
 #### 单卡训练
 
@@ -69,10 +72,16 @@ python -m paddle.distributed.launch --gpus 0,1 --log_dir output run_classifier.p
     --output_dir output
 ```
 
+在XNLI数据集上Finetune cross-lingual-transfer 类型的文本蕴含任务后，在验证集上有如下结果
+| 模型 | ar | bg | de | el | en | es | fr | hi | ru | sw | th | tr | ur | vi | zh | Avg |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Cross-lingual Transfer |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| ERNIE-M | 75.1 | 79.4 | 79.0 | 77.6 | 85.2 | 80.0 | 79.2 | 71.8 | 77.3 | 69.5 | 74.3 | 76.1 | 68.2 | 77.0 | 76.5 | 76.4 |
+
 ## 致谢
 
-* 感谢[百度NLP](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-m)提供ERNIE-M开源代码的实现以及预训练模型。
+ 感谢百度NLP提供[ERNIE-M开源代码](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-m)的实现以及预训练模型。
 
 ## 参考论文
 
-* Ouyang X ,  Wang S ,  Pang C , et al. ERNIE-M: Enhanced Multilingual Representation by Aligning Cross-lingual Semantics with Monolingual Corpora[J].  2020.
+ [Ouyang X ,  Wang S ,  Pang C , et al. ERNIE-M: Enhanced Multilingual Representation by Aligning Cross-lingual Semantics with Monolingual Corpora[J].  2020.](https://arxiv.org/abs/2012.15674)
