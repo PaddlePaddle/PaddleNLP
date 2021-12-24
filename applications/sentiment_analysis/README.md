@@ -36,7 +36,14 @@
 
 另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
 
-<center> <img src="./imgs/sentiment_system.png" /></center>
+
+<div align="center">
+    <img src="./imgs/sentiment_system.png" />
+</div>
+<div align="center">
+图1 情感分析系统图
+
+</div>
 
 ## 3. 细粒度情感分析实践
 
@@ -67,14 +74,20 @@
 (1) 运行环境  
 除非特殊说明，本实验默认是在以下配置环境研发运行的：
 ```shell
-python == 3.8
+python version: 3.8
 CUDA Version: 10.2
 NVIDIA Driver Version: 440.64.00
 GPU： Tesla V100
 linux：CentOS Linux release 7.9.2009 (Core)
 ```
-(2) 依赖安装  
-可以通过以下命令进行软件环境安装：
+(2) 环境依赖  
+```
+python >= 3.6
+paddlenlp >= 2.2.1
+paddlepaddle-gpu >= 2.2.1
+```
+
+可以通过以下命令进行一键式软件环境安装：
 ```shell
 pip install -r requirements.txt
 ```
