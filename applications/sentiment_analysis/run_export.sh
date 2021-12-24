@@ -16,12 +16,12 @@ python  export_model.py \
         --model_path "./classification/checkpoints/best_cls.pdparams" \
         --save_path "./classification/checkpoints/static/infer" 
         
-elif [ $model_type = ppminilm ]; then
+elif [ $model_type = speedup ]; then
 python  export_model.py \
-        --model_type "ppminilm" \
-        --base_model_name_or_path "./ppminilm/checkpoints/ppminilm" \
-        --model_path "./ppminilm/checkpoints/best_mini.pdparams" \
-        --save_path "./ppminilm/checkpoints/static/infer" 
+        --model_type "speedup" \
+        --base_model_name_or_path "./speedup/checkpoints/ppminilm" \
+        --model_path "./speedup/checkpoints/best_mini.pdparams" \
+        --save_path "./speedup/checkpoints/static/infer" 
 else
-echo "Three model_types are supported:  [extraction, classification, ppminilm]"
+echo "Three model_types are supported:  [extraction, classification, speedup]"
 fi
