@@ -1,5 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -53,7 +53,7 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model")
+        help="Path to pre-trained model.")
     parser.add_argument(
         "--output_dir",
         default=None,
@@ -208,7 +208,7 @@ class XnliDataset(Dataset):
     def __init__(self, datasets):
         self.datasets = datasets
         # Ar language has 2000 empty data.
-        self.num_samples = [390702] + [392702] * 14
+        self.num_samples = [len(i) for i in datasets]
         self.cumsum_len = np.cumsum(self.num_samples)
 
     def __getitem__(self, idx):
@@ -264,6 +264,7 @@ def do_train(args):
     num_classes = 3
     model = ErnieMForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
+    n_layers = model.ernie_m.config['num_hidden_layers']
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -286,7 +287,6 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-
     # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
@@ -298,7 +298,7 @@ def do_train(args):
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        n_layers=model.ernie_m.config['num_hidden_layers'],
+        n_layers=n_layers,
         layerwise_decay=args.layerwise_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
         name_dict=name_dict)
@@ -355,7 +355,9 @@ def do_train(args):
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
-                return
+                break
+        if global_step >= num_training_steps:
+            break
     if paddle.distributed.get_rank() == 0:
         output_dir = os.path.join(
             args.output_dir, "ernie_m_final_model_%d.pdparams" % global_step)
