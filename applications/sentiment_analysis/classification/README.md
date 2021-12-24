@@ -8,8 +8,6 @@
 
 <center><img src="../imgs/design_cls_model.png" /></center>
 
-<br><center>图1 细粒度情感分类模型</center><br/>
-
 ## 2. 项目结构说明
 
 以下是本项目运行的完整目录结构及说明：

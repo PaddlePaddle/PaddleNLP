@@ -7,7 +7,6 @@
 如图1所示，首先将文本串传入 SKEP 模型中，利用 SKEP 模型对该文本串进行语义编码后，然后基于每个位置的输出去预测相应的标签。
 
 <center><img src="../imgs/design_ext_model.png" /></center>
-<br><center>图1 评价维度和观点词抽取模型</center><br/>
 
 ## 2. 项目结构说明
 

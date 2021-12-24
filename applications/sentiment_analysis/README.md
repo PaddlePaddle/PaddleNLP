@@ -37,8 +37,6 @@
 另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
 
 <center> <img src="./imgs/sentiment_system.png" /></center>
-<center><font>图1 情感分析系统图 </font></center>
-
 
 ## 3. 细粒度情感分析实践
 
