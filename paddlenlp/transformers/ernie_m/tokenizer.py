@@ -18,7 +18,6 @@ from paddle.utils import try_import
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import _is_control, _is_whitespace
-from ...data.vocab import Vocab
 
 __all__ = ['ErnieMTokenizer']
 
@@ -100,7 +99,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'.".format(vocab_file))
-        self.vocab = self.load_vocab(vocab_file, unk_token=unk_token)
+        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
 
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
@@ -134,33 +133,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
             int: The size of vocabulary.
         """
         return len(self.vocab)
-
-    def load_vocab(self,
-                   vocab_file,
-                   unk_token=None,
-                   pad_token=None,
-                   bos_token=None,
-                   eos_token=None,
-                   **kwargs):
-        token_to_idx = {}
-        with open(vocab_file, 'r', encoding='utf-8') as f:
-            for index, line in enumerate(f):
-                items = line.strip('\n').split('\t')
-                if len(items) > 2:
-                    break
-                token = items[0]
-                index = items[1] if len(items) == 2 else index
-                token = token.strip()
-                token_to_idx[token] = int(index)
-
-        vocab = Vocab.from_dict(
-            token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
-        return vocab
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
@@ -216,14 +188,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
             List(str): A list of string representing converted tokens.
         """
         return self._tokenize(text)
-
-    def _convert_token_to_id(self, token):
-        """Converts a token (str) to an id using the vocab. """
-        return self.sp_model.PieceToId(token)
-
-    def _convert_id_to_token(self, index):
-        """Converts an index (integer) to a token (str) using the vocab."""
-        return self.sp_model.IdToPiece(index)
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
