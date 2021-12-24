@@ -143,6 +143,51 @@ def load_dataset(path_or_read_func,
         return datasets
 
 
+def _map_data(data, fn, lazy=True, batched=False):
+    if batched:
+        data = fn(data)
+    else:
+        data = [fn(data[idx]) for idx in range(len(data))]
+    return data
+
+
+def _shard(data, num_shards=None, index=None, contiguous=False):
+    """
+    Split the dataset into `num_shards` pieces. Note that the size of each
+    shard might be different because the original dataset may not be evenly
+    divisible.
+
+    Args:
+        num_shards (int, optional): An integer representing the number of
+            data shards. If None, `num_shards` would be number of trainers.
+            Defaults to `None`.
+        index (int, optional): An integer representing the index of the
+            current shard. If None, `index` would be the current trainer rank
+            id. Defaults to `None`.
+        contiguous: (bool, optional): If true, contiguous chunks of data 
+            will be select for sharding. And total number of examples will 
+            be the same. Otherwise each shard will contain all examples of 
+            dataset whose index mod `num_shards` = `index`. Defaults to `False`.
+    """
+    if num_shards is None:
+        num_shards = dist.get_world_size()
+    if index is None:
+        index = dist.get_rank()
+    if contiguous:
+        div = len(data) // num_shards
+        mod = len(data) % num_shards
+        start = div * index + min(index, mod)
+        end = start + div + (1 if index < mod else 0)
+        data = data[start:end]
+    else:
+        num_samples = int(math.ceil(len(data) * 1.0 / num_shards))
+        data = [
+            data[idx] for idx in range(len(data)) if idx % num_shards == index
+        ]
+
+    return data
+
+
 class MapDataset(Dataset):
     """
     Wraps a map-style dataset-like object as an instance of `MapDataset`, and equips it 
@@ -199,28 +244,30 @@ class MapDataset(Dataset):
         """
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 0:
-            with Pool(num_workers, initargs=(RLock(), )) as pool:
+            pool = Pool(
+                num_workers, initargs=(RLock(), ), maxtasksperchild=1000)
 
-                def filter_shard(num_workers, index, fn):
-                    self.shard(
-                        num_shards=num_workers, index=index, contiguous=True)
-                    self._filter(fn=fn)
-                    return self
+            def filter_shard(num_workers, index, fn):
+                self.shard(num_shards=num_workers, index=index, contiguous=True)
+                self._filter(fn=fn)
+                return self
 
-                kwds_per_shard = [
-                    dict(
-                        num_workers=num_workers, index=rank, fn=fn)
-                    for rank in range(num_workers)
-                ]
-                results = [
-                    pool.apply_async(
-                        filter_shard, kwds=kwds) for kwds in kwds_per_shard
-                ]
-                transformed_shards = [r.get() for r in results]
+            kwds_per_shard = [
+                dict(
+                    num_workers=num_workers, index=rank, fn=fn)
+                for rank in range(num_workers)
+            ]
+            results = [
+                pool.apply_async(
+                    filter_shard, kwds=kwds) for kwds in kwds_per_shard
+            ]
+            transformed_shards = [r.get() for r in results]
 
-                self.new_data = []
-                for i in range(num_workers):
-                    self.new_data += transformed_shards[i].new_data
+            pool.close()
+            pool.join()
+            self.new_data = []
+            for i in range(num_workers):
+                self.new_data += transformed_shards[i].new_data
             return self
         else:
             return self._filter(fn)
@@ -291,31 +338,30 @@ class MapDataset(Dataset):
 
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 0:
-            with Pool(num_workers, initargs=(RLock(), )) as pool:
 
-                def map_shard(num_workers, index, fn, batched):
-                    self.shard(
-                        num_shards=num_workers, index=index, contiguous=True)
-                    self._map(fn=fn, lazy=False, batched=batched)
-                    return self
+            def map_shard(num_workers, index, fn, batched):
+                self.shard(num_shards=num_workers, index=index, contiguous=True)
+                self._map(fn=fn, lazy=False, batched=batched)
+                return self
 
-                kwds_per_shard = [
-                    dict(
-                        num_workers=num_workers,
-                        index=rank,
-                        fn=fn,
-                        batched=batched) for rank in range(num_workers)
-                ]
-                results = [
-                    pool.apply_async(
-                        map_shard, kwds=kwds) for kwds in kwds_per_shard
-                ]
-                transformed_shards = [r.get() for r in results]
+            kwds_per_shard = [
+                dict(
+                    num_workers=num_workers, index=rank, fn=fn, batched=batched)
+                for rank in range(num_workers)
+            ]
+            pool = Pool(
+                num_workers, initargs=(RLock(), ), maxtasksperchild=1000)
+            results = [
+                pool.apply_async(
+                    map_shard, kwds=kwds) for kwds in kwds_per_shard
+            ]
 
-                self.new_data = []
-                for i in range(num_workers):
-                    self.new_data += transformed_shards[i].new_data
-
+            transformed_shards = [r.get() for r in results]
+            pool.close()
+            pool.join()
+            self.new_data = []
+            for i in range(num_workers):
+                self.new_data += transformed_shards[i].new_data
             return self
         else:
             return self._map(fn, lazy=lazy, batched=batched)
