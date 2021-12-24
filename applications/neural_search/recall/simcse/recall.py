@@ -74,10 +74,10 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+        "ernie-1.0")
 
-    model = SimCSE(
-        pretrained_model, output_emb_size=args.output_emb_size)
+    model = SimCSE(pretrained_model, output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
 
     # Load pretrained semantic model

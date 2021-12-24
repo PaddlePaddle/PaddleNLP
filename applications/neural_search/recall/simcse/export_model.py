@@ -33,13 +33,13 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     # If you want to use ernie1.0 model, plesace uncomment the following code
-    output_emb_size=256
+    output_emb_size = 256
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+        "ernie-1.0")
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    model = SimCSE(
-        pretrained_model, output_emb_size=output_emb_size)
+    model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

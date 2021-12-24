@@ -21,7 +21,7 @@
 
 <a name="ERNIE-Gram"></a>
 
-# ERNIE-Gram 
+# ERNIE-Gram
 
 <a name="技术方案"></a>
 
@@ -40,7 +40,7 @@
 
 |  模型 |  AUC |
 | ------------ | ------------ |
-|  ERNIE-Gram |  0.801 | 
+|  ERNIE-Gram |  0.801 |
 
 <a name="环境依赖"></a>
 
@@ -113,7 +113,7 @@ ernie_matching/
     ├── test_pairwise.csv   # 排序测试集
     ├── dev_pairwise.csv    # 排序验证集
     └── train_pairwise.csv  # 排序训练集
-    
+
 ```
 
 <a name="模型训练"></a>
@@ -131,7 +131,7 @@ ernie_matching/
 ### 训练环境说明
 
 
-- NVIDIA Driver Version: 440.64.00 
+- NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 

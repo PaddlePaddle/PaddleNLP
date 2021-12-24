@@ -34,7 +34,7 @@ In-batch Negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 <a name="In-batch Negatives"></a>
 
-# In-batch Negatives 
+# In-batch Negatives
 
 <a name="技术方案"></a>
 
@@ -114,10 +114,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 **训练集** 和 **验证集** 格式一致，训练集4k条，测试集2w条，每行由一对语义相似的文本Pair构成，以tab符分割，第一列是检索query，第二列由相关文献标题（+关键词）构成。样例数据如下:
 
 ```
-宁夏社区图书馆服务体系布局现状分析	       宁夏社区图书馆服务体系布局现状分析社区图书馆,社区图书馆服务,社区图书馆服务体系
-人口老龄化对京津冀经济	                 京津冀人口老龄化对区域经济增长的影响京津冀,人口老龄化,区域经济增长,固定效应模型
-英语广告中的模糊语	                  模糊语在英语广告中的应用及其功能模糊语,英语广告,表现形式,语用功能
-甘氨酸二肽的合成	                      甘氨酸二肽合成中缩合剂的选择甘氨酸,缩合剂,二肽
+宁夏社区图书馆服务体系布局现状分析           宁夏社区图书馆服务体系布局现状分析社区图书馆,社区图书馆服务,社区图书馆服务体系
+人口老龄化对京津冀经济                     京津冀人口老龄化对区域经济增长的影响京津冀,人口老龄化,区域经济增长,固定效应模型
+英语广告中的模糊语                      模糊语在英语广告中的应用及其功能模糊语,英语广告,表现形式,语用功能
+甘氨酸二肽的合成                          甘氨酸二肽合成中缩合剂的选择甘氨酸,缩合剂,二肽
 ```
 
 **召回库** 用于模拟业务线上的全量语料库，评估模型的召回效果，计算相应的Recall指标。召回库总共30万条样本，每行由一列构成，文献标题（+关键词），样例数据如下：
@@ -147,7 +147,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
     ├── test_pairwise.csv   # 排序测试集
     ├── dev_pairwise.csv    # 排序验证集
     └── train_pairwise.csv  # 排序训练集
-    
+
 ```
 
 <a name="模型训练"></a>
@@ -165,7 +165,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 ### 训练环境说明
 
 
-- NVIDIA Driver Version: 440.64.00 
+- NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
@@ -191,7 +191,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 10 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file recall/train.csv 
+    --train_set_file recall/train.csv
 
 ```
 
@@ -242,7 +242,7 @@ d. 评估
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
 ```
-root_dir="checkpoints/inbatch" 
+root_dir="checkpoints/inbatch"
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
@@ -256,7 +256,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --max_seq_length 60 \
         --recall_num 50 \
         --similar_text_pair "recall/dev.csv" \
-        --corpus_file "recall/corpus.csv" 
+        --corpus_file "recall/corpus.csv"
 ```
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
@@ -350,17 +350,17 @@ python inference.py
 
 待预测数据为 tab 分隔的 csv 文件，每一行为 1 个文本 Pair，部分示例如下:
 ```
-试论我国海岸带经济开发的问题与前景	试论我国海岸带经济开发的问题与前景海岸带,经济开发,问题,前景
-外语阅读焦虑与英语成绩及性别的关系	外语阅读焦虑与英语成绩及性别的关系外语阅读焦虑,外语课堂焦虑,英语成绩,性别
-数字图书馆	智能化图书馆
-网络健康可信性研究	网络成瘾少年
+试论我国海岸带经济开发的问题与前景    试论我国海岸带经济开发的问题与前景海岸带,经济开发,问题,前景
+外语阅读焦虑与英语成绩及性别的关系    外语阅读焦虑与英语成绩及性别的关系外语阅读焦虑,外语课堂焦虑,英语成绩,性别
+数字图书馆    智能化图书馆
+网络健康可信性研究    网络成瘾少年
 ```
 
 ### 开始预测
 
 以上述 demo 数据为例，运行如下命令基于我们开源的 [In-batch Negatives](https://arxiv.org/abs/2004.04906) 策略语义索引模型开始计算文本 Pair 的语义相似度:
 ```
-root_dir="checkpoints/inbatch" 
+root_dir="checkpoints/inbatch"
 
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \

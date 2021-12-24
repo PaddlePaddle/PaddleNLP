@@ -15,11 +15,11 @@
 import numpy as np
 from milvus_insert import VecToMilvus
 import random
-from tqdm import tqdm 
+from tqdm import tqdm
 from milvus_recall import RecallByMilvus
 import time
 
-embeddings=np.load('corpus_embedding.npy') 
+embeddings = np.load('corpus_embedding.npy')
 print(embeddings.shape)
 
 embedding_ids = [i for i in range(embeddings.shape[0])]
@@ -27,14 +27,17 @@ print(len(embedding_ids))
 client = VecToMilvus()
 collection_name = 'literature_search'
 partition_tag = 'partition_2'
-data_size=len(embedding_ids)
+data_size = len(embedding_ids)
 client = RecallByMilvus()
-embeddings = embeddings[np.arange(1,2)]
-time_start = time.time() #开始计时
-status, resultes = client.search(collection_name=collection_name, vectors=embeddings, partition_tag=partition_tag)
-time_end = time.time()    #结束计时
+embeddings = embeddings[np.arange(1, 2)]
+time_start = time.time()  #开始计时
+status, resultes = client.search(
+    collection_name=collection_name,
+    vectors=embeddings,
+    partition_tag=partition_tag)
+time_end = time.time()  #结束计时
 
-sum_t=time_end - time_start   #运行所花时间
+sum_t = time_end - time_start  #运行所花时间
 print('time cost', sum_t, 's')
 print(status)
 print(resultes)

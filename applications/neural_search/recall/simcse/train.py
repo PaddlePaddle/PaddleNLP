@@ -107,7 +107,7 @@ def do_train():
     train_ds = load_dataset(
         read_simcse_text, data_path=args.train_set_file, lazy=False)
 
-    
+
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
        args.model_name_or_path,
        hidden_dropout_prob=args.dropout,

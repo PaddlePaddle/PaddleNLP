@@ -21,6 +21,7 @@ import paddle.nn.functional as F
 
 from base_model import SemanticIndexBase
 
+
 class SemanticIndexBatchNeg(SemanticIndexBase):
     def __init__(self,
                  pretrained_model,

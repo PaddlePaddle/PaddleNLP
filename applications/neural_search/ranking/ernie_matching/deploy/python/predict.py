@@ -60,6 +60,7 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
 args = parser.parse_args()
 # yapf: enable
 
+
 def read_text_pair(data_path):
     """Reads data."""
     with open(data_path, 'r', encoding='utf-8') as f:
@@ -212,6 +213,7 @@ class Predictor(object):
 
         return sim_score
 
+
 if __name__ == "__main__":
     # Define predictor to do prediction.
     predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
@@ -222,9 +224,9 @@ if __name__ == "__main__":
         'ernie-gram-zh')
 
     # test_ds = load_dataset("lcqmc", splits=["test"])
-    input_file='sort/test_pairwise.csv'
+    input_file = 'sort/test_pairwise.csv'
 
-    test_ds = load_dataset(read_text_pair,data_path=input_file, lazy=False)
+    test_ds = load_dataset(read_text_pair, data_path=input_file, lazy=False)
 
     data = [{'query': d['query'], 'title': d['title']} for d in test_ds]
 

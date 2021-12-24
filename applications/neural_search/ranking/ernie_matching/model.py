@@ -27,18 +27,21 @@ class PairwiseMatching(nn.Layer):
         # hidden_size -> 1, calculate similarity
         self.similarity = nn.Linear(self.ptm.config["hidden_size"], 1)
 
-    @paddle.jit.to_static(input_spec=[paddle.static.InputSpec(shape=[None, None], dtype='int64'),paddle.static.InputSpec(shape=[None, None], dtype='int64')])
+    @paddle.jit.to_static(input_spec=[
+        paddle.static.InputSpec(
+            shape=[None, None], dtype='int64'), paddle.static.InputSpec(
+                shape=[None, None], dtype='int64')
+    ])
     def get_pooled_embedding(self,
                              input_ids,
                              token_type_ids=None,
                              position_ids=None,
                              attention_mask=None):
-        _, cls_embedding = self.ptm(input_ids, token_type_ids,
-                                        position_ids, attention_mask)
+        _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
+                                    attention_mask)
         cls_embedding = self.dropout(cls_embedding)
         sim = self.similarity(cls_embedding)
         return sim
-
 
     def predict(self,
                 input_ids,

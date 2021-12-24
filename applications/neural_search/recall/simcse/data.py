@@ -43,9 +43,9 @@ def create_dataloader(dataset,
 
 
 def convert_example_test(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    pad_to_max_seq_len=False):
+                         tokenizer,
+                         max_seq_length=512,
+                         pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
         
@@ -114,12 +114,14 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
 
     return result
 
+
 def gen_id2corpus(corpus_file):
     id2corpus = {}
     with open(corpus_file, 'r', encoding='utf-8') as f:
         for idx, line in enumerate(f):
             id2corpus[idx] = line.rstrip()
     return id2corpus
+
 
 def gen_text_file(similar_text_pair_file):
     text2similar_text = {}

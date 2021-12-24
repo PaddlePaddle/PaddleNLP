@@ -85,7 +85,7 @@ ERNIE 1.0/
 ### 训练环境说明
 
 
-- NVIDIA Driver Version: 440.64.00 
+- NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 

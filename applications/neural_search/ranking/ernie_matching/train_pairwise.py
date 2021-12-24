@@ -31,7 +31,7 @@ from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
 from model import PairwiseMatching
 import pandas as pd
-from tqdm import tqdm 
+from tqdm import tqdm
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -91,22 +91,24 @@ def evaluate(model, metric, data_loader, phase="dev"):
     metric.reset()
     model.train()
 
+
 # 构建读取函数，读取原始数据
 def read(src_path, is_predict=False):
-    data=pd.read_csv(src_path,sep='\t')
+    data = pd.read_csv(src_path, sep='\t')
     for index, row in tqdm(data.iterrows()):
-        query=row['query']
-        title=row['title']
-        neg_title=row['neg_title']
-        yield {'query':query, 'title':title,'neg_title':neg_title}
+        query = row['query']
+        title = row['title']
+        neg_title = row['neg_title']
+        yield {'query': query, 'title': title, 'neg_title': neg_title}
+
 
 def read_test(src_path, is_predict=False):
-    data=pd.read_csv(src_path,sep='\t')
+    data = pd.read_csv(src_path, sep='\t')
     for index, row in tqdm(data.iterrows()):
-        query=row['query']
-        title=row['title']
-        label=row['label']
-        yield {'query':query, 'title':title,'label':label}
+        query = row['query']
+        title = row['title']
+        label = row['label']
+        yield {'query': query, 'title': title, 'label': label}
 
 
 def do_train():
@@ -119,8 +121,8 @@ def do_train():
 
     # train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
-    train_ds=load_dataset(read,src_path=args.train_file,lazy=False)
-    dev_ds=load_dataset(read_test,src_path=args.test_file,lazy=False)
+    train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
+    dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
     print(train_ds[0])
 
     # train_ds = gen_pair(train_ds)

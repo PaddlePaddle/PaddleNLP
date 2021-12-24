@@ -90,7 +90,7 @@
     ├── test_pairwise.csv   # 排序测试集
     ├── dev_pairwise.csv    # 排序验证集
     └── train_pairwise.csv  # 排序训练集
-    
+
 ```
 
 <a name="向量检索"></a>
@@ -112,7 +112,7 @@ cd scripts
 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
-root_dir="checkpoints" 
+root_dir="checkpoints"
 python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         feature_extract.py \
         --device gpu \
@@ -126,10 +126,10 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --max_seq_length 60 \
         --recall_num 50 \
         --similar_text_pair "recall/test.csv" \
-        --corpus_file "milvus/milvus_data.csv" 
+        --corpus_file "milvus/milvus_data.csv"
 ```
 
-|  数据量 |  时间 | 
+|  数据量 |  时间 |
 | ------------ | ------------ |
 |1000万条|5hour50min03s|
 
@@ -150,7 +150,7 @@ python3 embedding_insert.py
 ```
 
 
-|  数据量 |  时间 | 
+|  数据量 |  时间 |
 | ------------ | ------------ |
 |1000万条|12min24s|
 
@@ -182,7 +182,7 @@ Status(code=0, message='Search vectors successfully!')
 
 第一次检索的时间大概是18s左右，需要把数据从磁盘加载到内存，后面检索就很快，下面是测试的速度：
 
-|  数据量 |  时间 | 
+|  数据量 |  时间 |
 | ------------ | ------------ |
 |100条|0.15351247787475586|
 

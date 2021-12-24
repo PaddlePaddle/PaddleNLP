@@ -15,7 +15,8 @@ from paddlenlp.utils.log import logger
 
 from model import SimCSE
 from data import create_dataloader
-from tqdm import tqdm 
+from tqdm import tqdm
+
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
     """
@@ -50,30 +51,28 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
 
 
 if __name__ == "__main__":
-    device= 'gpu'
-    max_seq_length=64
-    output_emb_size=256
-    batch_size=1
-    params_path='checkpoints/model_20000/model_state.pdparams'
-    id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+    device = 'gpu'
+    max_seq_length = 64
+    output_emb_size = 256
+    batch_size = 1
+    params_path = 'checkpoints/model_20000/model_state.pdparams'
+    id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=max_seq_length)
+        convert_example, tokenizer=tokenizer, max_seq_length=max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+        "ernie-1.0")
     # pretrained_model=ErnieModel.from_pretrained("ernie-1.0")
 
-    model = SimCSE(
-        pretrained_model, output_emb_size=output_emb_size)
+    model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
@@ -83,7 +82,6 @@ if __name__ == "__main__":
     else:
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
-
 
     # conver_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
@@ -104,9 +102,10 @@ if __name__ == "__main__":
             input_ids = paddle.to_tensor(input_ids)
             token_type_ids = paddle.to_tensor(token_type_ids)
 
-            text_embeddings = model.get_pooled_embedding(input_ids, token_type_ids)
+            text_embeddings = model.get_pooled_embedding(input_ids,
+                                                         token_type_ids)
             all_embeddings.append(text_embeddings)
 
-    text_embedding=all_embeddings[0]
+    text_embedding = all_embeddings[0]
     print(text_embedding.shape)
     print(text_embedding.numpy())

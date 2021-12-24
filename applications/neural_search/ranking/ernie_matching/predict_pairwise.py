@@ -67,8 +67,8 @@ def predict(model, data_loader):
                 input_ids=input_ids, token_type_ids=token_type_ids).numpy()
 
             batch_probs.append(batch_prob)
-        if(len(batch_prob)==1):
-            batch_probs=np.array(batch_probs)
+        if (len(batch_prob) == 1):
+            batch_probs = np.array(batch_probs)
         else:
             batch_probs = np.concatenate(batch_probs, axis=0)
 

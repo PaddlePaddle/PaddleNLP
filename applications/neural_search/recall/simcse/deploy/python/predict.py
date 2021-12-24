@@ -26,9 +26,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-
 sys.path.append('.')
-
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -60,6 +58,7 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
 args = parser.parse_args()
 # yapf: enable
 
+
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
     """
     Builds model inputs from a sequence.
@@ -90,6 +89,7 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
         result += [input_ids, token_type_ids]
 
     return result
+
 
 class Predictor(object):
     def __init__(self,
@@ -186,8 +186,7 @@ class Predictor(object):
 
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example(
-                text, tokenizer)
+            input_ids, segment_ids = convert_example(text, tokenizer)
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -205,7 +204,7 @@ class Predictor(object):
         logits = self.output_handle.copy_to_cpu()
         if args.benchmark:
             self.autolog.times.stamp()
-            
+
         if args.benchmark:
             self.autolog.times.end(stamp=True)
 
@@ -270,11 +269,12 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    output_emb_size=256
+    output_emb_size = 256
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+    id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     res=predictor.extract_embedding(corpus_list, tokenizer)
+    res = predictor.predict(corpus_list, tokenizer)
     print(res.shape)
     print(res)
     corpus_list=[['中西方语言与文化的差异','中西方文化差异以及语言体现中西方文化,差异,语言体现'],

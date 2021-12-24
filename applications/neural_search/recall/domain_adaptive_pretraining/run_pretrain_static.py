@@ -82,6 +82,7 @@ def create_pretrained_dataset(
         binary_head=True,
         max_seq_length_dec=None,
         dataset_type='ernie')
+
     # 测试集没有
     # test_ds=valid_ds
     def _collate_data(data, stack_fn=Stack()):
@@ -548,7 +549,6 @@ def do_train(args):
         # many times. and start a new random dataloader.
         valid_data_loader = valid_data_loader()
         test_data_loader = test_data_loader()
-    
 
         for step, batch in enumerate(train_data_loader()):
             ret = exe.run(main_program,

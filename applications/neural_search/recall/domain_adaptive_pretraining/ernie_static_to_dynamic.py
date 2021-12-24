@@ -23,19 +23,18 @@ import paddle.nn as nn
 
 def load_ernie_model(static_model_path):
 
-    model=ErnieModel.from_pretrained('ernie-1.0')
+    model = ErnieModel.from_pretrained('ernie-1.0')
     program_state = static.load_program_state(static_model_path)
-    ret_dict=static_params_to_dygraph(model,program_state)
+    ret_dict = static_params_to_dygraph(model, program_state)
 
     print('转换前的参数：')
-    print(model.embeddings.word_embeddings.weight )
+    print(model.embeddings.word_embeddings.weight)
     model.load_dict(ret_dict)
     print('转换后的参数：')
-    print(model.embeddings.word_embeddings.weight )
+    print(model.embeddings.word_embeddings.weight)
     model.save_pretrained("./ernie_checkpoint")
-    
 
 
 if __name__ == "__main__":
-    static_model_path="./output/ernie-1.0-dp8-gb1024/model_last/static_vars"
+    static_model_path = "./output/ernie-1.0-dp8-gb1024/model_last/static_vars"
     load_ernie_model(static_model_path)

@@ -73,7 +73,6 @@ def do_train():
     train_ds = load_dataset(
         read_text_pair, data_path=args.train_set_file, lazy=False)
 
-
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')
 
@@ -103,7 +102,6 @@ def do_train():
         margin=args.margin,
         scale=args.scale,
         output_emb_size=args.output_emb_size)
-
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)

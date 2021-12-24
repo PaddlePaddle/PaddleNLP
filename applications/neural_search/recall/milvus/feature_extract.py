@@ -30,7 +30,7 @@ from paddlenlp.utils.log import logger
 from base_model import SemanticIndexBase
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
-from tqdm import tqdm 
+from tqdm import tqdm
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -110,4 +110,4 @@ if __name__ == "__main__":
 
     all_embeddings = np.concatenate(all_embeddings, axis=0)
     # print(all_embeddings.shape)
-    np.save('corpus_embedding',all_embeddings) 
+    np.save('corpus_embedding',all_embeddings)

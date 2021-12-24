@@ -33,7 +33,7 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 
 <a name="SimCSE"></a>
 
-# SimCSE 
+# SimCSE
 
 <a name="技术方案"></a>
 
@@ -144,7 +144,7 @@ simcse/
     ├── test_pairwise.csv   # 排序测试集
     ├── dev_pairwise.csv   # 排序验证集
     └── train_pairwise.csv  # 排序训练集
-    
+
 ```
 
 <a name="模型训练"></a>
@@ -161,7 +161,7 @@ simcse/
 
 ### 训练环境说明
 
-+ NVIDIA Driver Version: 440.64.00 
++ NVIDIA Driver Version: 440.64.00
 + Ubuntu 16.04.6 LTS (Docker)
 + Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
@@ -188,7 +188,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--dropout 0.2 \
     --output_emb_size 256 \
 	--train_set_file "./recall/train_unsupervised.csv" \
-	--test_set_file "./recall/dev.csv" 
+	--test_set_file "./recall/dev.csv"
 ```
 也可以使用bash脚本：
 
@@ -263,7 +263,7 @@ python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
         --max_seq_length 60 \
         --recall_num 50 \
         --similar_text_pair "recall/dev.csv" \
-        --corpus_file "recall/corpus.csv" 
+        --corpus_file "recall/corpus.csv"
 ```
 也可以使用下面的bash脚本：
 
@@ -347,7 +347,7 @@ huntington舞蹈病的动物模型      Huntington舞蹈病的动物模型
 
 以上述 demo 数据为例，运行如下命令基于我们开源的 SimCSE无监督语义索引模型开始计算文本 Pair 的语义相似度:
 ```
-root_dir="checkpoints" 
+root_dir="checkpoints"
 
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
