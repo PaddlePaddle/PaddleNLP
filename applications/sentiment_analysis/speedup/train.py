@@ -126,14 +126,14 @@ def train():
                     )
                     best_f1 = f1
                     paddle.save(model.state_dict(),
-                                f"{args.checkpoints}/best_mini.pdparams")
+                                f"{args.checkpoints}/best.pdparams")
                 print(
                     f'evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}'
                 )
 
             global_step += 1
 
-    paddle.save(model.state_dict(), f"{args.checkpoints}/final_mini.pdparams")
+    paddle.save(model.state_dict(), f"{args.checkpoints}/final.pdparams")
 
 
 if __name__ == "__main__":

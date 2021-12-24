@@ -13,16 +13,12 @@
 
 ```shell
 .
-├── data                      # 数据目录
-├── checkpoints               # 模型保存目录
-│   └── static                # 静态图模型保存目录
 ├── data.py                   # 数据处理脚本
 ├── model.py                  # 模型组网脚本
 ├── train.py                  # 模型训练脚本
 ├── evaluate.py               # 模型评估脚本
 ├── quant_post.py             # 模型量化脚本
 ├── static_predict.py         # 静态图预测脚本
-├── utils.py                  # 工具函数
 ├── run_train.sh              # 模型训练命令
 ├── run_evaluate.sh           # 模型评估命令
 ├── run_quant.sh              # 模型量化命令
@@ -36,16 +32,16 @@
 
 > 1   口味清淡   口味很清淡，价格也比较公道
 
-可点击 [data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz) 进行 Demo 数据下载，将数据解压之后放入本目录的 `data` 文件夹下。
+本实验数据和基于SKEP的细粒度情感分类实验所用数据是同一份，如果已将数据下载，并放入父目录的`data/cls_data/`目录下，则无需重复下载操作。更多信息请参考[这里](../classification/README.md)。
 
 ### 1.3 模型效果展示
 
-在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 更加详细的训练参数设置如下表所示：
-|Model|训练参数配置|硬件|MD5|
-| ------------ | ------------ | ------------ |-----------|
-|[PP-MiniLM_cls](https://bj.bcebos.com/paddlenlp/models/best_mini.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|<div style="width: 100pt">Tesla V100-32g</div>|d04fc43efa61c77f47c23ef042dcb325|
+在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 可点击下表的 `PP-MiniLM_cls` 进行模型下载，同时下表展示了训练过程中使用的训练参数：
+|Model|训练参数配置|MD5|
+| ------------ | ------------ |-----------|
+|[PP-MiniLM_cls](https://bj.bcebos.com/paddlenlp/models/best_mini.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|d04fc43efa61c77f47c23ef042dcb325|
 
-我们基于训练过程中的 best 模型在验证集 `dev_set` 和测试集 `test_set` 上进行了评估测试，模型效果如下表所示:
+我们基于训练过程中的 best 模型在 `cls_data` 验证集 `dev` 和测试集 `test` 上进行了评估测试，模型效果如下表所示:
 |Model|数据集|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
 |PP-MiniLM|dev_set|0.98624|0.99183|0.98903|
@@ -54,7 +50,7 @@
 **备注**：以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。
 
 ### 1.4 模型训练
-在训练之前需要下载 PP-MiniLM 小模型（包括模型和 tokenizer ），然后统一放入 `checkpoints/ppminilm` 文件夹下，接下来便可以通过运行以下命令进行分类小模型训练：
+在训练之前需要下载 PP-MiniLM 小模型（包括模型和 tokenizer ），然后统一放入父目录的 `checkpoints/ppminilm/` 文件夹下，接下来便可以通过运行以下命令进行分类小模型训练：
 ```shell
 sh run_train.sh
 ```
@@ -68,10 +64,10 @@ sh run_evaluate.sh
 ## 2. 对 PP-MiniLM 小模型进行量化
 本节将基于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) ，对训练好的 PP-MiniLM 小模型进行量化。具体来讲，本节采用的是静态离线量化方法，即在训练好的模型基础上，使用少量校准数据计算量化因子，便可快速得到量化模型。量化过程中，默认使用 `avg` 的量化策略，对 `matmul/matmul_v2` 算子进行 `channel_wise_abs_max` 类型的量化。
 
-首先，需要先将训练好的动态图模型，转为静态图模型：
+首先，需要先将训练好的动态图模型，转为静态图模型，注意这里需要跳到父目录进行操作：
 ```shell
 cd ..
-sh run_export.sh ppminilm
+sh run_export.sh speedup
 ```
 
 然后，使用如下命令进行量化生成的静态图模型：
@@ -87,7 +83,7 @@ sh run_static_predict.sh
 ## 3. 对量化后的小模型进行性能测试
 
 ### 3.1 环境要求
-本节需要使用安装有 Inference 预测库的 [PaddlePaddle 2.2.1](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html) 进行预测，请根据合适的机器环境进行下载安装。若想要得到明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100) 上进行测试，若在 V 系列 GPU 卡上测试，由于其不支持 Int8 Tensor Core，将达不到预期的加速效果。
+本节需要使用安装有 Paddle Inference 预测库的 [PaddlePaddle 2.2.1](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html) 进行预测，请根据合适的机器环境进行下载安装。若想要得到明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100) 上进行测试，若在 V 系列 GPU 卡上测试，由于其不支持 Int8 Tensor Core，将达不到预期的加速效果。
 
 **备注**：本项目基于T4进行性能测试。
 
@@ -99,13 +95,13 @@ sh run_static_predict.sh
 首先，设置 `--collect_shape` 参数，生成 shape range info 文件：
 ```shell
 python  static_predict.py \
-        --base_model_path "./checkpoints/ppminilm" \
-        --model_path "./checkpoints/quant/infer" \
-        --test_path "./data/test_cls.txt" \
-        --label_path "./data/label_cls.dict" \
+        --base_model_path "../checkpoints/ppminilm" \
+        --model_path "../checkpoints/sp_checkpoints/quant/infer" \
+        --test_path "../data/cls_data/test.txt" \
+        --label_path "../data/cls_data/label.dict" \
         --num_epochs 10 \
         --batch_size 16 \
-        --max_seq_len 256 \
+        --max_seq_len 256
         --use_tensorrt \
         --int8 \
         --perf \
@@ -114,13 +110,13 @@ python  static_predict.py \
 然后，基于 shape range info 文件进行预测：
 ```shell
 python  static_predict.py \
-        --base_model_path "./checkpoints/ppminilm" \
-        --model_path "./checkpoints/quant/infer" \
-        --test_path "./data/test_cls.txt" \
-        --label_path "./data/label_cls.dict" \
+        --base_model_path "../checkpoints/ppminilm" \
+        --model_path "../checkpoints/sp_checkpoints/quant/infer" \
+        --test_path "../data/cls_data/test.txt" \
+        --label_path "../data/cls_data/label.dict" \
         --num_epochs 10 \
         --batch_size 16 \
-        --max_seq_len 256 \
+        --max_seq_len 256
         --use_tensorrt \
         --int8 \
         --perf

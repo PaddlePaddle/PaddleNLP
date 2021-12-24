@@ -1,9 +1,9 @@
 export CUDA_VISIBLE_DEVICES=6
 
 python  dynamic_predict.py \
-        --ext_model_path "./extraction/checkpoints/best_ext.pdparams" \
-        --cls_model_path "./classification/checkpoints/best_cls.pdparams" \
-        --ext_label_path "./extraction/data/label_ext.dict" \
-        --cls_label_path "./classification/data/label_cls.dict" \
+        --ext_model_path "./checkpoints/ext_checkpoints/best.pdparams" \
+        --cls_model_path "./checkpoints/cls_checkpoints/best.pdparams" \
+        --ext_label_path "./data/ext_data/label.dict" \
+        --cls_label_path "./data/cls_data/label.dict" \
         --max_seq_len 256
 

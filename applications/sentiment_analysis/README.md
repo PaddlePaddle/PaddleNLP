@@ -48,13 +48,15 @@
 .
 ├── extraction                         # 评价维度和观点抽取模型包
 ├── classification                     # 细粒度情感分类模型包
-├── ppminilm                           # PP-MiniLM特色小模型包
-├── data                               # 全流程批量预测测试集，批量预测结果集
-├── imgs                               # 图片
+├── speedup                           # PP-MiniLM特色小模型包
+├── data                               # 数据集目录
+├── checkpoints                        # 模型保存目录 
+├── imgs                               # 图片目录
 ├── dynamic_predict.py                 # 全流程动态图单条预测脚本
 ├── dynamic_predict_by_batch.py        # 全流程动态图批量预测脚本
 ├── export_model.py                    # 动转静模型导出脚本
 ├── static_predict.py                  # 全流程静态图单条预测脚本
+├── utils.py                           # 工具函数脚本
 ├── run_dynamic_predict.sh             # 全流程动态图单条预测命令
 ├── run_dynamic_predict_by_batch.sh    # 全流程动态图批量预测命令
 ├── run_export.sh                      # 动转静模型导出命令
@@ -80,9 +82,9 @@ pip install -r requirements.txt
 ```
 
 ### 3.2 数据说明
-本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [data_ext](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz)和[data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_cls.tar.gz)。
+本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz)和[cls_data](https://bj.bcebos.com/v1/paddlenlp/data/cls_data.tar.gz)。
 
-用户可分别点击下载，解压后将数据文件依次放入 `./extraction/data` 和 `./classification/data` 目录下即可。
+用户可分别点击下载，解压后将相应的数据文件依次放入 `./data/ext_data` 和 `./data/cls_data` 目录下即可。
 
 ### 3.3 评论维度和观点抽取模型
 关于评论维度和观点抽取模型的原理和使用方式，请参考[这里](extraction/README.md)。
@@ -92,7 +94,7 @@ pip install -r requirements.txt
 
 
 ### 3.5 全流程细粒度情感分析推理
-在训练完成评论维度和观点模型，细粒度情感分类模型后，默认会将训练过程中最好的模型保存在 `./extraction/checkpoints` 和 `./classification/checkpoints` 目录下。接下来，便可以根据保存好的模型进行全流程的模型推理：给定一句评论文本，首先使用抽取模型进行抽取评论维度和观点，然后使用细粒度情感分类模型以评论维度级别进行情感极性分类。
+在训练完成评论维度和观点模型，细粒度情感分类模型后，默认会将训练过程中最好的模型保存在 `./checkpoints/ext_checkpoints` 和 `./checkpoints/cls_checkpoints` 目录下。接下来，便可以根据保存好的模型进行全流程的模型推理：给定一句评论文本，首先使用抽取模型进行抽取评论维度和观点，然后使用细粒度情感分类模型以评论维度级别进行情感极性分类。
 
 本项目将提供两套全流程预测方案：动态图预测和静态图高性能预测，其中动态图预测支持单条和批量预测两种方式。
 
@@ -106,7 +108,7 @@ sh run_dynamic_predict.sh
 ```shell
 sh run_dynamic_predict_by_batch.sh
 ```
-**备注**：动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的 `data` 文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
+**备注**：动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的 `./data` 文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
 ```
 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
 酒店干净整洁，性价比很高
@@ -130,7 +132,7 @@ sh run_static_predict.sh
 ### 3.6 小模型优化策略
 本项目提供了一套基于 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 中文特色小模型的细粒度情感分类解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
 
-本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。详细信息请参考[这里](./ppminilm/README.md)。
+本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。详细信息请参考[这里](./speedup/README.md)。
 
 
 ## 4. 引用

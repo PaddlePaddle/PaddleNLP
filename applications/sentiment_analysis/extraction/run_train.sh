@@ -1,9 +1,9 @@
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
 python  train.py \
-        --train_path "./data/train_ext.txt" \
-        --dev_path "./data/dev_ext.txt" \
-        --label_path "./data/label_ext.dict" \
+        --train_path "../data/ext_data/train.txt" \
+        --dev_path "../data/ext_data/dev.txt" \
+        --label_path "../data/ext_data/label.dict" \
         --num_epochs 10 \
         --batch_size 16 \
         --max_seq_len 256 \
@@ -15,4 +15,4 @@ python  train.py \
         --eval_steps 250 \
         --seed 1000 \
         --device "gpu" \
-        --checkpoints "./checkpoints"
+        --checkpoints "../checkpoints/ext_checkpoints/"

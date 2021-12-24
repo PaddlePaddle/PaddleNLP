@@ -7,21 +7,21 @@ echo "Please enter the correct export model type, for example: sh run_export ext
 elif [ $model_type = extraction ]; then 
 python  export_model.py \
         --model_type "extraction" \
-        --model_path "./extraction/checkpoints/best_ext.pdparams" \
-        --save_path "./extraction/checkpoints/static/infer" 
+        --model_path "./checkpoints/ext_checkpoints/best.pdparams" \
+        --save_path "./checkpoints/ext_checkpoints/static/infer" 
 
 elif [ $model_type = classification ]; then
 python  export_model.py \
         --model_type "classification" \
-        --model_path "./classification/checkpoints/best_cls.pdparams" \
-        --save_path "./classification/checkpoints/static/infer" 
+        --model_path "./checkpoints/cls_checkpoints/best.pdparams" \
+        --save_path "./checkpoints/cls_checkpoints/static/infer" 
         
 elif [ $model_type = speedup ]; then
 python  export_model.py \
         --model_type "speedup" \
-        --base_model_name_or_path "./speedup/checkpoints/ppminilm" \
-        --model_path "./speedup/checkpoints/best_mini.pdparams" \
-        --save_path "./speedup/checkpoints/static/infer" 
+        --base_model_name_or_path "./checkpoints/ppminilm" \
+        --model_path "./checkpoints/sp_checkpoints/best.pdparams" \
+        --save_path "./checkpoints/sp_checkpoints/static/infer" 
 else
 echo "Three model_types are supported:  [extraction, classification, speedup]"
 fi

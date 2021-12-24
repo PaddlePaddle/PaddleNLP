@@ -16,14 +16,10 @@
 
 ```shell
 .
-├── data             # 数据目录
-├── checkpoints      # 模型保存目录
-│   └── static       # 静态图模型保存目录
 ├── data.py          # 数据处理脚本
 ├── model.py         # 模型组网脚本
 ├── train.py         # 模型训练脚本
 ├── evaluate.py      # 模型评估脚本
-├── utils.py         # 工具函数
 ├── run_train.sh     # 模型训练命令
 ├── run_evaluate.sh  # 模型评估命令
 └── README.md
@@ -35,22 +31,22 @@
 
 > 1   口味清淡   口味很清淡，价格也比较公道
 
-可点击 [data_cls](https://bj.bcebos.com/v1/paddlenlp/data/data_ext.tar.gz) 进行 Demo 数据下载，将数据解压之后放入本目录的 `data` 文件夹下。
+可点击 [cls_data](https://bj.bcebos.com/v1/paddlenlp/data/cls_data.tar.gz) 进行 Demo 数据下载，将数据解压之后放入父目录的 `data/cls_data/` 文件夹下。
 
 ## 4. 模型效果展示
 
-在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 更加详细的训练参数设置如下表所示：
-|Model|训练参数配置|硬件|MD5|
-| ------------ | ------------ | ------------ |-----------|
-|[cls_model](https://bj.bcebos.com/paddlenlp/models/best_cls.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|<div style="width: 100pt">Tesla V100-32g</div>|3de6ddf581e665d9b1d035c29b49778a|
+在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 可点击下表的 `cls_model` 进行模型下载，同时下表展示了训练过程中使用的训练参数：
+|Model|训练参数配置|MD5|
+| ------------ | ------------ |-----------|
+|[cls_model](https://bj.bcebos.com/paddlenlp/models/best_cls.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|3de6ddf581e665d9b1d035c29b49778a|
 
-我们基于训练过程中的 best 模型在验证集 `dev_set` 和测试集 `test_set` 上进行了评估测试，模型效果如下表所示:
+我们基于训练过程中的 best 模型在验证集 `dev` 和测试集 `test` 上进行了评估测试，模型效果如下表所示:
 |Model|数据集|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
-|SKEP-Large|dev_set|0.98758|0.99251|0.99004|
-|SKEP-Large|test_set|0.98497|0.99139|0.98817|
+|SKEP-Large|dev|0.98758|0.99251|0.99004|
+|SKEP-Large|test|0.98497|0.99139|0.98817|
 
-**备注**：以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。
+**备注**： 以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。
 
 ## 5. 模型训练
 通过运行以下命令进行分类模型训练：
