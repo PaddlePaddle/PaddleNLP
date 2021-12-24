@@ -143,51 +143,6 @@ def load_dataset(path_or_read_func,
         return datasets
 
 
-def _map_data(data, fn, lazy=True, batched=False):
-    if batched:
-        data = fn(data)
-    else:
-        data = [fn(data[idx]) for idx in range(len(data))]
-    return data
-
-
-def _shard(data, num_shards=None, index=None, contiguous=False):
-    """
-    Split the dataset into `num_shards` pieces. Note that the size of each
-    shard might be different because the original dataset may not be evenly
-    divisible.
-
-    Args:
-        num_shards (int, optional): An integer representing the number of
-            data shards. If None, `num_shards` would be number of trainers.
-            Defaults to `None`.
-        index (int, optional): An integer representing the index of the
-            current shard. If None, `index` would be the current trainer rank
-            id. Defaults to `None`.
-        contiguous: (bool, optional): If true, contiguous chunks of data 
-            will be select for sharding. And total number of examples will 
-            be the same. Otherwise each shard will contain all examples of 
-            dataset whose index mod `num_shards` = `index`. Defaults to `False`.
-    """
-    if num_shards is None:
-        num_shards = dist.get_world_size()
-    if index is None:
-        index = dist.get_rank()
-    if contiguous:
-        div = len(data) // num_shards
-        mod = len(data) % num_shards
-        start = div * index + min(index, mod)
-        end = start + div + (1 if index < mod else 0)
-        data = data[start:end]
-    else:
-        num_samples = int(math.ceil(len(data) * 1.0 / num_shards))
-        data = [
-            data[idx] for idx in range(len(data)) if idx % num_shards == index
-        ]
-
-    return data
-
-
 class MapDataset(Dataset):
     """
     Wraps a map-style dataset-like object as an instance of `MapDataset`, and equips it 
