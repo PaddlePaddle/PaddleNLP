@@ -15,8 +15,8 @@
 import os
 from milvus import MetricType, IndexType
 
-MILVUS_HOST='10.21.226.173'
-MILVUS_PORT = 8530
+MILVUS_HOST='10.255.129.15'
+MILVUS_PORT = 8126
 
 collection_param = {
     'dimension': 256,
