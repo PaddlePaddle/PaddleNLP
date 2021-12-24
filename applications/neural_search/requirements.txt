@@ -1,0 +1,8 @@
+pymilvus
+pandas==0.25.1 
+paddlenlp==2.1.1    
+paddlepaddle-gpu==2.1.3
+hnswlib>=0.5.2
+numpy>=1.17.2
+visualdl>=2.2.2
+pybind11
