@@ -36,7 +36,7 @@
 
 ### 1.3 模型效果展示
 
-在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 可点击下表的 `PP-MiniLM_cls` 进行模型下载，同时下表展示了训练过程中使用的训练参数：
+在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 下表展示了训练过程中使用的训练参数。我们同时开源了相应的模型，可点击下表的 `PP-MiniLM_cls` 进行下载，下载后将模型重命名为 `best.pdparams`，然后放入父目录的 `checkpoints/sp_checkpoints` 中。
 |Model|训练参数配置|MD5|
 | ------------ | ------------ |-----------|
 |[PP-MiniLM_cls](https://bj.bcebos.com/paddlenlp/models/best_mini.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|d04fc43efa61c77f47c23ef042dcb325|

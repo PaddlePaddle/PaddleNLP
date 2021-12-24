@@ -36,13 +36,9 @@
 
 另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
 
-
 <div align="center">
     <img src="./imgs/sentiment_system.png" />
     <p>图1 情感分析系统图<p/>
-</div>
-<div align="center">
-图1 情感分析系统图
 </div>
 
 ## 3. 细粒度情感分析实践
@@ -54,8 +50,6 @@
 ├── extraction                         # 评价维度和观点抽取模型包
 ├── classification                     # 细粒度情感分类模型包
 ├── speedup                           # PP-MiniLM特色小模型包
-├── data                               # 数据集目录
-├── checkpoints                        # 模型保存目录 
 ├── imgs                               # 图片目录
 ├── dynamic_predict.py                 # 全流程动态图单条预测脚本
 ├── dynamic_predict_by_batch.py        # 全流程动态图批量预测脚本
@@ -91,6 +85,8 @@ paddlepaddle-gpu >= 2.2.1
 ```shell
 pip install -r requirements.txt
 ```
+(3) 运行环境准备
+在运行之前，请在本目录下新建文件夹 `data` 和 `checkpoints`，分别用于存放数据和保存模型。
 
 ### 3.2 数据说明
 本项目需要训练两个阶段的模型：评论维度和观点抽取模型，细粒度情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz)和[cls_data](https://bj.bcebos.com/v1/paddlenlp/data/cls_data.tar.gz)。
@@ -98,16 +94,56 @@ pip install -r requirements.txt
 用户可分别点击下载，解压后将相应的数据文件依次放入 `./data/ext_data` 和 `./data/cls_data` 目录下即可。
 
 ### 3.3 评论维度和观点抽取模型
-关于评论维度和观点抽取模型的原理和使用方式，请参考[这里](extraction/README.md)。
+在抽取模型训练过程中，总共训练了10轮，并选择了评估F1得分最高的 best 模型，下表展示了训练过程中使用的训练参数。我们同时开源了相应的模型，可点击下表的 `ext_model` 进行下载，下载后将模型重命名为 `best.pdparams`，然后放入目录 `./checkpoints/ext_checkpoints` 中。
+|Model|训练参数配置|MD5|
+| ------------ | ------------ |-----------|
+|[ext_model](https://bj.bcebos.com/paddlenlp/models/best_ext.pdparams)|<div style="width: 150pt"> learning_rate: 5e-5, batch_size: 8, max_seq_len:512, epochs：10 </div> |e3358632165aa0338225e175b57cb304|
+
+我们基于训练过程中的 best 模型在验证集 `dev` 和测试集 `test` 上进行了评估测试，模型效果如下表所示:
+|Model|数据集|precision|Recall|F1|
+| ------------ | ------------ | ------------ |-----------|------------ |
+|SKEP-Large|dev|0.87095|0.90056|0.88551|
+|SKEP-Large|test|0.87125|0.89944|0.88512|
+
+**备注**：以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。关于评论维度和观点抽取模型的原理和使用方式，请参考[这里](extraction/README.md)。
 
 ### 3.4 细粒度情感分类模型
-关于细粒度情感分类模型的原理和使用方式，请参考[这里](classification/README.md)
+在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型，下表展示了训练过程中使用的训练参数。我们同时开源了相应的模型，可点击下表的 `cls_model` 进行下载，下载后将模型重命名为 `best.pdparams`，然后放入目录 `./checkpoints/cls_checkpoints` 中。
+|Model|训练参数配置|MD5|
+| ------------ | ------------ |-----------|
+|[cls_model](https://bj.bcebos.com/paddlenlp/models/best_cls.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|3de6ddf581e665d9b1d035c29b49778a|
+
+我们基于训练过程中的 best 模型在验证集 `dev` 和测试集 `test` 上进行了评估测试，模型效果如下表所示:
+|Model|数据集|precision|Recall|F1|
+| ------------ | ------------ | ------------ |-----------|------------ |
+|SKEP-Large|dev|0.98758|0.99251|0.99004|
+|SKEP-Large|test|0.98497|0.99139|0.98817|
+
+**备注**： 以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。
+关于细粒度情感分类模型的原理和使用方式，请参考[这里](classification/README.md)。
 
 
 ### 3.5 全流程细粒度情感分析推理
 在训练完成评论维度和观点模型，细粒度情感分类模型后，默认会将训练过程中最好的模型保存在 `./checkpoints/ext_checkpoints` 和 `./checkpoints/cls_checkpoints` 目录下。接下来，便可以根据保存好的模型进行全流程的模型推理：给定一句评论文本，首先使用抽取模型进行抽取评论维度和观点，然后使用细粒度情感分类模型以评论维度级别进行情感极性分类。
 
-本项目将提供两套全流程预测方案：动态图预测和静态图高性能预测，其中动态图预测支持单条和批量预测两种方式。
+本项目将提供两套全流程预测方案：动态图预测和静态图高性能预测，两者默认均支持单条文本预测，同时考虑用户有批量输出处理的需求，本项目还支持了动态图批量预测。
+
+其中，在单条预测时，用户需要根据运行相应命令后的提示传入待分析的文本，然后模型便会给出相应的分析结果，如下所示：
+
+```
+input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
+aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
+aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
+aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
+```
+
+动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的 `./data` 文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
+```
+蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
+酒店干净整洁，性价比很高
+酒店环境不错，非常安静，性价比还可以
+房间很大，环境不错
+```
 
 #### 3.5.1 全流程动态图预测
 通过运行以下命令进行全流程动态图单条预测：
@@ -118,13 +154,6 @@ sh run_dynamic_predict.sh
 通过运行以下命令进行动态图批量预测：
 ```shell
 sh run_dynamic_predict_by_batch.sh
-```
-**备注**：动态图批量预测时需要传入测试集文件路径，可将测试集文件放入本目录的 `./data` 文件夹下，模型在预测后会将结果以文件的形式存入测试集的同目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
-```
-蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
-酒店干净整洁，性价比很高
-酒店环境不错，非常安静，性价比还可以
-房间很大，环境不错
 ```
 
 #### 3.5.2 静态图高性能预测
@@ -143,8 +172,15 @@ sh run_static_predict.sh
 ### 3.6 小模型优化策略
 本项目提供了一套基于 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 中文特色小模型的细粒度情感分类解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
 
-本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。详细信息请参考[这里](./speedup/README.md)。
+本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。
 
+在实验进行后，我们将 SKEP-Large、PP-MiniLM、量化PP-MiniLM 三个模型在性能和效果方面进行了对比，如下表所示。可以看到，三者在本任务数据集上的评估指标几乎相等，但是 PP-MiniLM 小模型运行速度较 SKEP-Large 提高了4倍，量化后的 PP-MiniLM 运行速度较 SKEP-Large 提高了近8倍。更多的详细信息请参考[这里](./speedup/README.md)。
+
+|Model|运行时间(s)|precision|Recall|F1|
+| ------------ | ------------ | ------------ |-----------|------------ |
+|SKEP-Large|1.00x|0.98497|0.99139|0.98817|
+|PP-MiniLM|4.95x|0.98379|0.98859|0.98618|
+|量化 PP-MiniLM|8.93x|0.98312|0.98953|0.98631|
 
 ## 4. 引用
 

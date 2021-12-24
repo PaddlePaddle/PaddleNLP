@@ -6,7 +6,10 @@
 
 如图1所示，首先将文本串传入 SKEP 模型中，利用 SKEP 模型对该文本串进行语义编码后，然后基于每个位置的输出去预测相应的标签。
 
-<center><img src="../imgs/design_ext_model.png" /></center>
+<div align="center">
+    <img src="../imgs/design_ext_model.png" />
+    <p>图1 评论维度和观点抽取模型<p/>
+</div>
 
 ## 2. 项目结构说明
 
@@ -34,7 +37,7 @@
 可点击 [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz) 进行 Demo 数据下载，将数据解压之后放入父目录的 `data/ext_data/` 文件夹下。
 
 ## 4. 模型效果展示
-在分类模型训练过程中，总共训练了10轮，并选择了评估F1得分最高的 best 模型， 可点击下表的 `ext_model` 进行模型下载，同时下表展示了训练过程中使用的训练参数：
+在抽取模型训练过程中，总共训练了10轮，并选择了评估F1得分最高的 best 模型，下表展示了训练过程中使用的训练参数。我们同时开源了相应的模型，可点击下表的 `ext_model` 进行下载，下载后将模型重命名为 `best.pdparams`，然后放入父目录的 `checkpoints/ext_checkpoints` 中。
 |Model|训练参数配置|MD5|
 | ------------ | ------------ |-----------|
 |[ext_model](https://bj.bcebos.com/paddlenlp/models/best_ext.pdparams)|<div style="width: 150pt"> learning_rate: 5e-5, batch_size: 8, max_seq_len:512, epochs：10 </div> |e3358632165aa0338225e175b57cb304|
