@@ -85,7 +85,7 @@ paddlepaddle-gpu >= 2.2.1
 ```shell
 pip install -r requirements.txt
 ```
-(3) 运行环境准备
+(3) 运行环境准备  
 在运行之前，请在本目录下新建文件夹 `data` 和 `checkpoints`，分别用于存放数据和保存模型。
 
 ### 3.2 数据说明
