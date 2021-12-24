@@ -39,10 +39,10 @@
 
 <div align="center">
     <img src="./imgs/sentiment_system.png" />
+    <p>图1 情感分析系统图<p/>
 </div>
 <div align="center">
 图1 情感分析系统图
-
 </div>
 
 ## 3. 细粒度情感分析实践
