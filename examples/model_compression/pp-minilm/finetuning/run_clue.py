@@ -217,7 +217,10 @@ def do_eval(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    dev_ds = load_dataset('clue', args.task_name, splits='dev')
+    if args.task_name == 'chnsenticorp':
+        dev_ds = load_dataset('chnsenticorp', splits='dev')
+    else:
+        dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
     tokenizer = tokenizer_class.from_pretrained('ppminilm-6l-768h')
     trans_func = partial(
@@ -299,8 +302,11 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_ds, dev_ds = load_dataset(
-        'clue', args.task_name, splits=('train', 'dev'))
+    if args.task_name == 'chnsenticorp':
+        train_ds, dev_ds = load_dataset('chnsenticorp', splits=('train', 'dev'))
+    else:
+        train_ds, dev_ds = load_dataset(
+            'clue', args.task_name, splits=('train', 'dev'))
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 

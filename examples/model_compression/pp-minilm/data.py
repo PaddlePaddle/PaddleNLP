@@ -30,6 +30,7 @@ METRIC_CLASSES = {
     "cmnli": Accuracy,
     "cluewsc2020": Accuracy,
     "csl": Accuracy,
+    "chnsenticorp": Accuracy,
 }
 
 
@@ -72,6 +73,9 @@ def convert_example_for_faster_tokenizer(example,
             text_list.insert(query_idx + len(query) + 2 + 1, "_")
         text = "".join(text_list)
         example['sentence'] = text
+    elif 'text' in example:
+        example['sentence'] = example['text']
+
     return example
 
 
@@ -128,6 +132,12 @@ def convert_example(example,
         text = "".join(text_list)
         example = tokenizer(
             text, max_seq_len=max_seq_length, pad_to_max_seq_len=True)
+
+    elif 'text' in example:
+        example = tokenizer(
+            example['text'],
+            max_seq_len=max_seq_length,
+            pad_to_max_seq_len=True)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
