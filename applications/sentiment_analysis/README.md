@@ -34,7 +34,7 @@
 
 这里需要提到的是，由于目前市面上的大多数模型是基于通用语料训练出来的，这些模型可能并不会对情感信息那么敏感。基于这样的考量，本项目使用了百度自研的 SKEP 预训练模型，其在预训练阶段便设计了多种情感信息相关的预训练目标进行训练。作为一种情感专属的模型，其更适合用来做上边提到的评论维度和观点抽取任务，以及细粒度情感分类任务。
 
-另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
+另外，本项目使用的是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目专门提供了一个通用版的小模型 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 以及一套量化策略，用户可以使用相应情感数据集对 PP-MiniLM 进行微调，然后进行量化，以达到更快的使用效率。
 
 <div align="center">
     <img src="./imgs/sentiment_system.png" />
@@ -171,7 +171,7 @@ sh run_static_predict.sh
 ```
 
 ### 3.6 小模型优化策略
-本项目提供了一套基于 [PP-MiniLM](https://github.com/LiuChiachi/PaddleNLP/tree/add-ppminilm/examples/model_compression/PP-MiniLM) 中文特色小模型的细粒度情感分类解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
+本项目提供了一套基于 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 中文特色小模型的细粒度情感分类解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
 
 本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 细粒度情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。
 
