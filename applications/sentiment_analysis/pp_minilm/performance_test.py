@@ -130,7 +130,7 @@ class Predictor(object):
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
+    parser.add_argument("--base_model_name", type=str, default=None, help="The name of base model.")
     parser.add_argument("--model_path", default='./checkpoints/quant/infer', type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     label2id, id2label = load_dict(args.label_path)
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,

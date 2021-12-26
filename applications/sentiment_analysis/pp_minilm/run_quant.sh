@@ -1,7 +1,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 python  quant_post.py \
-        --base_model_path "../checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --static_model_dir "../checkpoints/pp_checkpoints/static" \
         --quant_model_dir "../checkpoints/pp_checkpoints/quant" \
         --algorithm "avg" \

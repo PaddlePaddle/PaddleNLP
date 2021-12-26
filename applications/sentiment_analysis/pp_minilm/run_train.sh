@@ -1,7 +1,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 python  train.py \
-        --base_model_path "../checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --train_path "../data/cls_data/train.txt" \
         --dev_path "../data/cls_data/dev.txt" \
         --label_path "../data/cls_data/label.dict" \

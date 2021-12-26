@@ -34,7 +34,7 @@ def quant_post(args):
     label2id, id2label = load_dict(args.label_path)
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
@@ -73,7 +73,7 @@ def quant_post(args):
 if __name__ == '__main__':
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_model_path", type=str, default="./checkpoints/ppminilm", help="The path of ppminilm model.")
+    parser.add_argument("--base_model_name", type=str, default="ppminilm-6l-768h", help="The path of ppminilm model.")
     parser.add_argument("--static_model_dir", type=str, default="./checkpoints/static", help="Directory of static model that will be quantized.")
     parser.add_argument("--quant_model_dir", type=str, default=None, help="Directory of the quantized model that will be written.")
     parser.add_argument("--algorithm", type=str, default="avg", help="Quantize algorithm that you want to choice, such as abs_max, avg, mse, hist.")

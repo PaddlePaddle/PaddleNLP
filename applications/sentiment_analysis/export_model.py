@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_type", type=str, default="extraction", choices=["extraction", "classification", "pp_minilm"], help="The model type that you wanna export.")
-    parser.add_argument("--base_model_name_or_path", type=str, default="skep_ernie_1.0_large_ch", help="The base model of experiment, skep or ppminilm")
+    parser.add_argument("--base_model_name", type=str, default="skep_ernie_1.0_large_ch", help="The base model of experiment, skep or ppminilm")
     parser.add_argument("--model_path", type=str, default=None, help="The path of model that you want to load.")
     parser.add_argument("--save_path", type=str, default=None, help="The path of the exported static model.")
     args = parser.parse_args()
@@ -32,15 +32,13 @@ if __name__ == "__main__":
 
     # load model with saved state_dict
     if args.model_type == "extraction":
-        skep = SkepModel.from_pretrained(args.base_model_name_or_path)
+        skep = SkepModel.from_pretrained(args.base_model_name)
         model = SkepForTokenClassification(skep, num_classes=5)
     elif args.model_type == "classification":
-        skep = SkepModel.from_pretrained(args.base_model_name_or_path)
+        skep = SkepModel.from_pretrained(args.base_model_name)
         model = SkepForSequenceClassification(skep, num_classes=2)
     else:
-        if os.path.isfile(args.base_model_name_or_path):
-            raise ValueError(f"Not find model: {args.base_model_name_or_path}")
-        ppminilm = ErnieModel.from_pretrained(args.base_model_name_or_path)
+        ppminilm = ErnieModel.from_pretrained(args.base_model_name)
         model = PPMiniLMForSequenceClassification(ppminilm, num_classes=2)
 
     loaded_state_dict = paddle.load(args.model_path)

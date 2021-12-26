@@ -46,7 +46,7 @@ def train():
     train_ds = load_dataset(read, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
@@ -73,7 +73,7 @@ def train():
 
     # configure model training
     ppminilm = ErnieModel.from_pretrained(
-        pretrained_model_name_or_path=args.base_model_path)
+        pretrained_model_name_or_path=args.base_model_name)
     model = PPMiniLMForSequenceClassification(
         ppminilm, num_classes=len(label2id))
 
@@ -139,7 +139,7 @@ def train():
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("--base_model_path", type=str, default=None, help="The path of ppminilm model.")
+    parser.add_argument("--base_model_name", type=str, default=None, help="The name of base model.")
     parser.add_argument("--train_path", type=str, default=None, help="The path of train set.")
     parser.add_argument("--dev_path", type=str, default=None, help="The path of dev set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")

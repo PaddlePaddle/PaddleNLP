@@ -19,7 +19,7 @@ python  export_model.py \
 elif [ $model_type = pp_minilm ]; then
 python  export_model.py \
         --model_type "pp_minilm" \
-        --base_model_name_or_path "./checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --model_path "./checkpoints/pp_checkpoints/best.pdparams" \
         --save_path "./checkpoints/pp_checkpoints/static/infer" 
 else
