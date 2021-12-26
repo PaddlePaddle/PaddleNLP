@@ -40,6 +40,7 @@ def concate_aspect_and_opinion(text, aspect, opinions):
 
     return aspect_text
 
+
 def predict_ext(ext_model_path, ext_label_path, test_path):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"

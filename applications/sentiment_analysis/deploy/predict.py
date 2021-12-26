@@ -94,7 +94,8 @@ class Predictor(object):
         return predictor, input_handles, output_handle
 
     def predict_ext(self, args):
-        ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
+        ori_test_ds = load_dataset(
+            read_test_file, data_path=args.test_path, lazy=False)
         trans_func = partial(
             convert_example_to_feature_ext,
             tokenizer=self.tokenizer,
@@ -102,7 +103,10 @@ class Predictor(object):
             max_seq_len=args.max_seq_len,
             is_test=True)
         test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
-        batch_list = [test_ds[idx:idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
+        batch_list = [
+            test_ds[idx:idx + args.batch_size]
+            for idx in range(0, len(test_ds), args.batch_size)
+        ]
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id),
@@ -111,21 +115,25 @@ class Predictor(object):
 
         results = []
         for bid, batch_data in enumerate(batch_list):
-            input_ids, token_type_ids, seq_lens =batchify_fn(batch_data)
+            input_ids, token_type_ids, seq_lens = batchify_fn(batch_data)
             self.ext_input_handles[0].copy_from_cpu(input_ids)
             self.ext_input_handles[1].copy_from_cpu(token_type_ids)
             self.ext_predictor.run()
             logits = self.ext_output_hanle.copy_to_cpu()
 
             predictions = logits.argmax(axis=2)
-            for eid, (seq_len, prediction) in enumerate(zip(seq_lens, predictions)):
+            for eid, (seq_len,
+                      prediction) in enumerate(zip(seq_lens, predictions)):
                 idx = bid * args.batch_size + eid
-                tag_seq = [self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
+                tag_seq = [
+                    self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]
+                ]
                 text = ori_test_ds[idx]["text"]
                 aps = decoding(text, tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
-                    aspect_text = self._concate_aspect_and_opinion(text, aspect, opinions)
+                    aspect_text = self._concate_aspect_and_opinion(text, aspect,
+                                                                   opinions)
                     results.append({
                         "id": str(idx) + "_" + str(aid),
                         "aspect": aspect,
@@ -144,7 +152,10 @@ class Predictor(object):
             max_seq_len=args.max_seq_len,
             is_test=True)
         test_ds = test_ds.map(trans_func, lazy=False)
-        batch_list = [test_ds[idx:idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
+        batch_list = [
+            test_ds[idx:idx + args.batch_size]
+            for idx in range(0, len(test_ds), args.batch_size)
+        ]
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id),
@@ -191,7 +202,9 @@ class Predictor(object):
         with open(args.save_path, "w", encoding="utf-8") as f:
             for sentiment_result in sentiment_results:
                 f.write(json.dumps(sentiment_result, ensure_ascii=False) + "\n")
-        print(f"sentiment analysis results has been saved to path: {args.save_path}")
+        print(
+            f"sentiment analysis results has been saved to path: {args.save_path}"
+        )
 
     def predict(self, args):
         ext_results = self.predict_ext(args)
@@ -208,7 +221,6 @@ class Predictor(object):
         aspect_text = aspect_text[:-1]
 
         return aspect_text
-
 
 
 if __name__ == "__main__":

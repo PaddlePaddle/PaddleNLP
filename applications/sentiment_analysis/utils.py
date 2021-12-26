@@ -23,6 +23,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+
 def load_dict(dict_path):
     with open(dict_path, "r", encoding="utf-8") as f:
         words = [word.strip() for word in f.readlines()]
@@ -31,11 +32,13 @@ def load_dict(dict_path):
 
         return word2id, id2word
 
+
 def read_test_file(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
             line = line.strip().replace(" ", "")
             yield {"text": line}
+
 
 def decoding(text, tag_seq):
     assert len(text) == len(
@@ -95,4 +98,3 @@ def decoding(text, tag_seq):
         aps.append(no_a_words)
 
     return aps
-
