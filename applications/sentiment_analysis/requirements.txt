@@ -1,4 +1,2 @@
-numpy==1.19.5
-tqdm==4.27.0
 paddlepaddle-gpu==2.2.1
 paddlenlp==2.2.1
