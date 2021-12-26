@@ -1,9 +1,9 @@
 export CUDA_VISIBLE_DEVICES=1
 
 python  quant_post.py \
-        --base_model_path "../checkpoints/ppminilm" \
-        --static_model_dir "../checkpoints/sp_checkpoints/static" \
-        --quant_model_dir "../checkpoints/sp_checkpoints/quant" \
+        --base_model_path "../checkpoints/pp_minilm" \
+        --static_model_dir "../checkpoints/pp_checkpoints/static" \
+        --quant_model_dir "../checkpoints/pp_checkpoints/quant" \
         --algorithm "avg" \
         --dev_path "../data/cls_data/dev.txt" \
         --label_path "../data/cls_data/label.dict" \

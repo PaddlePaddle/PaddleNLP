@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=6
 
 python  evaluate.py \
         --model_path "../checkpoints/ext_checkpoints/best.pdparams" \

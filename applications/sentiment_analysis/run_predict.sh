@@ -1,9 +1,12 @@
-export CUDA_VISIBLE_DEVICES=6
+export CUDA_VISIBLE_DEVICES=7
 
-python  dynamic_predict.py \
+python  predict.py \
         --ext_model_path "./checkpoints/ext_checkpoints/best.pdparams" \
         --cls_model_path "./checkpoints/cls_checkpoints/best.pdparams" \
+        --test_path "./data/test.txt" \
         --ext_label_path "./data/ext_data/label.dict" \
         --cls_label_path "./data/cls_data/label.dict" \
+        --save_path "./data/sentiment_results.json" \
+        --batch_size 16 \
         --max_seq_len 256
 

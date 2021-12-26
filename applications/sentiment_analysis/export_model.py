@@ -18,12 +18,12 @@ import paddle
 from paddlenlp.transformers import SkepModel, ErnieModel
 from extraction.model import SkepForTokenClassification
 from classification.model import SkepForSequenceClassification
-from speedup.model import PPMiniLMForSequenceClassification
+from pp_minilm.model import PPMiniLMForSequenceClassification
 
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, default="extraction", choices=["extraction", "classification", "speedup"], help="The model type that you wanna export.")
+    parser.add_argument("--model_type", type=str, default="extraction", choices=["extraction", "classification", "pp_minilm"], help="The model type that you wanna export.")
     parser.add_argument("--base_model_name_or_path", type=str, default="skep_ernie_1.0_large_ch", help="The base model of experiment, skep or ppminilm")
     parser.add_argument("--model_path", type=str, default=None, help="The path of model that you want to load.")
     parser.add_argument("--save_path", type=str, default=None, help="The path of the exported static model.")

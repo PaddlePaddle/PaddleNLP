@@ -32,7 +32,7 @@ def read(data_path):
             assert len(items) == 3
             example = {
                 "label": int(items[0]),
-                "target_text": items[1],
+                "aspect_text": items[1],
                 "text": items[2]
             }
 
@@ -45,7 +45,7 @@ def convert_example_to_feature(example,
                                max_seq_len=512,
                                is_test=False):
     encoded_inputs = tokenizer(
-        example["target_text"],
+        example["aspect_text"],
         text_pair=example["text"],
         max_seq_len=max_seq_len,
         return_length=True)

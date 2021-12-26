@@ -139,7 +139,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--perf_warmup_steps", default=1, type=int, help="Warmup steps for performance test.")
     parser.add_argument("--use_tensorrt", action='store_true', help="Whether to use inference engin TensorRT.")
-    parser.add_argument("--perf",action='store_true', help="Whether to test performance.")
+    parser.add_argument("--eval", action='store_true', help="Whether to test performance.")
     parser.add_argument("--collect_shape", action='store_true', help="Whether collect shape range info.")
     parser.add_argument("--int8", action='store_true', help="Whether to use int8 inference.")
     parser.add_argument("--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.")
@@ -179,15 +179,16 @@ if __name__ == "__main__":
         return_list=True)
 
     predictor = Predictor(args)
-    if args.perf:
-        print("start to do performance task.")
-        times = []
-        for epoch_id in range(1, args.num_epochs + 1):
-            used_time = predictor.predict_perf(args, data_loader)
-            times.append(used_time)
-            print(f"epoch {epoch_id}, used_time: {used_time}")
-        print(f"the avg time of {args.num_epochs} epochs is {np.mean(times)}")
-    else:
+
+    print("start to do performance task.")
+    times = []
+    for epoch_id in range(1, args.num_epochs + 1):
+        used_time = predictor.predict_perf(args, data_loader)
+        times.append(used_time)
+        print(f"epoch {epoch_id}, used_time: {used_time}")
+    print(f"the avg time of {args.num_epochs} epochs is {np.mean(times)}")
+
+    if args.eval:
         print("start to do evaluate task.")
         metric = AccuracyAndF1()
         outputs, accuracy, precision, recall, F1 = predictor.predict(

@@ -16,90 +16,23 @@ import os
 import copy
 import json
 import argparse
-from collections import defaultdict
 from functools import partial
+from collections import defaultdict
 import paddle
 from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset
+from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import SkepModel, SkepTokenizer
+from utils import decoding, load_dict, read_test_file
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
 from extraction.model import SkepForTokenClassification
 from classification.model import SkepForSequenceClassification
-from classification.data import load_dict
 from classification.data import convert_example_to_feature as convert_example_to_feature_cls
-
-from seqeval.metrics.sequence_labeling import get_entities
-
-
-def decoding(text, tag_seq):
-    assert len(text) == len(
-        tag_seq), f"text len: {len(text)}, tag_seq len: {len(tag_seq)}"
-
-    puncs = list(",.?;!，。？；！")
-    splits = [idx for idx in range(len(text)) if text[idx] in puncs]
-
-    prev = 0
-    sub_texts, sub_tag_seqs = [], []
-    for i, split in enumerate(splits):
-        sub_tag_seqs.append(tag_seq[prev:split])
-        sub_texts.append(text[prev:split])
-        prev = split
-    sub_tag_seqs.append(tag_seq[prev:])
-    sub_texts.append((text[prev:]))
-
-    ents_list = []
-    for sub_text, sub_tag_seq in zip(sub_texts, sub_tag_seqs):
-        ents = get_entities(sub_tag_seq, suffix=False)
-        ents_list.append((sub_text, ents))
-
-    aps = []
-    no_a_words = []
-    for sub_tag_seq, ent_list in ents_list:
-        sub_aps = []
-        sub_no_a_words = []
-        # print(ent_list)
-        for ent in ent_list:
-            ent_name, start, end = ent
-            if ent_name == "Aspect":
-                aspect = sub_tag_seq[start:end + 1]
-                sub_aps.append([aspect])
-                if len(sub_no_a_words) > 0:
-                    sub_aps[-1].extend(sub_no_a_words)
-                    sub_no_a_words.clear()
-            else:
-                ent_name == "Opinion"
-                opinion = sub_tag_seq[start:end + 1]
-                if len(sub_aps) > 0:
-                    sub_aps[-1].append(opinion)
-                else:
-                    sub_no_a_words.append(opinion)
-
-        if sub_aps:
-            aps.extend(sub_aps)
-            if len(no_a_words) > 0:
-                aps[-1].extend(no_a_words)
-                no_a_words.clear()
-        elif sub_no_a_words:
-            if len(aps) > 0:
-                aps[-1].extend(sub_no_a_words)
-            else:
-                no_a_words.extend(sub_no_a_words)
-
-    if no_a_words:
-        no_a_words.insert(0, "None")
-        aps.append(no_a_words)
-
-    return aps
-
-
-def is_aspect_first(text, aspect, opinion):
-    return text.find(aspect) <= text.find(opinion)
 
 
 def concate_aspect_and_opinion(text, aspect, opinions):
     aspect_text = ""
     for opinion in opinions:
-        if is_aspect_first(text, aspect, opinion):
+        if text.find(aspect) <= text.find(opinion):
             aspect_text += aspect + opinion + "，"
         else:
             aspect_text += opinion + aspect + "，"
@@ -107,28 +40,13 @@ def concate_aspect_and_opinion(text, aspect, opinions):
 
     return aspect_text
 
-
-def read_ext(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            line = line.strip().replace(" ", "")
-            yield {"text": line}
-
-
-def read_cls(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            example = json.loads(line)
-            yield example
-
-
 def predict_ext(ext_model_path, ext_label_path, test_path):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(read_ext, data_path=test_path, lazy=False)
+    ori_test_ds = load_dataset(read_test_file, data_path=test_path, lazy=False)
     trans_func = partial(
         convert_example_to_feature_ext,
         tokenizer=tokenizer,
@@ -176,22 +94,19 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
                     "aspect": aspect,
                     "opinions": opinions,
                     "text": text,
-                    "target_text": aspect_text
+                    "aspect_text": aspect_text
                 })
 
-    with open(args.save_ext_path, "w", encoding="utf-8") as f:
-        for result in results:
-            f.write(json.dumps(result, ensure_ascii=False) + "\n")
+    return results
 
 
-def predict_cls(cls_model_path, cls_label_path, test_path):
+def predict_cls(cls_model_path, cls_label_path, ext_results):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     cls_label2id, cls_id2label = load_dict(args.cls_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    test_ds = load_dataset(read_cls, data_path=test_path, lazy=False)
-    # examples = copy.copy(test_ds)
+    test_ds = MapDataset(ext_results)
     trans_func = partial(
         convert_example_to_feature_cls,
         tokenizer=tokenizer,
@@ -203,7 +118,7 @@ def predict_cls(cls_model_path, cls_label_path, test_path):
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(dtype="int64"), ): fn(samples)
+        Stack(dtype="int64")): fn(samples)
 
     # set shuffle is False
     test_batch_sampler = paddle.io.BatchSampler(
@@ -230,33 +145,16 @@ def predict_cls(cls_model_path, cls_label_path, test_path):
         predictions = logits.argmax(axis=1).numpy().tolist()
         results.extend(predictions)
 
-    with open(args.save_cls_path, "w", encoding="utf-8") as f:
-        for line_id, pred_id in enumerate(results):
-            f.write(
-                json.dumps(
-                    {
-                        "line_id": line_id,
-                        "sentiment_polarity": cls_id2label[pred_id]
-                    },
-                    ensure_ascii=False) + "\n")
+    results = [cls_id2label[pred_id] for pred_id in results]
+    return results
 
 
-def post_process():
-    ext_results, cls_results = [], []
-
-    with open(args.save_ext_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            ext_results.append(json.loads(line))
-
-    with open(args.save_cls_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            cls_results.append(json.loads(line))
-
+def post_process(ext_results, cls_results):
     assert len(ext_results) == len(cls_results)
 
     collect_dict = defaultdict(list)
     for ext_result, cls_result in zip(ext_results, cls_results):
-        ext_result["sentiment_polarity"] = cls_result["sentiment_polarity"]
+        ext_result["sentiment_polarity"] = cls_result
         eid, _ = ext_result["id"].split("_")
         collect_dict[eid].append(ext_result)
 
@@ -294,22 +192,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # yapf: enbale
 
-    # process save_path
-    ppath, whole_file_name = os.path.split(args.save_path)
-    file_name, suffix = whole_file_name.rsplit(".", maxsplit=1)
-    args.save_ext_path = os.path.join(ppath, file_name+"_ext."+suffix)
-    args.save_cls_path = os.path.join(ppath, file_name+"_cls."+suffix)
-
     # predict with ext model
-    predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
+    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
+    print("predicting with extraction model done!")
 
     # predict with cls model
-    predict_cls(args.cls_model_path, args.cls_label_path, args.save_ext_path)
+    cls_results = predict_cls(args.cls_model_path, args.cls_label_path, ext_results)
+    print("predicting with classification model done!")
 
     # post_process prediction results 
-    post_process()
+    post_process(ext_results, cls_results)
     print(f"sentiment analysis results has been saved to path: {args.save_path}")
-
-    # delete tmp files: ext prediction results and cls prediction results
-    os.remove(args.save_ext_path)
-    os.remove(args.save_cls_path)

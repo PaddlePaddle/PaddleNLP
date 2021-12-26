@@ -1,7 +1,7 @@
 export CUDA_VISIBLE_DEVICES=1
 
 python  train.py \
-        --base_model_path "../checkpoints/ppminilm" \
+        --base_model_path "../checkpoints/pp_minilm" \
         --train_path "../data/cls_data/train.txt" \
         --dev_path "../data/cls_data/dev.txt" \
         --label_path "../data/cls_data/label.dict" \
@@ -16,4 +16,4 @@ python  train.py \
         --eval_steps 100 \
         --seed 1000 \
         --device "gpu" \
-        --checkpoints "../checkpoints/sp_checkpoints/"
+        --checkpoints "../checkpoints/pp_checkpoints/"

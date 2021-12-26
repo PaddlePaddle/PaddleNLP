@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=6
 
 python  train.py \
         --train_path "../data/ext_data/train.txt" \
