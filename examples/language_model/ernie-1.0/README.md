@@ -82,6 +82,17 @@ python -u  -m paddle.distributed.launch \
 - 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。可以使用梯度累积的方式增大`global_batch_size`。设置`global_batch_size`为理论值的整数倍是，默认启用梯度累积。
 - 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
 
+### 其他
+#### 模型参数转换
+本示例提供了静态图训练脚本，但Paddle目前主要的使用方式是动态图。因此，本示例提供了静态图参数到动态图参数的转换脚本：
+
+```python
+python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_100000/static_vars
+# or
+python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_last/static_vars.pdparams
+```
+在当前目录下，可以看到转换后的参数`ernie-1.0_converted.pdparams`, 也可以设置脚本中`--output_path`参数，指定输出路径。
+
 
 ### 参考文献
 - [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/pdf/1904.09223.pdf)
