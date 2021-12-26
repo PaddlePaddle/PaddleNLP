@@ -134,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", default='./checkpoints/quant/infer', type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--label_path", type=str, default=None, help="The path of label dict.")
-    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epoches for training.")
+    parser.add_argument("--num_epochs", type=int, default=0, help="Number of epoches for training.")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--perf_warmup_steps", default=1, type=int, help="Warmup steps for performance test.")
