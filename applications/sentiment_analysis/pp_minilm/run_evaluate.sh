@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 python  evaluate.py \
         --base_model_path "../checkpoints/pp_minilm" \

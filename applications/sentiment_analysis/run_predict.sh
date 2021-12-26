@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=7
+export CUDA_VISIBLE_DEVICES=0
 
 python  predict.py \
         --ext_model_path "./checkpoints/ext_checkpoints/best.pdparams" \

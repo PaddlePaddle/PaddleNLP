@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=6
+export CUDA_VISIBLE_DEVICES=0
 
 python  predict.py \
         --base_model_name "skep_ernie_1.0_large_ch" \

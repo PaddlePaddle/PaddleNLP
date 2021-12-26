@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=6
+export CUDA_VISIBLE_DEVICES=0
 
 python  demo.py \
         --ext_model_path "./checkpoints/ext_checkpoints/best.pdparams" \
