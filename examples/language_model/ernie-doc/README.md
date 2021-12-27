@@ -35,11 +35,10 @@
 
 ### 环境依赖
 
-- re
 - nltk
 - beautifulsoup4
 
-安装命令：`pip install re nltk beautifulsoup4`
+安装命令：`pip install nltk==3.5 beautifulsoup4`
 
 ### 通用参数释义
 
