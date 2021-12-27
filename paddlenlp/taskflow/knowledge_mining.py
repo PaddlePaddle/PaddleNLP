@@ -196,8 +196,8 @@ class WordTagTask(Task):
             self._tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                      URLS['termtree_tags_pos'][0],
                                      URLS['termtree_tags_pos'][1])
-        self._tags_to_index, self._index_to_tags = self._load_labels(self._tag_path)
-            
+        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
+
         self._construct_tokenizer(model)
         if self._term_schema_path is None:
             term_schema_path = download_file(self._task_path, "termtree_type.csv",
@@ -242,14 +242,18 @@ class WordTagTask(Task):
     @staticmethod
     def _load_labels(tag_path):
         tags_to_idx = {}
+        all_tags = []
         i = 0
         with open(tag_path, encoding="utf-8") as fp:
             for line in fp:
                 line = line.strip()
+                tag = line.split("-")[-1]
+                if tag not in all_tags:
+                    all_tags.append(tag)
                 tags_to_idx[line] = i
                 i += 1
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
-        return tags_to_idx, idx_to_tags
+        return tags_to_idx, idx_to_tags, all_tags
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -440,12 +444,17 @@ class WordTagTask(Task):
 
     def _term_linking(self, wordtag_res):
         for item in wordtag_res["items"]:
-            if item["wordtag_label"] not in LABEL_TO_SCHEMA:
-                continue
             flag, _ = self._termtree.find_term(item["item"])
             if flag is False:
                 continue
-            target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
+            if item["wordtag_label"] not in LABEL_TO_SCHEMA:
+                # Custom label defined by user
+                if item["wordtag_label"] not in self._all_tags:
+                    target_type_can = [item["wordtag_label"]]
+                else:
+                    continue
+            else:
+                target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
             for target_type_raw in target_type_can:
                 target_type_ = target_type_raw.split("|")
                 target_src = None

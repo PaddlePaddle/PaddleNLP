@@ -31,7 +31,7 @@ wget https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz && tar -zxvf
 ### TermTree维护与修改
 
 加载TermTreeV1.0，增加新的term
-```shell
+```python
 from termtree import TermTree
 
 # 加载百科知识树
@@ -68,7 +68,7 @@ termtree.save("./")
 Taskflow支持使用自定义TermTree实现自定义Term-Linking，该示例中"平原上的火焰"的Term-Linking如下:
 作品类_实体(wordtag_label) -> 影视作品_eb_平原上的火焰(term_id)
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 wordtag = Taskflow("knowledge_mining", term_schema_path="termtree_type.csv", term_data_path="termtree_data")
