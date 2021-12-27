@@ -153,7 +153,7 @@ lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
 
 如果希望得到定制化的分词及标注结果，用户也可以通过Taskflow来加载自定义的词法分析模型并进行预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_lac = Taskflow("lexical_analysis", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
