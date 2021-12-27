@@ -74,7 +74,7 @@ def load_vocab(dict_path):
                 else:
                     key, value = terms
             elif len(terms) == 1:
-                key, value = terms[0], i
+                key, value = terms[0], str(i)
             else:
                 raise ValueError("Error line: %s in file: %s" %
                                  (line, dict_path))
@@ -91,28 +91,39 @@ class LacTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, task, model, **kwargs):
+    def __init__(self, 
+                 task, 
+                 model, 
+                 params_path=None,
+                 tag_path=None,
+                 **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
+        self._tag_path = tag_path
+        self._params_path = params_path
         self._user_dict = self.kwargs[
             'user_dict'] if 'user_dict' in self.kwargs else None
         word_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "word.dic",
             URLS['lac_params'][0], URLS['lac_params'][1])
-        tag_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "tag.dic",
-            URLS['lac_params'][0], URLS['lac_params'][1])
+        if self._tag_path is None:
+            self._tag_path = download_file(
+                self._task_path, "lac_params" + os.path.sep + "tag.dic",
+                URLS['lac_params'][0], URLS['lac_params'][1])
         q2b_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "q2b.dic",
             URLS['lac_params'][0], URLS['lac_params'][1])
         self._word_vocab = load_vocab(word_dict_path)
-        self._tag_vocab = load_vocab(tag_dict_path)
+        self._tag_vocab = load_vocab(self._tag_path)
         self._q2b_vocab = load_vocab(q2b_dict_path)
         self._id2word_dict = dict(
             zip(self._word_vocab.values(), self._word_vocab.keys()))
         self._id2tag_dict = dict(
             zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-        self._get_inference_model()
+        if self._params_path:
+            self._task_path = os.path.dirname(os.path.realpath(self._params_path))
+
+        self._get_inference_model(params_path=self._params_path)
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -137,11 +148,12 @@ class LacTask(Task):
         model_instance = BiGruCrf(self.kwargs['emb_dim'],
                                   self.kwargs['hidden_size'],
                                   len(self._word_vocab), len(self._tag_vocab))
-        # Load the model parameter for the predict
-        state_dict = paddle.load(
-            os.path.join(self._task_path, "lac_params", "model.pdparams"))
-        model_instance.set_dict(state_dict)
-        model_instance.eval()
+        if not self._params_path:
+            # Load the model parameter for the predict
+            state_dict = paddle.load(
+                os.path.join(self._task_path, "lac_params", "model.pdparams"))
+            model_instance.set_dict(state_dict)
+            model_instance.eval()
         self._model = model_instance
 
     def _construct_tokenizer(self, model):

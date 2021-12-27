@@ -41,7 +41,6 @@ TASKS = {
             "wordtag": {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
-                "linking": True,
             },
             "nptag": {
                 "task_class": NPTagTask,

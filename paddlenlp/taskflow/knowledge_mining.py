@@ -38,6 +38,7 @@ from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import TermTree, BurkhardKellerTree
+from .utils import Customization
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -181,14 +182,16 @@ class WordTagTask(Task):
                  tag_path=None,
                  term_schema_path=None,
                  term_data_path=None,
+                 user_dict=None,
+                 linking=True,
                  **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         self._tag_path = tag_path
         self._params_path = params_path
         self._term_schema_path = term_schema_path
         self._term_data_path = term_data_path
-        self._linking = self.kwargs[
-            'linking'] if 'linking' in self.kwargs else False
+        self._user_dict = user_dict
+        self._linking = linking
         if self._tag_path is None:
             self._tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                      URLS['termtree_tags_pos'][0],
@@ -204,16 +207,23 @@ class WordTagTask(Task):
             term_data_path = download_file(self._task_path, "TermTree.V1.0",
                                         URLS['TermTree.V1.0'][0],
                                         URLS['TermTree.V1.0'][1])
-        self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
-                                           self._linking)
+        if self._linking is True:
+            self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
+                                            self._linking)
         
         self._usage = usage
         self._summary_num = 2
 
+        if self._user_dict:
+            self._custom = Customization()
+            self._custom.load_customization(self._user_dict)
+        else:
+            self._custom = None
+
         if self._params_path:
             self._task_path = os.path.dirname(os.path.realpath(self._params_path))
 
-        self._load_static_model(self._params_path)
+        self._get_inference_model(params_path=self._params_path)
 
     @property
     def summary_num(self):
@@ -240,42 +250,6 @@ class WordTagTask(Task):
                 i += 1
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
         return tags_to_idx, idx_to_tags
-
-    def _load_static_model(self, params_path=None):
-        """Load static model"""
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
-        if not os.path.exists(inference_model_path + ".pdiparams"):
-            with dygraph_mode_guard():
-                self._construct_model(self.model)
-                if params_path:
-                    state_dict = paddle.load(params_path)
-                    self._model.set_dict(state_dict)
-                self._construct_input_spec()
-                self._convert_dygraph_to_static()
-
-        model_file = inference_model_path + ".pdmodel"
-        params_file = inference_model_path + ".pdiparams"
-        self._config = paddle.inference.Config(model_file, params_file)
-        place = paddle.get_device()
-        if place == 'cpu':
-            self._config.disable_gpu()
-        else:
-            self._config.enable_use_gpu(100, self.kwargs['device_id'])
-            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
-            self._config.delete_pass(
-                "embedding_eltwise_layernorm_fuse_pass")
-        self._config.switch_use_feed_fetch_ops(False)
-        self._config.disable_glog_info()
-        self.predictor = paddle.inference.create_predictor(self._config)
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = [
-            self.predictor.get_output_handle(name)
-            for name in self.predictor.get_output_names()
-        ]
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -429,35 +403,38 @@ class WordTagTask(Task):
 
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
-        for i, pred_tags in enumerate(batch_pred_tags):
-            pred_words, pred_word = [], []
-            text = batch_texts[i]
-            for j, tag in enumerate(pred_tags[self.summary_num:-1]):
-                if j >= len(text):
-                    break
-                pred_label = self._index_to_tags[tag]
-                if pred_label.find("-") != -1:
-                    _, label = pred_label.split("-")
-                else:
-                    label = pred_label
-                if pred_label.startswith("S") or pred_label.startswith("O"):
-                    pred_words.append({
-                        "item": text[j],
-                        "offset": 0,
-                        "wordtag_label": label
-                    })
-                else:
-                    pred_word.append(text[j])
-                    if pred_label.startswith("E"):
-                        pred_words.append({
-                            "item": "".join(pred_word),
-                            "offset": 0,
-                            "wordtag_label": label
-                        })
-                        del pred_word[:]
+        for sent_index in range(len(batch_texts)):
+            tags = [
+                self._index_to_tags[index]
+                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+            ]
+            sent = batch_texts[sent_index]
+            if self._custom:
+                self._custom.parse_customization(sent, tags, prefix=True)
+            sent_out = []
+            tags_out = []
+            partial_word = ""
+            for ind, tag in enumerate(tags):
+                if partial_word == "":
+                    partial_word = sent[ind]
+                    tags_out.append(tag.split('-')[1])
+                    continue
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                    sent_out.append(partial_word)
+                    tags_out.append(tag.split('-')[1])
+                    partial_word = sent[ind]
+                    continue
+                partial_word += sent[ind]
+
+            if len(sent_out) < len(tags_out):
+                sent_out.append(partial_word)
+    
+            pred_words = []
+            for s, t in zip(sent_out, tags_out):
+                pred_words.append({"item": s, "offset": 0, "wordtag_label": t})
 
             pred_words = self._reset_offset(pred_words)
-            result = {"text": text, "items": pred_words}
+            result = {"text": sent, "items": pred_words}
             batch_results.append(result)
         return batch_results
 

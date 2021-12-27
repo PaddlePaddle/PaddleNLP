@@ -151,6 +151,16 @@ lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
 '''
 ```
 
+如果希望得到定制化的分词及标注结果，用户也可以通过Taskflow来加载自定义的词法分析模型并进行预测：
+
+```shell
+from paddlenlp import Taskflow
+
+my_lac = Taskflow("lexical_analysis", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+```
+
+更多使用方法请参考[Taskflow文档](../../docs/model_zoo/taskflow.md)。
+
 ## 预训练模型
 
 如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：

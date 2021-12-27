@@ -56,8 +56,6 @@ class NERTask(WordTagTask):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._user_dict = self.kwargs[
-            'user_dict'] if 'user_dict' in self.kwargs else None
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -91,7 +89,7 @@ class NERTask(WordTagTask):
 
             if len(sent_out) < len(tags_out):
                 sent_out.append(partial_word)
-
+    
             pred_words = []
             for s, t in zip(sent_out, tags_out):
                 pred_words.append({"item": s, "wordtag_label": t})

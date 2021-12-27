@@ -109,10 +109,24 @@ my_seg("平原上的火焰计划于年末上映")
 >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
 ```
 
+#### 自定义模型
+
+用户可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```shell
+from paddlenlp import Taskflow
+
+my_seg = Taskflow("word_segmentation", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
+* `params_path`：模型参数文件路径，默认为None。
+* `tag_path`：标签文件路径，默认为None。
 
 ### 词性标注
 
@@ -168,10 +182,24 @@ my_pos("赛里木湖是新疆海拔最高的高山湖泊")
 >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
 ```
 
+#### 自定义模型
+
+用户可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```shell
+from paddlenlp import Taskflow
+
+my_pos = Taskflow("pos_tagging", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认值为1。
 * `user_dict`：用户自定义词典文件，默认为None。
+* `params_path`：模型参数文件路径，默认为None。
+* `tag_path`：标签文件路径，默认为None。
 
 ### 命名实体识别
 
@@ -386,6 +414,57 @@ wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
 >>> [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}, {'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
 ```
 
+#### 自定义词典
+
+用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
+
+词典文件`user_dict.txt`示例：
+
+```text
+长津湖/电影类_实体
+收/词汇用语 尾/术语类
+最 大
+海外票仓
+```
+
+以"《长津湖》收尾，北美是最大海外票仓"为例，原本的输出结果为：
+
+```text
+[{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 3, 'termid': '影视作品_eb_长津湖'}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收尾', 'offset': 5, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_收尾'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最大', 'offset': 11, 'wordtag_label': '修饰词', 'length': 2, 'termid': '修饰词_cb_最大'}, {'item': '海外', 'offset': 13, 'wordtag_label': '场所类', 'length': 2, 'termid': '区域场所_cb_海外'}, {'item': '票仓', 'offset': 15, 'wordtag_label': '词汇用语', 'length': 2}]}]
+```
+
+装载自定义词典及输出结果示例：
+
+```python
+from paddlenlp import Taskflow
+
+my_wordtag = Taskflow("knowledge_mining", user_dict="user_dict.txt")
+my_wordtag("《长津湖》收尾，北美是最大海外票仓")
+>>> [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '电影类_实体', 'length': 3}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收', 'offset': 5, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '尾', 'offset': 6, 'wordtag_label': '术语类', 'length': 1, 'termid': '动物体构造_cb_动物尾巴'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1}, {'item': '大', 'offset': 12, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_大'}, {'item': '海外票仓', 'offset': 13, 'wordtag_label': '场所类', 'length': 4}]}]
+```
+
+#### 自定义模型
+
+用户可以使用自己的数据训练自定义NER模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```shell
+from paddlenlp import Taskflow
+
+my_wordtag = Taskflow("knowledge_mining", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+```
+
+### 自定义Term-Linking
+
+Taskflow支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking:
+
+```shell
+from paddlenlp import Taskflow
+
+wordtag = Taskflow("knowledge_mining", term_schema_path="/path/to/your/termtree_type", term_data_path="/path/to/your/termtree_data")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
@@ -394,6 +473,7 @@ wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
 * `tag_path`：使用自定义标签文件，默认为None。
 * `term_schema_path`：使用自定义TermType词类体系，默认为None。
 * `term_data_path`：使用自定义百科知识树文件，默认为None。
+* `user_dict`：用户自定义词典文件，默认为None。
 
 ### 知识挖掘-名词短语标注
 
