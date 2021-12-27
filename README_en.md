@@ -227,7 +227,7 @@ For more details about our release, please refer to [ChangeLog](./docs/changelog
 If you find PaddleNLP useful in your research, please consider cite
 ```
 @misc{=paddlenlp,
-    title={An Easy-to-use and High Performance NLP Library based on PaddlePaddle},
+    title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
     author={PaddleNLP Contributors},
     howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},
     year={2021}
