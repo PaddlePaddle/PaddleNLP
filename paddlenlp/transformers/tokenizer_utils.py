@@ -1641,6 +1641,8 @@ class BPETokenizer(PretrainedTokenizer):
         text = convert_to_unicode(text)
         text = " ".join(text.split())  # remove duplicate whitespace
         nltk = try_import('nltk')
+        # Run slow at first time
+        nltk.download('punkt', quiet=True)
         if is_sentencepiece:
             sents = nltk.tokenize.sent_tokenize(text)
             bpe_ids = sum([self.encoder.encode(sent) for sent in sents], [])
