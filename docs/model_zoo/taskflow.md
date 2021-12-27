@@ -188,7 +188,7 @@ my_pos("赛里木湖是新疆海拔最高的高山湖泊")
 
 使用Taskflow加载自定义模型进行一键预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_pos = Taskflow("pos_tagging", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
@@ -455,7 +455,7 @@ from paddlenlp import Taskflow
 my_wordtag = Taskflow("knowledge_mining", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
 ```
 
-### 自定义Term-Linking
+#### 自定义Term-Linking
 
 Taskflow支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking:
 
@@ -566,7 +566,7 @@ dialogue.interactive_mode(max_turn=3)
 [Human]:喜欢
 [Bot]:那你喜欢什么运动啊?
 [Human]:篮球,你喜欢篮球吗
-[Bot]:当然了,我很喜欢打篮球的?
+[Bot]:当然了,我很喜欢打篮球的
 '''
 ```
 
