@@ -323,6 +323,17 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
 
+## Citation
+
+如果PaddleNLP对您的研究有帮助，欢迎引用
+```
+@misc{=paddlenlp,
+    title={An Easy-to-use and High Performance NLP Library based on PaddlePaddle},
+    author={PaddleNLP Contributors},
+    howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},
+    year={2021}
+}
+```
 ## Acknowledge
 
 我们借鉴了Hugging Face的[Transformers](https://github.com/huggingface/transformers)🤗关于预训练模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
