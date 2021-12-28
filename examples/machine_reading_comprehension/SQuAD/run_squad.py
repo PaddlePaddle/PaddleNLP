@@ -295,13 +295,10 @@ def run(args):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
-                kwargs = {
-                    "input_ids": input_ids,
-                    "token_type_ids": token_type_ids
-                }
-                if "attention_mask" in model.forward.__code__.co_varnames:
-                    kwargs["attention_mask"] = attention_mask
-                logits = model(**kwargs)
+                logits = model(
+                    input_ids=input_ids,
+                    token_type_ids=token_type_ids,
+                    attention_mask=attention_mask)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
