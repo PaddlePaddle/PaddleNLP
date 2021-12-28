@@ -177,8 +177,8 @@ tag(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 ```python
 from paddlenlp import Taskflow
 
-my_pos = Taskflow("pos_tagging", user_dict="user_dict.txt")
-my_pos("赛里木湖是新疆海拔最高的高山湖泊")
+my_tag = Taskflow("pos_tagging", user_dict="user_dict.txt")
+my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
 ```
 
@@ -191,7 +191,7 @@ my_pos("赛里木湖是新疆海拔最高的高山湖泊")
 ```python
 from paddlenlp import Taskflow
 
-my_pos = Taskflow("pos_tagging", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+my_tag = Taskflow("pos_tagging", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
 ```
 
 #### 可配置参数说明
