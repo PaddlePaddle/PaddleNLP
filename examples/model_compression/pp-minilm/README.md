@@ -104,7 +104,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 与ERNIE 结构相同的模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的预训练小模型，在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
