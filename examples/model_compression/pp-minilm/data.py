@@ -14,11 +14,12 @@
 import numpy as np
 
 from paddle.metric import Metric, Accuracy
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, FasterPPMiniLMTokenizer
+from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer
 
 MODEL_CLASSES = {
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "ppminilm": (PPMiniLMForSequenceClassification, PPMiniLMTokenizer),
     "bert": (BertForSequenceClassification, BertTokenizer)
 }
 
@@ -34,10 +35,10 @@ METRIC_CLASSES = {
 }
 
 
-def convert_example_for_faster_tokenizer(example,
-                                         label_list,
-                                         is_test=False,
-                                         **kwargs):
+def get_example_for_faster_tokenizer(example,
+                                     label_list,
+                                     is_test=False,
+                                     **kwargs):
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
@@ -73,7 +74,7 @@ def convert_example_for_faster_tokenizer(example,
             text_list.insert(query_idx + len(query) + 2 + 1, "_")
         text = "".join(text_list)
         example['sentence'] = text
-    elif 'text' in example:
+    elif 'text' in example:  # chn
         example['sentence'] = example['text']
 
     return example

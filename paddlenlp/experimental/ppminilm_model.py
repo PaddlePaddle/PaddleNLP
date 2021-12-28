@@ -20,15 +20,15 @@ import paddle.nn as nn
 
 from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from paddlenlp.transformers.model_utils import register_base_model
-from paddlenlp.transformers.ernie.modeling import ErnieEmbeddings, ErniePooler
+from paddlenlp.transformers.ppminilm.modeling import PPMiniLMEmbeddings, PPMiniLMPooler
 
 __all__ = [
-    "PPMiniLMModel",
-    "PPMiniLMForSequenceClassification",
+    "FasterPPMiniLMModel",
+    "FasterPPMiniLMForSequenceClassification",
 ]
 
 
-class PPMiniLMPretrainedModel(FasterPretrainedModel):
+class FasterPPMiniLMPretrainedModel(FasterPretrainedModel):
     r"""
     An abstract class for pretrained ERNIE models. It provides ERNIE related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -69,7 +69,7 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
         }
     }
-    base_model_prefix = "ernie"
+    base_model_prefix = "ppminilm"
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -82,14 +82,14 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
-                        self.ernie.config["initializer_range"],
+                        self.ppminilm.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
 
 @register_base_model
-class PPMiniLMModel(PPMiniLMPretrainedModel):
+class FasterPPMiniLMModel(FasterPPMiniLMPretrainedModel):
     r"""
     The bare ERNIE Model transformer outputting raw hidden-states.
 
@@ -164,7 +164,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
             do_lower_case=True,
             is_split_into_words=False,
             max_seq_len=512, ):
-        super(PPMiniLMModel, self).__init__()
+        super(FasterPPMiniLMModel, self).__init__()
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
@@ -183,7 +183,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
         self.initializer_range = initializer_range
         weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
             mean=0.0, std=self.initializer_range))
-        self.embeddings = ErnieEmbeddings(
+        self.embeddings = PPMiniLMEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
         encoder_layer = nn.TransformerEncoderLayer(
@@ -197,7 +197,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
             weight_attr=weight_attr,
             normalize_before=False)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = ErniePooler(hidden_size, weight_attr)
+        self.pooler = PPMiniLMPooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
 
     def forward(self, text, text_pair=None):
@@ -216,22 +216,21 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
         return sequence_output, pooled_output
 
 
-class PPMiniLMForSequenceClassification(PPMiniLMPretrainedModel):
-    def __init__(self, ernie, num_classes=2, dropout=None):
-        super(PPMiniLMForSequenceClassification, self).__init__()
+class FasterPPMiniLMForSequenceClassification(FasterPPMiniLMPretrainedModel):
+    def __init__(self, ppminilm, num_classes=2, dropout=None):
+        super(FaserPPMiniLMForSequenceClassification, self).__init__()
         self.num_classes = num_classes
-        self.ernie = ernie  # allow ernie to be config
+        self.ppminilm = ppminilm  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                  self.ppminilm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
 
     def forward(self, text, text_pair=None):
 
-        _, pooled_output = self.ernie(text, text_pair)
+        _, pooled_output = self.ppminilm(text, text_pair)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        predictions = paddle.argmax(logits, axis=-1)
-        return logits, predictions
+        return logits

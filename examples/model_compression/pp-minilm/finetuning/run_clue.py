@@ -32,11 +32,11 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer, BertModel
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.experimental import PPMiniLMForSequenceClassification, to_tensor
+from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, to_tensor
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, convert_example_for_faster_tokenizer
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -187,12 +187,12 @@ def evaluate(model, loss_fct, metric, data_loader):
             if 'sentence' in batch:
                 sentence, labels = batch['sentence'], batch['label']
                 sentence = to_tensor(sentence, "sentence")
-                logits, _ = model(sentence)
+                logits = model(sentence)
             else:
                 labels = batch['label']
                 sentence1 = to_tensor(batch['sentence1'], "sentence1")
                 sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                logits, _ = model(sentence1, sentence2)
+                logits = model(sentence1, sentence2)
         else:
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
@@ -224,12 +224,11 @@ def do_eval(args):
 
     tokenizer = tokenizer_class.from_pretrained('ppminilm-6l-768h')
     trans_func = partial(
-        convert_example_for_faster_tokenizer
+        get_example_for_faster_tokenizer
         if args.use_faster_tokenizer else convert_example,
         tokenizer=tokenizer if not args.use_faster_tokenizer else None,
         label_list=dev_ds.label_list,
-        max_seq_length=args.max_seq_length
-        if not args.use_faster_tokenizer else 0)
+        max_seq_len=args.max_seq_length if not args.use_faster_tokenizer else 0)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
@@ -254,10 +253,9 @@ def do_eval(args):
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
     if args.use_faster_tokenizer:
-        model = PPMiniLMForSequenceClassification.from_pretrained(
-            args.model_name_or_path,
-            num_classes=num_classes,
-            max_seq_len=args.max_seq_length)
+        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
+            args.model_name_or_path, num_classes=num_classes, max_seq_len=-1)
+        # max_seq_len=args.max_seq_length)
     else:
         model = model_class.from_pretrained(
             args.model_name_or_path, num_classes=num_classes)
@@ -275,12 +273,12 @@ def do_eval(args):
             if 'sentence' in batch:
                 labels = batch['label']
                 sentence = to_tensor(batch['sentence'], "sentence")
-                logits, _ = model(sentence)
+                logits = model(sentence)
             else:
                 labels = batch['label']
                 sentence1 = to_tensor(batch['sentence1'], "sentence1")
                 sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                logits, _ = model(sentence1, sentence2)
+                logits = model(sentence1, sentence2)
         else:
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
@@ -311,7 +309,7 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
-        convert_example_for_faster_tokenizer
+        get_example_for_faster_tokenizer
         if args.use_faster_tokenizer else convert_example,
         tokenizer=tokenizer if not args.use_faster_tokenizer else None,
         label_list=train_ds.label_list,
@@ -354,8 +352,9 @@ def do_train(args):
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
 
     if args.use_faster_tokenizer:
-        model = PPMiniLMForSequenceClassification.from_pretrained(
+        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
             args.model_name_or_path,
+            max_seq_len=args.max_seq_length,
             num_classes=num_classes, )
     else:
         model = model_class.from_pretrained(
@@ -407,12 +406,12 @@ def do_train(args):
                 if 'sentence' in batch:
                     labels = batch['label']
                     sentence = to_tensor(batch['sentence'], "sentence")
-                    logits, _ = model(sentence)
+                    logits = model(sentence)
                 else:
                     labels = batch['label']
                     sentence1 = to_tensor(batch['sentence1'], "sentence1")
                     sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                    logits, _ = model(sentence1, sentence2)
+                    logits = model(sentence1, sentence2)
             else:
                 input_ids, segment_ids, labels = batch
                 logits = model(input_ids, segment_ids)
@@ -445,14 +444,16 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 print("best_acc: ", best_acc)
-                if args.use_faster_tokenizer:
-                    save_path = os.path.join(args.output_dir, "inference")
-                    model.to_static(save_path)
                 return
-    if args.use_faster_tokenizer:
-        save_path = os.path.join(args.output_dir, "inference")
-        model.to_static(save_path)
+
     print("best_acc: ", best_acc)
+
+
+def export_model(args):
+    model = FasterPPMiniLMForSequenceClassification.from_pretrained(
+        args.output_dir)
+    save_path = os.path.join(args.output_dir, "inference")
+    model.to_static(save_path)
 
 
 def print_arguments(args):
@@ -468,5 +469,6 @@ if __name__ == "__main__":
     print_arguments(args)
     if args.do_train:
         do_train(args)
+        export_model(args)
     if args.do_eval:
         do_eval(args)
