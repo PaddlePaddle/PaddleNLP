@@ -104,16 +104,16 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的预训练小模型，在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
 ```python
 
-from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification
+from paddlenlp.transformers import PPMiniLMModel, PPMiniLMForSequenceClassification
 
-model = ErnieModel.from_pretrained('ppminilm-6l-768h')
-model = ErnieForSequenceClassification.from_pretrained('ppminilm-6l-768h') # 用于分类任务
+model = PPMiniLMModel.from_pretrained('ppminilm-6l-768h')
+model = PPMiniLMForSequenceClassification.from_pretrained('ppminilm-6l-768h') # 用于分类任务
 ```
 
 PP-MiniLM 是一个 6 层的预训练模型，使用 `from_pretrained`导入 PP-MiniLM 之后，就可以在自己的数据集上进行 fine-tuning。接下来会介绍如何用下游任务数据在导入的 PP-MiniLM 上进行微调、进一步压缩及推理部署。
@@ -193,7 +193,7 @@ sh run_clue.sh CLUEWSC2020 1e-4 32 50 128 0 ppminilm-6l-768h
 假设待导出的模型的地址为 `ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32`，可以运行下方命令将动态图模型导出为可用于部署的静态图模型：
 
 ```shell
-python export_model.py --model_type ernie --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
+python export_model.py --model_type ppminilm --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
 cd ..
 ```
 
@@ -221,7 +221,7 @@ cd ..
 cd pruning
 export FT_MODELS=../finetuning/ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32
 
-sh prune.sh CLUEWSC2020 5e-5 16 50 128 0 ${FT_MODELS} 0.75
+sh prune.sh CLUEWSC2020 1e-4 32 50 128 0 ${FT_MODELS} 0.75
 ```
 其中每个参数依次表示：CLUE 中的任务名称、学习率、batch size、epoch 数、最大序列长度、gpu id、学生模型的地址、裁剪后宽度比例列表。执行完成后，模型保存的路径位于 `pruned_models/CLUEWSC2020/0.75/best_model/`。
 
