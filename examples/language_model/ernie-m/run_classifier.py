@@ -73,6 +73,8 @@ def parse_args():
         type=float,
         help="The initial learning rate for Adam.")
     parser.add_argument(
+        "--dropout", default=0.1, type=float, help="Dropout rate.")
+    parser.add_argument(
         "--num_train_epochs",
         default=5,
         type=int,
@@ -263,7 +265,7 @@ def do_train(args):
 
     num_classes = 3
     model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+        args.model_name_or_path, num_classes=num_classes, dropout=args.dropout)
     n_layers = model.ernie_m.config['num_hidden_layers']
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
