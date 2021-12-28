@@ -110,7 +110,7 @@ def do_predict(args):
 
     if args.enable_faster_encoder:
         transformer = enable_faster_encoder(
-            transformer, need_build=False, use_fp16=args.use_fp16_encoder)
+            transformer, use_fp16=args.use_fp16_encoder)
 
     src_word = generate_src_word(
         batch_size=args.infer_batch_size,

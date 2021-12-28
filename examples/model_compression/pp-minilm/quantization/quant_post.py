@@ -25,7 +25,7 @@ import paddle
 import paddleslim
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMTokenizer
 
 sys.path.append("../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
@@ -85,7 +85,7 @@ def quant_post(args, batch_size=8, algo='avg'):
 
     train_ds = load_dataset("clue", args.task_name, splits="dev")
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,

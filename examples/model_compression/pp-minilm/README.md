@@ -45,7 +45,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 | TinyBERT<sub>6</sub>    | 59.7M   | 5.44B  | 1.66x   | 72.59 | 55.70 | 57.64   | 79.57 | 73.97 | 76.32       | 80.00 | 70.83       |
 | UER-py RoBERTa L6- H768 | 59.7M   | 5.44B  | 1.66x   | 69.62 | 66.45 | 59.91   | 76.89 | 71.36 | 71.05       | 82.87 | 71.16       |
 | RBT6, Chinese           | 59.7M   | 5.44B  | 1.66x   | 73.93 | 56.63 | 59.79   | 79.28 | 73.12 | 77.30       | 80.80 | 71.55       |
-| ERNIE-Tiny              | 90.7M   | 4.83B  | 1.89x   | 70.67 | 55.60 | 59.91   | 75.74 | 71.36 | 67.11       | 76.70 | 68.16       |
+| ERNIE-Tiny              | 90.7M   | 4.83B  | 1.89x   | 71.55 | 58.34 | 61.41   | 76.81 | 71.46 | 72.04       | 79.13 | 70.11       |
 | PP-MiniLM 6L-768H       | 59.7M   | 5.44B  | 1.66x   | 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18       | 79.17 | 73.69       |
 | PP-MiniLM 裁剪后        | 49.1M   | 4.08B  | 2.00x   | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86       | 78.53 | 73.44       |
 | PP-MiniLM 量化后        | 49.2M   | -      | 4.15x   | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40       |
@@ -81,7 +81,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 │ └── run_clue.sh                # CLUE 上的微调启动脚本
 │ └── run_one_search.sh          # 单数据集下精调脚本
 │ └── run_all_search.sh          # CLUE数据集下精调脚本
-│ └── export_model.sh            # 导出 fine-tuned 部署模型脚本
+│ └── export_model.py            # 导出 fine-tuned 部署模型脚本
 ├── pruning                      # 裁剪、蒸馏目录
 │ └── prune.py                   # 裁剪、蒸馏脚本
 │ └── prune.sh                   # 裁剪、蒸馏启动脚本
@@ -104,16 +104,16 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 ## 导入 PP-MiniLM
 
-PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的 6 层 ERNIE 模型（即包含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的中文预训练小模型），在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
+PP-MiniLM 是使用任务无关蒸馏方法，以 `roberta-wwm-ext-large` 做教师模型蒸馏产出的含 6 层 Transformer Encoder Layer、Hidden Size 为 768 的预训练小模型，在 CLUE 上 7 个分类任务上的模型精度超过 BERT<sub>base</sub>、TinyBERT<sub>6</sub>、UER-py RoBERTa L6-H768、RBT6。
 
 可以这样导入 PP-MiniLM：
 
 ```python
 
-from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification
+from paddlenlp.transformers import PPMiniLMModel, PPMiniLMForSequenceClassification
 
-model = ErnieModel.from_pretrained('ppminilm-6l-768h')
-model = ErnieForSequenceClassification.from_pretrained('ppminilm-6l-768h') # 用于分类任务
+model = PPMiniLMModel.from_pretrained('ppminilm-6l-768h')
+model = PPMiniLMForSequenceClassification.from_pretrained('ppminilm-6l-768h') # 用于分类任务
 ```
 
 PP-MiniLM 是一个 6 层的预训练模型，使用 `from_pretrained`导入 PP-MiniLM 之后，就可以在自己的数据集上进行 fine-tuning。接下来会介绍如何用下游任务数据在导入的 PP-MiniLM 上进行微调、进一步压缩及推理部署。
@@ -193,7 +193,7 @@ sh run_clue.sh CLUEWSC2020 1e-4 32 50 128 0 ppminilm-6l-768h
 假设待导出的模型的地址为 `ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32`，可以运行下方命令将动态图模型导出为可用于部署的静态图模型：
 
 ```shell
-python export_model.py --model_type ernie --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
+python export_model.py --model_type ppminilm --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
 cd ..
 ```
 

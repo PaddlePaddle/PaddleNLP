@@ -29,14 +29,15 @@ from args import parse_args
 import paddlenlp as ppnlp
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer
+from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, FunnelForQuestionAnswering, FunnelTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.datasets import load_dataset
 
 MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
-    "ernie": (ErnieForQuestionAnswering, ErnieTokenizer)
+    "ernie": (ErnieForQuestionAnswering, ErnieTokenizer),
+    'funnel': (FunnelForQuestionAnswering, FunnelTokenizer)
 }
 
 
@@ -53,7 +54,8 @@ def prepare_train_features(examples, tokenizer, args):
         questions,
         contexts,
         stride=args.doc_stride,
-        max_seq_len=args.max_seq_length)
+        max_seq_len=args.max_seq_length,
+        return_attention_mask=True)
 
     # Let's label those examples!
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -126,7 +128,8 @@ def prepare_validation_features(examples, tokenizer, args):
         questions,
         contexts,
         stride=args.doc_stride,
-        max_seq_len=args.max_seq_length)
+        max_seq_len=args.max_seq_length,
+        return_attention_mask=True)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -162,9 +165,11 @@ def evaluate(model, data_loader, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, token_type_ids = batch
-        start_logits_tensor, end_logits_tensor = model(input_ids,
-                                                       token_type_ids)
+        input_ids, token_type_ids, attention_mask = batch
+        start_logits_tensor, end_logits_tensor = model(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask)
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -231,7 +236,6 @@ def run(args):
             'squad', splits='train_v1', data_files=args.train_file)
         dev_ds = load_dataset(
             'squad', splits='dev_v1', data_files=args.predict_file)
-
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
@@ -251,6 +255,7 @@ def run(args):
         train_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            'attention_mask': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
             "start_positions": Stack(dtype="int64"),
             "end_positions": Stack(dtype="int64")
         }): fn(samples)
@@ -285,13 +290,15 @@ def run(args):
 
         global_step = 0
         tic_train = time.time()
+
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, start_positions, end_positions = batch
-
+                input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
                 logits = model(
-                    input_ids=input_ids, token_type_ids=token_type_ids)
+                    input_ids=input_ids,
+                    token_type_ids=token_type_ids,
+                    attention_mask=attention_mask)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
@@ -329,7 +336,8 @@ def run(args):
 
         dev_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
         }): fn(samples)
 
         dev_data_loader = DataLoader(
