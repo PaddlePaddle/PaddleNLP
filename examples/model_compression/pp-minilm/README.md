@@ -81,7 +81,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 │ └── run_clue.sh                # CLUE 上的微调启动脚本
 │ └── run_one_search.sh          # 单数据集下精调脚本
 │ └── run_all_search.sh          # CLUE数据集下精调脚本
-│ └── export_model.sh            # 导出 fine-tuned 部署模型脚本
+│ └── export_model.py            # 导出 fine-tuned 部署模型脚本
 ├── pruning                      # 裁剪、蒸馏目录
 │ └── prune.py                   # 裁剪、蒸馏脚本
 │ └── prune.sh                   # 裁剪、蒸馏启动脚本
