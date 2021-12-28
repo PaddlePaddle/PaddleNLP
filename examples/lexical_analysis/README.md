@@ -4,7 +4,7 @@
 
 词法分析任务的输入是一个字符串（我们后面使用『句子』来指代它），而输出是句子中的词边界和词性、实体类别。序列标注是词法分析的经典建模方式，我们使用基于 GRU 的网络结构学习特征，将学习到的特征接入 CRF 解码层完成序列标注。模型结构如下所示：<br />
 
-![GRU-CRF-MODEL](https://paddlenlp.bj.bcebos.com/imgs/gru-crf-model.png)
+![GRU-CRF-MODEL](https://bj.bcebos.com/paddlenlp/imgs/gru-crf-model.png)
 
 1. 输入采用 one-hot 方式表示，每个字以一个 id 表示
 2. one-hot 序列通过字表，转换为实向量表示的字向量序列；

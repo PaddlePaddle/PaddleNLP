@@ -28,7 +28,7 @@ from paddlenlp.transformers import BertPretrainedModel, ElectraPretrainedModel, 
 
 from ..utils import InitTrackerMeta, fn_args_to_dict
 
-__all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration"]
+__all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration", "ErnieGenModel"]
 
 
 def _build_linear(n_in, n_out, name, init):
@@ -213,10 +213,10 @@ class ErnieEncoderStack(nn.Layer):
 class ErnieGenPretrainedModel(object):
     r"""
     An abstract class for pretrained ErnieGen models. It provides ErnieGen related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
     model_config_file = "model_config.json"
@@ -268,11 +268,11 @@ class ErnieGenPretrainedModel(object):
     ernie_gen_pretrained_resource_files_map = {
         "model_state": {
             "ernie-gen-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
             "ernie-gen-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
             "ernie-gen-large-430g-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
         }
     }
 
@@ -674,3 +674,6 @@ class ErnieForGeneration(ErnieModel):
                 soft_label=(tgt_labels.shape[-1] != 1))
 
             return loss, logits_2d, info
+
+
+ErnieGenModel = ErnieForGeneration

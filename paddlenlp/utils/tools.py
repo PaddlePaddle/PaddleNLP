@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import numpy as np
+import paddle
+from .log import logger
 
 
 def static_params_to_dygraph(model, static_tensor_dict):
@@ -34,6 +35,9 @@ def static_params_to_dygraph(model, static_tensor_dict):
 
     ret_dict = dict()
     for n, p in state_dict.items():
+        if p.name not in static_tensor_dict:
+            logger.info("%s paramter is missing from you state dict." % n)
+            continue
         ret_dict[n] = static_tensor_dict[p.name]
 
     return ret_dict
@@ -56,7 +60,7 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
     ret_dict = dict()
     for name, parm in state_dict.items():
         if name not in dygraph_tensor_dict:
-            print("Miss \t\t", name)
+            logger.info("%s paramter is missing from you state dict." % name)
             continue
 
         tensor = dygraph_tensor_dict[name]
@@ -119,3 +123,42 @@ def get_env_device():
     elif paddle.is_compiled_with_xpu():
         return 'xpu'
     return 'cpu'
+
+
+def compare_version(version, pair_version):
+    """
+    Args:
+        version (str): The first version string needed to be compared.
+            The format of version string should be as follow : "xxx.yyy.zzz".
+        pair_version (str): The second version string needed to be compared.
+             The format of version string should be as follow : "xxx.yyy.zzz".
+    Returns:
+        int: The result of comparasion. 1 means version > pair_version; 0 means
+            version = pair_version; -1 means version < pair_version.
+    
+    Examples:
+        >>> compare_version("2.2.1", "2.2.0")
+        >>> 1
+        >>> compare_version("2.2.0", "2.2.0")
+        >>> 0
+        >>> compare_version("2.2.0-rc0", "2.2.0")
+        >>> -1
+        >>> compare_version("2.3.0-rc0", "2.2.0")
+        >>> 1
+    """
+    version = version.strip()
+    pair_version = pair_version.strip()
+    if version == pair_version:
+        return 0
+    version_list = version.split(".")
+    pair_version_list = pair_version.split(".")
+    for version_code, pair_version_code in zip(version_list, pair_version_list):
+        if not version_code.isnumeric():
+            return -1
+        if not pair_version_code.isnumeric():
+            return 1
+        if int(version_code) > int(pair_version_code):
+            return 1
+        elif int(version_code) < int(pair_version_code):
+            return -1
+    return 0

@@ -24,6 +24,7 @@ import itertools
 from .utils import download_file
 from .utils import TermTree
 from .knowledge_mining import WordTagTask
+from .utils import Customization
 
 usage = r"""
           from paddlenlp import Taskflow 
@@ -35,8 +36,7 @@ usage = r"""
           '''
 
           ner = Taskflow("ner")
-          ner(["热梅茶是一道以梅子为主要原料制作的茶饮",
-               "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
+          ner(["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
           '''
           [[('热梅茶', '饮食类_饮品'), ('是', '肯定词'), ('一道', '数量词'), ('以', '介词'), ('梅子', '饮食类'), ('为', '肯定词'), ('主要原料', '物体类'), ('制作', '场景事件'), ('的', '助词'), ('茶饮', '饮食类_饮品')], [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]]
           '''
@@ -56,32 +56,47 @@ class NERTask(WordTagTask):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
+        self._user_dict = self.kwargs[
+            'user_dict'] if 'user_dict' in self.kwargs else None
+        if self._user_dict:
+            self._custom = Customization()
+            self._custom.load_customization(self._user_dict)
+        else:
+            self._custom = None
 
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
-        for i, pred_tags in enumerate(batch_pred_tags):
-            pred_words, pred_word = [], []
-            text = batch_texts[i]
-            for j, tag in enumerate(pred_tags[self.summary_num:-1]):
-                if j >= len(text):
-                    break
-                pred_label = self._index_to_tags[tag]
-                if pred_label.find("-") != -1:
-                    _, label = pred_label.split("-")
-                else:
-                    label = pred_label
-                if pred_label.startswith("S") or pred_label.startswith("O"):
-                    pred_words.append({"item": text[j], "wordtag_label": label})
-                else:
-                    pred_word.append(text[j])
-                    if pred_label.startswith("E"):
-                        pred_words.append({
-                            "item": "".join(pred_word),
-                            "wordtag_label": label
-                        })
-                        del pred_word[:]
+        for sent_index in range(len(batch_texts)):
+            tags = [
+                self._index_to_tags[index]
+                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+            ]
+            sent = batch_texts[sent_index]
+            if self._custom:
+                self._custom.parse_customization(sent, tags, prefix=True)
+            sent_out = []
+            tags_out = []
+            partial_word = ""
+            for ind, tag in enumerate(tags):
+                if partial_word == "":
+                    partial_word = sent[ind]
+                    tags_out.append(tag.split('-')[1])
+                    continue
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                    sent_out.append(partial_word)
+                    tags_out.append(tag.split('-')[1])
+                    partial_word = sent[ind]
+                    continue
+                partial_word += sent[ind]
 
-            result = {"text": text, "items": pred_words}
+            if len(sent_out) < len(tags_out):
+                sent_out.append(partial_word)
+
+            pred_words = []
+            for s, t in zip(sent_out, tags_out):
+                pred_words.append({"item": s, "wordtag_label": t})
+
+            result = {"text": sent, "items": pred_words}
             batch_results.append(result)
         return batch_results
 

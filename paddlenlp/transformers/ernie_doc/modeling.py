@@ -301,11 +301,11 @@ class ErnieDocEncoder(nn.Layer):
 
 class ErnieDocPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained ErnieDoc models. It provides ErnieDoc related `model_config_file`,
-    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
-    `base_model_prefix` for downloading and loading pretrained models.
-
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    An abstract class for pretrained ErnieDoc models. It provides ErnieDoc related
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading
+    and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
@@ -346,9 +346,9 @@ class ErnieDocPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-doc-base-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
             "ernie-doc-base-zh":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
         }
     }
     base_model_prefix = "ernie_doc"

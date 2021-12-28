@@ -7,8 +7,8 @@
 
 | 模型  | dev acc |
 | ---- | ------- |
-| [ERNIE-1.0-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/pointwise_matching_model.tar)  | 88.48 |
-| [ERNIE-Gram-Base](https://paddlenlp.bj.bcebos.com/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 89.62 |
+| [ERNIE-1.0-Base](https://bj.bcebos.com/paddlenlp/models/text_matching/ernie1.0_zh_pointwise_matching_model.tar)  | 89.43 |
+| [ERNIE-Gram-Base](https://bj.bcebos.com/paddlenlp/models/text_matching/ernie_gram_zh_pointwise_matching_model.tar)  | 90.60 |
 
 ## 快速开始
 
@@ -153,14 +153,18 @@ python -u -m paddle.distributed.launch --gpus "0" \
 #### 模型导出
 使用动态图训练结束之后，可以使用静态图导出工具 `export_model.py` 将动态图参数导出成静态图参数。 执行如下命令：
 
-`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+```shell
+python export_model.py --params_path checkpoints/model_300/model_state.pdparams --output_path=./output
+```
 
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 #### 预测部署
 导出静态图模型之后，可以基于静态图模型进行预测，`deploy/python/predict.py` 文件提供了静态图预测示例。执行如下命令：
 
-`python deploy/python/predict.py --model_dir ./output`
+```shell
+python deploy/python/predict.py --model_dir ./output
+```
 
 ## Reference
 [1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.

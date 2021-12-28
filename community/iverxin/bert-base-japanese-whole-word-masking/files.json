@@ -1,0 +1,6 @@
+{
+  "model_config_file":"https://bj.bcebos.com/paddlenlp/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/tokenizer_config.pdparams",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/iverxin/bert-base-japanese-whole-word-masking/vocab.txt"
+}

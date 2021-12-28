@@ -27,12 +27,15 @@ from paddlenlp.ops import FasterTransformer
 
 from paddlenlp.utils.log import logger
 
+paddle.seed(2)
+np.random.seed(2)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./sample/config/decoding.sample.yaml",
+        default="./faster_transformer/sample/config/decoding.sample.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(

@@ -1,3 +1,18 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
 import io
 import json
@@ -15,6 +30,10 @@ class NeZhaTokenizer(PretrainedTokenizer):
     Constructs a NeZha tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
@@ -60,13 +79,13 @@ class NeZhaTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "nezha-base-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-base-wwm-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-large-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
             "nezha-large-wwm-chinese":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-chinese-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-chinese-vocab.txt",
         }
     }
     pretrained_init_configuration = {

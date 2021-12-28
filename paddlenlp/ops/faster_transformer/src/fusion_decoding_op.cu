@@ -25,7 +25,6 @@ limitations under the License. */
 #include "fusion_decoding_op.h"
 #include "pd_traits.h"
 
-
 template <paddle::DataType D>
 std::vector<paddle::Tensor> decoding_kernel(
     const paddle::Tensor& input,
@@ -65,19 +64,18 @@ std::vector<paddle::Tensor> decoding_kernel(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
-    std::string decoding_strategy,
-    int beam_size,
-    int topk,
-    float topp,
-    int head_num_,
-    int size_per_head_,
-    int num_layer_,
-    int start_id_,
-    int end_id_,
-    int64_t max_seq_len_,
-    float beam_search_diversity_rate_,
-    float alpha,
-    cublasHandle_t cublas_handle_,
+    const std::string& decoding_strategy,
+    const int& beam_size,
+    const int& topk,
+    const float& topp,
+    const int& head_num_,
+    const int& size_per_head_,
+    const int& num_layer_,
+    const int& start_id_,
+    const int& end_id_,
+    const int64_t& max_seq_len_,
+    const float& beam_search_diversity_rate_,
+    const float& alpha,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2")
@@ -106,7 +104,9 @@ std::vector<paddle::Tensor> decoding_kernel(
   typedef typename traits_::data_t data_t_;
 
   DecodingInitParam<DataType_> decoding_params;
-  decoding_params.cublas_handle = cublas_handle_;
+  decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+  decoding_params.cublaslt_handle =
+      CublasHandle::GetInstance()->cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
@@ -124,9 +124,25 @@ std::vector<paddle::Tensor> decoding_kernel(
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
+  auto q_weight_shape = self_attn_query_weight[0].shape();
+  auto k_weight_shape = self_attn_key_weight[0].shape();
+  bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
+
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
-    params[i].cublas_handle = cublas_handle_;
+    params[i].cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+    params[i].cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
+
+    if (decoding_strategy == "beam_search" ||
+        decoding_strategy == "beam_search_v2") {
+      params[i].request_batch_size = batch_size_ * beam_width_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    } else if (decoding_strategy == "sampling" ||
+               decoding_strategy == "topk_sampling" ||
+               decoding_strategy == "topp_sampling") {
+      params[i].request_batch_size = batch_size_;
+      params[i].request_max_mem_seq_len = memory_max_seq_len;
+    }
 
     // self attn
     params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
@@ -225,19 +241,10 @@ std::vector<paddle::Tensor> decoding_kernel(
   // for weight sharing matmul
   decoding_params.embedding_kernel =
       reinterpret_cast<const DataType_*>(embedding_weight.data<data_t_>());
-  // NOTE: the data type of the embedding bias for logits is different
-  // between decoding with beam search and top-k/top-p sampling in
-  // FasterTransformer when using float16.
-  if ("beam_search" == decoding_strategy ||
-      "beam_search_v2" == decoding_strategy) {
-    // for matmul bias
-    decoding_params.embedding_bias =
-        reinterpret_cast<const float*>(embedding_bias.data<float>());
-  } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
-    decoding_params.embedding_bias_T =
-        reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
-  }
+  // for matmul bias
+  decoding_params.embedding_bias =
+      reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
+
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
 
@@ -256,7 +263,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         memory_max_seq_len,
         start_id_,
         end_id_,
-        beam_search_diversity_rate_);
+        beam_search_diversity_rate_,
+        true,  // is_fuse_topk_softMax
+        fuse_qkv);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -277,15 +286,17 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true,  // is_fuse_topk_softMax_
-        true,  // keep_alive_beam_
+        true,   // is_fuse_topk_softMax
+        fuse_qkv,
+        true,   // keep_alive_beam
         alpha);
 
     decoding_beam_search_->forward(params, decoding_params);
 
     delete decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
-             "topp_sampling" == decoding_strategy) {
+             "topp_sampling" == decoding_strategy ||
+             "sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
     decoding_sampling_ =
         new DecodingSampling<DecodingTraits_::OpType>(allocator_,
@@ -300,7 +311,8 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       start_id_,
                                                       end_id_,
                                                       candidate_num_,
-                                                      probability_threshold_);
+                                                      probability_threshold_,
+                                                      fuse_qkv);
 
     decoding_sampling_->forward(params, decoding_params);
 
@@ -353,22 +365,21 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
-    std::string decoding_strategy,
-    int beam_size,
-    int topk,
-    float topp,
-    int n_head,
-    int size_per_head,
-    int num_layer,
-    int bos_id,
-    int eos_id,
-    int64_t max_len,
-    float beam_search_diversity_rate,
-    float alpha) {
+    const std::string& decoding_strategy,
+    const int& beam_size,
+    const int& topk,
+    const float& topp,
+    const int& n_head,
+    const int& size_per_head,
+    const int& num_layer,
+    const int& bos_id,
+    const int& eos_id,
+    const int64_t& max_len,
+    const float& beam_search_diversity_rate,
+    const float& alpha) {
   auto stream = input.stream();
-  cublasHandle_t cublas_handle_;
-  cublasCreate(&cublas_handle_);
-  cublasSetStream(cublas_handle_, stream);
+
+  cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
 
@@ -424,7 +435,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          cublas_handle_,
           stream);
       break;
     }
@@ -479,7 +489,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          cublas_handle_,
           stream);
       break;
     }
@@ -490,7 +499,5 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
       break;
     }
   }
-
-  cublasDestroy(cublas_handle_);
   return ret;
 }

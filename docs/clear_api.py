@@ -20,19 +20,21 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
     del_nodes = ['Submodules', 'Module contents', 'Subpackages']
     # 要删除的标题中的字符串
     del_str = [' module', ' package']
-    #datasets需要的部分
+    # datasets需要的部分
     dataset_list = ['datasets', 'dataset']
-    #需要call方法
+    # 需要call方法
     add_call_files = [
         'data.collate', 'data.iterator', 'data.sampler', 'data.tokenizer',
         'data.vocab', 'tokenizer\_utils'
     ]
-    #删除inheritance
+    # 删除inheritance
     del_inheritance = [
         'crf', 'tcn', 'distributed', 'dataset', 'paraller', 'decoder', 'rdrop',
         'decoding', 'fast\_transformer', 'Adamoptimizer', 'attention\_utils',
         'model\_utils', 'batch\_sampler', 'model'
     ]
+    # 文档中空白的part，不显示
+    del_rst = ['iterator', 'constant']
     for rst_file in rst_files:
         f = open(os.path.join(abspath_rstfiles_dir, rst_file), 'r')
         file_lines = f.readlines()
@@ -48,14 +50,26 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
             if length > 2:
                 if 'datasets.dataset' not in first_line:
                     path = os.path.join(abspath_rstfiles_dir, rst_file)
+                    print(path)
                     os.remove(path)
+                    print(path)
                     continue
-        #是否加入call
+        # 去除文档中空白页面，目前是data.iterator, embeddings.constant部分
+        del_rst_flag = 0
+        for pattern in del_rst:
+            if pattern in first_line:
+                path = os.path.join(abspath_rstfiles_dir, rst_file)
+                os.remove(path)
+                del_rst_flag = 1
+                break
+        if del_rst_flag == 1:
+            continue
+        # 是否加入call
         add_call_files_flag = 0
         for i in add_call_files:
             if i in first_line:
                 add_call_files_flag = 1
-        #是否删除inheritance
+        # 是否删除inheritance
         del_inheritance_flag = 0
         for j in del_inheritance:
             if j in first_line:
@@ -91,7 +105,7 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
                 if 'no-undoc-members' not in file_line:
                     file_line = file_line.replace('undoc-members',
                                                   'no-undoc-members')
-            #去除datasets中多余内容
+            # 去除datasets中多余内容
             if 'paddlenlp.datasets' in file_line:
                 last_name = file_line.split('.')[-1]
                 if last_name.strip() not in dataset_list:

@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2021 Google Research and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,7 +68,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "bigbird-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bigbird/sentencepiece_gpt2.model",
         },
     }
     pretrained_init_configuration = {

@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/renmada/sshleifer-tiny-distilbert-base-uncased-finetuned-sst-2-english/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/renmada/sshleifer-tiny-distilbert-base-uncased-finetuned-sst-2-english/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/renmada/sshleifer-tiny-distilbert-base-uncased-finetuned-sst-2-english/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/renmada/sshleifer-tiny-distilbert-base-uncased-finetuned-sst-2-english/vocab.txt"
+}

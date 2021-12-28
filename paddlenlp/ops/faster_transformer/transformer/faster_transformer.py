@@ -23,12 +23,16 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
-                           InferUnifiedDecoding, InferBartDecoding)
+                           InferUnifiedDecoding, InferBartDecoding,
+                           InferMBartDecoding)
+
+from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UnifiedTransformerPretrainedModel,
-                                    UNIMOPretrainedModel, BartPretrainedModel)
+                                    UNIMOPretrainedModel, BartPretrainedModel,
+                                    GPTPretrainedModel, MBartPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -96,7 +100,14 @@ class FasterTransformer(TransformerModel):
             for details. Bigger `diversity_rate` would lead to more diversity.
             if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
             to 0 if not set.
-        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        use_fp16_decoding(bool, optional):
+            Whether to use fp16 for decoding. 
+        enable_faster_encoder(bool, optional):
+            Whether to use the faster version of encoder. This is experimental option for now.
+            Defaults to False.
+        use_fp16_encoder(bool, optional):
+            Whether to use fp16 for encoder. Only works when enable_faster_encoder is True.
+            Defaults to False.
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
             of source text. Only works in `v2` temporarily. It is suggest to set
@@ -131,6 +142,8 @@ class FasterTransformer(TransformerModel):
                  diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
+                 enable_faster_encoder=False,
+                 use_fp16_encoder=False,
                  rel_len=False,
                  alpha=0.6):
         # if decoding_lib is None:
@@ -150,6 +163,8 @@ class FasterTransformer(TransformerModel):
         self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.enable_faster_encoder = args.pop("enable_faster_encoder")
+        self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
         self.dropout = dropout
@@ -159,6 +174,13 @@ class FasterTransformer(TransformerModel):
         self.bos_id = bos_id
         self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
+
+        if self.enable_faster_encoder:
+            logger.warning(
+                "enable_faster_encoder is an experimental option and subject to change."
+            )
+        elif self.use_fp16_encoder:
+            self.use_fp16_encoder = False
 
         self.decoding_linear = nn.Linear(
             in_features=d_model, out_features=trg_vocab_size)
@@ -190,7 +212,7 @@ class FasterTransformer(TransformerModel):
             rel_len=self.rel_len,
             alpha=self.alpha)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
@@ -206,16 +228,22 @@ class FasterTransformer(TransformerModel):
         enc_input = F.dropout(
             src_emb, p=self.dropout,
             training=False) if self.dropout else src_emb
+
+        if self.enable_faster_encoder and self.use_fp16_encoder:
+            enc_input = paddle.cast(enc_input, dtype="float16")
+
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
-        if self.use_fp16_decoding:
+        if self.use_fp16_decoding and enc_output.dtype != paddle.float16:
             enc_output = paddle.cast(enc_output, dtype="float16")
+        elif not self.use_fp16_decoding and enc_output.dtype != paddle.float32:
+            enc_output = paddle.cast(enc_output, dtype="float32")
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
                                   dtype="int32",
                                   axis=1)
-        ids = self.decoding(enc_output, mem_seq_lens)
+        ids = self.decoding(enc_output, mem_seq_lens, trg_word=trg_word)
 
         return ids
 
@@ -236,17 +264,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # FasterTransformer when using float16.
-        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
-        # after update to FT-4.0.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
-                "beam_search"):
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -255,9 +272,25 @@ class FasterTransformer(TransformerModel):
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
             self.max_length, self.d_model)
 
+        if self.decoding._fuse_qkv:
+            for item in self.state_dict():
+                if "decoder" in item and "self_attn.q_proj" in item:
+                    num_layer = item.split(".")[3]
+                    param_type = item.split(".")[-1]
+
+                    model_dict["decoding.slf_q_" + param_type + "_" +
+                               num_layer] = np.concatenate(
+                                   (model_dict[item], model_dict[
+                                       "transformer.decoder.layers." + num_layer
+                                       + ".self_attn.k_proj." + param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer + ".self_attn.v_proj."
+                                               + param_type]),
+                                   axis=-1)
+
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
@@ -265,6 +298,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         self.load_dict(model_dict)
 
@@ -350,17 +385,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # FasterTransformer when using float16.
-        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
-        # after update to FT-4.0.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
-                "beam_search"):
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -369,9 +393,25 @@ class FasterTransformer(TransformerModel):
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
             self.max_length, self.d_model)
 
+        if self.decoding._fuse_qkv:
+            for item in self.state_dict():
+                if "decoder" in item and "self_attn.q_proj" in item:
+                    num_layer = item.split(".")[3]
+                    param_type = item.split(".")[-1]
+
+                    model_dict["decoding.slf_q_" + param_type + "_" +
+                               num_layer] = np.concatenate(
+                                   (model_dict[item], model_dict[
+                                       "transformer.decoder.layers." + num_layer
+                                       + ".self_attn.k_proj." + param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer + ".self_attn.v_proj."
+                                               + param_type]),
+                                   axis=-1)
+
         if self.use_fp16_decoding:
             for item in self.state_dict():
-                if "decoder" in item:
+                if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
@@ -379,6 +419,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         for item in self.state_dict():
             param = self
@@ -581,7 +623,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 rel_len=rel_len,
                 alpha=alpha)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         r"""
         Performs decoding for transformer model.
 
@@ -590,6 +632,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 The ids of source sequence words. It is a tensor with shape
                 `[batch_size, source_sequence_length]` and its data type can be
                 int or int64.
+            trg_word (Tensor):
+                The ids of target sequence words. Normally, it should NOT be
+                given. If it's given, force decoding with previous output token
+                will be trigger. Defaults to None. 
         
         Returns:
             Tensor:
@@ -627,7 +673,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 transformer(
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        out = self.transformer(src_word)
+        out = self.transformer(src_word, trg_word=trg_word)
         # TODO(guosheng): FasterTransformer has an output with layout
         # `[seq_len, batch_size, beam_size]`. While the output layout of
         # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
@@ -645,32 +691,71 @@ class TransformerGenerator(paddle.nn.Layer):
             self.transformer.load_dict(model_dict)
 
 
-class FasterGPT(nn.Layer):
-    def __init__(self,
-                 model,
-                 topk=4,
-                 topp=0.0,
-                 max_out_len=256,
-                 bos_id=50256,
-                 eos_id=50256,
-                 temperature=0,
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+class FasterGPT(GPTPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
+        self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(
             model=model,
-            topk=topk,
-            topp=topp,
-            max_out_len=max_out_len,
-            bos_id=bos_id,
-            eos_id=eos_id,
-            temperature=temperature,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
-    def forward(self, input_ids):
-        return self.decoding(input_ids)
+    def forward(self,
+                input_ids,
+                seq_len=None,
+                attention_mask=None,
+                top_k=4,
+                top_p=0.0,
+                max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=0,
+                decode_strategy="sample",
+                num_return_sequences=1,
+                **model_kwargs):
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 dtype="int32")
+
+            if bos_token_id == pad_token_id and paddle.sum(
+                    paddle.any(input_ids == pad_token_id), dtype="int64") > 0:
+                seq_len = seq_len + 1
+
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
+            seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
+
+        return self.decoding(
+            input_ids,
+            mem_seq_len=seq_len,
+            attention_mask=attention_mask,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            forced_eos_token_id=forced_eos_token_id,
+            temperature=temperature)
 
     def export_params(self, state_to_load, place):
         for item in state_to_load:
@@ -698,34 +783,28 @@ class FasterGPT(nn.Layer):
         elif isinstance(tokenizer, GPTChineseTokenizer):
             tokenizer.save_resources(path)
 
+    generate = forward
+
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
-    def __init__(self,
-                 model,
-                 decoding_strategy="sampling",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
-        self._decoding_strategy = decoding_strategy
-        self.bos_token_id = model.bos_token_id
-        self.pad_token_id = model.pad_token_id
-        self.eos_token_id = model.eos_token_id
-        self.unk_token_id = model.unk_token_id
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.unk_token_id = self._model.unk_token_id
+        self.mask_token_id = self._model.mask_token_id
+        self.bos_token_id = self._model.bos_token_id
+        self.pad_token_id = self._model.pad_token_id
         self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
-
         self._n_head = self._model.num_attention_heads
         self._hidden_dims = self._model.hidden_size
         self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
-        self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decoding_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -734,32 +813,25 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             size_per_head=self._size_per_head,
             n_layer=self._n_layer,
             unk_id=self.unk_token_id,
-            mask_id=self._mask_id,
+            mask_id=self.mask_token_id,
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
-                                      use_cache=False,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
+                                      position_ids, attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
         decoding_type_id = token_type_ids[:, -1]
         token_type_ids = token_type_ids[:, :-1]
         position_ids = position_ids[:, :-1]
         attention_mask = attention_mask[:, :, :-1, :-1]
-        seq_len = kwargs.get("seq_len", None) - 1
+        seq_len = kwargs.get("seq_len") - 1
 
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
             "position_ids": position_ids,
             "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache,
+            "use_cache": True,
             "seq_len": seq_len,
             "decoding_type_id": paddle.cast(
                 decoding_type_id, dtype="int32")
@@ -768,74 +840,82 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decoding_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
 
-    def sample(self,
-               input_ids,
-               logits_processors,
-               max_length,
-               pad_token_id,
-               eos_token_id,
-               top_k=4,
-               top_p=0.0,
-               temperature=1.0,
-               min_tokens_to_keep=1,
-               **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
-
-        if self._decoding_strategy == "sampling":
-            if top_p == 1.0 and top_k > 0:
-                top_p = 0.0
-            elif top_p <= 0.0 and top_k == 0:
-                raise ValueError(
-                    "Topk sampling or topp sampling must be applied. " \
-                    "Topk sampling and topp sampling cannot be both applied. ")
-            elif (top_p > 0.0 and top_p < 1.0) and top_k > 0:
-                raise ValueError(
-                    "Topk sampling and topp sampling cannot be both applied. ")
-
-        return self.forward(
-            model_inputs=model_inputs,
-            max_length=max_length,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature)
-
-    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
-        temperature = model_kwargs.pop('temperature', 1.0)
-
-        return self.forward(
-            model_inputs=model_inputs,
-            max_length=max_length,
-            num_beams=beam_scorer.num_beams,
-            diversity_rate=diversity_rate,
-            temperature=temperature)
-
     def forward(self,
-                max_length,
-                decoding_strategy="sampling",
+                input_ids,
+                token_type_ids,
+                position_ids,
+                attention_mask,
+                seq_len=None,
+                max_length=128,
                 top_k=4,
                 top_p=0.0,
+                decode_strategy="sampling",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 num_beams=4,
                 diversity_rate=0.0,
                 temperature=1.0,
-                model_inputs=None,
+                num_return_sequences=1,
+                length_penalty=0.6,
+                early_stopping=False,
+                forced_eos_token_id=None,
                 **model_kwargs):
-        seq_len = model_inputs.pop('seq_len', None)
+
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if decode_strategy.startswith("beam_search"):
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_beams,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "sampling":
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "greedy_search":
+            model_kwargs = {
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len
+            }
+        else:
+            raise ValueError(
+                "Only greedy search, beam search and sampling are supported. ")
+
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+
+        seq_len = model_inputs.pop('seq_len')
         decoding_type_id = model_inputs.pop('decoding_type_id')
 
         outputs = self._model(**model_inputs)
@@ -843,6 +923,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             caches = outputs[1]
         else:
             raise RuntimeError('Not support.')
+
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
 
@@ -854,41 +935,41 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
+            decoding_strategy=decode_strategy,
             max_out_len=max_length,
-            bos_id=self.bos_token_id,
-            eos_id=self.eos_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=True)
+            pos_bias=True,
+            forced_eos_token_id=forced_eos_token_id,
+            early_stopping=early_stopping)
+
+    generate = forward
 
 
 class FasterUNIMOText(UNIMOPretrainedModel):
-    def __init__(self,
-                 model,
-                 decoding_strategy="sampling",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
-        self._decoding_strategy = decoding_strategy
-        self.bos_token_id = model.bos_token_id
-        self.pad_token_id = model.pad_token_id
-        self.eos_token_id = model.eos_token_id
-        self.unk_token_id = model.unk_token_id
+        self.unk_token_id = self._model.unk_token_id
+        self.mask_token_id = self._model.mask_token_id
+        self.bos_token_id = self._model.bos_token_id
+        self.pad_token_id = self._model.pad_token_id
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
-        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
 
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
         self._n_head = self._model.num_attention_heads
         self._hidden_dims = self._model.hidden_size
         self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
-        self._mask_id = self._model.mask_token_id
         self._hidden_act = self._model.hidden_act
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
-            decoding_strategy=self._decoding_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             logits_mask=self.logits_mask,
@@ -897,32 +978,25 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             size_per_head=self._size_per_head,
             n_layer=self._n_layer,
             unk_id=self.unk_token_id,
-            mask_id=self._mask_id,
+            mask_id=self.mask_token_id,
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
-                                      use_cache=False,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
+                                      position_ids, attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
         decoding_type_id = token_type_ids[:, -1]
         token_type_ids = token_type_ids[:, :-1]
         position_ids = position_ids[:, :-1]
         attention_mask = attention_mask[:, :, :-1, :-1]
-        seq_len = kwargs.get("seq_len", None) - 1
+        seq_len = kwargs.get("seq_len") - 1
 
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
             "position_ids": position_ids,
             "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache,
+            "use_cache": True,
             "seq_len": seq_len,
             "decoding_type_id": paddle.cast(
                 decoding_type_id, dtype="int32")
@@ -931,74 +1005,81 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
-        logits_mask[self.unk_token_id] = -1e9
-        logits_mask[self.bos_token_id] = -1e9
-        logits_mask[self.pad_token_id] = -1e9
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
 
         logits_mask_t = paddle.assign(logits_mask)
-        if use_fp16_decoding and self._decoding_strategy == "sampling":
+        if use_fp16_decoding:
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
 
-    def sample(self,
-               input_ids,
-               logits_processors,
-               max_length,
-               pad_token_id,
-               eos_token_id,
-               top_k=4,
-               top_p=0.0,
-               temperature=1.0,
-               min_tokens_to_keep=1,
-               **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
-
-        if self._decoding_strategy == "sampling":
-            if top_p == 1.0 and top_k > 0:
-                top_p = 0.0
-            elif top_p <= 0.0 and top_k == 0:
-                raise ValueError(
-                    "Topk sampling or topp sampling must be applied. " \
-                    "Topk sampling and topp sampling cannot be both applied. ")
-            elif (top_p > 0.0 and top_p < 1.0) and top_k > 0:
-                raise ValueError(
-                    "Topk sampling and topp sampling cannot be both applied. ")
-
-        return self.forward(
-            model_inputs=model_inputs,
-            max_length=max_length,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature)
-
-    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
-        temperature = model_kwargs.pop('temperature', 1.0)
-
-        return self.forward(
-            model_inputs=model_inputs,
-            max_length=max_length,
-            num_beams=beam_scorer.num_beams,
-            diversity_rate=diversity_rate,
-            temperature=temperature)
-
     def forward(self,
-                max_length,
-                decoding_strategy="sampling",
+                input_ids,
+                token_type_ids,
+                position_ids,
+                attention_mask,
+                seq_len=None,
+                max_length=128,
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                decode_strategy="sampling",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
                 diversity_rate=0.0,
                 temperature=1.0,
-                model_inputs=None,
+                num_return_sequences=1,
+                length_penalty=0.6,
+                early_stopping=False,
+                forced_eos_token_id=None,
                 **model_kwargs):
-        seq_len = model_inputs.pop('seq_len', None)
+
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if decode_strategy.startswith("beam_search"):
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_beams,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "sampling":
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "greedy_search":
+            model_kwargs = {
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len
+            }
+        else:
+            raise ValueError(
+                "Only greedy search, beam search and sampling are supported. ")
+
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        seq_len = model_inputs.pop('seq_len')
         decoding_type_id = model_inputs.pop('decoding_type_id')
 
         outputs = self._model(**model_inputs)
@@ -1006,6 +1087,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             caches = outputs[1]
         else:
             raise RuntimeError('Not support.')
+
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
 
@@ -1017,22 +1099,26 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
+            decoding_strategy=decode_strategy,
             max_out_len=max_length,
-            bos_id=self.bos_token_id,
-            eos_id=self.eos_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
             temperature=temperature,
+            length_penalty=length_penalty,
             decoding_type_id=decoding_type_id,
-            pos_bias=False)
+            forced_eos_token_id=forced_eos_token_id,
+            pos_bias=False,
+            early_stopping=early_stopping)
+
+    generate = forward
 
 
 class FasterBART(BartPretrainedModel):
-    def __init__(self,
-                 model,
-                 decoding_strategy="beam_search_v2",
-                 decoding_lib=None,
-                 use_fp16_decoding=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
         if use_fp16_decoding:
             weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
                 model.bart.encoder.embed_tokens.weight))
@@ -1041,15 +1127,10 @@ class FasterBART(BartPretrainedModel):
                 weight_attr=weight_attr)
         self.encoder = model.bart.get_encoder()
         self.decoder = model.bart.get_decoder()
-        self.bos_token_id = model.bart.config['bos_token_id']
-        self.eos_token_id = model.bart.config['eos_token_id']
         self.pad_token_id = model.bart.config['pad_token_id']
-        if decoding_strategy.startswith("beam_search"):
-            decoding_strategy = "beam_search_v2"
-        self._decoding_strategy = decoding_strategy
+
         self.decoding = InferBartDecoding(
-            model=model,
-            decoding_strategy=decoding_strategy,
+            model=self._model,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
@@ -1059,95 +1140,186 @@ class FasterBART(BartPretrainedModel):
     def get_decoder(self):
         return self.decoder
 
-    def greedy_search(self, input_ids, logits_processors, max_length,
-                      pad_token_id, eos_token_id, **model_kwargs):
-        return self.sample(
-            input_ids=input_ids,
-            logits_processors=logits_processors,
-            max_length=max_length,
-            pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
-            top_k=1,
-            top_p=1.0,
-            **model_kwargs)
+    def forward(self,
+                input_ids=None,
+                encoder_output=None,
+                seq_len=None,
+                num_beams=4,
+                top_k=1,
+                top_p=0.0,
+                decode_strategy="beam_search",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                max_length=256,
+                diversity_rate=0.0,
+                length_penalty=0.6,
+                num_return_sequences=1,
+                early_stopping=False,
+                forced_eos_token_id=None,
+                **model_kwargs):
 
-    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        rel_len = model_kwargs.pop("rel_len", False)
-        alpha = model_kwargs.pop("alpha", 0.6)
-        encoder_output = model_kwargs.pop("encoder_output")
-        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
-        return self.forward(
-            encoder_output=encoder_output,
-            mem_seq_lens=mem_seq_lens,
-            beam_size=beam_scorer.num_beams,
+        if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder)
+            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
+            self.encoder = disable_faster_encoder(self.encoder)
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        if decode_strategy.startswith("beam_search") and num_beams > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        elif decode_strategy == "sampling" and num_return_sequences > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output,
+                expand_size=num_return_sequences,
+                seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        if decoder_start_token_id is not None:
+            bos_token_id = decoder_start_token_id
+        return self.decoding(
+            enc_output=encoder_output,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            top_k=top_k,
+            decoding_strategy=decode_strategy,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            top_p=top_p,
             max_out_len=max_length,
             diversity_rate=diversity_rate,
-            rel_len=rel_len,
-            alpha=alpha)
+            alpha=length_penalty,
+            early_stopping=early_stopping,
+            forced_eos_token_id=forced_eos_token_id)
 
-    def sample(self,
-               input_ids,
-               logits_processors,
-               max_length,
-               pad_token_id,
-               eos_token_id,
-               top_k=4,
-               top_p=0.0,
-               temperature=1.0,
-               min_tokens_to_keep=1,
-               **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        if self._decoding_strategy in ["sampling", "greedy_search"] and (
-                abs(top_p - 1.0) < 1e-6 and top_k > 0):
-            top_p = 0.0
-        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
-                                                        top_k == 0):
-            top_k = 0
-        else:
-            raise ValueError(
-                "Only top_k sampling or top_p sampling are supported. " \
-                "Top_k sampling and top_p sampling cannot be both applied. ")
-        encoder_output = model_kwargs.pop("encoder_output")
-        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
-        return self.forward(
-            encoder_output=encoder_output,
-            mem_seq_lens=mem_seq_lens,
-            top_k=top_k,
-            top_p=top_p,
-            max_out_len=max_length)
+    generate = forward
+
+
+class FasterMBART(MBartPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterMBART, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
+                model.mbart.encoder.embed_tokens.weight))
+            model.mbart.encoder.embed_tokens = nn.Embedding(
+                *model.mbart.encoder.embed_tokens.weight.shape,
+                weight_attr=weight_attr)
+        self.encoder = model.mbart.get_encoder()
+        self.decoder = model.mbart.get_decoder()
+        self.pad_token_id = model.mbart.config['pad_token_id']
+
+        self.decoding = InferMBartDecoding(
+            model=self._model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            hidden_act=model.mbart.config['activation_function'])
+
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
 
     def forward(self,
                 input_ids=None,
                 encoder_output=None,
-                mem_seq_lens=None,
-                beam_size=4,
+                seq_len=None,
+                forced_bos_token_id=None,
+                num_beams=4,
                 top_k=1,
                 top_p=0.0,
-                max_out_len=256,
+                decode_strategy="beam_search_v3",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                max_length=256,
                 diversity_rate=0.0,
-                rel_len=False,
-                alpha=0.6):
+                length_penalty=0.6,
+                temperature=1.0,
+                num_return_sequences=1,
+                early_stopping=False,
+                **model_kwargs):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self._model, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self._model, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self._model, 'pad_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self._model, 'decoder_start_token_id', None)
+
+        #(gongenlei) Not enable_faster_encoder temporarily
         if encoder_output is None:
+            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
-            encoder_output = self.encoder(input_ids)
-        if mem_seq_lens is None:
-            assert input_ids is not None, "You have to specify either input_ids when generating mem_seq_lens."
-            mem_seq_lens = paddle.sum(paddle.cast(
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)["encoder_output"]
+            self.encoder = disable_faster_encoder(self.encoder)
+        batch_size = paddle.shape(encoder_output)[0]
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
                 input_ids != self.pad_token_id, dtype="int32"),
-                                      axis=-1,
-                                      keepdim=True,
-                                      dtype="int32")
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
+        if decode_strategy.startswith("beam_search") and num_beams > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        elif decode_strategy == "sampling" and num_return_sequences > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output,
+                expand_size=num_return_sequences,
+                seq_len=seq_len)
+            seq_len = expanded_kwargs["seq_len"]
+        if decoder_start_token_id is not None:
+            bos_token_id = decoder_start_token_id
+
+        if forced_bos_token_id is not None:
+            if decode_strategy == "sampling":
+                trg_word = paddle.full(
+                    [batch_size * num_return_sequences, 1],
+                    forced_bos_token_id,
+                    dtype="int32")
+            else:
+                trg_word = paddle.full(
+                    [batch_size, 1], forced_bos_token_id, dtype="int32")
+        else:
+            trg_word = paddle.zeros([0])
+
         return self.decoding(
             enc_output=encoder_output,
-            memory_seq_lens=mem_seq_lens,
-            beam_size=beam_size,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            trg_word=trg_word,
             top_k=top_k,
             top_p=top_p,
-            max_out_len=max_out_len,
+            decoding_strategy=decode_strategy,
             diversity_rate=diversity_rate,
-            rel_len=rel_len,
-            alpha=alpha)
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            alpha=length_penalty,
+            temperature=temperature,
+            early_stopping=early_stopping)
+
+    generate = forward

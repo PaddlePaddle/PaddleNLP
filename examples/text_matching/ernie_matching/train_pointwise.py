@@ -42,6 +42,7 @@ parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight deca
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--eval_step", default=100, type=int, help="Step interval for evaluation.")
 parser.add_argument('--save_step', default=10000, type=int, help="Step interval for saving checkpoint.")
+parser.add_argument('--max_step', default=10000, type=int, help="Max steps for training.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
@@ -73,10 +74,10 @@ def evaluate(model, criterion, metric, data_loader, phase="dev"):
     losses = []
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch
-        probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-        loss = criterion(probs, labels)
+        logits = model(input_ids=input_ids, token_type_ids=token_type_ids)
+        loss = criterion(logits, labels)
         losses.append(loss.numpy())
-        correct = metric.compute(probs, labels)
+        correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
     print("eval {} loss: {:.5}, accu: {:.5}".format(phase,
@@ -162,13 +163,20 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-            loss = criterion(probs, labels)
-            correct = metric.compute(probs, labels)
+            logits = model(input_ids=input_ids, token_type_ids=token_type_ids)
+            loss = criterion(logits, labels)
+            correct = metric.compute(logits, labels)
             metric.update(correct)
             acc = metric.accumulate()
 
             global_step += 1
+
+            if global_step > args.max_step:
+                print(
+                    "Training steps have achieved max_step, training is stopped."
+                )
+                return
+
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
@@ -190,6 +198,13 @@ def do_train():
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
+
+    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+    paddle.save(model.state_dict(), save_param_path)
+    tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":

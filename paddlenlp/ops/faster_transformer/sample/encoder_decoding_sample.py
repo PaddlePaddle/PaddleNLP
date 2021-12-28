@@ -24,6 +24,7 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterTransformer
+from paddlenlp.ops import enable_faster_encoder
 
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Pad
@@ -33,7 +34,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./sample/config/decoding.sample.yaml",
+        default="./faster_transformer/sample/config/decoding.sample.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
@@ -45,6 +46,15 @@ def parse_args():
         "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument(
+        "--enable_faster_encoder",
+        action="store_true",
+        help="Whether to use faster version encoder to predict. This is experimental option for now. "
+    )
+    parser.add_argument(
+        "--use_fp16_encoder",
+        action="store_true",
+        help="Whether to use fp16 encoder to predict. ")
     args = parser.parse_args()
     return args
 
@@ -69,7 +79,7 @@ def generate_src_word(batch_size, vocab_size, max_length, eos_idx, pad_idx):
 
 def do_predict(args):
     place = "gpu"
-    paddle.set_device(place)
+    place = paddle.set_device(place)
 
     # Define model
     transformer = FasterTransformer(
@@ -91,10 +101,16 @@ def do_predict(args):
         topp=args.topp,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+        use_fp16_decoding=args.use_fp16_decoding,
+        enable_faster_encoder=args.enable_faster_encoder,
+        use_fp16_encoder=args.use_fp16_encoder)
 
     # Set evaluate mode
     transformer.eval()
+
+    if args.enable_faster_encoder:
+        transformer = enable_faster_encoder(
+            transformer, use_fp16=args.use_fp16_encoder)
 
     src_word = generate_src_word(
         batch_size=args.infer_batch_size,
@@ -107,8 +123,10 @@ def do_predict(args):
         for i in range(100):
             # For warmup. 
             if 50 == i:
+                paddle.device.cuda.synchronize(place)
                 start = time.time()
             transformer(src_word=src_word)
+        paddle.device.cuda.synchronize(place)
         logger.info("Average test time for encoder-decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
@@ -118,8 +136,10 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.enable_faster_encoder = ARGS.enable_faster_encoder
+    args.use_fp16_encoder = ARGS.use_fp16_encoder
+    pprint(args)
 
     do_predict(args)

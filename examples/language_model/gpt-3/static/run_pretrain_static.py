@@ -32,6 +32,7 @@ from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
@@ -54,15 +55,11 @@ def create_data_holder(args):
         name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
         name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
-    attention_mask = paddle.static.data(
-        name="attention_mask",
-        shape=[-1, 1, args.max_seq_len, args.max_seq_len],
-        dtype="float32")
     position_ids = paddle.static.data(
         name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
     labels = paddle.static.data(
         name="labels", shape=[-1, args.max_seq_len], dtype="int64")
-    return [tokens, loss_mask, attention_mask, position_ids, labels]
+    return [tokens, loss_mask, position_ids, labels]
 
 
 def dist_optimizer(args, topo):
@@ -90,14 +87,12 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": [
-                'softmax',
-                'layer_norm',
-                'gelu',
-            ],
-            "custom_black_list": ['c_softmax_with_cross_entropy'],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
+            "use_pure_fp16": args.amp_level=="O2",
+            "use_fp16_guard": False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -198,6 +193,10 @@ def do_train(args):
     get_rng_state_tracker().add('global_seed', args.seed)
     get_rng_state_tracker().add('local_seed',
                                 args.seed + fleet.worker_index() + 2021)
+    
+    if args.use_amp and args.amp_level=="O2":
+        assert (args.mp_degree == 1 and args.pp_degree == 1), "When amp level is O2, mp_degree and pp_degree should be 1."
+        assert (args.use_sharding == False), "When amp level is O2, use_sharding should be False."
 
     assert args.device in [
         "cpu", "gpu", "xpu"
@@ -245,7 +244,7 @@ def do_train(args):
         with paddle.utils.unique_name.guard():
             with paddle.static.device_guard('gpu:0'):
                 data_holders = create_data_holder(args)
-                [tokens, loss_mask, attention_mask, position_ids,
+                [tokens, loss_mask, position_ids,
                  labels] = data_holders
 
                 tokenizer = tokenizer_class.from_pretrained(
@@ -284,9 +283,8 @@ def do_train(args):
                         attention_probs_dropout_prob=args.
                         attention_probs_dropout_prob,
                         topo=topo)
-
                 # Create the model for the gpt pretrain
-                preds = model(tokens, position_ids, attention_mask)
+                preds = model(tokens, position_ids)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
                     GPTPretrainingCriterion)(topo)
@@ -308,12 +306,12 @@ def do_train(args):
             if args.grad_clip > 0:
                 clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
+                
 
             decay_param = [
                 p.name for n, p in model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
-
             optimizer = paddle.optimizer.AdamW(
                 learning_rate=lr_scheduler,
                 beta1=args.adam_beta1,
@@ -356,6 +354,11 @@ def do_train(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
+    
+    
+    if args.use_amp and args.amp_level=="O2":
+        optimizer.amp_init(place)
+    
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -402,28 +405,45 @@ def do_train(args):
         valid_data_loader = valid_data_loader()
         test_data_loader = test_data_loader()
 
+        train_reader_cost = 0.0
+        train_run_cost = 0.0
+        reader_start = time.time()
         for step, batch in enumerate(train_data_loader()):
+            train_reader_cost += time.time() - reader_start
+            train_start = time.time()
+
             global_step += 1
+
             ret = exe.run(main_program,
                           feed=batch,
                           fetch_list=fetchs,
                           use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
+            train_run_cost += time.time() - train_start
+
+            # Profile for model benchmark
+            profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
                     loss_return, lr_return = ret
-                    speed = args.logging_freq / (time.time() - tic_train)
+                    #speed = args.logging_freq / (time.time() - tic_train)
+                    speed = args.logging_freq / (
+                        train_reader_cost + train_run_cost)
+                    avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, loss_return[0], speed,
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        % (global_step, epoch, step, loss_return[0],
+                           avg_reader_cost, 1. / speed, speed,
                            speed * args.global_batch_size * args.max_seq_len,
                            lr_return[0]))
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)
                 tic_train = time.time()
+                train_reader_cost = 0.0
+                train_run_cost = 0.0
 
             if args.check_accuracy:
                 if global_step >= args.max_steps:
@@ -466,6 +486,8 @@ def do_train(args):
                              epoch, topo.is_last, eval_fetch, "test")
                 del train_data_loader
                 return
+            reader_start = time.time()
+
         epoch += 1
 
 

@@ -1,5 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The HuggingFace Inc. team, Microsoft Corporation.
+# Copyright 2018 The HuggingFace Inc. team, Microsoft Corporation.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -299,7 +300,8 @@ class MPNetPretrainedModel(PretrainedModel):
     An abstract class for pretrained MPNet models. It provides MPNet related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -324,7 +326,7 @@ class MPNetPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "mpnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mpnet/mpnet-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/model_state.pdparams",
         }
     }
     base_model_prefix = "mpnet"
@@ -347,7 +349,7 @@ class MPNetPretrainedModel(PretrainedModel):
 @register_base_model
 class MPNetModel(MPNetPretrainedModel):
     """
-    The bare MPNet Model transformer outputting raw hidden-states without any specific head on top.
+    The bare MPNet Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -551,7 +553,7 @@ class MPNetLMHead(nn.Layer):
 
 class MPNetForMaskedLM(MPNetPretrainedModel):
     """
-    MPNet Model with pretraining tasks on top.
+    MPNet Model with a `language modeling` head on top.
 
     Args:
         MPNet (:class:`MPNetModel`):
@@ -624,8 +626,8 @@ class MPNetForMaskedLM(MPNetPretrainedModel):
 
 class MPNetForSequenceClassification(MPNetPretrainedModel):
     """
-    MPNet Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    MPNet Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         mpnet (:class:`MPNetModel`):
@@ -691,8 +693,9 @@ class MPNetForSequenceClassification(MPNetPretrainedModel):
 
 class MPNetForMultipleChoice(MPNetPretrainedModel):
     """
-    MPNet Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
-    softmax) e.g. for RocStories/SWAG tasks.
+    MPNet Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+
     Args:
         mpnet (:class:`MPNetModel`):
             An instance of MPNetModel.
@@ -768,8 +771,8 @@ class MPNetForMultipleChoice(MPNetPretrainedModel):
 
 class MPNetForTokenClassification(MPNetPretrainedModel):
     """
-    MPNet Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    MPNet Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         mpnet (:class:`MPNetModel`):
@@ -833,9 +836,8 @@ class MPNetForTokenClassification(MPNetPretrainedModel):
 
 class MPNetForQuestionAnswering(MPNetPretrainedModel):
     """
-    MPNet Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    MPNet Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         mpnet (:class:`MPNetModel`):

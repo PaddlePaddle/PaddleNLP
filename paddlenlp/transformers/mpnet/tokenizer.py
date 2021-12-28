@@ -1,4 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team, Microsoft Corporation.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,15 +21,14 @@ __all__ = ['MPNetTokenizer']
 
 class MPNetTokenizer(BertTokenizer):
     """
-    Construct a MPNet tokenizer. `MPNetTokenizer` is almost identical to `BertTokenizer` and runs end-to-end 
-    tokenization: punctuation splitting and wordpiece. Refer to superclass `BertTokenizer` for usage examples 
-    and documentation concerning parameters.
+    Construct a MPNet tokenizer which is almost identical to `BertTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
             "mpnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mpnet/mpnet-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/vocab.txt",
         }
     }
     pretrained_init_configuration = {"mpnet-base": {"do_lower_case": True}}

@@ -34,6 +34,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
     Args:
         vocab_file (str): 
             The vocabulary file path (ends with '.txt') required to instantiate
@@ -76,13 +80,18 @@ class UNIMOTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "unimo-text-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-lcsts-new":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
         }
     }
     pretrained_init_configuration = {
         "unimo-text-1.0": {
+            "do_lower_case": True
+        },
+        "unimo-text-1.0-lcsts-new": {
             "do_lower_case": True
         },
         "unimo-text-1.0-large": {

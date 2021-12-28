@@ -1,6 +1,6 @@
 # 千言-问题匹配鲁棒性评测基线
 
-我们基于预训练模型 ERNIE-Gram 结合正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 在 [2021 CCF BDCI 千言-问题匹配鲁棒性评测](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/question_matching) 竞赛上建立了 Baseline 方案和评测结果。
+我们基于预训练模型 ERNIE-Gram 结合正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 在 [2021 CCF BDCI 千言-问题匹配鲁棒性评测](https://aistudio.baidu.com/aistudio/competition/detail/116/0/introduction) 竞赛上建立了 Baseline 方案和评测结果。
 
 ## 赛题背景
 
@@ -28,8 +28,8 @@
 | ---- | ---- |-----|--------|------- |
 | ernie-1.0-base |0.0| 86.96 |76.20 | 77.50|
 | bert-base-chinese |0.0| 86.93| 76.90 |77.60 |
-| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p0_baseline_model.tar) | 0.0 |87.66 | **80.80** | **81.20** |
-| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p1_baseline_model.tar) | 0.1 |87.91 | 80.20 | 80.80 |
+| [ernie-gram-zh](https://bj.bcebos.com/paddlenlp/models/text_matching/question_matching_rdrop0p0_baseline_model.tar) | 0.0 |87.66 | **80.80** | **81.20** |
+| [ernie-gram-zh](https://bj.bcebos.com/paddlenlp/models/text_matching/question_matching_rdrop0p1_baseline_model.tar) | 0.1 |87.91 | 80.20 | 80.80 |
 | ernie-gram-zh | 0.2 |87.47 | 80.10 | 81.00 |
 
 

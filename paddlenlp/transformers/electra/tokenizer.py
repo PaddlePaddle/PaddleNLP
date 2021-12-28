@@ -22,9 +22,13 @@ __all__ = ['ElectraTokenizer', ]
 
 class ElectraTokenizer(PretrainedTokenizer):
     """
-    Constructs a Electra tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs an Electra tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
@@ -67,15 +71,15 @@ class ElectraTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "electra-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-small-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-small-vocab.txt",
             "electra-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-base-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-base-vocab.txt",
             "electra-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-large-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/electra/electra-large-vocab.txt",
             "chinese-electra-base":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/vocab.txt",
             "chinese-electra-small":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -93,7 +97,7 @@ class ElectraTokenizer(PretrainedTokenizer):
         },
         "chinese-electra-small": {
             "do_lower_case": True
-        }
+        },
     }
 
     def __init__(self,

@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex-discriminator/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex-discriminator/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex-discriminator/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex-discriminator/vocab.txt"
+}

@@ -96,7 +96,7 @@ def batch_evaluate(
 
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
         metric.update(arc_preds, rel_preds, arcs, rels, mask)
-        uas, las = metric.accumulate()
+    uas, las = metric.accumulate()
     total_loss = np.mean(losses)
     model.train()
     metric.reset()

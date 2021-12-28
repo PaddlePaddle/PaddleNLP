@@ -48,15 +48,20 @@ std::vector<paddle::Tensor> DecoderForward(
     const paddle::Tensor& ffn_inter_bias,
     const paddle::Tensor& ffn_out_weight,
     const paddle::Tensor& ffn_out_bias,
-    const paddle::Tensor& old_self_cache,
+    const paddle::Tensor& old_self_cache_key,
+    const paddle::Tensor& old_self_cache_value,
     const paddle::Tensor& old_mem_cache,
+    const int step,
     int n_head,
-    int size_per_head) {
+    int size_per_head,
+    int memory_hidden_dim,
+    bool is_fuse_qkv) {
   const int batch_size = memory_tensor.shape()[0];
   std::vector<int64_t> output_dims;
   output_dims = {batch_size, 1, n_head * size_per_head};
 
-  auto new_self_cache = old_self_cache;
+  auto new_self_cache_key = old_self_cache_key;
+  auto new_self_cache_value = old_self_cache_value;
   auto new_mem_cache = old_mem_cache;
 
   if (from_tensor.place() == paddle::PlaceType::kGPU) {
@@ -99,13 +104,18 @@ std::vector<paddle::Tensor> DecoderForward(
                               ffn_inter_bias,
                               ffn_out_weight,
                               ffn_out_bias,
-                              old_self_cache,
+                              old_self_cache_key,
+                              old_self_cache_value,
                               old_mem_cache,
+                              step,
                               decoder_output,
-                              new_self_cache,
+                              new_self_cache_key,
+                              new_self_cache_value,
                               new_mem_cache,
                               n_head,
-                              size_per_head);
+                              size_per_head,
+                              memory_hidden_dim,
+                              is_fuse_qkv);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -141,11 +151,18 @@ std::vector<std::vector<int64_t>> DecoderInferShape(
     const std::vector<int64_t>& ffn_inter_bias_shapes,
     const std::vector<int64_t>& ffn_out_weight_shapes,
     const std::vector<int64_t>& ffn_out_bias_shapes,
-    const std::vector<int64_t>& old_self_cache_shape,
+    const std::vector<int64_t>& old_self_cache_key_shape,
+    const std::vector<int64_t>& old_self_cache_value_shape,
     const std::vector<int64_t>& old_mem_cache_shape,
+    const int& step,
     const int& n_head,
-    const int& size_per_head) {
-  return {from_tensor_shape, old_self_cache_shape, old_mem_cache_shape};
+    const int& size_per_head,
+    const int& memory_hidden_dim,
+    const bool& is_fuse_qkv) {
+  return {from_tensor_shape,
+          old_self_cache_key_shape,
+          old_self_cache_value_shape,
+          old_mem_cache_shape};
 }
 
 std::vector<paddle::DataType> DecoderInferDtype(
@@ -178,9 +195,10 @@ std::vector<paddle::DataType> DecoderInferDtype(
     const paddle::DataType& ffn_inter_bias,
     const paddle::DataType& ffn_out_weight,
     const paddle::DataType& ffn_out_bias,
-    const paddle::DataType& old_self_cache,
+    const paddle::DataType& old_self_cache_key,
+    const paddle::DataType& old_self_cache_value,
     const paddle::DataType& old_mem_cache) {
-  return {from_tensor, old_self_cache, old_mem_cache};
+  return {from_tensor, old_self_cache_key, old_self_cache_value, old_mem_cache};
 }
 
 PD_BUILD_OP(fusion_decoder)
@@ -194,10 +212,17 @@ PD_BUILD_OP(fusion_decoder)
          "CrossKeyBias",        "CrossValueWeight",     "CrossValueBias",
          "CrossOutWeight",      "CrossOutBias",         "FFNLayernormWeight",
          "FFNLayernormBias",    "FFNInterWeight",       "FFNInterBias",
-         "FFNOutWeight",        "FFNOutBias",           "OldSelfCache",
-         "OldMemCache"})
-    .Outputs({"DecoderOutput", "NewSelfCache", "NewMemCache"})
-    .Attrs({"n_head: int", "size_per_head: int"})
+         "FFNOutWeight",        "FFNOutBias",           "OldSelfCacheKey",
+         "OldSelfCacheValue",   "OldMemCache"})
+    .Outputs({"DecoderOutput",
+              "NewSelfCacheKey",
+              "NewSelfCacheValue",
+              "NewMemCache"})
+    .Attrs({"step: int",
+            "n_head: int",
+            "size_per_head: int",
+            "memory_hidden_dim: int",
+            "is_fuse_qkv: bool"})
     .SetKernelFn(PD_KERNEL(DecoderForward))
     .SetInferShapeFn(PD_INFER_SHAPE(DecoderInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(DecoderInferDtype));
