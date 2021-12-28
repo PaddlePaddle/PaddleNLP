@@ -3,26 +3,33 @@
 * [模型简介](#模型简介)
 * [快速开始](#快速开始)
   * [通用参数释义](#通用参数释义)
-  * [文本蕴含任务](#文本蕴含任务)
+  * [自然语言推断任务](#自然语言推断任务)
 * [参考论文](#参考论文)
 
 ## 模型简介
 
-[ERNIE-M](https://arxiv.org/abs/2012.15674) 是百度 NLP 提出的基于回译机制，从单语语料中学习语言间的语义对齐关系的预训练模型，显著提升包括跨语言自然语言推断、语义检索、语义相似度、命名实体识别、阅读理解在内的5种典型跨语言理解任务效果，并登顶权威跨语言理解评测 XTREME 榜首。
+[ERNIE-M](https://arxiv.org/abs/2012.15674) 是百度提出的一种多语言语言模型。原文提出了一种新的训练方法，让模型能够将多种语言的表示与单语语料库对齐，以克服平行语料库大小对模型性能的限制。原文的主要想法是将回译机制整合到预训练的流程中，在单语语料库上生成伪平行句对，以便学习不同语言之间的语义对齐，从而增强跨语言模型的语义建模。实验结果表明，ERNIE-M 优于现有的跨语言模型，并在各种跨语言下游任务中提供了最新的 SOTA 结果。
+原文提出两种方法建模各种语言间的对齐关系:
+
+- **Cross-Attention Masked Language Modeling(CAMLM)**: 该算法在少量双语语料上捕捉语言间的对齐信息。其需要在不利用源句子上下文的情况下，通过目标句子还原被掩盖的词语，使模型初步建模了语言间的对齐关系。
+- **Back-Translation masked language modeling(BTMLM)**: 该方法基于回译机制从单语语料中学习语言间的对齐关系。通过CAMLM 生成伪平行语料，然后让模型学习生成的伪平行句子，使模型可以利用单语语料更好地建模语义对齐关系。
+
+
+![framework](./framework.png)
 
 本项目是 ERNIE-M 的 PaddlePaddle 动态图实现， 包含模型训练，模型验证等内容。以下是本例的简要目录结构及说明：
 
 ```text
 .
 ├── README.md                   # 文档
-├── run_classifier.py           # 文本蕴含任务
+├── run_classifier.py           # 自然语言推断任务
 ```
 
 ## 快速开始
 
 ### 通用参数释义
 
-- `task_type` 表示了文本蕴含任务的类型，目前支持的类型为："cross-lingual-transfer", "translate-train-all"
+- `task_type` 表示了自然语言推断任务的类型，目前支持的类型为："cross-lingual-transfer", "translate-train-all"
   ，分别表示在英文数据集上训练并在所有15种语言数据集上测试、在所有15种语言数据集上训练和测试。
 - `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-m-base"， "ernie-m-large"
   。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
@@ -44,7 +51,7 @@
 - `use_amp` 表示是否启用自动混合精度训练。
 - `scale_loss` 表示自动混合精度训练的参数。
 
-### 文本蕴含任务
+### 自然语言推断任务
 
 #### 数据集介绍
 XNLI 是 MNLI 的子集，并且已被翻译成14种不同的语言（包含一些较低资源语言）。与 MNLI 一样，目标是预测文本蕴含（句子 A 是否暗示/矛盾/都不是句子 B ）。
@@ -71,7 +78,7 @@ python -m paddle.distributed.launch --gpus 0,1 --log_dir output run_classifier.p
     --output_dir output
 ```
 
-在XNLI数据集上Finetune cross-lingual-transfer 类型的文本蕴含任务后，在验证集上有如下结果
+在XNLI数据集上微调 cross-lingual-transfer 类型的自然语言推断任务后，在验证集上有如下结果
 | 模型 | ar | bg | de | el | en | es | fr | hi | ru | sw | th | tr | ur | vi | zh | Avg |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Cross-lingual Transfer |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
