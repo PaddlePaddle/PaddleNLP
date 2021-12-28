@@ -15,6 +15,7 @@
 import argparse
 import logging
 import os
+import sys
 import math
 import random
 import time
@@ -31,6 +32,9 @@ from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
+
+sys.path.append("../")
+from data import MODEL_CLASSES
 
 
 def ppminilm_forward(self,
