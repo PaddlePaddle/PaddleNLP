@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.io import Dataset, BatchSampler, DistributedBatchSampler, DataLoader
-from paddlenlp.transformers import ErnieMForSequenceClassification, ErnieMTokenizer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
@@ -232,7 +232,7 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args)
-    tokenizer = ErnieMTokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -262,7 +262,7 @@ def do_train(args):
         return_list=True)
 
     num_classes = 3
-    model = ErnieMForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     n_layers = model.ernie_m.config['num_hidden_layers']
     if paddle.distributed.get_world_size() > 1:
