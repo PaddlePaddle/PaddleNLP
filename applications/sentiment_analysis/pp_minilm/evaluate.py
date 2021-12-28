@@ -18,8 +18,7 @@ import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics.glue import AccuracyAndF1
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ErnieModel, ErnieTokenizer
-from model import PPMiniLMForSequenceClassification
+from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer
 from data import read, load_dict, convert_example_to_feature
 
 
@@ -54,7 +53,7 @@ if __name__ == "__main__":
     label2id, id2label = load_dict(args.label_path)
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
     test_ds = test_ds.map(trans_func, lazy=False)
 
@@ -70,8 +69,7 @@ if __name__ == "__main__":
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
-    ppminilm = ErnieModel.from_pretrained(pretrained_model_name_or_path=args.base_model_name)
-    model = PPMiniLMForSequenceClassification(ppminilm, num_classes=len(label2id))
+    model = PPMiniLMForSequenceClassification.from_pretrained(args.base_model_name, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = AccuracyAndF1()
