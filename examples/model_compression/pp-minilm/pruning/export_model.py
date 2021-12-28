@@ -26,14 +26,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-# from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
-
-# MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
 
 
 def ppminilm_forward(self,
