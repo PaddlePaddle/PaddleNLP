@@ -110,6 +110,7 @@ def do_predict(args):
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 early_stopping=True,
+                use_faster=True,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize(place)
         faster_cost = (time.perf_counter() - start) / 50 * 1000
@@ -133,8 +134,7 @@ def do_predict(args):
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.num_beams,
-                early_stopping=True,
-                use_faster=False)
+                early_stopping=True)
         paddle.device.cuda.synchronize(place)
         pd_cost = (time.perf_counter() - start) / 50 * 1000
 

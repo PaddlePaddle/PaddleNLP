@@ -32,7 +32,7 @@ class Cote(DatasetBuilder):
 
     BUILDER_CONFIGS = {
         'dp': {
-            'url': "https://dataset-bj.cdn.bcebos.com/qianyan/COTE-DP.zip",
+            'url': "https://bj.bcebos.com/paddlenlp/datasets/COTE-DP.zip",
             'md5': "a73d4170a283a2264a41c3ee9eb4d262",
             'splits': {
                 'train': [
@@ -47,7 +47,7 @@ class Cote(DatasetBuilder):
             'labels': ["B", "I", "O"]
         },
         'bd': {
-            'url': "https://dataset-bj.cdn.bcebos.com/qianyan/COTE-BD.zip",
+            'url': "https://bj.bcebos.com/paddlenlp/datasets/COTE-BD.zip",
             'md5': "8d87ff9bb6f5e5d46269d72632a1b01f",
             'splits': {
                 'train': [
@@ -62,7 +62,7 @@ class Cote(DatasetBuilder):
             'labels': ["B", "I", "O"]
         },
         'mfw': {
-            'url': "https://dataset-bj.cdn.bcebos.com/qianyan/COTE-MFW.zip",
+            'url': "https://bj.bcebos.com/paddlenlp/datasets/COTE-MFW.zip",
             'md5': "c85326bf2be4424d03373ea70cb32c3f",
             'splits': {
                 'train': [

@@ -426,13 +426,13 @@ class NeZhaPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "nezha-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-base-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-chinese.pdparams",
             "nezha-large-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-large-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-chinese.pdparams",
             "nezha-base-wwm-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
             "nezha-large-wwm-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
         }
     }
     base_model_prefix = "nezha"

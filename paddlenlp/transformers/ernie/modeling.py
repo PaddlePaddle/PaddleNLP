@@ -173,15 +173,15 @@ class ErniePretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-1.0":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
             "ernie-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/ernie_tiny.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base.pdparams",
             "ernie-2.0-en-finetuned-squad":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
         }
     }
     base_model_prefix = "ernie"
@@ -277,8 +277,9 @@ class ErnieModel(ErniePretrainedModel):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
-            mean=0.0, std=self.initializer_range))
+        weight_attr = paddle.ParamAttr(
+            initializer=nn.initializer.TruncatedNormal(
+                mean=0.0, std=self.initializer_range))
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
@@ -667,8 +668,9 @@ class ErnieForPretraining(ErniePretrainedModel):
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
         self.ernie = ernie
-        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
-            mean=0.0, std=self.ernie.initializer_range))
+        weight_attr = paddle.ParamAttr(
+            initializer=nn.initializer.TruncatedNormal(
+                mean=0.0, std=self.ernie.initializer_range))
         self.cls = ErniePretrainingHeads(
             self.ernie.config["hidden_size"],
             self.ernie.config["vocab_size"],

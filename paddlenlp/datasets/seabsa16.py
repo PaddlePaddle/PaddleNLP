@@ -35,7 +35,7 @@ class SeAbsa16(DatasetBuilder):
         # phns is short for phones.
         'phns': {
             'url':
-            "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_PHNS.zip",
+            "https://bj.bcebos.com/paddlenlp/datasets/SE-ABSA16_PHNS.zip",
             'md5': "f5a62548f2fcf73892cacf2cdf159671",
             'splits': {
                 'train': [
@@ -52,7 +52,7 @@ class SeAbsa16(DatasetBuilder):
         # came is short for cameras.
         'came': {
             'url':
-            "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_CAME.zip",
+            "https://bj.bcebos.com/paddlenlp/datasets/SE-ABSA16_CAME.zip",
             'md5': "3104e92217bbff80a1ed834230f1df51",
             'splits': {
                 'train': [

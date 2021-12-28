@@ -25,7 +25,6 @@ limitations under the License. */
 #include "fusion_decoding_op.h"
 #include "pd_traits.h"
 
-
 template <paddle::DataType D>
 std::vector<paddle::Tensor> decoding_kernel(
     const paddle::Tensor& input,
@@ -77,8 +76,6 @@ std::vector<paddle::Tensor> decoding_kernel(
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
     const float& alpha,
-    cublasHandle_t cublas_handle_,
-    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2")
@@ -107,8 +104,9 @@ std::vector<paddle::Tensor> decoding_kernel(
   typedef typename traits_::data_t data_t_;
 
   DecodingInitParam<DataType_> decoding_params;
-  decoding_params.cublas_handle = cublas_handle_;
-  decoding_params.cublaslt_handle = cublaslt_handle_;
+  decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+  decoding_params.cublaslt_handle =
+      CublasHandle::GetInstance()->cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
@@ -126,10 +124,14 @@ std::vector<paddle::Tensor> decoding_kernel(
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
+  auto q_weight_shape = self_attn_query_weight[0].shape();
+  auto k_weight_shape = self_attn_key_weight[0].shape();
+  bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
+
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
-    params[i].cublas_handle = cublas_handle_;
-    params[i].cublaslt_handle = cublaslt_handle_;
+    params[i].cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+    params[i].cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
 
     if (decoding_strategy == "beam_search" ||
         decoding_strategy == "beam_search_v2") {
@@ -262,7 +264,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true);  // is_fuse_topk_softMax
+        true,  // is_fuse_topk_softMax
+        fuse_qkv);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -284,7 +287,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,   // is_fuse_topk_softMax
-        false,  // is_fuse_qkv
+        fuse_qkv,
         true,   // keep_alive_beam
         alpha);
 
@@ -308,7 +311,8 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       start_id_,
                                                       end_id_,
                                                       candidate_num_,
-                                                      probability_threshold_);
+                                                      probability_threshold_,
+                                                      fuse_qkv);
 
     decoding_sampling_->forward(params, decoding_params);
 
@@ -374,11 +378,8 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const float& beam_search_diversity_rate,
     const float& alpha) {
   auto stream = input.stream();
-  cublasHandle_t cublas_handle_;
-  cublasCreate(&cublas_handle_);
-  cublasLtHandle_t cublaslt_handle_;
-  cublasLtCreate(&cublaslt_handle_);
-  cublasSetStream(cublas_handle_, stream);
+
+  cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
 
@@ -434,8 +435,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          cublas_handle_,
-          cublaslt_handle_,
           stream);
       break;
     }
@@ -490,8 +489,6 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           max_len,
           beam_search_diversity_rate,
           alpha,
-          cublas_handle_,
-          cublaslt_handle_,
           stream);
       break;
     }
@@ -502,8 +499,5 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
       break;
     }
   }
-
-  cublasDestroy(cublas_handle_);
-  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

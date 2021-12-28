@@ -29,7 +29,7 @@ textcnn/
 完整数据集可以通过以下命令下载并解压：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/RobotChat.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/RobotChat.tar.gz
 tar xvf RobotChat.tar.gz
 ```
 
@@ -38,7 +38,7 @@ tar xvf RobotChat.tar.gz
 在模型训练之前，需要先下载词汇表文件word_dict.txt，用于构造词-id映射关系。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/robot_chat_word_dict.txt
+wget https://bj.bcebos.com/paddlenlp/robot_chat_word_dict.txt
 ```
 
 **NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。
@@ -48,7 +48,7 @@ wget https://paddlenlp.bj.bcebos.com/robot_chat_word_dict.txt
 这里我们提供了一个百度基于海量数据训练好的TextCNN模型，用户通过以下方式下载预训练模型。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/models/textcnn.pdparams
+wget https://bj.bcebos.com/paddlenlp/models/textcnn.pdparams
 ```
 
 ### 模型训练

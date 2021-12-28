@@ -13,11 +13,12 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* [2021-10-12] PaddleNLP 2.1 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0).
+* [2021-12-12] PaddleNLP v2.2 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.0).
+* [2021-12-12] *End-to-end Question Answering Toolkit**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA) has been released！:tada:
 
 ## Introduction
 
-**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications.
+**PaddleNLP** is an **easy-to-use** and **high performance** NLP library with **awesome** pre-trained Transformer models, supporting wide-range of NLP tasks from research to industrial applications.
 
 
 * **Easy-to-Use API**
@@ -34,7 +35,7 @@ English | [简体中文](./README.md)
 ### Prerequisites
 
 * python >= 3.6
-* paddlepaddle >= 2.1
+* paddlepaddle >= 2.2
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 
@@ -220,6 +221,18 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 ## ChangeLog
 
 For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
+
+## Citation
+
+If you find PaddleNLP useful in your research, please consider cite
+```
+@misc{=paddlenlp,
+    title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
+    author={PaddleNLP Contributors},
+    howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},
+    year={2021}
+}
+```
 
 ## Acknowledge
 

@@ -161,15 +161,15 @@ class MBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "mbart-large-cc25":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-cc25.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
             "mbart-large-en-ro":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart/mbart-large-en-ro.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
             "mbart-large-50-one-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
             "mbart-large-50-many-to-one-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
             "mbart-large-50-many-to-many-mmt":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
         }
     }
     base_model_prefix = "mbart"
@@ -839,30 +839,20 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterMBART
-        decoding_strategy = kwargs.get('decode_strategy')
-        model_kwargs = kwargs['model_kwargs']
-        use_fp16_decoding = model_kwargs.get('use_fp16_decoding', False)
-        # TODO(guosheng): Currently, beam_search_v2 in FasterTransformer uses
-        # t2t beam search which has some difference with beam search in generation
-        # api on finish queue addition and early-stop criterion, and it seems
-        # lead to poor performance on mbart cnn-sum model, thus we disable it temporarily.
-        if decoding_strategy == 'beam_search':
-            return False
-        # Some checks on kwargs. For example, FasterMBART needs `mem_seq_lens` as
-        # one input while MBART not, thus check whether `mem_seq_lens` in kwargs.
-        if model_kwargs.get('mem_seq_lens', None) is None:
-            return False
-        # Assume no args change among multi-turns run to convert parameters only
-        # once. Additionaly, use some converted args as default values instead of
-        # converting args to allow overriding.
-        # TODO(guosheng): maybe use weakref for the model in faster model
-        self._faster_entry = partial(
-            FasterMBART(
-                self,
-                decoding_strategy=decoding_strategy,
-                use_fp16_decoding=use_fp16_decoding).generate,
-            alpha=kwargs.get('length_penalty'),
-            rel_len=False)
+        decode_strategy = kwargs.get('decode_strategy')
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        if kwargs['repetition_penalty'] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
+        self._faster_entry = FasterMBART(
+            self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def forward(self,

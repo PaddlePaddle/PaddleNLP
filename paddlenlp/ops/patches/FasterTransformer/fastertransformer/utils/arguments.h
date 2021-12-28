@@ -55,6 +55,7 @@ public:
 
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
+  LayerNormWeight<T> mbart_layernorm;
 
   const T *logits_mask = nullptr;
 
@@ -106,6 +107,7 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float temperature_{1.0};
   float repeat_penalty_{1.0};
   bool prefix_lm_{false};
+  bool is_mbart_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -120,9 +122,9 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
 
   int memory_max_seq_len_{0};
   bool prefix_lm_{false};
-
   int finished_candidate_num_{-1};
   bool early_stopping_{false};
+  bool is_mbart_{false};
 };
 
 struct GptArguments : public DecodingSamplingArguments {

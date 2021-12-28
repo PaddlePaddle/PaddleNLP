@@ -94,6 +94,7 @@ def do_predict(args):
                 top_p=args.top_p,
                 bos_token_id=bos_id,
                 eos_token_id=eos_id,
+                use_faster=True,
                 use_fp16_decoding=args.use_fp16_decoding)
         paddle.device.cuda.synchronize(place)
         faster_cost = (time.perf_counter() - start) / 50 * 1000
@@ -116,8 +117,7 @@ def do_predict(args):
                 top_k=args.top_k,
                 top_p=args.top_p,
                 bos_token_id=bos_id,
-                eos_token_id=eos_id,
-                use_faster=False)
+                eos_token_id=eos_id)
         paddle.device.cuda.synchronize(place)
         pd_cost = (time.perf_counter() - start) / 50 * 1000
 

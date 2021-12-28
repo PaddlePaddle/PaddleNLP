@@ -163,7 +163,7 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
 
     >>> import paddle
     >>> model_name = "bert-base-uncased"
-    >>> # 模型下载地址： https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams
+    >>> # 模型下载地址： https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams
     >>> model_file = "bert-base-uncased.pdparams"
     >>> paddle_state_dict = paddle.load(model_file)
     >>> paddle_state_dict.keys()

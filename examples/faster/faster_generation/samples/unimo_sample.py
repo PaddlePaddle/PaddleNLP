@@ -41,7 +41,7 @@ inputs_ids = tokenizer.gen_encode(
     add_start_token_for_decoding=True,
     return_tensors=True,
     is_split_into_words=False)
-model.eval()
+
 outputs, _ = model.generate(
     input_ids=inputs_ids['input_ids'],
     token_type_ids=inputs_ids['token_type_ids'],
@@ -49,7 +49,8 @@ outputs, _ = model.generate(
     attention_mask=inputs_ids['attention_mask'],
     max_length=64,
     decode_strategy='beam_search',
-    num_beams=2)
+    num_beams=2,
+    use_faster=True)
 
 result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)

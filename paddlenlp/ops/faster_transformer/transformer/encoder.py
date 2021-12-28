@@ -17,6 +17,7 @@ import paddle
 from paddle.fluid.layer_helper import LayerHelper
 import paddle.nn as nn
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
+from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load
@@ -200,19 +201,13 @@ def encoder_forward(self, src, src_mask=None, cache=None):
         src (Tensor):
             The input of Transformer encoder. It is a tensor
             with shape `[batch_size, sequence_length, d_model]`. The data
-            type should be float32 or float64.
+            type should be float32 or float16.
         src_mask (Tensor, optional):
             A tensor used in multi-head attention to prevents attention to
             some unwanted positions, usually the paddings or the subsequent
             positions. It is a tensor with shape `[batch_size, 1, 1, sequence_length]`.
-            When the data type is bool, the unwanted positions have `False`
-            values and the others have `True` values. When the data type is
-            int, the unwanted positions have 0 values and the others have 1
-            values. When the data type is float, the unwanted positions have
-            `-INF` values and the others have 0 values. It can be None when
-            nothing wanted or needed to be prevented attention to. Defaults
-            to None.
-
+            The data type must be float, the unwanted positions have `-INF` values or other non-zeros
+            and the wanted positions must be 0.0.
     Returns:
         output (Tensor|tuple):
             It is a tensor that has the same shape and data type as `src`,
@@ -224,9 +219,17 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             `paddle.nn.MultiHeadAttention.forward` for more details.
     """
 
-    max_seq_len = src.shape[1]
-    # broadcast
-    src_mask = paddle.concat(x=[src_mask] * max_seq_len, axis=2)
+    if src_mask.dtype == paddle.float16:
+        src_mask = paddle.cast(src_mask, "float32")
+
+    src_mask = src_mask == 0.0
+    src_mask = paddle.cast(src_mask, src.dtype)
+
+    # transpose_src_mask: [batch_size, 1, sequence_length, 1]
+    transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
+
+    # src_mask: [batch_size, 1, sequence_length, sequence_length]
+    src_mask = src_mask * transpose_src_mask
     output = src
     for i, layer in enumerate(self.layers):
         output = layer(output, src_mask)
@@ -235,7 +238,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self, need_build=True, use_fp16=False):
+def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
     """
     Compiles fusion encoder operator intergrated FasterTransformer using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
@@ -275,14 +278,21 @@ def enable_faster_encoder(self, need_build=True, use_fp16=False):
                 convert_to_fp16(layer)
 
     if not self.training:
-        if need_build:
-            try:
+        try:
+            # Pass decoding lib to prevent re-building encoder.
+            # Todo: check weather decoding lib have contained encoder or not.
+            if encoder_lib is not None:
+                if "FasterTransformer" not in LOADED_EXT.keys():
+                    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                        decoding_lib)
+                    LOADED_EXT["FasterTransformer"] = ops
+            else:
                 load("FasterTransformer", verbose=True)
-            except Exception:
-                logger.warning(
-                    "Exception occurs when using FasterTransformer. " \
-                    "The original forward will be involved. ")
-                return self
+        except Exception:
+            logger.warning(
+                "Exception occurs when using FasterEncoder. " \
+                "The original forward will be involved. ")
+            return self
         for layer in self.children():
             layer.apply(init_func)
     return self

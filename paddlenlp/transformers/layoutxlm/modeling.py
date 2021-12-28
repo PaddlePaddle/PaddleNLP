@@ -229,7 +229,7 @@ class LayoutXLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "layoutxlm-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/layoutxlm_base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/model_state.pdparams",
         }
     }
     base_model_prefix = "layoutxlm"
@@ -1083,7 +1083,8 @@ class REDecoder(nn.Layer):
         for b in range(batch_size):
             head_entities = paddle.to_tensor(relations[b]["head"])
             tail_entities = paddle.to_tensor(relations[b]["tail"])
-            relation_labels = paddle.to_tensor(relations[b]["label"])
+            relation_labels = paddle.to_tensor(
+                relations[b]["label"], dtype='int64')
             entities_start_index = paddle.to_tensor(entities[b]["start"])
             entities_labels = paddle.to_tensor(entities[b]["label"])
             head_index = entities_start_index[head_entities]
