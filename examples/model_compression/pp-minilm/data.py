@@ -14,11 +14,13 @@
 import numpy as np
 
 from paddle.metric import Metric, Accuracy
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+# from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
 MODEL_CLASSES = {
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    # "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "ppminilm": (PPMiniLMForSequenceClassification, PPMiniLMTokenizer),
     "bert": (BertForSequenceClassification, BertTokenizer)
 }
 

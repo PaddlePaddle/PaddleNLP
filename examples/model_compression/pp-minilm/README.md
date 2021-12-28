@@ -193,7 +193,7 @@ sh run_clue.sh CLUEWSC2020 1e-4 32 50 128 0 ppminilm-6l-768h
 假设待导出的模型的地址为 `ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32`，可以运行下方命令将动态图模型导出为可用于部署的静态图模型：
 
 ```shell
-python export_model.py --model_type ernie --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
+python export_model.py --model_type ppminilm --model_path ppminilm-6l-768h/models/CLUEWSC2020/1e-4_32  --output_path fine_tuned_infer_model/float
 cd ..
 ```
 
