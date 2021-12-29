@@ -98,18 +98,9 @@
 ## 5. 向量检索
 
 
-数据准备结束以后，我们开始搭建Milvus的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，milvus的搭建教程请参考官方教程  [milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是milvus的1.1.1 CPU版本，搭建完以后启动milvus
+数据准备结束以后，我们开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
 
-
-```
-cd [Milvus root path]/core/milvus
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:[Milvus root path]/core/milvus/lib
-cd scripts
-./start_server.sh
-
-```
-
-搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
+Milvus 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
 root_dir="checkpoints"
