@@ -134,46 +134,148 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     pretrained_init_configuration = {
         "albert-base-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-large-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xxlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-base-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-large-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-tiny": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-small": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-base": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-large": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-xlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-xxlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
     }
 
@@ -183,13 +285,6 @@ class AlbertTokenizer(PretrainedTokenizer):
                  do_lower_case=True,
                  remove_space=True,
                  keep_accents=False,
-                 bos_token="[CLS]",
-                 eos_token="[SEP]",
-                 unk_token="<unk>",
-                 sep_token="[SEP]",
-                 pad_token="<pad>",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
                  **kwargs):
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
@@ -199,12 +294,14 @@ class AlbertTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
-                vocab_file=vocab_file,
-                do_lower_case=False, )
+                vocab_file=vocab_file, do_lower_case=do_lower_case, **kwargs)
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
-                do_lower_case=True, )
+                do_lower_case=do_lower_case,
+                remove_space=remove_space,
+                keep_accents=keep_accents,
+                **kwargs)
         else:
             raise ValueError(
                 "You should only specify either one(not both) of 'vocal_file'"
@@ -443,28 +540,100 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
     pretrained_init_configuration = {
         "albert-base-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-large-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xxlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-base-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-large-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "bos_token": "[CLS]",
+            "eos_token": "[SEP]",
+            "unk_token": "<unk>",
+            "sep_token": "[SEP]",
+            "pad_token": "<pad>",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
     }
 
@@ -473,13 +642,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
                  do_lower_case=True,
                  remove_space=True,
                  keep_accents=False,
-                 bos_token="[CLS]",
-                 eos_token="[SEP]",
-                 unk_token="<unk>",
-                 sep_token="[SEP]",
-                 pad_token="<pad>",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
                  **kwargs):
 
         self.do_lower_case = do_lower_case
@@ -663,32 +825,55 @@ class AlbertChineseTokenizer(BertTokenizer):
     }
     pretrained_init_configuration = {
         "albert-chinese-tiny": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-small": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-base": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-large": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-xlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
         "albert-chinese-xxlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "sep_token": "[SEP]",
+            "pad_token": "[PAD]",
+            "cls_token": "[CLS]",
+            "mask_token": "[MASK]",
         },
     }
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=False,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]"):
+    def __init__(self, vocab_file, do_lower_case=False, **kwargs):
         super(AlbertChineseTokenizer, self).__init__(
-            vocab_file, do_lower_case=do_lower_case)
+            vocab_file, do_lower_case=do_lower_case, **kwargs)
