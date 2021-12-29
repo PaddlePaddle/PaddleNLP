@@ -1,4 +1,11 @@
 # $1 means GENERAL_DIR
+mkdir $1/afqmc
+mkdir $1/tnews
+mkdir $1/ifly
+mkdir $1/ocnli
+mkdir $1/cmnli
+mkdir $1/wsc
+mkdir $1/csl
 
 # The penultimate parameter is the card id, this script can be changed if necessary
 bash run_one_search.sh $1 afqmc 0 &

@@ -17,7 +17,7 @@ from paddle.metric import Metric, Accuracy
 
 from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, FasterPPMiniLMTokenizer
+from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification
 
 MODEL_CLASSES = {
     "ppminilm": (PPMiniLMForSequenceClassification, PPMiniLMTokenizer),
@@ -75,7 +75,7 @@ def get_example_for_faster_tokenizer(example,
             text_list.insert(query_idx + len(query) + 2 + 1, "_")
         text = "".join(text_list)
         example['sentence'] = text
-    elif 'text' in example:  # chn
+    elif 'text' in example:
         example['sentence'] = example['text']
 
     return example
@@ -95,23 +95,16 @@ def convert_example(example,
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
     if 'sentence' in example:
-        example = tokenizer(
-            example['sentence'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=True)
+        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     elif 'sentence1' in example:
         example = tokenizer(
             example['sentence1'],
             text_pair=example['sentence2'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=True)
+            max_seq_len=max_seq_length)
     elif 'keyword' in example:  # CSL
         sentence1 = " ".join(example['keyword'])
         example = tokenizer(
-            sentence1,
-            text_pair=example['abst'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=True)
+            sentence1, text_pair=example['abst'], max_seq_len=max_seq_length)
     elif 'target' in example:  # wsc
         text, query, pronoun, query_idx, pronoun_idx = example['text'], example[
             'target']['span1_text'], example['target']['span2_text'], example[
@@ -132,14 +125,10 @@ def convert_example(example,
             text_list.insert(query_idx + 2, "_")
             text_list.insert(query_idx + len(query) + 2 + 1, "_")
         text = "".join(text_list)
-        example = tokenizer(
-            text, max_seq_len=max_seq_length, pad_to_max_seq_len=True)
+        example = tokenizer(text, max_seq_len=max_seq_length)
 
     elif 'text' in example:
-        example = tokenizer(
-            example['text'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=True)
+        example = tokenizer(example['text'], max_seq_len=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label

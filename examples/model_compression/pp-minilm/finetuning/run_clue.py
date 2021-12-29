@@ -31,7 +31,7 @@ from paddle.metric import Accuracy
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, to_tensor
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, PPMiniLMForSequenceClassification
 
 sys.path.append("../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
@@ -448,10 +448,26 @@ def do_train(args):
 
 
 def export_model(args):
-    model = FasterPPMiniLMForSequenceClassification.from_pretrained(
-        args.output_dir)
     save_path = os.path.join(args.output_dir, "inference")
-    model.to_static(save_path)
+    if args.use_faster_tokenizer:
+        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
+            args.output_dir)
+        model.to_static(save_path)
+    else:
+        model = PPMiniLMForSequenceClassification.from_pretrained(
+            args.output_dir)
+        model.eval()
+        # convert to static graph with specific input description
+        model = paddle.jit.to_static(
+            model,
+            input_spec=[
+                paddle.static.InputSpec(
+                    shape=[None, None], dtype="int64"),  # input_ids
+                paddle.static.InputSpec(
+                    shape=[None, None], dtype="int64")  # segment_ids
+            ])
+        # save converted static graph model
+        paddle.jit.save(model, save_path)
 
 
 def print_arguments(args):

@@ -270,7 +270,6 @@ class Predictor(object):
         return examples
 
     def predict(self, dataset, tokenizer, batchify_fn, args):
-
         batches = [
             dataset[idx:idx + args.batch_size]
             for idx in range(0, len(dataset), args.batch_size)
