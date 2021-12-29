@@ -39,7 +39,7 @@ def parse_args():
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
-        default='ernie',
+        default='ppminilm',
         type=str,
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()), )

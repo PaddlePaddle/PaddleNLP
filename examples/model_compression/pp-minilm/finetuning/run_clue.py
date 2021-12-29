@@ -30,8 +30,6 @@ from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer, BertModel
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 sys.path.append("../")
