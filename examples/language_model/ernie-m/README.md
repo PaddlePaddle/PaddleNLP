@@ -61,9 +61,9 @@ XNLI 是 MNLI 的子集，并且已被翻译成14种不同的语言（包含一�
 ```shell
 python run_classifier.py \
     --task_type cross-lingual-transfer \
-    --batch_size 64 \
+    --batch_size 16 \
     --model_name_or_path ernie-m-base \
-    --save_steps 3068 \
+    --save_steps 12272 \
     --output_dir output
 ```
 
@@ -72,9 +72,9 @@ python run_classifier.py \
 ```shell
 python -m paddle.distributed.launch --gpus 0,1 --log_dir output run_classifier.py \
     --task_type cross-lingual-transfer \
-    --batch_size 64 \
+    --batch_size 16 \
     --model_name_or_path ernie-m-base \
-    --save_steps 3068 \
+    --save_steps 12272 \
     --output_dir output
 ```
 
