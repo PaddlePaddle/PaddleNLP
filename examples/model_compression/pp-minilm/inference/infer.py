@@ -14,8 +14,10 @@
 
 import argparse
 import os
+import time
 import sys
 from functools import partial
+import distutils.util
 import numpy as np
 
 import paddle
@@ -148,17 +150,21 @@ class Predictor(object):
                     use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
-        if args.collect_shape:
-            config.collect_shape_range_info(
-                os.path.join(
-                    os.path.dirname(args.model_path), args.task_name +
-                    '_shape_range_info.pbtxt'))
-        else:
-            config.enable_tuned_tensorrt_dynamic_shape(
-                os.path.join(
-                    os.path.dirname(args.model_path),
-                    args.task_name + "_shape_range_info.pbtxt"), True)
+            if args.collect_shape:
+                config.collect_shape_range_info(
+                    os.path.join(
+                        os.path.dirname(args.model_path), args.task_name +
+                        '_shape_range_info.pbtxt'))
+            else:
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    os.path.join(
+                        os.path.dirname(args.model_path),
+                        args.task_name + "_shape_range_info.pbtxt"), True)
+
         predictor = paddle.inference.create_predictor(config)
+
+        input_handle = predictor.get_input_handle(predictor.get_input_names()[
+            0])
         input_handles = [
             predictor.get_input_handle(name)
             for name in predictor.get_input_names()
@@ -178,53 +184,58 @@ class Predictor(object):
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]
-
         return output
 
-    def predict(self, dataset, collate_fn, args, batch_size=1):
-        metric = METRIC_CLASSES[args.task_name]()
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=False)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=collate_fn,
-            num_workers=0,
-            return_list=True)
-        outputs = []
-        metric.reset()
-        for i, data in enumerate(data_loader):
-            if len(data) == 2:
-                output = self.predict_batch(data)
-            else:
-                output = self.predict_batch([data[0], data[1]])
-                logits = paddle.to_tensor(output)
-                correct = metric.compute(logits, data[2])
+    def convert_predict_batch(self, args, data, tokenizer, batchify_fn,
+                              label_list):
+        examples = []
+        for example in data:
+            example = convert_example(
+                example,
+                tokenizer,
+                label_list=label_list,
+                max_seq_length=args.max_seq_length)
+            examples.append(example)
+
+        return examples
+
+    def predict(self, dataset, tokenizer, batchify_fn, args):
+        batches = [
+            dataset[idx:idx + args.batch_size]
+            for idx in range(0, len(dataset), args.batch_size)
+        ]
+        if args.perf:
+            for i, batch in enumerate(batches):
+                examples = self.convert_predict_batch(
+                    args, batch, tokenizer, batchify_fn, dataset.label_list)
+                input_ids, segment_ids, label = batchify_fn(examples)
+                output = self.predict_batch([input_ids, segment_ids])
+                if i > args.perf_warmup_steps:
+                    break
+            time1 = time.time()
+            for batch in batches:
+                self.convert_predict_batch(args, batch, tokenizer, batchify_fn,
+                                           dataset.label_list)
+                input_ids, segment_ids, _ = batchify_fn(examples)
+                output = self.predict_batch([input_ids, segment_ids])
+
+            print("task name: %s, time: %s, " %
+                  (args.task_name, time.time() - time1))
+
+        else:
+            metric = METRIC_CLASSES[args.task_name]()
+            metric.reset()
+            for i, batch in enumerate(batches):
+                examples = self.convert_predict_batch(
+                    args, batch, tokenizer, batchify_fn, dataset.label_list)
+                input_ids, segment_ids, label = batchify_fn(examples)
+                output = self.predict_batch([input_ids, segment_ids])
+                correct = metric.compute(
+                    paddle.to_tensor(output), paddle.to_tensor(label))
                 metric.update(correct)
-            outputs.append(output)
-        if len(data) > 2:
+
             res = metric.accumulate()
             print("task name: %s, acc: %s, " % (args.task_name, res), end='')
-
-        return outputs
-
-    def predict_perf(self, dataset, collate_fn, args, batch_size=1):
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=False)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=collate_fn,
-            num_workers=0,
-            return_list=True)
-        time1 = time.time()
-        for i, data in enumerate(data_loader):
-            if i < args.perf_warmup_steps:  # skip warmup steps.
-                continue
-            output = self.predict_batch([data[0], data[1]])
-            logits = paddle.to_tensor(output)
-
-        print("time: ", time.time() - time1)
 
 
 def main():
@@ -239,32 +250,14 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=dev_ds.label_list,
-        max_seq_length=args.max_seq_length,
-        is_test=False)
 
-    dev_ds = dev_ds.map(trans_func, lazy=True)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
     ): fn(samples)
-    if args.perf:
-        outputs = predictor.predict_perf(
-            dev_ds,
-            batch_size=args.batch_size,
-            collate_fn=batchify_fn,
-            args=args)
-    else:
-        outputs = predictor.predict(
-            dev_ds,
-            batch_size=args.batch_size,
-            collate_fn=batchify_fn,
-            args=args)
+    outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
 if __name__ == "__main__":
