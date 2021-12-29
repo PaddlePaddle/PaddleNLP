@@ -23,7 +23,7 @@ import paddle
 import paddleslim
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMTokenizer
 from data import convert_example_to_feature, read, load_dict
 
 
@@ -34,7 +34,7 @@ def quant_post(args):
     label2id, id2label = load_dict(args.label_path)
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,

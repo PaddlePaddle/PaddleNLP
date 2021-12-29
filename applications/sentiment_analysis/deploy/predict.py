@@ -26,7 +26,7 @@ import paddle
 from paddle import inference
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepTokenizer
 from utils import decoding, read_test_file, load_dict
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
 from classification.data import convert_example_to_feature as convert_example_to_feature_cls

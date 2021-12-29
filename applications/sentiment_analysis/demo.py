@@ -14,10 +14,8 @@
 
 import argparse
 import paddle
-from paddlenlp.transformers import SkepModel, SkepTokenizer
-from extraction.model import SkepForTokenClassification
-from classification.model import SkepForSequenceClassification
-from classification.data import load_dict
+from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
+from utils import load_dict
 from seqeval.metrics.sequence_labeling import get_entities
 
 
@@ -189,15 +187,13 @@ if __name__ == "__main__":
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
-    ext_skep = SkepModel.from_pretrained(model_name)
-    ext_model = SkepForTokenClassification(ext_skep, num_classes=len(ext_label2id))
+    ext_model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
-    cls_skep = SkepModel.from_pretrained(model_name)
-    cls_model = SkepForSequenceClassification(cls_skep, num_classes=len(cls_label2id))
+    cls_model = SkepForSequenceClassification.from_pretrained(model_name, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 
