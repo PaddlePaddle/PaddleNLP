@@ -23,4 +23,3 @@ python -u ./run_clue.py \
     --adam_epsilon 1e-8 \
     --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/ \
     --device gpu  \
-    --use_faster_tokenizer False \

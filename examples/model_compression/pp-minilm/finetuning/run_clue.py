@@ -30,11 +30,10 @@ from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, to_tensor
 from paddlenlp.transformers import LinearDecayWithWarmup, PPMiniLMForSequenceClassification
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -139,12 +138,6 @@ def parse_args():
         default=False,
         help="Whether do train.")
     parser.add_argument(
-        "--use_faster_tokenizer",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use FasterTokenizer to accelerate training or further inference."
-    )
-    parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
@@ -181,19 +174,8 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
     for batch in data_loader:
-        if args.use_faster_tokenizer:
-            if 'sentence' in batch:
-                sentence, labels = batch['sentence'], batch['label']
-                sentence = to_tensor(sentence, "sentence")
-                logits = model(sentence)
-            else:
-                labels = batch['label']
-                sentence1 = to_tensor(batch['sentence1'], "sentence1")
-                sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                logits = model(sentence1, sentence2)
-        else:
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids)
         loss = loss_fct(logits, labels)
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -222,11 +204,10 @@ def do_eval(args):
 
     tokenizer = tokenizer_class.from_pretrained('ppminilm-6l-768h')
     trans_func = partial(
-        get_example_for_faster_tokenizer
-        if args.use_faster_tokenizer else convert_example,
-        tokenizer=tokenizer if not args.use_faster_tokenizer else None,
+        convert_example,
+        tokenizer=tokenizer,
         label_list=dev_ds.label_list,
-        max_seq_len=args.max_seq_length if not args.use_faster_tokenizer else 0)
+        max_seq_len=args.max_seq_length)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
@@ -238,25 +219,17 @@ def do_eval(args):
         Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
     ): fn(samples)
 
-    if not args.use_faster_tokenizer:
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-    else:
-        dev_data_loader = DataLoader(
-            dataset=dev_ds, batch_sampler=dev_batch_sampler)
+    dev_data_loader = DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
-    if args.use_faster_tokenizer:
-        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
-            args.model_name_or_path, num_classes=num_classes, max_seq_len=-1)
-        # max_seq_len=args.max_seq_length)
-    else:
-        model = model_class.from_pretrained(
-            args.model_name_or_path, num_classes=num_classes)
+
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -267,19 +240,8 @@ def do_eval(args):
     model.eval()
     metric.reset()
     for batch in dev_data_loader:
-        if args.use_faster_tokenizer:
-            if 'sentence' in batch:
-                labels = batch['label']
-                sentence = to_tensor(batch['sentence'], "sentence")
-                logits = model(sentence)
-            else:
-                labels = batch['label']
-                sentence1 = to_tensor(batch['sentence1'], "sentence1")
-                sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                logits = model(sentence1, sentence2)
-        else:
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids)
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
@@ -307,12 +269,10 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
-        get_example_for_faster_tokenizer
-        if args.use_faster_tokenizer else convert_example,
-        tokenizer=tokenizer if not args.use_faster_tokenizer else None,
+        convert_example,
+        tokenizer=tokenizer,
         label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length
-        if not args.use_faster_tokenizer else 0)
+        max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -328,35 +288,23 @@ def do_train(args):
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
 
-    if not args.use_faster_tokenizer:
-        train_data_loader = DataLoader(
-            dataset=train_ds,
-            batch_sampler=train_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-    else:
-        train_data_loader = DataLoader(
-            dataset=train_ds, batch_sampler=train_batch_sampler)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds, batch_sampler=dev_batch_sampler)
+    train_data_loader = DataLoader(
+        dataset=train_ds,
+        batch_sampler=train_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
+    dev_data_loader = DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
 
-    if args.use_faster_tokenizer:
-        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
-            args.model_name_or_path,
-            max_seq_len=args.max_seq_length,
-            num_classes=num_classes, )
-    else:
-        model = model_class.from_pretrained(
-            args.model_name_or_path, num_classes=num_classes)
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -400,19 +348,8 @@ def do_train(args):
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            if args.use_faster_tokenizer:
-                if 'sentence' in batch:
-                    labels = batch['label']
-                    sentence = to_tensor(batch['sentence'], "sentence")
-                    logits = model(sentence)
-                else:
-                    labels = batch['label']
-                    sentence1 = to_tensor(batch['sentence1'], "sentence1")
-                    sentence2 = to_tensor(batch['sentence2'], "sentence2")
-                    logits = model(sentence1, sentence2)
-            else:
-                input_ids, segment_ids, labels = batch
-                logits = model(input_ids, segment_ids)
+            input_ids, segment_ids, labels = batch
+            logits = model(input_ids, segment_ids)
             loss = loss_fct(logits, labels)
             loss.backward()
             optimizer.step()
@@ -438,8 +375,7 @@ def do_train(args):
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
-                    if not args.use_faster_tokenizer:
-                        tokenizer.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 print("best_acc: ", best_acc)
                 return
@@ -449,25 +385,19 @@ def do_train(args):
 
 def export_model(args):
     save_path = os.path.join(args.output_dir, "inference")
-    if args.use_faster_tokenizer:
-        model = FasterPPMiniLMForSequenceClassification.from_pretrained(
-            args.output_dir)
-        model.to_static(save_path)
-    else:
-        model = PPMiniLMForSequenceClassification.from_pretrained(
-            args.output_dir)
-        model.eval()
-        # convert to static graph with specific input description
-        model = paddle.jit.to_static(
-            model,
-            input_spec=[
-                paddle.static.InputSpec(
-                    shape=[None, None], dtype="int64"),  # input_ids
-                paddle.static.InputSpec(
-                    shape=[None, None], dtype="int64")  # segment_ids
-            ])
-        # save converted static graph model
-        paddle.jit.save(model, save_path)
+    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
+    model.eval()
+    # convert to static graph with specific input description
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
+        ])
+    # save converted static graph model
+    paddle.jit.save(model, save_path)
 
 
 def print_arguments(args):

@@ -24,10 +24,9 @@ import paddle
 from paddle import inference
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.experimental import FasterPPMiniLMForSequenceClassification, to_tensor
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
 def parse_args():
@@ -90,12 +89,6 @@ def parse_args():
         "--collect_shape",
         action='store_true',
         help="Whether collect shape range info.", )
-    parser.add_argument(
-        "--use_faster_tokenizer",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use FasterTokenizer to accelerate training or further inference."
-    )
     parser.add_argument(
         "--int8",
         action='store_true',
@@ -194,68 +187,6 @@ class Predictor(object):
         ]
         return output
 
-    def faster_predict(self, dataset, args):
-        batch_num = 0
-        if 'sentence' in dataset[0]:
-            data = [example["sentence"] for example in dataset]
-            batches = [
-                data[idx:idx + args.batch_size]
-                for idx in range(0, len(data), args.batch_size)
-            ]
-            batch_num = len(batches)
-        else:
-            data1 = [example["sentence1"] for example in dataset]
-            data2 = [example["sentence2"] for example in dataset]
-            batches1 = [
-                data1[idx:idx + args.batch_size]
-                for idx in range(0, len(data1), args.batch_size)
-            ]
-            batches2 = [
-                data2[idx:idx + args.batch_size]
-                for idx in range(0, len(data1), args.batch_size)
-            ]
-            batch_num = len(batches1)
-        if args.perf:
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
-                    output = self.predict_batch([batches[i]])
-                else:
-                    output = self.predict_batch([batches1[i], batches2[i]])
-                if i > args.perf_warmup_steps:
-                    break
-            time1 = time.time()
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
-                    output = self.predict_batch([batches[i]])
-                else:
-                    output = self.predict_batch([batches1[i], batches2[i]])
-            print("task name: %s, time: %s, " %
-                  (args.task_name, time.time() - time1))
-            return output
-
-        else:
-            labels = [example['label'] for example in dataset]
-
-            batched_labels = [
-                labels[idx:idx + args.batch_size]
-                for idx in range(0, len(labels), args.batch_size)
-            ]
-            metric = METRIC_CLASSES[args.task_name]()
-            metric.reset()
-
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
-                    logits = self.predict_batch([batches[i]])
-                else:
-                    logits = self.predict_batch([batches1[i], batches2[i]])
-                correct = metric.compute(
-                    paddle.to_tensor(logits),
-                    paddle.to_tensor(batched_labels[i]))
-                metric.update(correct)
-
-            res = metric.accumulate()
-            print("task name: %s, acc: %s, " % (args.task_name, res), end='')
-
     def convert_predict_batch(self, args, data, tokenizer, batchify_fn,
                               label_list):
         examples = []
@@ -319,28 +250,15 @@ def main():
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    if args.task_name == 'chnsenticorp':
-        dev_ds = load_dataset(args.task_name, splits='dev')
-    else:
-        dev_ds = load_dataset('clue', args.task_name, splits='dev')
+    dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    if not args.use_faster_tokenizer:
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    else:
-        trans_func = partial(
-            get_example_for_faster_tokenizer,
-            label_list=dev_ds.label_list,
-            is_test=False)
-        dev_ds = dev_ds.map(trans_func, lazy=True)
-    if not args.use_faster_tokenizer:
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-            Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-        ): fn(samples)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
-    else:
-        outputs = predictor.faster_predict(dev_ds, args=args)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
+    ): fn(samples)
+    outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
 if __name__ == "__main__":

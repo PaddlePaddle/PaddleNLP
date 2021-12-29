@@ -19,6 +19,7 @@ import sys
 import random
 import time
 import math
+import distutils.util
 from functools import partial
 
 import numpy as np
@@ -31,7 +32,7 @@ from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import PPMiniLMModel
+from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer, ErnieModel
 
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
 from paddleslim.nas.ofa.utils import nlp_utils
@@ -220,15 +221,14 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
     for layer, current_importance in enumerate(neuron_importance):
         # reorder heads
         idx = paddle.argsort(head_importance[layer], descending=True)
-        nlp_utils.reorder_head(model.ppminilm.encoder.layers[layer].self_attn,
-                               idx)
+        nlp_utils.reorder_head(model.ernie.encoder.layers[layer].self_attn, idx)
         # reorder neurons
         idx = paddle.argsort(
             paddle.to_tensor(current_importance), descending=True)
         nlp_utils.reorder_neuron(
-            model.ppminilm.encoder.layers[layer].linear1.fn, idx, dim=1)
+            model.ernie.encoder.layers[layer].linear1.fn, idx, dim=1)
         nlp_utils.reorder_neuron(
-            model.ppminilm.encoder.layers[layer].linear2.fn, idx, dim=0)
+            model.ernie.encoder.layers[layer].linear2.fn, idx, dim=0)
 
 
 def soft_cross_entropy(inp, target):
@@ -249,16 +249,24 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     train_ds = load_dataset('clue', args.task_name, splits='train')
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    tokenizer = tokenizer_class.from_pretrained("ppminilm-6l-768h")
 
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
+
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
+
+    dev_ds = load_dataset('clue', args.task_name, splits='dev')
+    dev_ds = dev_ds.map(trans_func, lazy=True)
+    dev_batch_sampler = paddle.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
+
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -266,22 +274,9 @@ def do_train(args):
     ): fn(samples)
 
     train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
-
-    dev_ds = load_dataset('clue', args.task_name, splits='dev')
-    dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
+        dataset=train_ds, batch_sampler=train_batch_sampler)
     dev_data_loader = DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+        dataset=dev_ds, batch_sampler=dev_batch_sampler)
     num_labels = 1 if train_ds.label_list == None else len(train_ds.label_list)
 
     model = model_class.from_pretrained(
