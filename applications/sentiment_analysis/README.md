@@ -104,7 +104,7 @@ linux：CentOS Linux release 7.9.2009 (Core)
 (2) 环境依赖  
 ```
 python >= 3.6
-paddlenlp >= 2.2.1
+paddlenlp >= 2.2.2
 paddlepaddle-gpu >= 2.2.1
 ```
 
