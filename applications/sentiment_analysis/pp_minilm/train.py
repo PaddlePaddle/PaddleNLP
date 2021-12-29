@@ -24,9 +24,8 @@ import paddle.nn.functional as F
 from paddlenlp.metrics.glue import AccuracyAndF1
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel, LinearDecayWithWarmup
+from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer, LinearDecayWithWarmup
 from evaluate import evaluate
-from model import PPMiniLMForSequenceClassification
 from utils import set_seed
 from data import read, load_dict, convert_example_to_feature
 
@@ -46,7 +45,7 @@ def train():
     train_ds = load_dataset(read, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
@@ -72,10 +71,8 @@ def train():
         dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
 
     # configure model training
-    ppminilm = ErnieModel.from_pretrained(
-        pretrained_model_name_or_path=args.base_model_name)
-    model = PPMiniLMForSequenceClassification(
-        ppminilm, num_classes=len(label2id))
+    model = PPMiniLMForSequenceClassification.from_pretrained(
+        args.base_model_name, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(
