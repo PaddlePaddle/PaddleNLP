@@ -5,7 +5,7 @@ python  train.py \
         --train_path "../data/cls_data/train.txt" \
         --dev_path "../data/cls_data/dev.txt" \
         --label_path "../data/cls_data/label.dict" \
-        --num_epochs 3 \
+        --num_epochs 5 \
         --batch_size 16 \
         --max_seq_len 256 \
         --learning_rate 3e-5 \

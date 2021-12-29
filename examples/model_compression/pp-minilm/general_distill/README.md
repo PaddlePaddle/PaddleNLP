@@ -29,9 +29,9 @@ cd ..
 
 其中 `general_distill.py` 参数释义如下：
 
-- `model_type` 指示了学生模型类型，当前仅支持 'ernie'、'roberta'。
+- `model_type` 指示了学生模型类型，当前仅支持 'ppminilm'、'roberta'。
 - `num_relation_heads` relation head 的个数，一般对于 large-size 的教师模型是64，对于 base-size 的教师模型是 48。
-- `teacher_model_type`指示了教师模型类型，当前仅支持 'ernie'、'roberta'。
+- `teacher_model_type`指示了教师模型类型，当前仅支持 'roberta'。
 - `teacher_layer_index`蒸馏时使用的教师模型的层
 - `student_layer_index` 蒸馏时使用的学生模型的层
 - `teacher_model_name_or_path`教师模型的名称，例如`'roberta-wwm-ext-large'`
