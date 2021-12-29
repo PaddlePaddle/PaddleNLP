@@ -60,10 +60,10 @@
 
 给定一段文本，使用我们提供的全流程预测脚本可以轻松获得情感分析结果，如下所示。
 
-> input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒  
-> aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向  
-> aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向  
-> aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
+- input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒  
+  - aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
+  - aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
+  - aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
 
 如果你想了解更多评论观点抽取模型和属性级情感分类模型的实现细节，请分别点击 [extraction](extraction/README.md) 和 [classification](classification/README.md)。
 
@@ -121,12 +121,11 @@ sh run_demo.py
 如果你有一批数据，不方便逐句输入，可使用本项目提供的正式预测脚本 `predict.py`， 以文件的形式进行输入，处理后该脚本会将结果文件保存到与输入文件相同的目录下，默认的结果文件名为 `sentiment_results.json`。
 
 本功能在预测时需要传入测试集文件路径，可将测试集文件命名为`test.txt`， 然后放入 `./data` 目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
-```
-蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
-酒店干净整洁，性价比很高
-酒店环境不错，非常安静，性价比还可以
-房间很大，环境不错
-```
+
+- 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
+- 酒店干净整洁，性价比很高
+- 酒店环境不错，非常安静，性价比还可以
+- 房间很大，环境不错  
 
 通过运行如下命令，便可进行批量文本情感分析预测：
 ```shell
