@@ -1,4 +1,3 @@
-# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -153,7 +152,7 @@ class FNetLayer(Layer):
         intermediate_output = self.intermediate(fourier_output)
         layer_output = self.output(intermediate_output, fourier_output)
         
-        return (layer_output,)
+        return layer_output
 
 
 class FNetEncoder(Layer):
@@ -185,7 +184,7 @@ class FNetEncoder(Layer):
             return {"last_hidden_state": hidden_states,
                     "all_hidden_states": all_hidden_states
                     }
-        return (hidden_states,)
+        return hidden_states
 
 
 class FNetPooler(Layer):
@@ -266,11 +265,11 @@ class FNetBasicFourierTransform(Layer):
     def __init__(self):
         super().__init__()
         # self.fourier_transform = paddle.fft.fftn
-        self.fourier_transform = partial(paddle.fft.fftn, axes=(1, 2))
+        self.fourier_transform = paddle.fft.fftn
     
     def forward(self, hidden_states):
         outputs = self.fourier_transform(hidden_states).real()
-        return (outputs,)
+        return outputs
 
 
 class FNetFourierTransform(Layer):
@@ -282,7 +281,7 @@ class FNetFourierTransform(Layer):
     def forward(self, hidden_states):
         self_outputs = self.fourier_transform(hidden_states)
         fourier_output = self.output(self_outputs[0], hidden_states)
-        return (fourier_output,)
+        return fourier_output
 
 
 class FNetPredictionHeadTransform(Layer):
