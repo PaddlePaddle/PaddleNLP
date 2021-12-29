@@ -80,7 +80,7 @@ ERNIE 1.0/
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE 1.0](ttps://bj.bcebos.com/v1/paddlenlp/models/ernie_pretrain.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|91b0e30c444ab654dd99c0ee354f6a8f|
+|[ERNIE 1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_pretrain.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|91b0e30c444ab654dd99c0ee354f6a8f|
 
 ### 训练环境说明
 
