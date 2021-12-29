@@ -32,12 +32,12 @@ from paddlenlp.data import Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import RobertaModel, RobertaTokenizer
-from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMModel, PPMiniLMForSequenceClassification, PPMiniLMTokenizer
 from paddlenlp.transformers.distill_utils import to_distill, calc_multi_relation_loss
 
 MODEL_CLASSES = {
     "roberta": (RobertaModel, RobertaTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer)
+    "ppminilm": (PPMiniLMForSequenceClassification, PPMiniLMTokenizer)
 }
 
 
@@ -47,14 +47,14 @@ def parse_args():
     # Required parameters
     parser.add_argument(
         "--model_type",
-        default="ernie",
+        default="ppminilm",
         type=str,
         required=True,
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
         "--teacher_model_type",
-        default="ernie",
+        default="roberta",
         type=str,
         required=True,
         help="Model type selected in the list: " +
@@ -276,14 +276,14 @@ def do_train(args):
     # For student
     model_class, _ = MODEL_CLASSES[args.model_type]
     if args.num_layers == 6:
-        ernie = ErnieModel(
+        ppminilm = PPMiniLMModel(
             vocab_size=tokenizer.vocab_size,
             num_hidden_layers=6,
             hidden_act='relu',
             intermediate_size=3072,
             hidden_size=768)  # layer: 6
     elif args.num_layers == 4:
-        ernie = ErnieModel(
+        ppminilm = PPMiniLMModel(
             vocab_size=tokenizer.vocab_size,
             num_hidden_layers=4,
             hidden_act='relu',
@@ -291,13 +291,13 @@ def do_train(args):
             hidden_size=256,
             num_attention_heads=16)  # layer: 4
     else:
-        ernie = ErnieModel(
+        ppminilm = PPMiniLMModel(
             vocab_size=tokenizer.vocab_size,
             num_hidden_layers=2,
             hidden_act='relu',
             hidden_size=128,
             intermediate_size=512)  # layer: 2
-    student = model_class(ernie)
+    student = model_class(ppminilm)
 
     teacher = teacher_model_class.from_pretrained(
         args.teacher_model_name_or_path)

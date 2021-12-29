@@ -37,7 +37,7 @@ class RecallByMilvus():
 if __name__ == '__main__':
     import random
     client = RecallByMilvus()
-    collection_name = 'test1'
+    collection_name = 'literature_search'
     partition_tag = 'partition_3'
     embeddings = [[random.random() for _ in range(128)] for _ in range(2)]
     status, resultes = client.search(

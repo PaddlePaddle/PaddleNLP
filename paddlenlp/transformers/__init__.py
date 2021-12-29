@@ -21,6 +21,8 @@ from .bert.tokenizer import *
 from .bert_japanese.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
+from .ppminilm.modeling import *
+from .ppminilm.tokenizer import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *

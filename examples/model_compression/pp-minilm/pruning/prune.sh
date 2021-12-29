@@ -21,7 +21,7 @@ export CUDA_VISIBLE_DEVICES=$6
 export STUDENT_DIR=$7
 export WIDTH_LIST=$8
 
-python -u ./prune.py --model_type ernie \
+python -u ./prune.py --model_type ppminilm \
           --model_name_or_path ${STUDENT_DIR} \
           --task_name $TASK_NAME --max_seq_length ${SEQ_LEN}     \
           --batch_size ${BATCH_SIZE}       \
