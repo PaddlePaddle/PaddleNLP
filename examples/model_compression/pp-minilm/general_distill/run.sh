@@ -47,7 +47,7 @@ cp ../../../../paddlenlp/transformers/distill_utils.py ${output_dir}/
 
 
 python3 -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" general_distill.py \
-    --model_type ernie \
+    --model_type ppminilm \
     --num_relation_heads ${numH} \
     --teacher_model_type ${teacher} \
     --teacher_layer_index ${teacher_layer_index} \
