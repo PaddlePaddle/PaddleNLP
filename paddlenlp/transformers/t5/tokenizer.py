@@ -58,6 +58,10 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/spiece.model",
             "t5-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/spiece.model",
+            "t5-v1_1-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/spiece.model",
+            "t5-v1_1-large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/spiece.model",
         },
     }
 
@@ -69,6 +73,12 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             "do_lower_case": False
         },
         "t5-large": {
+            "do_lower_case": False
+        },
+        "t5-v1_1-base": {
+            "do_lower_case": False
+        },
+        "t5-v1_1-large": {
             "do_lower_case": False
         },
     }
