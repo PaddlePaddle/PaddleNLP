@@ -110,10 +110,9 @@ def evaluate(outputs, metric, data_loader):
 
 
 class Predictor(object):
-    def __init__(self, predictor, input_handles, output_handles, input_handle):
+    def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
-        self.input_handle = input_handle
         self.output_handles = output_handles
 
     @classmethod
@@ -175,7 +174,7 @@ class Predictor(object):
             for name in predictor.get_output_names()
         ]
 
-        return cls(predictor, input_handles, output_handles, input_handle)
+        return cls(predictor, input_handles, output_handles)
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
@@ -255,7 +254,7 @@ def main():
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
     ): fn(samples)
     outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)

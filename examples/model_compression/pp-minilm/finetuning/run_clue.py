@@ -204,7 +204,7 @@ def do_eval(args):
         convert_example,
         tokenizer=tokenizer,
         label_list=dev_ds.label_list,
-        max_seq_len=args.max_seq_length)
+        max_seq_length=args.max_seq_length)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
@@ -296,10 +296,8 @@ def do_train(args):
         return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
-
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -373,7 +371,6 @@ def do_train(args):
             if global_step >= num_training_steps:
                 print("best_acc: ", best_acc)
                 return
-
     print("best_acc: ", best_acc)
 
 
