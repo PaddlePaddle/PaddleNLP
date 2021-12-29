@@ -30,7 +30,7 @@ from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, PPMiniLMForSequenceClassification
 
 sys.path.append("../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
@@ -73,7 +73,6 @@ def parse_args():
         "--output_dir",
         default="best_clue_model",
         type=str,
-        required=True,
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
@@ -132,6 +131,11 @@ def parse_args():
         "--do_train",
         type=distutils.util.strtobool,
         default=True,
+        help="Whether do train.")
+    parser.add_argument(
+        "--do_eval",
+        type=distutils.util.strtobool,
+        default=False,
         help="Whether do train.")
     parser.add_argument(
         "--max_steps",
@@ -196,7 +200,6 @@ def do_eval(args):
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -221,6 +224,7 @@ def do_eval(args):
         return_list=True)
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
+
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
@@ -253,7 +257,8 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_ds = load_dataset('clue', args.task_name, splits='train')
+    train_ds, dev_ds = load_dataset(
+        'clue', args.task_name, splits=('train', 'dev'))
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
@@ -262,26 +267,27 @@ def do_train(args):
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
+
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
+
+    dev_ds = dev_ds.map(trans_func, lazy=True)
+    dev_batch_sampler = paddle.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
+
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
+
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-
-    dev_ds = load_dataset('clue', args.task_name, splits='dev')
-
-    dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
     dev_data_loader = DataLoader(
         dataset=dev_ds,
         batch_sampler=dev_batch_sampler,
@@ -368,6 +374,23 @@ def do_train(args):
     print("best_acc: ", best_acc)
 
 
+def export_model(args):
+    save_path = os.path.join(args.output_dir, "inference")
+    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
+    model.eval()
+    # convert to static graph with specific input description
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
+        ])
+    # save converted static graph model
+    paddle.jit.save(model, save_path)
+
+
 def print_arguments(args):
     """print arguments"""
     print('-----------  Configuration Arguments -----------')
@@ -381,5 +404,6 @@ if __name__ == "__main__":
     print_arguments(args)
     if args.do_train:
         do_train(args)
-    else:
+        export_model(args)
+    if args.do_eval:
         do_eval(args)

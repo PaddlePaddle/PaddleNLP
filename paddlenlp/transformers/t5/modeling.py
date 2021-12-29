@@ -638,7 +638,43 @@ class T5PretrainedModel(PretrainedModel):
             "layer_norm_epsilon": 1e-06,
             "initializer_factor": 1.0,
             "feed_forward_proj": "relu"
-        }
+        },
+        "t5-v1_1-base": {
+            "tie_word_embeddings": False,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 768,
+            "d_kv": 64,
+            "d_ff": 2048,
+            "num_layers": 12,
+            "num_decoder_layers": 12,
+            "num_heads": 12,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "gated-gelu",
+        },
+        "t5-v1_1-large": {
+            "tie_word_embeddings": False,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 64,
+            "d_ff": 2816,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 16,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "gated-gelu",
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -649,6 +685,10 @@ class T5PretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
             "t5-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
+            "t5-v1_1-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/model_state.pdparams",
+            "t5-v1_1-large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/model_state.pdparams",
         }
     }
 

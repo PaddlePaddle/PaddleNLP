@@ -1,2 +1,0 @@
-paddlepaddle-gpu==2.2.1
-paddlenlp==2.2.1
