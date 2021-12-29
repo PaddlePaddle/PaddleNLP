@@ -120,6 +120,9 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-gen-large-430g-en": {
             "do_lower_case": True
         },
+        "ppminilm-6l-768h": {
+            "do_lower_case": True
+        },
     }
 
     def __init__(self,

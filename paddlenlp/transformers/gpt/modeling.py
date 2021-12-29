@@ -1134,6 +1134,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
             raise AttributeError(
                 "'size_per_head = %d' is not supported yet in the faster version of GPT"
                 % size_per_head)
+        if kwargs['forced_bos_token_id'] is not None:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'forced_bos_token_id != None' is not supported yet in the faster version"
+            )
         self._faster_entry = FasterGPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry

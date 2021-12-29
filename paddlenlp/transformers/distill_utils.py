@@ -21,7 +21,7 @@ from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEn
 from paddle.fluid.data_feeder import convert_dtype
 
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieForSequenceClassification
+from paddlenlp.transformers import PPMiniLMForSequenceClassification
 from paddlenlp.transformers import TinyBertForPretraining
 from paddlenlp.transformers import BertForSequenceClassification
 
@@ -140,7 +140,6 @@ def calc_multi_relation_loss(loss_fct,
 def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
     """
     Calculates loss for Q-Q, K-K, V-V relation from MiniLMv2.
-
     Args:
         loss_fct (callable):
             Loss function for distillation. It only supports kl_div loss now.
@@ -197,7 +196,6 @@ def to_distill(self,
     expose attributes `outputs.q`, `outputs.k`, `outputs.v`,
     `outputs.scaled_qks`, `outputs.hidden_states`and `outputs.attentions` of
     the object for distillation.
-
     It could be returned intermediate tensor using in MiniLM and TinyBERT
     strategy.
     """
@@ -210,7 +208,7 @@ def to_distill(self,
     if return_qkv:
         # forward function of student class should be replaced for distributed training.
         TinyBertForPretraining._forward = minilm_pretraining_forward
-        ErnieForSequenceClassification._forward = minilm_pretraining_forward
+        PPMiniLMForSequenceClassification._forward = minilm_pretraining_forward
     else:
         TinyBertForPretraining._forward = tinybert_forward
 
@@ -218,7 +216,7 @@ def to_distill(self,
         if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
                               TransformerEncoder, TinyBertForPretraining,
                               BertForSequenceClassification,
-                              ErnieForSequenceClassification)):
+                              PPMiniLMForSequenceClassification)):
             layer.forward = layer._forward
             if isinstance(layer, TransformerEncoder):
                 layer.return_layer_outputs = return_layer_outputs
