@@ -59,12 +59,12 @@
 |SKEP-Large|test|0.98497|0.99139|0.98817|
 
 给定一段文本，使用我们提供的全流程预测脚本可以轻松获得情感分析结果，如下所示。
-```
-input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
-aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
-aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
-aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
-```
+
+> input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒  
+> aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向  
+> aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向  
+> aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
+
 如果你想了解更多评论观点抽取模型和属性级情感分类模型的实现细节，请分别点击 [extraction](extraction/README.md) 和 [classification](classification/README.md)。
 
 
