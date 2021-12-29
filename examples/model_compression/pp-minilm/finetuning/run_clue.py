@@ -199,7 +199,7 @@ def do_eval(args):
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    tokenizer = tokenizer_class.from_pretrained('ppminilm-6l-768h')
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
