@@ -141,23 +141,18 @@ def is_chinese_char(cp):
     return False
 
 
+@dataclass(frozen=True, eq=True)
 class AddedToken:
     """
     AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
     way it should behave.
     """
 
-    def __init__(self,
-                 content,
-                 single_word=False,
-                 lstrip=False,
-                 rstrip=False,
-                 normalized=True):
-        self.content = content
-        self.single_word = single_word
-        self.lstrip = lstrip
-        self.rstrip = rstrip
-        self.normalized = normalized
+    content: str = field(default_factory=str)
+    single_word: bool = False
+    lstrip: bool = False
+    rstrip: bool = False
+    normalized: bool = True
 
     def __getstate__(self):
         return self.__dict__
@@ -444,16 +439,23 @@ class PretrainedTokenizer(object):
             "right", "left"
         ], "Padding side must be either left or right"
         init_dict = fn_args_to_dict(original_init, *args, **kwargs)
-
+        self.added_tokens_encoder = {}
+        self.added_tokens_decoder = {}
         # TODO(guosheng): Use OrderedDict, otherwise `all_special_tokens` returns
         # a list without order.
         self.tokens_trie = Trie()
-        special_tokens_map = {}
-        for identifier, token in init_dict.items():
+        self.special_tokens_map = {}
+        for identifier, value in init_dict.items():
             if identifier.endswith('_token'):
-                special_tokens_map[identifier] = token
-                self.tokens_trie.add(token)
-        self.special_tokens_map = special_tokens_map
+                self.special_tokens_map[identifier] = value
+                self.tokens_trie.add(value)
+            if identifier == "additional_special_tokens":
+                assert isinstance(value, (
+                    list, tuple)), f"Value {value} is not a list or tuple"
+                assert all(
+                    isinstance(t, (str, AddedToken)) for t in
+                    value), "One of the tokens is not a string or an AddedToken"
+                self.add_tokens(value, special_tokens=True)
 
     def _build_special_tokens_map_extended(self, **kwargs):
         for identifier, token in kwargs.items():
@@ -639,6 +641,20 @@ class PretrainedTokenizer(object):
         return all_toks
 
     @property
+    def all_special_tokens_extended(self):
+        """ 
+        list: All the special tokens ('<unk>', '<cls>'...) corresponding to
+            special token arguments in `__init__` (arguments end with '_end').
+        """
+        all_toks = []
+        set_attr = self.special_tokens_map_extended
+        for attr_value in set_attr.values():
+            all_toks = all_toks + (list(attr_value) if isinstance(attr_value, (
+                list, tuple)) else [attr_value])
+        all_toks = list(set(all_toks))
+        return all_toks
+
+    @property
     def all_special_ids(self):
         """ 
         list: All the token ids corresponding to all the special tokens.
@@ -647,9 +663,63 @@ class PretrainedTokenizer(object):
         all_ids = self.convert_tokens_to_ids(all_toks)
         return all_ids
 
+    def __len__(self):
+        """
+        Size of the full vocabulary with the added tokens.
+        """
+        return self.vocab_size + len(self.added_tokens_encoder)
+
+    def _add_tokens(self, new_tokens, special_tokens=True):
+        if special_tokens:
+            add_special_tokens = []
+            add_special_tokens_extended = []
+            for token in new_tokens:
+                if isinstance(token, AddedToken):
+                    if hasattr(self, "do_lower_case") and self.do_lower_case:
+                        token.content = token.content.lower()
+                    if token.content not in self.added_tokens_encoder:
+                        add_special_tokens_extended.append(token)
+                        add_special_tokens.append(token.content)
+                        self.tokens_trie.add(token.content)
+                        self.added_tokens_encoder[token.content] = len(self)
+                        self.added_tokens_decoder[len(self) - 1] = token.content
+                else:
+                    if hasattr(self, "do_lower_case") and self.do_lower_case:
+                        token = token.lower()
+                    if token not in self.added_tokens_encoder:
+                        add_special_tokens.append(token)
+                        self.tokens_trie.add(token)
+                        self.added_tokens_encoder[token] = len(self)
+                        self.added_tokens_decoder[len(self) - 1] = token
+            self.special_tokens_map_extended[
+                "additional_special_tokens"] = add_special_tokens_extended
+            self.special_tokens_map[
+                "additional_special_tokens"] = add_special_tokens
+        else:
+            for token in new_tokens:
+                if not isinstance(token, str):
+                    raise TypeError(
+                        f"Token {token} is not a string but a {type(token)}.")
+                if hasattr(self, "do_lower_case") and self.do_lower_case:
+                    token = token.lower()
+                if token not in self.added_tokens_encoder:
+                    self.added_tokens_encoder[token] = len(self)
+                    self.added_tokens_decoder[len(self) - 1] = token
+
+        return len(self.added_tokens_encoder)
+
+    def add_tokens(self, new_tokens, special_tokens=True):
+        if not new_tokens:
+            return 0
+
+        if not isinstance(new_tokens, (list, tuple)):
+            new_tokens = [new_tokens]
+
+        return self._add_tokens(new_tokens, special_tokens=special_tokens)
+
     def tokenize(self, text, **kwargs):
         all_special_tokens_extended = dict(
-            (t.content, t) for t in self.special_tokens_map_extended.values()
+            (t.content, t) for t in self.all_special_tokens_extended
             if isinstance(t, AddedToken))
         no_split_token = set(self.all_special_tokens)
         tokens = self.tokens_trie.split(text)
@@ -684,17 +754,19 @@ class PretrainedTokenizer(object):
         return tokenized_text
 
     def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a sequence of tokens into ids using the `vocab` attribute (an
-        instance of `Vocab`). Override it if needed.
+        ids = []
+        if isinstance(tokens, str):
+            tokens = [tokens]
+        for token in tokens:
+            if token in self.added_tokens_encoder:
+                ids.append(self.added_tokens_encoder[token])
+            else:
+                ids.append(self._convert_token_to_id(token))
+        return ids
 
-        Args：
-            tokens (list[int]): List of token ids.
+    def _convert_token_to_id(self, token):
 
-        Returns:
-            list: Converted id list.
-        """
-        return self.vocab.to_indices(tokens)
+        return self.vocab.to_indices(token)
 
     def convert_tokens_to_string(self, tokens):
         """
@@ -710,26 +782,21 @@ class PretrainedTokenizer(object):
         return " ".join(tokens)
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts a token id or a sequence of token ids (integer) to a token or
-        a sequence of tokens (str) by using the `vocab` attribute (an instance
-        of `Vocab`).
-
-        Args:
-            ids (int` or `list[int]): A token id or a sequence of token ids.
-            skip_special_tokens (bool, optional): Whether to skip and not
-                decode special tokens when converting. Defaults to `False`.
-        
-        Returns:
-            str: Converted token or token sequence.
-        """
-        tokens = self.vocab.to_tokens(ids)
-        if skip_special_tokens and isinstance(tokens, list):
-            tokens = [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
+        tokens = []
+        if isinstance(ids, int):
+            ids = [ids]
+        for index in ids:
+            if skip_special_tokens and index in self.all_special_ids:
+                continue
+            if index in self.added_tokens_decoder:
+                tokens.append(self.added_tokens_decoder[index])
+            else:
+                tokens.append(self._convert_id_to_token(index))
         return tokens
+
+    def _convert_id_to_token(self, index):
+
+        return self.vocab.to_tokens(index)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -978,8 +1045,7 @@ class PretrainedTokenizer(object):
         if name.endswith('_token'):
             return self.special_tokens_map[name]
         elif name.endswith('_token_id'):
-            return self.convert_tokens_to_ids(self.special_tokens_map[name[:
-                                                                           -3]])
+            return self._convert_token_to_id(self.special_tokens_map[name[:-3]])
         raise AttributeError("'{}' object has no attribute '{}'".format(
             type(self).__name__, name))
 
@@ -1251,7 +1317,7 @@ class PretrainedTokenizer(object):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                tokens = self._tokenize(text)
+                tokens = self.tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
@@ -1463,7 +1529,7 @@ class PretrainedTokenizer(object):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                tokens = self._tokenize(text)
+                tokens = self.tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(

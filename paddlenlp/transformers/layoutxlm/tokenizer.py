@@ -20,7 +20,7 @@ from collections import OrderedDict
 from paddle.utils import try_import
 from typing import List, Optional
 
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
 
 SPIECE_UNDERLINE = "▁"
@@ -40,23 +40,6 @@ def _is_start_of_word(text):
     return bool(
         _is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(
             first_char))
-
-
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
 
 
 class LayoutXLMTokenizer(PretrainedTokenizer):
