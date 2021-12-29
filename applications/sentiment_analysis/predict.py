@@ -67,7 +67,8 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
-    ext_model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(ext_label2id))
+    ext_model = SkepForTokenClassification.from_pretrained(
+        model_name, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
@@ -126,7 +127,8 @@ def predict_cls(cls_model_path, cls_label_path, ext_results):
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
-    cls_model = SkepForSequenceClassification.from_pretrained(model_name, num_classes=len(cls_label2id))
+    cls_model = SkepForSequenceClassification.from_pretrained(
+        model_name, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 

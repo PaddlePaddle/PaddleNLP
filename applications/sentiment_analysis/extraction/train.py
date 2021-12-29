@@ -74,7 +74,8 @@ def train():
         dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
 
     # configure model training
-    model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(label2id))
+    model = SkepForTokenClassification.from_pretrained(
+        model_name, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(
