@@ -22,7 +22,7 @@ import paddle
 from paddle import inference
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import PPMiniLMTokenizer
 from paddlenlp.metrics import AccuracyAndF1
 
 from data import read, load_dict, convert_example_to_feature
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     label2id, id2label = load_dict(args.label_path)
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
