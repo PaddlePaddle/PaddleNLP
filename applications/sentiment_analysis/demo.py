@@ -15,68 +15,8 @@
 import argparse
 import paddle
 from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
-from utils import load_dict
+from utils import decoding, load_dict
 from seqeval.metrics.sequence_labeling import get_entities
-
-
-def decoding(text, tag_seq):
-    assert len(text) == len(
-        tag_seq), f"text len: {len(text)}, tag_seq len: {len(tag_seq)}"
-
-    puncs = list(",.?;!，。？；！")
-    splits = [idx for idx in range(len(text)) if text[idx] in puncs]
-
-    prev = 0
-    sub_texts, sub_tag_seqs = [], []
-    for i, split in enumerate(splits):
-        sub_tag_seqs.append(tag_seq[prev:split])
-        sub_texts.append(text[prev:split])
-        prev = split
-    sub_tag_seqs.append(tag_seq[prev:])
-    sub_texts.append((text[prev:]))
-
-    ents_list = []
-    for sub_text, sub_tag_seq in zip(sub_texts, sub_tag_seqs):
-        ents = get_entities(sub_tag_seq, suffix=False)
-        ents_list.append((sub_text, ents))
-
-    aps = []
-    no_a_words = []
-    for sub_tag_seq, ent_list in ents_list:
-        sub_aps = []
-        sub_no_a_words = []
-        for ent in ent_list:
-            ent_name, start, end = ent
-            if ent_name == "Aspect":
-                aspect = sub_tag_seq[start:end + 1]
-                sub_aps.append([aspect])
-                if len(sub_no_a_words) > 0:
-                    sub_aps[-1].extend(sub_no_a_words)
-                    sub_no_a_words.clear()
-            else:
-                ent_name == "Opinion"
-                opinion = sub_tag_seq[start:end + 1]
-                if len(sub_aps) > 0:
-                    sub_aps[-1].append(opinion)
-                else:
-                    sub_no_a_words.append(opinion)
-
-        if sub_aps:
-            aps.extend(sub_aps)
-            if len(no_a_words) > 0:
-                aps[-1].extend(no_a_words)
-                no_a_words.clear()
-        elif sub_no_a_words:
-            if len(aps) > 0:
-                aps[-1].extend(sub_no_a_words)
-            else:
-                no_a_words.extend(sub_no_a_words)
-
-    if no_a_words:
-        no_a_words.insert(0, "None")
-        aps.append(no_a_words)
-
-    return aps
 
 
 def is_aspect_first(text, aspect, opinion_word):
@@ -130,8 +70,6 @@ def predict(ext_model,
             max_seq_len=max_seq_len, )
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
         token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
-        print("input_text:",len(list(input_text)))
-        print("input_ids:",len(input_ids[0]))
 
         # extract aspect and opinion words
         logits = ext_model(input_ids, token_type_ids=token_type_ids)
