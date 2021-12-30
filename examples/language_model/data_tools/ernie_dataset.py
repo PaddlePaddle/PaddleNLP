@@ -1,5 +1,5 @@
-# Copyright (c) 2021, PadddlePaddle authors.  All rights reserved.
-# Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2021, PadddlePaddle authors. All Rights Reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -203,6 +203,8 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     # Padding mask.
     padding_mask_np = np.array(
         [1] * num_tokens + [0] * padding_length, dtype=np.float32)
+    padding_mask_np = (1 - padding_mask_np) * -1e4
+
     padding_mask_np = padding_mask_np.reshape([1, 1, -1])
     # Lables and loss mask.
     labels = [-1] * max_seq_length

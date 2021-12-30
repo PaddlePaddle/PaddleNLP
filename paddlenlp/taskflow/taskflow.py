@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+from collections import deque
 import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask
+from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
@@ -28,6 +30,8 @@ from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
+from .text_similarity import TextSimilarityTask
+from .dialogue import DialogueTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -38,7 +42,11 @@ TASKS = {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
                 "linking": True,
-            }
+            },
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'knowledge_mining-nptag',
+            },
         },
         "default": {
             "model": "wordtag"
@@ -161,7 +169,29 @@ TASKS = {
         "default": {
             "model": "csc-ernie-1.0"
         }
-    }
+    },
+    'text_similarity': {
+        "models": {
+            "simbert-base-chinese": {
+                "task_class": TextSimilarityTask,
+                "task_flag": "text_similarity-simbert-base-chinese"
+            },
+        },
+        "default": {
+            "model": "simbert-base-chinese"
+        }
+    },
+    'dialogue': {
+        "models": {
+            "plato-mini": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-plato-mini"
+            },
+        },
+        "default": {
+            "model": "plato-mini"
+        }
+    },
 }
 
 
@@ -227,3 +257,16 @@ class Taskflow(object):
         """
         task_list = list(TASKS.keys())
         return task_list
+
+    def from_segments(self, *inputs):
+        results = self.task_instance.from_segments(inputs)
+        return results
+
+    def interactive_mode(self, max_turn):
+        with self.task_instance.interactive_mode(max_turn=3):
+            while True:
+                human = input("[Human]:").strip()
+                if human.lower() == "exit":
+                    exit()
+                robot = self.task_instance(human)[0]
+                print("[Bot]:%s"%robot)

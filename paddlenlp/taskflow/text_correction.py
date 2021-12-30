@@ -60,9 +60,9 @@ usage = r"""
 
 URLS = {
     "csc-ernie-1.0": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
+        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
         None,  # md5
-        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
+        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
     ],
 }
 
@@ -308,15 +308,21 @@ class CSCTask(Task):
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
         rest_words = []
-        if len(words) > self._max_seq_length - 2:
-            rest_words = words[max_seq_length - 2:]
-            words = words[:self._max_seq_length - 2]
+        max_seq_length = self._max_seq_length - 2
+        if len(words) > max_seq_length:
+            rest_words = words[max_seq_length:]
+            words = words[:max_seq_length]
 
         pred_result = ""
         for j, word in enumerate(words):
-            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[j])
-            if not is_chinese_char(ord(word)) or det_pred[
-                    j] == 0 or candidates == UNK or candidates == '[PAD]':
+            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[
+                j] if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
+            word_icc = is_chinese_char(ord(word))
+            cand_icc = is_chinese_char(ord(candidates)) if len(
+                candidates) == 1 else False
+            if not word_icc or det_pred[j] == 0\
+                or candidates in [UNK, '[PAD]']\
+                or (word_icc and not cand_icc):
                 pred_result += word
             else:
                 pred_result += candidates.lstrip("##")

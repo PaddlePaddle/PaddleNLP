@@ -73,7 +73,7 @@ class Glue(DatasetBuilder):
 
     BUILDER_CONFIGS = {
         'cola': {
-            'url': "https://dataset.bj.bcebos.com/glue/CoLA.zip",
+            'url': "https://bj.bcebos.com/dataset/glue/CoLA.zip",
             'md5': 'b178a7c2f397b0433c39c7caf50a3543',
             'splits': {
                 'train': [
@@ -92,7 +92,7 @@ class Glue(DatasetBuilder):
             'labels': ["0", "1"]
         },
         'sst-2': {
-            'url': "https://dataset.bj.bcebos.com/glue/SST.zip",
+            'url': "https://bj.bcebos.com/dataset/glue/SST.zip",
             'md5': '9f81648d4199384278b86e315dac217c',
             'splits': {
                 'train': [
@@ -111,7 +111,7 @@ class Glue(DatasetBuilder):
             'labels': ["0", "1"]
         },
         'sts-b': {
-            'url': 'https://dataset.bj.bcebos.com/glue/STS.zip',
+            'url': 'https://bj.bcebos.com/dataset/glue/STS.zip',
             'md5': 'd573676be38f1a075a5702b90ceab3de',
             'splits': {
                 'train': [
@@ -149,7 +149,7 @@ class Glue(DatasetBuilder):
             'labels': ["0", "1"]
         },
         'mnli': {
-            'url': 'https://dataset.bj.bcebos.com/glue/MNLI.zip',
+            'url': 'https://bj.bcebos.com/dataset/glue/MNLI.zip',
             'md5': 'e343b4bdf53f927436d0792203b9b9ff',
             'splits': {
                 'train': [
@@ -176,7 +176,7 @@ class Glue(DatasetBuilder):
             'labels': ["contradiction", "entailment", "neutral"]
         },
         'qnli': {
-            'url': 'https://dataset.bj.bcebos.com/glue/QNLI.zip',
+            'url': 'https://bj.bcebos.com/dataset/glue/QNLI.zip',
             'md5': 'b4efd6554440de1712e9b54e14760e82',
             'splits': {
                 'train': [
@@ -195,7 +195,7 @@ class Glue(DatasetBuilder):
             'labels': ["entailment", "not_entailment"]
         },
         'rte': {
-            'url': 'https://dataset.bj.bcebos.com/glue/RTE.zip',
+            'url': 'https://bj.bcebos.com/dataset/glue/RTE.zip',
             'md5': 'bef554d0cafd4ab6743488101c638539',
             'splits': {
                 'train': [
@@ -214,7 +214,7 @@ class Glue(DatasetBuilder):
             'labels': ["entailment", "not_entailment"]
         },
         'wnli': {
-            'url': 'https://dataset.bj.bcebos.com/glue/WNLI.zip',
+            'url': 'https://bj.bcebos.com/dataset/glue/WNLI.zip',
             'md5': 'a1b4bd2861017d302d29e42139657a42',
             'splits': {
                 'train': [
@@ -235,10 +235,10 @@ class Glue(DatasetBuilder):
         'mrpc': {
             'url': {
                 'train_data':
-                'https://dataset.bj.bcebos.com/glue/mrpc/msr_paraphrase_train.txt',
-                'dev_id': 'https://dataset.bj.bcebos.com/glue/mrpc/dev_ids.tsv',
+                'https://bj.bcebos.com/dataset/glue/mrpc/msr_paraphrase_train.txt',
+                'dev_id': 'https://bj.bcebos.com/dataset/glue/mrpc/dev_ids.tsv',
                 'test_data':
-                'https://dataset.bj.bcebos.com/glue/mrpc/msr_paraphrase_test.txt'
+                'https://bj.bcebos.com/dataset/glue/mrpc/msr_paraphrase_test.txt'
             },
             'md5': {
                 'train_data': '793daf7b6224281e75fe61c1f80afe35',

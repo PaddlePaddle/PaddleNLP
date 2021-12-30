@@ -63,7 +63,8 @@ def interaction(args, model, tokenizer):
                 num_beams=args.num_beams,
                 length_penalty=args.length_penalty,
                 early_stopping=args.early_stopping,
-                num_return_sequences=args.num_return_sequences)
+                num_return_sequences=args.num_return_sequences,
+                use_faster=True)
             bot_response = select_response(
                 ids,
                 scores,

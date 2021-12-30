@@ -1,6 +1,6 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -171,6 +171,10 @@ class SkepTokenizer(PretrainedTokenizer):
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
+
     Args:
         vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
@@ -221,23 +225,23 @@ class SkepTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "skep_ernie_1.0_large_ch":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
             "skep_ernie_2.0_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.txt",
         },
         "bpe_vocab_file": {
             "skep_ernie_1.0_large_ch": None,
             "skep_ernie_2.0_large_en": None,
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
         },
         "bpe_json_file": {
             "skep_ernie_1.0_large_ch": None,
             "skep_ernie_2.0_large_en": None,
             "skep_roberta_large_en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep_roberta_large_en.encoder.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
         }
     }
 

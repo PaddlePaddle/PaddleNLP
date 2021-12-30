@@ -53,7 +53,7 @@ vocab4 = Vocab.from_json(json_file_path)
 ```python
 from paddlenlp.data import Vocab, JiebaTokenizer
 # 词表文件路径，运行示例程序可先下载词表文件
-# wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+# wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 vocab_file_path = './senta_word_dict.txt'
 # 构建词表
 vocab = Vocab.load_vocabulary(
@@ -195,7 +195,7 @@ from paddlenlp.datasets import load_dataset
 from paddle.io import DataLoader
 
 # 词表文件路径，运行示例程序可先下载词表文件
-# wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+# wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 vocab_file_path = './senta_word_dict.txt'
 # 构建词表
 vocab = Vocab.load_vocabulary(

@@ -1,0 +1,7 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/microsoft-DialoGPT-large/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/microsoft-DialoGPT-large/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/microsoft-DialoGPT-large/tokenizer_config.json",
+  "merges_file":"https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/microsoft-DialoGPT-large/merges.txt",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/junnyu/microsoft-DialoGPT-large/vocab.json"
+}

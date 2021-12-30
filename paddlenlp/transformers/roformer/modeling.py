@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -256,7 +257,8 @@ class RoFormerPretrainedModel(PretrainedModel):
     An abstract class for pretrained RoFormer models. It provides RoFormer related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -427,25 +429,25 @@ class RoFormerPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "roformer-chinese-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-small/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-small/model_state.pdparams",
             "roformer-chinese-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-base/model_state.pdparams",
             "roformer-chinese-char-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-small/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-small/model_state.pdparams",
             "roformer-chinese-char-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-base/model_state.pdparams",
             "roformer-chinese-sim-char-ft-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-small/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-small/model_state.pdparams",
             "roformer-chinese-sim-char-ft-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-base/model_state.pdparams",
             "roformer-chinese-sim-char-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-small/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-small/model_state.pdparams",
             "roformer-chinese-sim-char-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-base/model_state.pdparams",
             "roformer-english-small-discriminator":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-discriminator/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-discriminator/model_state.pdparams",
             "roformer-english-small-generator":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-generator/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/model_state.pdparams",
         }
     }
 
@@ -678,9 +680,8 @@ class RoFormerModel(RoFormerPretrainedModel):
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
     """
-    RoFormer Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    RoFormer with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         roformer (:class:`RoFormerModel`):

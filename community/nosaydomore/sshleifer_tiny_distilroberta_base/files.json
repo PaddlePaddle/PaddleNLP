@@ -1,0 +1,7 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json",
+  "merges_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
+}

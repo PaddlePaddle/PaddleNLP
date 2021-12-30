@@ -25,7 +25,7 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 ## 数据介绍
 
-本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)作为训练语料，该数据集来源于[这个github repo](https://github.com/v-zich/couplet-clean-dataset)，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
+本教程使用[couplet数据集](https://bj.bcebos.com/paddlenlp/datasets/couplet.tar.gz)作为训练语料，该数据集来源于[这个github repo](https://github.com/v-zich/couplet-clean-dataset)，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
 
 数据集会在调用`paddlenlp.datasets.load_dataset`时自动下载，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/Couplet/`目录下
 

@@ -1,4 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The OpenAI Team Authors and HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,28 +15,25 @@
 # limitations under the License.
 
 import collections
-import math
-
-import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
 from .. import PretrainedModel, register_base_model
-import paddlenlp
 
 __all__ = [
     'GPTModel',
-    "GPTPretrainedModel",
+    'GPTPretrainedModel',
     'GPTForPretraining',
     'GPTPretrainingCriterion',
     'GPTForGreedyGeneration',
     'GPTLMHeadModel',
+    'GPTForTokenClassification',
+    'GPTForSequenceClassification',
+    'GPTForCausalLM',
 ]
 
 
@@ -238,7 +237,7 @@ class TransformerDecoder(nn.Layer):
         self.layers = decoder_layers
         self.norm = norm
         if norm == "LayerNorm":
-            self.norm = nn.LayerNorm(hidden_size)
+            self.norm = nn.LayerNorm(hidden_size, epsilon=1e-5)
         elif norm is not None:
             raise ValueError("Only support LayerNorm")
         self.checkpoints = []
@@ -435,7 +434,8 @@ class GPTPretrainedModel(PretrainedModel):
     An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -504,6 +504,36 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
+        "gpt2-xl-en": { # 1558M
+            "vocab_size": 50257,
+            "hidden_size": 1600,
+            "num_hidden_layers": 48,
+            "num_attention_heads": 25,
+            "intermediate_size": 6400,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
+        "gpt2-large-en": { # 774M
+            "vocab_size": 50257,
+            "hidden_size": 1280,
+            "num_hidden_layers": 36,
+            "num_attention_heads": 20,
+            "intermediate_size": 5120,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
         "gpt2-medium-en": { #345M
             "vocab_size": 50304,
             "hidden_size": 1024,
@@ -520,7 +550,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eol_token_id": 198,
         },
         "gpt2-en": { #117M
-            "vocab_size": 50304,
+            "vocab_size": 50257,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -549,18 +579,22 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-
-
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "gpt2-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "gpt2-large-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
+            "gpt2-xl-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -585,7 +619,7 @@ class GPTPretrainedModel(PretrainedModel):
 @register_base_model
 class GPTModel(GPTPretrainedModel):
     r"""
-    The bare GPT Model transformer outputting raw hidden-states without any specific head on top.
+    The bare GPT Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -762,7 +796,7 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.arange(
                 past_length,
                 paddle.shape(input_ids)[-1] + past_length,
-                dtype='int64')
+                dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
@@ -796,7 +830,7 @@ class GPTModel(GPTPretrainedModel):
 
 class GPTForPretraining(GPTPretrainedModel):
     """
-    The pretraining model of GPT. It returns some logits and cached_kvs.
+    GPT Model with pretraining tasks on top.
 
     Args:
         gpt (:class:`GPTModel`):
@@ -1023,8 +1057,7 @@ class GPTLMHead(nn.Layer):
 
 class GPTLMHeadModel(GPTPretrainedModel):
     """
-    The GPT Model with a language modeling head on top (linear layer with weights tied to the input
-    embeddings).
+    The GPT Model with a `language modeling` head on top.
 
     Args:
         gpt (:class:`GPTModel`):
@@ -1086,6 +1119,30 @@ class GPTLMHeadModel(GPTPretrainedModel):
         else:
             return logits
 
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterGPT
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == "beam_search":
+            raise AttributeError(
+                "'beam_search' is not supported yet in the faster version of GPT"
+            )
+        # Currently, FasterTransformer only support restricted size_per_head.
+        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config[
+            "num_attention_heads"]
+        if size_per_head not in [32, 64, 128]:
+            raise AttributeError(
+                "'size_per_head = %d' is not supported yet in the faster version of GPT"
+                % size_per_head)
+        if kwargs['forced_bos_token_id'] is not None:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'forced_bos_token_id != None' is not supported yet in the faster version"
+            )
+        self._faster_entry = FasterGPT(
+            self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
+
     def prepare_inputs_for_generation(self,
                                       input_ids,
                                       use_cache=False,
@@ -1120,3 +1177,140 @@ class GPTLMHeadModel(GPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class GPTForTokenClassification(GPTPretrainedModel):
+    """
+    GPT Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of GPTModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of GPT.
+            If None, use the same value as `hidden_dropout_prob` of `GPTModel`
+            instance `gpt`. Defaults to None.
+    """
+
+    def __init__(self, gpt, num_classes=2, dropout=None):
+        super(GPTForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+        self.gpt = gpt  # allow gpt to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.gpt.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The GPTForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids(Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (list, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForTokenClassification, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForTokenClassification.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+        sequence_output = self.gpt(input_ids,
+                                   position_ids=position_ids,
+                                   attention_mask=attention_mask)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+        return logits
+
+
+class GPTForSequenceClassification(GPTPretrainedModel):
+    """
+    GPT Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of GPTModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+            
+    """
+
+    def __init__(self, gpt, num_classes=2):
+        super(GPTForSequenceClassification, self).__init__()
+        self.gpt = gpt  # allow gpt to be config
+        self.score = nn.Linear(
+            self.gpt.config["hidden_size"], num_classes, bias_attr=False)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The GPTForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids(Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (list, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForSequenceClassification, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForSequenceClassification.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
+        # sequence_output shape [bs, seq_len, hidden_size]
+        sequence_output = self.gpt(input_ids,
+                                   position_ids=position_ids,
+                                   attention_mask=attention_mask)
+        # logits shape [bs, seq_len, num_class]
+        logits = self.score(sequence_output)
+        # padding index maybe 0
+        eos_token_id = self.gpt.config.get("eos_token_id", 0)
+        # sequence_lengths shape [bs,]
+        sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(
+            axis=-1) - 1
+        pooled_logits = logits.gather_nd(
+            paddle.stack(
+                [paddle.arange(sequence_output.shape[0]), sequence_lengths],
+                axis=-1))
+
+        return pooled_logits
+
+
+GPTForCausalLM = GPTLMHeadModel

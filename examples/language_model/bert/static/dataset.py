@@ -125,7 +125,7 @@ class PretrainingDataset(Dataset):
         # TODO: whether to use reversed mask by changing 1s and 0s to be
         # consistent with nv bert
         input_mask = (1 - np.reshape(
-            input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])) * -1e9
+            input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])) * -1e4
 
         index = self.max_pred_length
         # store number of  masked tokens in index

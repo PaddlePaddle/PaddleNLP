@@ -1,3 +1,20 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 Huawei Technologies Co., Ltd.
+# Copyright 2018 The Google AI Language Team Authors, The HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
 import math
 import numpy as np
@@ -336,9 +353,10 @@ class NeZhaPooler(nn.Layer):
 class NeZhaPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained NeZha models. It provides NeZha related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -408,13 +426,13 @@ class NeZhaPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "nezha-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-base-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-chinese.pdparams",
             "nezha-large-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-large-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-chinese.pdparams",
             "nezha-base-wwm-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
             "nezha-large-wwm-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
         }
     }
     base_model_prefix = "nezha"
@@ -798,12 +816,11 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
 class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     """
-    NeZha Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    NeZha with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        nezha (:class:`BertModel`):
+        nezha (:class:`NeZhaModel`):
             An instance of NeZhaModel.
         dropout (float, optional):
             The dropout probability for output of NeZha.
@@ -1006,7 +1023,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
 class NeZhaForMultipleChoice(NeZhaPretrainedModel):
     """
-    NeZha Model with a multiple choice classification head on top.
+    NeZha Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):

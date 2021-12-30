@@ -65,17 +65,17 @@ python -u -m paddle.distributed.launch --gpus "0" predict.py \
         --max_seq_length 512
 ```
 
-#### 基于静态图的预测部署
+#### 基于静态图的预测
 
-使用动态图训练结束之后，可以将动态图参数导出成静态图参数，从而获得最优的预测部署性能，执行如下命令完成动态图转换静态图的功能:
+使用动态图训练结束之后，可以将动态图参数导出成静态图参数，从而获得最优的预测性能，执行如下命令完成动态图转换静态图的功能:
 ```
 python export_model.py --params_path=./checkpoint/model_100/model_state.pdparams --output_path=./output
 
 ```
 
-导出静态图模型之后，可以用于部署，`deploy/python/predict.py` 脚本提供了 python 部署预测示例。运行方式：
+导出静态图模型之后，可以基于静态图做预测部署，`deploy/python/predict.py` 脚本提供了 python 静态图预测示例。以 tnews 数据集为例, 执行如下命令基于静态图预测：
 ```
-python deploy/python/predict.py --model_dir=./output
+python deploy/python/predict.py --model_dir=./output --task_name="tnews"
 
 ```
 

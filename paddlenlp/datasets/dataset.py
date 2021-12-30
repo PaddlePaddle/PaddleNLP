@@ -199,28 +199,30 @@ class MapDataset(Dataset):
         """
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 0:
-            with Pool(num_workers, initargs=(RLock(), )) as pool:
+            pool = Pool(
+                num_workers, initargs=(RLock(), ), maxtasksperchild=1000)
 
-                def filter_shard(num_workers, index, fn):
-                    self.shard(
-                        num_shards=num_workers, index=index, contiguous=True)
-                    self._filter(fn=fn)
-                    return self
+            def filter_shard(num_workers, index, fn):
+                self.shard(num_shards=num_workers, index=index, contiguous=True)
+                self._filter(fn=fn)
+                return self
 
-                kwds_per_shard = [
-                    dict(
-                        num_workers=num_workers, index=rank, fn=fn)
-                    for rank in range(num_workers)
-                ]
-                results = [
-                    pool.apply_async(
-                        filter_shard, kwds=kwds) for kwds in kwds_per_shard
-                ]
-                transformed_shards = [r.get() for r in results]
+            kwds_per_shard = [
+                dict(
+                    num_workers=num_workers, index=rank, fn=fn)
+                for rank in range(num_workers)
+            ]
+            results = [
+                pool.apply_async(
+                    filter_shard, kwds=kwds) for kwds in kwds_per_shard
+            ]
+            transformed_shards = [r.get() for r in results]
 
-                self.new_data = []
-                for i in range(num_workers):
-                    self.new_data += transformed_shards[i].new_data
+            pool.close()
+            pool.join()
+            self.new_data = []
+            for i in range(num_workers):
+                self.new_data += transformed_shards[i].new_data
             return self
         else:
             return self._filter(fn)
@@ -291,31 +293,30 @@ class MapDataset(Dataset):
 
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 0:
-            with Pool(num_workers, initargs=(RLock(), )) as pool:
 
-                def map_shard(num_workers, index, fn, batched):
-                    self.shard(
-                        num_shards=num_workers, index=index, contiguous=True)
-                    self._map(fn=fn, lazy=False, batched=batched)
-                    return self
+            def map_shard(num_workers, index, fn, batched):
+                self.shard(num_shards=num_workers, index=index, contiguous=True)
+                self._map(fn=fn, lazy=False, batched=batched)
+                return self
 
-                kwds_per_shard = [
-                    dict(
-                        num_workers=num_workers,
-                        index=rank,
-                        fn=fn,
-                        batched=batched) for rank in range(num_workers)
-                ]
-                results = [
-                    pool.apply_async(
-                        map_shard, kwds=kwds) for kwds in kwds_per_shard
-                ]
-                transformed_shards = [r.get() for r in results]
+            kwds_per_shard = [
+                dict(
+                    num_workers=num_workers, index=rank, fn=fn, batched=batched)
+                for rank in range(num_workers)
+            ]
+            pool = Pool(
+                num_workers, initargs=(RLock(), ), maxtasksperchild=1000)
+            results = [
+                pool.apply_async(
+                    map_shard, kwds=kwds) for kwds in kwds_per_shard
+            ]
 
-                self.new_data = []
-                for i in range(num_workers):
-                    self.new_data += transformed_shards[i].new_data
-
+            transformed_shards = [r.get() for r in results]
+            pool.close()
+            pool.join()
+            self.new_data = []
+            for i in range(num_workers):
+                self.new_data += transformed_shards[i].new_data
             return self
         else:
             return self._map(fn, lazy=lazy, batched=batched)

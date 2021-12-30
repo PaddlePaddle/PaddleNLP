@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,17 +20,17 @@ __all__ = ['DistilBertTokenizer']
 
 class DistilBertTokenizer(BertTokenizer):
     """
-    Constructs a DistilBertTokenizer.
-    The usage of DistilBertTokenizer is the same as
+    Constructs a DistilBert tokenizer. The usage of DistilBertTokenizer is the same as
     `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
+    For more information regarding those methods, please refer to this superclass.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
             "distilbert-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-uncased-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-uncased-vocab.txt",
             "distilbert-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-cased-vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-cased-vocab.txt",
         }
     }
     pretrained_init_configuration = {

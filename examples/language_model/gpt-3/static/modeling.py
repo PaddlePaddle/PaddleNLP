@@ -23,6 +23,7 @@ import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddle.distributed.fleet import fleet
+import paddle.incubate as incubate
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
@@ -228,10 +229,8 @@ class MultiHeadAttention(nn.Layer):
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
 
-        if attn_mask is not None:
-            product = product + attn_mask
+        weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
-        weights = F.softmax(product)
         if self.dropout:
             weights = F.dropout(
                 weights,
@@ -620,11 +619,11 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
             "gpt-cpm-small-cn-distill":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -745,12 +744,10 @@ class GPTModel(GPTPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        attention_mask.stop_gradient = True
-
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=attention_mask,
+            tgt_mask=None,
             use_cache=use_cache,
             cache=cache)
         self.checkpoints.extend(self.decoder.checkpoints)

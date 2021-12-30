@@ -19,7 +19,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
-
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -699,33 +698,33 @@ class AlbertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "albert-base-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.pdparams",
             "albert-large-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.pdparams",
             "albert-xlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.pdparams",
             "albert-xxlarge-v1":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.pdparams",
             "albert-base-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.pdparams",
             "albert-large-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.pdparams",
             "albert-xlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.pdparams",
             "albert-xxlarge-v2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.pdparams",
             "albert-chinese-tiny":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.pdparams",
             "albert-chinese-small":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.pdparams",
             "albert-chinese-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.pdparams",
             "albert-chinese-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.pdparams",
             "albert-chinese-xlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.pdparams",
             "albert-chinese-xxlarge":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.pdparams",
         }
     }
     base_model_prefix = "transformer"
@@ -1068,7 +1067,7 @@ class AlbertModel(AlbertPretrainedModel):
 class AlbertForPretraining(AlbertPretrainedModel):
     """
     Albert Model with a `masked language modeling` head and a `sentence order prediction` head
-    on top during the pretraining.
+    on top.
 
     Args:
         albert (:class:`AlbertModel`):
@@ -1241,7 +1240,7 @@ class AlbertSOPHead(Layer):
 
 class AlbertForMaskedLM(AlbertPretrainedModel):
     """
-    Albert Model with a `masked language modeling` head on top during the pretraining.
+    Albert Model with a `masked language modeling` head on top.
 
     Args:
         albert (:class:`AlbertModel`):
@@ -1566,8 +1565,8 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
 class AlbertForQuestionAnswering(AlbertPretrainedModel):
     """
-    Albert Model  with a linear layer on top of the hidden-states output to compute `span_start_logits` and `span_end_logits`,
-    designed for question-answering tasks like SQuAD.
+    Albert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
+    and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         albert (:class:`AlbertModel`):

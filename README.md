@@ -8,35 +8,34 @@
 [![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
 [![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
-![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
-* [2021-10-12] PaddleNLP 2.1版本已发布！新增开箱即用的NLP任务能力、Prompt Tuning应用示例与生成任务的高性能推理！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
-* [2021-09-16][《千言-问题匹配鲁棒性评测》](https://www.datafountain.cn/competitions/516)正式开赛啦🔥🔥🔥，欢迎大家踊跃报名!! [官方基线地址](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching/question_matching)。
-* [2021-08-22][《千言：面向事实一致性的生成评测比赛》](https://aistudio.baidu.com/aistudio/competition/detail/105)正式开赛啦🔥🔥🔥，欢迎大家踊跃报名!! [官方基线地址](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text)。
 
+* [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！**12.28-12.30**直播课[直通车](https://paddleqiyeban.wjx.cn/vj/txe5jBZ.aspx?udsid=178736)！:tada: 
+* [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
+* [2021-12-12] 飞桨新产品**端到端问答工具**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA)全新发布！:tada:
 
 ## 简介
 
 PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。
 
 - **易用的文本领域API**
-  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
+  - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供100+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
 
 - **多场景的应用示例**
-  - 覆盖从学术到工业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+  - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
 
 - **高性能分布式训练**
-  - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成超大规模参数的模型训练。
+  - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成大规模预训练模型训练。
 
 ## 安装
 
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.1
+- paddlepaddle >= 2.2
 
 ### pip安装
 
@@ -48,9 +47,9 @@ pip install --upgrade paddlenlp
 
 ## 易用的文本领域API
 
-### Taskflow：开箱即用的工业级NLP能力
+### Taskflow：开箱即用的产业级NLP能力
 
-Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**工业级的效果**与**极致的预测性能**。
+Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
 
 ```python
 from paddlenlp import Taskflow
@@ -70,57 +69,62 @@ ner = Taskflow("ner")
 ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
 >>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
 
+# 『解语』- 名词短语标注
+nptag = Taskflow("knowledge_mining", model="nptag")
+nptag("红曲霉菌")
+>>> [{'text': '红曲霉菌', 'label': '微生物'}]
+
 # 句法分析
 ddp = Taskflow("dependency_parsing")
-ddp("百度是一家高科技公司")
->>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
+>>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
 
 # 情感分析
 senta = Taskflow("sentiment_analysis")
-senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
->>> [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative', 'score': 0.6691398620605469}]
+senta("这个产品用起来真的很流畅，我非常喜欢")
+>>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
 ```
-更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)
+更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### Transformer API: 强大的预训练模型生态底座
+### Transformers API: 强大的预训练模型生态底座
 
-覆盖**22**个网络结构和**90**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如。欢迎开发者贡献更多预训练模型！🤗
+覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
 
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+ernie = AutoModel.from_pretrained('ernie-1.0')
+ernie_gram = AutoModel.from_pretrained('ernie-gram-zh')
+bert = AutoModel.from_pretrained('bert-wwm-chinese')
+albert = AutoModel.from_pretrained('albert-chinese-tiny')
+roberta = AutoModel.from_pretrained('roberta-wwm-ext')
+electra = AutoModel.from_pretrained('chinese-electra-small')
+gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
 
 ```python
 import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import *
 
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
 # 语义表示
-model = ErnieModel.from_pretrained('ernie-1.0')
+model = AutoModel.from_pretrained('ernie-1.0')
 sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # 文本分类 & 句对匹配
-model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0')
 # 序列标注
-model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
+model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 # 问答
-model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
 请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
 
-### Dataset API: 丰富的中文数据集
+### Datasets API: 丰富的中文数据集
 
 Dataset API提供便捷、高效的数据集加载功能；内置[千言数据集](https://www.luge.ai/)，提供丰富的面向自然语言理解与生成场景的中文数据集，为NLP研究人员提供一站式的科研体验。
 
@@ -158,7 +162,7 @@ wordemb.cosine_sim("艺术", "火车")
 ## 多场景的应用示例
 
 PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模式和全新的API体系开发，更加简单易懂。
-涵盖了[NLP基础技术](#nlp-基础技术)、[NLP核心技术](#nlp-核心技术)、[NLP系统应用](#nlp-系统应用)以及文本相关的拓展应用如[模型压缩](./examples/model_compression/)、与知识库结合的[文本知识关联](./examples/text_to_knowledge)、与图结合的[文本图学习](./examples/text_graph/)等。
+涵盖了[NLP基础技术](#nlp-基础技术)、[NLP系统应用](#nlp-系统应用)以及文本相关的[NLP拓展应用](#拓展应用)、与知识库结合的[文本知识关联](./examples/text_to_knowledge)、与图结合的[文本图学习](./examples/text_graph/)等。
 
 ### NLP 基础技术
 
@@ -166,10 +170,14 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :------------  | ---- |
 | [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./examples/language_model/rnnlm)和[Transformer-XL](./examples/language_model/transformer-xl)两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
-| [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
+| [语言模型](./examples/language_model/)  | 覆盖了经典的LSTM类语言模型，和Transformer类的预训练语言模型，如BERT, ERNIE, GPT, XLNet, BART，ELECTRA，BigBird等。 |
+| [语义解析](./examples/text_to_sql/):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
-### NLP 核心技术
+#### 句法依存分析 (Dependency Parsing)
+
+| 模型  | 简介    |
+| :----- | ------ |
+| [Deep Biaffine Parsing](./examples/dependency_parsing/) | 实现经典的Deep Biaffine Parsing句法分析模型，并提供高质量的中文预训练模型可供直接使用。|
 
 #### 文本分类 (Text Classification)
 
@@ -260,6 +268,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 * [TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree):star2:
 * [WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag):star2:
+* [NPTag: 中文名词短语标注工具](./examples/text_to_knowledge/nptag):star2:
 
 #### 文本图学习 (Text Graph Learning)
 
@@ -271,10 +280,11 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 模型                                                       | 简介                                                         |
 | :--------------------------------------------------------- | ------------------------------------------------------------ |
-| [MiniLMv2](examples/model_compression/minilmv2) :star2:    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
+| [MiniLMv2](examples/model_compression/minilmv2)    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
 | [TinyBERT](./examples/model_compression/tinybert)          | 基于论文[TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)的实现，提供了通用蒸馏和下游任务蒸馏的脚本。本实例利用开源模型`tinybert-6l-768d-v2`初始化，在GLUE的7个数据集上进行下游任务的蒸馏，最终模型参数量缩小1/2，预测速度提升2倍，同时保证模型精度几乎无损，其中精度可达教师模型`bert-base-uncased`的 98.90%。 |
-| [OFA-BERT](./examples/model_compression/ofa/) :star2:      | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
+| [OFA-BERT](./examples/model_compression/ofa/)     | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。 |
+| [PP-MiniLM](examples/model_compression/pp-minilm) :star2:    | 基于 PaddleSlim 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT-base 的4.2倍，参数量相比减少52%，模型精度在中文语言理解评测基准 CLUE 高0.32。 |
 
 #### 小样本学习 (Few-Shot Learning)
 
@@ -313,6 +323,22 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 ## 版本更新
 
 更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
+
+## Citation
+
+如果PaddleNLP对您的研究有帮助，欢迎引用
+```
+@misc{=paddlenlp,
+    title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
+    author={PaddleNLP Contributors},
+    howpublished = {\url{https://github.com/PaddlePaddle/PaddleNLP}},
+    year={2021}
+}
+```
+
+## Acknowledge
+
+我们借鉴了Hugging Face的[Transformers](https://github.com/huggingface/transformers)🤗关于预训练模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
 
 ## License
 

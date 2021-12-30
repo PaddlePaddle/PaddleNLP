@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt"
+}

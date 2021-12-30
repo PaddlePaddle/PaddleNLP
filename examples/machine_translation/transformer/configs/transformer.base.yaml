@@ -129,3 +129,6 @@ scale_loss: 128.0
 
 # Maximum iteration for training. 
 max_iter: None
+
+# enable to static ? 
+to_static: False

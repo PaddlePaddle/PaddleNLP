@@ -1,4 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2021 The Fairseq Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,8 +44,8 @@ def shift_tokens_right(input_ids, decoder_start_token_id):
 class BartPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained Bart models. It provides Bart related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
@@ -55,6 +56,7 @@ class BartPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "pad_token_id": 1,
             "eos_token_id": 2,
+            "forced_eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 768,
             "num_encoder_layers": 6,
@@ -75,6 +77,7 @@ class BartPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "pad_token_id": 1,
             "eos_token_id": 2,
+            "forced_eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 1024,
             "num_encoder_layers": 12,
@@ -95,9 +98,9 @@ class BartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "bart-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
             "bart-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams"
         }
     }
     base_model_prefix = "bart"
@@ -114,10 +117,6 @@ class BartPretrainedModel(PretrainedModel):
                         std=self.init_std if hasattr(self, "init_std") else
                         self.bart.config["init_std"],
                         shape=layer.weight.shape))
-        elif isinstance(layer, (nn.TransformerEncoderLayer,
-                                nn.TransformerDecoderLayer)):
-            if layer.activation == F.gelu:
-                layer.activation = partial(F.gelu, approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
@@ -390,6 +389,7 @@ class BartModel(BartPretrainedModel):
                  bos_token_id=0,
                  pad_token_id=1,
                  eos_token_id=2,
+                 forced_eos_token_id=2,
                  decoder_start_token_id=2,
                  d_model=768,
                  num_encoder_layers=6,
@@ -533,7 +533,7 @@ class BartModel(BartPretrainedModel):
 
 class BartClassificationHead(Layer):
     """
-    Head for sentence-level classification tasks.
+    Perform sentence-level classification tasks.
     """
 
     def __init__(self,
@@ -732,8 +732,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
 
 class BartForConditionalGeneration(BartPretrainedModel):
     r"""
-    Bart Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+    Bart Model with a `language modeling` head on top.
 
     Args:
         bart (:class:`BartModel`):
@@ -758,6 +757,29 @@ class BartForConditionalGeneration(BartPretrainedModel):
 
     def get_decoder(self):
         return self.bart.get_decoder()
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterBART
+        decode_strategy = kwargs.get('decode_strategy')
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        if kwargs['repetition_penalty'] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
+        if kwargs['forced_bos_token_id'] is not None:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'forced_bos_token_id != None' is not supported yet in the faster version"
+            )
+        self._faster_entry = FasterBART(
+            self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     def forward(self,
                 input_ids,
