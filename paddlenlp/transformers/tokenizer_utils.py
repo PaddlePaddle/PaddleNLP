@@ -1637,8 +1637,6 @@ class BPETokenizer(PretrainedTokenizer):
         self.vocab_bpe_path = vocab_bpe_path
         self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
         self.nltk = try_import('nltk')
-        # Run slow at first time downloading punkt
-        self.nltk.download('punkt', quiet=True)
 
     def _tokenize(self, text, is_sentencepiece=True):
         text = convert_to_unicode(text)
