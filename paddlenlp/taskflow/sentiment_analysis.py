@@ -101,6 +101,12 @@ class SentaTask(Task):
                 shape=[None], dtype="int64", name='length')
         ]
 
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        return None
+
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
@@ -234,6 +240,12 @@ class SkepTask(Task):
         else:
             self._construct_model(model)
         self._usage = usage
+
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        return None
 
     def _construct_model(self, model):
         """

@@ -178,24 +178,25 @@ class WordTagTask(Task):
                  model, 
                  task,
                  batch_size=1,
-                 params_path=None,
-                 tag_path=None,
+                 model_path=None,
                  term_schema_path=None,
                  term_data_path=None,
                  user_dict=None,
                  linking=True,
                  **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._tag_path = tag_path
-        self._params_path = params_path
+        self._model_path = model_path
         self._term_schema_path = term_schema_path
         self._term_data_path = term_data_path
         self._user_dict = user_dict
         self._linking = linking
-        if self._tag_path is None:
+        if not self._model_path:
             self._tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                      URLS['termtree_tags_pos'][0],
                                      URLS['termtree_tags_pos'][1])
+        else:
+            self._task_path = self._model_path
+            self._tag_path = os.path.join(self._task_path, "tags.txt")
         self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
 
         self._construct_tokenizer(model)
@@ -210,20 +211,18 @@ class WordTagTask(Task):
         if self._linking is True:
             self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
                                             self._linking)
-        
         self._usage = usage
         self._summary_num = 2
 
+        if not self._model_path:
+            self._get_inference_model()
+        else:
+            self._load_custom_model(self._model_path)
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
-
-        if self._params_path:
-            self._task_path = os.path.dirname(os.path.realpath(self._params_path))
-
-        self._get_inference_model(params_path=self._params_path)
 
     @property
     def summary_num(self):
@@ -410,7 +409,7 @@ class WordTagTask(Task):
         for sent_index in range(len(batch_texts)):
             tags = [
                 self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:]
+                for index in batch_pred_tags[sent_index][self.summary_num:-1]
             ]
             sent = batch_texts[sent_index]
             if self._custom:
@@ -421,11 +420,12 @@ class WordTagTask(Task):
             for ind, tag in enumerate(tags):
                 if partial_word == "":
                     partial_word = sent[ind]
-                    tags_out.append(tag.split('-')[1])
+                    tags_out.append(tag.split('-')[-1])
                     continue
                 if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
                     sent_out.append(partial_word)
-                    tags_out.append(tag.split('-')[1])
+                    print(tags)
+                    tags_out.append(tag.split('-')[-1])
                     partial_word = sent[ind]
                     continue
                 partial_word += sent[ind]
@@ -528,6 +528,13 @@ class WordTagTask(Task):
         inputs = self._check_input_text(inputs)
         outputs = self._preprocess_text(inputs)
         return outputs
+
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        self._params_path = os.path.join(self._task_path, "model.pdparams")
+        self._get_inference_model(self._params_path)
 
     def _run_model(self, inputs):
         """
@@ -701,6 +708,12 @@ class NPTagTask(Task):
                                     dtype="int64",
                                     name="token_type_ids"),  # token_type_ids
         ]
+
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        return None
 
     def _construct_model(self, model):
         """

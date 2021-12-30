@@ -113,20 +113,27 @@ my_seg("平原上的火焰计划于年末上映")
 
 用户可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
+通过`model_path`定义用户自定义路径，文件组成：
+```text
+custom_model/
+├── model.pdparams
+├── word.dict
+├── tag.dic
+└── q2b.dic 
+```
+
 使用Taskflow加载自定义模型进行一键预测：
 
 ```shell
 from paddlenlp import Taskflow
 
-my_seg = Taskflow("word_segmentation", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+my_seg = Taskflow("word_segmentation", model_path="./custom_model")
 ```
-
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `params_path`：模型参数文件路径，默认为None。
-* `tag_path`：标签文件路径，默认为None。
+* `model_path`：模型参数文件路径，默认为None。
 
 ### 词性标注
 
@@ -186,20 +193,28 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 
 用户可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
+通过`model_path`定义用户自定义路径，文件组成：
+```text
+data/
+├── model.pdparams
+├── word.dict
+├── tag.dic
+└── q2b.dic 
+```
+
 使用Taskflow加载自定义模型进行一键预测：
 
-```python
+```shell
 from paddlenlp import Taskflow
 
-my_tag = Taskflow("pos_tagging", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+my_tag = Taskflow("pos_tagging", model_path="./custom_model")
 ```
 
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认值为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `params_path`：模型参数文件路径，默认为None。
-* `tag_path`：标签文件路径，默认为None。
+* `model_path`：模型参数文件路径，默认为None。
 
 ### 命名实体识别
 
@@ -247,20 +262,26 @@ my_ner("《长津湖》收尾，北美是最大海外票仓")
 
 用户可以使用自己的数据训练自定义NER模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 
+通过`model_path`定义用户自定义路径，文件组成：
+```text
+custom_model/
+├── model.pdparams
+└── tags.txt
+```
+
 使用Taskflow加载自定义模型进行一键预测：
 
 ```shell
 from paddlenlp import Taskflow
 
-my_ner = Taskflow("ner", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+my_ner = Taskflow("ner", model_path="./custom_model")
 ```
 
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `params_path`：模型参数文件路径，默认为None。
-* `tag_path`：标签文件路径，默认为None。
+* `model_path`：模型参数文件路径，默认为None。
 
 ### 文本纠错
 
@@ -447,12 +468,19 @@ my_wordtag("《长津湖》收尾，北美是最大海外票仓")
 
 用户可以使用自己的数据训练自定义NER模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 
+通过`model_path`定义用户自定义路径，文件组成：
+```text
+custom_model/
+├── model.pdparams
+└── tags.txt
+```
+
 使用Taskflow加载自定义模型进行一键预测：
 
 ```shell
 from paddlenlp import Taskflow
 
-my_wordtag = Taskflow("knowledge_mining", params_path="/path/to/your/params", tag_path="/path/to/your/tag")
+my_wordtag = Taskflow("knowledge_mining", model_path="./custom_model")
 ```
 
 #### 自定义Term-Linking
@@ -469,8 +497,7 @@ wordtag = Taskflow("knowledge_mining", term_schema_path="/path/to/your/termtree_
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `linking`：实现基于词类的linking，默认为True。
-* `params_path`：使用自定义模型参数，默认为None。
-* `tag_path`：使用自定义标签文件，默认为None。
+* `model_path`：模型参数文件路径，默认为None。
 * `term_schema_path`：使用自定义TermType词类体系，默认为None。
 * `term_data_path`：使用自定义百科知识树文件，默认为None。
 * `user_dict`：用户自定义词典文件，默认为None。

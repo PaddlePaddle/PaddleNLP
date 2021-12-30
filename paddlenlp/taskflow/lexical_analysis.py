@@ -93,42 +93,53 @@ class LacTask(Task):
 
     def __init__(self, 
                  task, 
-                 model, 
-                 params_path=None,
-                 tag_path=None,
+                 model,
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self._tag_path = tag_path
-        self._params_path = params_path
         self._user_dict = self.kwargs[
             'user_dict'] if 'user_dict' in self.kwargs else None
-        word_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "word.dic",
-            URLS['lac_params'][0], URLS['lac_params'][1])
-        if self._tag_path is None:
-            self._tag_path = download_file(
+        self._model_path = self.kwargs[
+            'user_path'] if 'user_path' in self.kwargs else None
+        if not self._model_path:
+            word_dict_path = download_file(
+                self._task_path, "lac_params" + os.path.sep + "word.dic",
+                URLS['lac_params'][0], URLS['lac_params'][1])
+            q2b_dict_path = download_file(
+                self._task_path, "lac_params" + os.path.sep + "q2b.dic",
+                URLS['lac_params'][0], URLS['lac_params'][1])
+            tag_dict_path = download_file(
                 self._task_path, "lac_params" + os.path.sep + "tag.dic",
                 URLS['lac_params'][0], URLS['lac_params'][1])
-        q2b_dict_path = download_file(
-            self._task_path, "lac_params" + os.path.sep + "q2b.dic",
-            URLS['lac_params'][0], URLS['lac_params'][1])
+        else:
+            self._task_path = self._model_path
+            word_dict_path = os.path.join(self._task_path, "word.dic")
+            tag_dict_path = os.path.join(self._task_path, "tag.dic")
+            q2b_dict_path = os.path.join(self._task_path, "q2b.dic")
         self._word_vocab = load_vocab(word_dict_path)
-        self._tag_vocab = load_vocab(self._tag_path)
+        self._tag_vocab = load_vocab(tag_dict_path)
         self._q2b_vocab = load_vocab(q2b_dict_path)
         self._id2word_dict = dict(
             zip(self._word_vocab.values(), self._word_vocab.keys()))
         self._id2tag_dict = dict(
             zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-        if self._params_path:
-            self._task_path = os.path.dirname(os.path.realpath(self._params_path))
 
-        self._get_inference_model(params_path=self._params_path)
+        if not self._model_path:
+            self._get_inference_model()
+        else:
+            self._load_custom_model(self._model_path)
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
+
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        self._params_path = os.path.join(self._task_path, "model.pdparams")
+        self._get_inference_model(self._params_path)
 
     def _construct_input_spec(self):
         """

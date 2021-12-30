@@ -109,7 +109,6 @@ class DDParserTask(Task):
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self.static_mode = True
         self.model = model
 
         if self.model == "ddparser":
@@ -152,10 +151,13 @@ class DDParserTask(Task):
         self.use_cuda = use_cuda
         self.lac = LAC(mode="lac" if self.use_pos else "seg",
                     use_cuda=self.use_cuda)
-        if self.static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+        self._get_inference_model()
+
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        return None
 
     def _check_segmented_words(self, inputs):
         inputs = inputs[0]

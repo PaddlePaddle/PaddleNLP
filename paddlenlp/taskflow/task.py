@@ -89,6 +89,12 @@ class Task(metaclass=abc.ABCMeta):
         Construct the input spec for the convert dygraph model to static model.
         """
 
+    @abstractmethod
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+
     def _prepare_static_mode(self):
         """
         Construct the input data and predictor in the PaddlePaddele static mode. 

@@ -74,6 +74,12 @@ class TextGenerationTask(Task):
                 shape=[None, None], dtype="int64", name='token_ids')
         ]
 
+    def _load_custom_model(self, task_path):
+        """
+        Load custom model from the path specified by the user.
+        """
+        return None
+
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
