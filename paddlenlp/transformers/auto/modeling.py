@@ -49,6 +49,7 @@ MAPPING_NAMES = OrderedDict([
     ("ErnieGram", "ernie_gram"),
     ("ErnieGen", "ernie_gen"),
     ("Ernie", "ernie"),
+    ("ErnieM", "ernie_m"),
     ("GPT", "gpt"),
     ("LayoutXLM", "layoutxlm"),
     ("LayoutLMv2", "layoutlmv2"),
