@@ -13,6 +13,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！**12.28-12.30**直播课[直通车](https://paddleqiyeban.wjx.cn/vj/txe5jBZ.aspx?udsid=178736)！:tada: 
 * [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
 * [2021-12-12] 飞桨新产品**端到端问答工具**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA)全新发布！:tada:
 

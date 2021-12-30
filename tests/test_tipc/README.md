@@ -17,7 +17,8 @@
 
 | 模型名称 | 模型类型 | 基础<br>训练预测 | 更多<br>训练方式 | 模型压缩 |
 | :--- |  :----:  | :--------: |  :----  |   :----  |  
-|bigru_crf | 序列标注  | 支持 | - | - |  
+| bigru_crf | 序列标注  | 支持 | - | - |  
+| Transformer | 机器翻译 | 支持 | - | - |
 
 
 
@@ -33,10 +34,15 @@ test_tipc/
 │   ├── export_model.py            # 模型导出脚本
 │   ├── model.py                   # 模型实现脚本
 │   └── train.py                   # 训练脚本
+├── transformer                    # Transformer 双精度模型实现
+│   ├── modeling.py                # Transformer 双精度模型组网脚本
+│   └── train.py                   # Transformer 双精度训练脚本
 ├── compare_results.py             # 用于对比log中的预测结果与results中的预存结果精度误差是否在限定范围内
 ├── configs                        # 配置文件目录
-│   └── bigru_crf                  # bigru_crf模型的测试配置文件目录
+│   ├── bigru_crf                  # bigru_crf模型的测试配置文件目录
 │       └── train_infer_python.txt # 测试Linux上python训练预测（基础训练预测）的配置文件
+│   └── Transformer                # Transformer 模型的测试配置文件目录
+│       └── train_infer_python.txt # 测试 Linux 上 python 训练预测（基础训练预测）的配置文件
 ├── prepare.sh                     # 完成test_*.sh运行所需要的数据和模型下载
 ├── readme.md                      # 使用文档
 ├── results                        # 预先保存的预测结果，用于和实际预测结果进行精读比对

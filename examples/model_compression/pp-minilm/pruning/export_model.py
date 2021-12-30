@@ -15,6 +15,7 @@
 import argparse
 import logging
 import os
+import sys
 import math
 import random
 import time
@@ -26,20 +27,21 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import ErnieModel, ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
 
-MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
+sys.path.append("../")
+from data import MODEL_CLASSES
 
 
-def ernie_forward(self,
-                  input_ids,
-                  token_type_ids=None,
-                  position_ids=None,
-                  attention_mask=None):
+def ppminilm_forward(self,
+                     input_ids,
+                     token_type_ids=None,
+                     position_ids=None,
+                     attention_mask=None):
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
     if attention_mask is None:
@@ -52,7 +54,7 @@ def ernie_forward(self,
     return encoded_layer, pooled_output
 
 
-ErnieModel.forward = ernie_forward
+PPMiniLMModel.forward = ppminilm_forward
 
 
 def parse_args():

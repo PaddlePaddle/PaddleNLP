@@ -410,7 +410,7 @@ class WordTagTask(Task):
         for sent_index in range(len(batch_texts)):
             tags = [
                 self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+                for index in batch_pred_tags[sent_index][self.summary_num:]
             ]
             sent = batch_texts[sent_index]
             if self._custom:
