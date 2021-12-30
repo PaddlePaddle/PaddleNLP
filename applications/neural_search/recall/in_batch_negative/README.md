@@ -237,7 +237,7 @@ c. 获取Query的Embedding并查询相似结果
 
 d. 评估
 
-基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50。
+基于评估集 `dev.csv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50。
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
