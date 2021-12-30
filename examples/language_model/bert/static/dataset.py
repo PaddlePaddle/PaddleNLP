@@ -28,6 +28,8 @@ def create_pretraining_dataset(input_file,
                                places=None):
     train_data = PretrainingDataset(
         input_file=input_file, max_pred_length=max_pred_length)
+    train_batch_sampler = paddle.io.BatchSampler(
+        train_data, batch_size=args.batch_size, shuffle=True)
 
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
@@ -65,6 +67,7 @@ def create_pretraining_dataset(input_file,
         dataset=train_data,
         places=places,
         feed_list=data_holders,
+        batch_sampler=train_batch_sampler,
         collate_fn=_collate_data,
         num_workers=0,
         worker_init_fn=worker_init,
