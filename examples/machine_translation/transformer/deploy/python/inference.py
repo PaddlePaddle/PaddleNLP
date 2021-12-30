@@ -61,7 +61,7 @@ def parse_args():
     )
     parser.add_argument(
         "--save_log_path",
-        default="./output/",
+        default="./transformer/output/",
         type=str,
         help="The path to save logs when profile is enabled. ")
     parser.add_argument(
