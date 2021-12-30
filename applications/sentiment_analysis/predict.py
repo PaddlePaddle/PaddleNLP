@@ -39,7 +39,7 @@ def concate_aspect_and_opinion(text, aspect, opinions):
     return aspect_text
 
 
-def predict_ext(ext_model_path, ext_label_path, test_path):
+def predict_ext(ext_model_path, ext_label_path, test_path, max_seq_len):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
@@ -83,7 +83,7 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text, tag_seq)
+            aps = decoding(text[:max_seq_len-2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # yapf: enbale
 
     # predict with ext model
-    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
+    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path, args.max_seq_len)
     print("predicting with extraction model done!")
 
     # predict with cls model
