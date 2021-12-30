@@ -30,9 +30,11 @@
 
 如上所述，本项目将采用序列标注的方式进行抽取评论属性和观点，所以本项目训练集中需要包含两列数据：文本串和相应的序列标签数据，下面给出了一条样本。
 
-```
-还不错价格不高，服务好 O B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect B-Opinion
-```
+
+- 服务好，环境好，做出来效果也不错        B-Aspect I-Aspect B-Opinion O B-Aspect I-Aspect B-Opinion O O O O B-Aspect I-Aspect O B-Opinion I-Opinion
+- 环境很好，交通便利      B-Aspect I-Aspect O B-Opinion O B-Aspect I-Aspect B-Opinion I-Opinion
+- 空气清新，景色优美      B-Aspect I-Aspect B-Opinion I-Opinion O B-Aspect I-Aspect O B-Opinion
+
 
 可点击 [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz) 进行 Demo 数据下载，将数据解压之后放入父目录的 `data/ext_data/` 文件夹下。
 

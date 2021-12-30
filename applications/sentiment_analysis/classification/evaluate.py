@@ -19,8 +19,7 @@ import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics.glue import AccuracyAndF1
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
-from model import SkepForSequenceClassification
+from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 from data import read, load_dict, convert_example_to_feature
 
 
@@ -71,8 +70,7 @@ if __name__ == "__main__":
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForSequenceClassification(skep, num_classes=len(label2id))
+    model = SkepForSequenceClassification.from_pretrained(model_name, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = AccuracyAndF1()

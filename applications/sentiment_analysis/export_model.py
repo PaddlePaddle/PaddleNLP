@@ -15,10 +15,7 @@
 import os
 import argparse
 import paddle
-from paddlenlp.transformers import SkepModel, ErnieModel
-from extraction.model import SkepForTokenClassification
-from classification.model import SkepForSequenceClassification
-from pp_minilm.model import PPMiniLMForSequenceClassification
+from paddlenlp.transformers import SkepForTokenClassification, SkepForSequenceClassification, PPMiniLMForSequenceClassification
 
 if __name__ == "__main__":
     # yapf: disable
@@ -32,14 +29,11 @@ if __name__ == "__main__":
 
     # load model with saved state_dict
     if args.model_type == "extraction":
-        skep = SkepModel.from_pretrained(args.base_model_name)
-        model = SkepForTokenClassification(skep, num_classes=5)
+        model = SkepForTokenClassification.from_pretrained(args.base_model_name, num_classes=5)
     elif args.model_type == "classification":
-        skep = SkepModel.from_pretrained(args.base_model_name)
-        model = SkepForSequenceClassification(skep, num_classes=2)
+        model = SkepForSequenceClassification.from_pretrained(args.base_model_name, num_classes=2)
     else:
-        ppminilm = ErnieModel.from_pretrained(args.base_model_name)
-        model = PPMiniLMForSequenceClassification(ppminilm, num_classes=2)
+        model = PPMiniLMForSequenceClassification.from_pretrained(args.base_model_name, num_classes=2)
 
     loaded_state_dict = paddle.load(args.model_path)
     model.load_dict(loaded_state_dict)
