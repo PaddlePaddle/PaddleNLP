@@ -35,11 +35,16 @@
 
 ### 环境依赖
 
-- re
 - nltk
 - beautifulsoup4
 
-安装命令：`pip install re nltk beautifulsoup4`
+安装命令：`pip install nltk==3.5 beautifulsoup4`
+
+初次使用时，需要下载nltk的模型，可运行以下命令（下载模型可能比较慢，请耐心等待）：
+
+```
+python -c "import nltk; nltk.download('punkt')"
+```
 
 ### 通用参数释义
 

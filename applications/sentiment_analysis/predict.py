@@ -21,11 +21,9 @@ from collections import defaultdict
 import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
 from utils import decoding, load_dict, read_test_file
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
-from extraction.model import SkepForTokenClassification
-from classification.model import SkepForSequenceClassification
 from classification.data import convert_example_to_feature as convert_example_to_feature_cls
 
 
@@ -41,7 +39,7 @@ def concate_aspect_and_opinion(text, aspect, opinions):
     return aspect_text
 
 
-def predict_ext(ext_model_path, ext_label_path, test_path):
+def predict_ext(ext_model_path, ext_label_path, test_path, max_seq_len):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
@@ -69,9 +67,8 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
-    ext_skep = SkepModel.from_pretrained(model_name)
-    ext_model = SkepForTokenClassification(
-        ext_skep, num_classes=len(ext_label2id))
+    ext_model = SkepForTokenClassification.from_pretrained(
+        model_name, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
@@ -86,7 +83,7 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text, tag_seq)
+            aps = decoding(text[:max_seq_len-2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
@@ -130,9 +127,8 @@ def predict_cls(cls_model_path, cls_label_path, ext_results):
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
-    cls_skep = SkepModel.from_pretrained(model_name)
-    cls_model = SkepForSequenceClassification(
-        cls_skep, num_classes=len(cls_label2id))
+    cls_model = SkepForSequenceClassification.from_pretrained(
+        model_name, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 
@@ -194,7 +190,7 @@ if __name__ == "__main__":
     # yapf: enbale
 
     # predict with ext model
-    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
+    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path, args.max_seq_len)
     print("predicting with extraction model done!")
 
     # predict with cls model
