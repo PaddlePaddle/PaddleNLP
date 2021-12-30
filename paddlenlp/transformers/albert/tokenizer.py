@@ -548,9 +548,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
         return new_pieces
 
-    def tokenize(self, text):
-        return self._tokenize(text)
-
     def _convert_token_to_id(self, token):
         """Converts a token (str) to an id using the vocab. """
         return self.sp_model.PieceToId(token)
@@ -558,23 +555,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
         return self.sp_model.IdToPiece(index)
-
-    def convert_tokens_to_ids(self, tokens):
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        if skip_special_tokens:
-            return [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""

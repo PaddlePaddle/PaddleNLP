@@ -677,20 +677,27 @@ class PretrainedTokenizer(object):
                 if isinstance(token, AddedToken):
                     if hasattr(self, "do_lower_case") and self.do_lower_case:
                         token.content = token.content.lower()
-                    if token.content not in self.added_tokens_encoder:
+                    if token.content not in add_special_tokens:
+                        self.tokens_trie.add(token.content)
                         add_special_tokens_extended.append(token)
                         add_special_tokens.append(token.content)
-                        self.tokens_trie.add(token.content)
-                        self.added_tokens_encoder[token.content] = len(self)
-                        self.added_tokens_decoder[len(self) - 1] = token.content
+                        if token.content != self.unk_token and self.convert_tokens_to_ids(
+                                token.content) == self.convert_tokens_to_ids(
+                                    self.unk_token):
+                            self.added_tokens_encoder[token.content] = len(self)
+                            self.added_tokens_decoder[len(self) -
+                                                      1] = token.content
                 else:
                     if hasattr(self, "do_lower_case") and self.do_lower_case:
                         token = token.lower()
-                    if token not in self.added_tokens_encoder:
-                        add_special_tokens.append(token)
+                    if token not in add_special_tokens:
                         self.tokens_trie.add(token)
-                        self.added_tokens_encoder[token] = len(self)
-                        self.added_tokens_decoder[len(self) - 1] = token
+                        add_special_tokens.append(token)
+                        if token != self.unk_token and self.convert_tokens_to_ids(
+                                token) == self.convert_tokens_to_ids(
+                                    self.unk_token):
+                            self.added_tokens_encoder[token] = len(self)
+                            self.added_tokens_decoder[len(self) - 1] = token
             self.special_tokens_map_extended[
                 "additional_special_tokens"] = add_special_tokens_extended
             self.special_tokens_map[
@@ -702,7 +709,8 @@ class PretrainedTokenizer(object):
                         f"Token {token} is not a string but a {type(token)}.")
                 if hasattr(self, "do_lower_case") and self.do_lower_case:
                     token = token.lower()
-                if token not in self.added_tokens_encoder:
+                if token not in self.added_tokens_encoder and token != self.unk_token and self.convert_tokens_to_ids(
+                        token) == self.convert_tokens_to_ids(self.unk_token):
                     self.added_tokens_encoder[token] = len(self)
                     self.added_tokens_decoder[len(self) - 1] = token
 
@@ -754,9 +762,14 @@ class PretrainedTokenizer(object):
         return tokenized_text
 
     def convert_tokens_to_ids(self, tokens):
-        ids = []
+        if tokens is None:
+            return None
         if isinstance(tokens, str):
-            tokens = [tokens]
+            if tokens in self.added_tokens_encoder:
+                return self.added_tokens_encoder[tokens]
+            else:
+                return self._convert_token_to_id(tokens)
+        ids = []
         for token in tokens:
             if token in self.added_tokens_encoder:
                 ids.append(self.added_tokens_encoder[token])
@@ -782,9 +795,12 @@ class PretrainedTokenizer(object):
         return " ".join(tokens)
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        tokens = []
         if isinstance(ids, int):
-            ids = [ids]
+            if ids in self.added_tokens_decoder:
+                return self.added_tokens_decoder[ids]
+            else:
+                return self._convert_id_to_token(ids)
+        tokens = []
         for index in ids:
             if skip_special_tokens and index in self.all_special_ids:
                 continue
