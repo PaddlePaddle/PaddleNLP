@@ -130,12 +130,15 @@ def predict(ext_model,
             max_seq_len=max_seq_len, )
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
         token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
+        print("input_text:",len(list(input_text)))
+        print("input_ids:",len(input_ids[0]))
 
         # extract aspect and opinion words
         logits = ext_model(input_ids, token_type_ids=token_type_ids)
         predictions = logits.argmax(axis=2).numpy()[0]
         tag_seq = [ext_id2label[idx] for idx in predictions][1:-1]
-        aps = decoding(input_text, tag_seq)
+
+        aps = decoding(input_text[:max_seq_len-2], tag_seq)
 
         # predict sentiment for aspect with cls_model
         results = []
