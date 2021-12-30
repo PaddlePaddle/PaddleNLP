@@ -80,7 +80,7 @@ ERNIE 1.0/
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[ERNIE 1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_post.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|-|
+|[ERNIE 1.0](https://bj.bcebos.com/v1/paddlenlp/models/ernie_pretrain.zip)|<div style="width: 150pt">max_lr:0.0001 min_lr:0.00001  bs:512 max_len:512 </div>|<div style="width: 100pt">4卡 v100-32g</div>|91b0e30c444ab654dd99c0ee354f6a8f|
 
 ### 训练环境说明
 
@@ -92,7 +92,7 @@ ERNIE 1.0/
 
 ### 单机单卡训练/单机多卡训练
 
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把--pugs参数设置成单卡的卡号即可
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡, 基于SimCSE训练模型，数据量比较小，几分钟就可以完成。如果采用单机单卡训练，只需要把 `--gpus` 参数设置成单卡的卡号即可
 
 
 
@@ -105,7 +105,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name/log" \
     run_pretrain_static.py \
     --model_type "ernie" \
-    --model_name_or_path "ERNIE 1.0" \
+    --model_name_or_path "ernie-1.0" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 512 \
