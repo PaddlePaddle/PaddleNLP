@@ -124,7 +124,7 @@ custom_model/
 
 使用Taskflow加载自定义模型进行一键预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_seg = Taskflow("word_segmentation", model_path="./custom_model")
@@ -204,7 +204,7 @@ data/
 
 使用Taskflow加载自定义模型进行一键预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_tag = Taskflow("pos_tagging", model_path="./custom_model")
@@ -477,7 +477,7 @@ custom_model/
 
 使用Taskflow加载自定义模型进行一键预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_wordtag = Taskflow("knowledge_mining", model_path="./custom_model")
