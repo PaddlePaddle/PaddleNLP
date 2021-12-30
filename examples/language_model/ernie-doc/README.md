@@ -40,6 +40,12 @@
 
 安装命令：`pip install nltk==3.5 beautifulsoup4`
 
+初次使用时，需要下载nltk的模型，可运行以下命令（下载模型可能比较慢，请耐心等待）：
+
+```
+python -c "import nltk; nltk.download('punkt')"
+```
+
 ### 通用参数释义
 
 - `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-doc-base-zh", "ernie-doc-base-en"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
