@@ -133,46 +133,90 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     pretrained_init_configuration = {
         "albert-base-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-large-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xxlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-base-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-large-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-chinese-tiny": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-small": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-base": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-large": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-xlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-xxlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
     }
 
@@ -204,11 +248,27 @@ class AlbertTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
-                vocab_file=vocab_file, do_lower_case=False, **kwargs)
+                vocab_file=vocab_file,
+                do_lower_case=do_lower_case,
+                unk_token=unk_token,
+                sep_token=sep_token,
+                pad_token=pad_token,
+                cls_token=cls_token,
+                mask_token=mask_token,
+                **kwargs)
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
-                do_lower_case=True,
+                do_lower_case=do_lower_case,
+                remove_space=remove_space,
+                keep_accents=keep_accents,
+                bos_token=bos_token,
+                eos_token=eos_token,
+                unk_token=unk_token,
+                sep_token=sep_token,
+                pad_token=pad_token,
+                cls_token=cls_token,
+                mask_token=mask_token,
                 **kwargs)
         else:
             raise ValueError(
@@ -446,28 +506,60 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
     pretrained_init_configuration = {
         "albert-base-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-large-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xxlarge-v1": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-base-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-large-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "remove_space": True,
+            "keep_accents": False,
+            "unk_token": "<unk>",
+            "pad_token": "<pad>",
         },
     }
 
@@ -646,22 +738,34 @@ class AlbertChineseTokenizer(BertTokenizer):
     }
     pretrained_init_configuration = {
         "albert-chinese-tiny": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-small": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-base": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-large": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-xlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
         "albert-chinese-xxlarge": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "unk_token": "[UNK]",
+            "pad_token": "[PAD]",
         },
     }
 
@@ -675,4 +779,10 @@ class AlbertChineseTokenizer(BertTokenizer):
                  mask_token="[MASK]",
                  **kwargs):
         super(AlbertChineseTokenizer, self).__init__(
-            vocab_file, do_lower_case=do_lower_case)
+            vocab_file,
+            do_lower_case=do_lower_case,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token, )

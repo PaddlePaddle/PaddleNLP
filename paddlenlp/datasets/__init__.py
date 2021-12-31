@@ -37,4 +37,5 @@ from .clue import *
 from .nlpcc14_sc import *
 from .nlpcc13_evsam05_thu import *
 from .nlpcc13_evsam05_hit import *
+from .xnli_cn import *
 from .xnli import *

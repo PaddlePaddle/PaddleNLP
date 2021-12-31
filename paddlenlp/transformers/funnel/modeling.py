@@ -15,7 +15,6 @@
 
 from .. import register_base_model
 import math
-from packaging import version
 from dataclasses import dataclass
 from dataclasses import fields
 from collections import OrderedDict

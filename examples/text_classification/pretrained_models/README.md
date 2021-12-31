@@ -75,7 +75,7 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 可支持配置的参数：
 
 * `save_dir`：可选，保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
-* `dataset`：可选，xnli chnsenticorp可选，默认为chnsenticorp数据集。
+* `dataset`：可选，xnli_cn，chnsenticorp 可选，默认为chnsenticorp数据集。
 * `max_seq_length`：可选，ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。

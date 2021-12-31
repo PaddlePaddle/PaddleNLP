@@ -876,7 +876,8 @@ class PretrainedTokenizer(object):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
-                vocab_files[file_id] = full_file_name
+                if os.path.isfile(full_file_name):
+                    vocab_files[file_id] = full_file_name
             vocab_files["tokenizer_config_file"] = os.path.join(
                 pretrained_model_name_or_path, cls.tokenizer_config_file)
         else:
@@ -2001,13 +2002,13 @@ class BPETokenizer(PretrainedTokenizer):
         self.encoder_json_path = encoder_json_path
         self.vocab_bpe_path = vocab_bpe_path
         self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
+        self.nltk = try_import('nltk')
 
     def _tokenize(self, text, is_sentencepiece=True):
         text = convert_to_unicode(text)
         text = " ".join(text.split())  # remove duplicate whitespace
-        nltk = try_import('nltk')
         if is_sentencepiece:
-            sents = nltk.tokenize.sent_tokenize(text)
+            sents = self.nltk.tokenize.sent_tokenize(text)
             bpe_ids = sum([self.encoder.encode(sent) for sent in sents], [])
         else:
             bpe_ids = self.encoder.encode(text)

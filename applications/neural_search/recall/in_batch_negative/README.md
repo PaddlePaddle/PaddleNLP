@@ -291,7 +291,7 @@ run_build_index.sh还包含cpu和gpu运行的脚本，默认是gpu的脚本
 接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10, Recall@20 和 Recall@50 指标:
 ```
 python -u evaluate.py \
-        --similar_text_pair "recall/test.csv" \
+        --similar_text_pair "recall/dev.csv" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 50
 ```

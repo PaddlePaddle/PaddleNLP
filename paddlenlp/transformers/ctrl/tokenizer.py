@@ -127,21 +127,26 @@ class CTRLTokenizer(PretrainedTokenizer):
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt",
     }
-    ctrl_vocab_link = (
-        "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/vocab.json")
-    ctrl_merges_link = (
-        "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/merges.txt")
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ctrl": ctrl_vocab_link,
-            "sshleifer-tiny-ctrl": ctrl_merges_link,
+            "ctrl":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/vocab.json",
+            "sshleifer-tiny-ctrl":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/vocab.json",
         },
         "merges_file": {
-            "ctrl": ctrl_vocab_link,
-            "sshleifer-tiny-ctrl": ctrl_merges_link,
+            "ctrl":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/merges.txt",
+            "sshleifer-tiny-ctrl":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/merges.txt",
         },
     }
-    pretrained_init_configuration = {"ctrl": {}, "sshleifer-tiny-ctrl": {}}
+    pretrained_init_configuration = {
+        "ctrl": {},
+        "sshleifer-tiny-ctrl": {
+            "max_len": 256
+        }
+    }
 
     CONTROL_CODES = CONTROL_CODES
 
