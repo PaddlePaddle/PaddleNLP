@@ -876,7 +876,8 @@ class PretrainedTokenizer(object):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
-                vocab_files[file_id] = full_file_name
+                if os.path.isfile(full_file_name):
+                    vocab_files[file_id] = full_file_name
             vocab_files["tokenizer_config_file"] = os.path.join(
                 pretrained_model_name_or_path, cls.tokenizer_config_file)
         else:
