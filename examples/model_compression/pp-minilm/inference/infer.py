@@ -317,10 +317,7 @@ def main():
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    if args.task_name == 'chnsenticorp':
-        dev_ds = load_dataset(args.task_name, splits='dev')
-    else:
-        dev_ds = load_dataset('clue', args.task_name, splits='dev')
+    dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
     if not args.use_faster_tokenizer:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
