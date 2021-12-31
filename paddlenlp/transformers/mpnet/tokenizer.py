@@ -45,6 +45,16 @@ class MPNetTokenizer(BertTokenizer):
                  cls_token="<s>",
                  mask_token="<mask>",
                  **kwargs):
+
+        super().__init__(
+            vocab_file=vocab_file,
+            do_lower_case=do_lower_case,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token)
+
         bos_token = AddedToken(
             bos_token, lstrip=False,
             rstrip=False) if isinstance(bos_token, str) else bos_token
@@ -75,15 +85,6 @@ class MPNetTokenizer(BertTokenizer):
             cls_token=cls_token,
             unk_token=unk_token,
             pad_token=pad_token,
-            mask_token=mask_token)
-
-        super().__init__(
-            vocab_file=vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
             mask_token=mask_token)
 
     def __call__(self,

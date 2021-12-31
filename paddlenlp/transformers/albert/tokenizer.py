@@ -204,12 +204,12 @@ class AlbertTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
-                vocab_file=vocab_file,
-                do_lower_case=False, )
+                vocab_file=vocab_file, do_lower_case=False, **kwargs)
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
-                do_lower_case=True, )
+                do_lower_case=True,
+                **kwargs)
         else:
             raise ValueError(
                 "You should only specify either one(not both) of 'vocal_file'"
@@ -229,6 +229,28 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text):
         return self.tokenizer._tokenize(text)
+
+    def tokenize(self, text):
+        """
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import RobertaTokenizer
+
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+
+        """
+
+        return self.tokenizer.tokenize(text)
 
     def _convert_token_to_id(self, token):
         """
@@ -650,6 +672,7 @@ class AlbertChineseTokenizer(BertTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         super(AlbertChineseTokenizer, self).__init__(
             vocab_file, do_lower_case=do_lower_case)

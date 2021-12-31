@@ -69,6 +69,7 @@ class MBartTokenizer(PretrainedTokenizer):
                  **kwargs):
         self.src_lang = src_lang if src_lang is not None else "en_XX"
         self.tgt_lang = tgt_lang
+
         if mbart_type == "mbart":
             self.tokenizer = _MBartTokenizer(
                 vocab_file, src_lang, tgt_lang, bos_token, eos_token, sep_token,
@@ -78,11 +79,6 @@ class MBartTokenizer(PretrainedTokenizer):
                 vocab_file, src_lang, tgt_lang, bos_token, eos_token, sep_token,
                 cls_token, unk_token, pad_token, mask_token, **kwargs)
         self.lang_code_to_id = self.tokenizer.lang_code_to_id
-        self._additional_special_tokens = list(self.lang_code_to_id.keys())
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
-        self._build_special_tokens_map_extended(mask_token=mask_token)
 
     def __call__(self,
                  text,
@@ -117,6 +113,10 @@ class MBartTokenizer(PretrainedTokenizer):
     def _tokenize(self, text):
         """ Tokenize a string. """
         return self.tokenizer._tokenize(text)
+
+    def tokenize(self, text):
+        """ Tokenize a string. """
+        return self.tokenizer.tokenize(text)
 
     def _convert_token_to_id(self, token):
         """
@@ -235,6 +235,10 @@ class _MBartTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
         spm = try_import('sentencepiece')
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
@@ -263,6 +267,7 @@ class _MBartTokenizer(PretrainedTokenizer):
         self.eos_token_id = self.fairseq_tokens_to_ids[eos_token]
         self.unk_token_id = self.fairseq_tokens_to_ids[unk_token]
         self.set_src_lang_special_tokens(self.src_lang)
+        self._additional_special_tokens = list(self.lang_code_to_id.keys())
 
     def __call__(self,
                  text,
@@ -423,6 +428,10 @@ class _MBart50Tokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
         spm = try_import('sentencepiece')
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
@@ -451,6 +460,7 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         self.eos_token_id = self.fairseq_tokens_to_ids[eos_token]
         self.unk_token_id = self.fairseq_tokens_to_ids[unk_token]
         self.set_src_lang_special_tokens(self.src_lang)
+        self._additional_special_tokens = list(self.lang_code_to_id.keys())
 
     def __call__(self,
                  text,

@@ -458,6 +458,16 @@ class PretrainedTokenizer(object):
                 self.special_tokens_map[
                     identifier] = self._additional_special_tokens
 
+        self.add_tokens(self.all_special_tokens, special_tokens=True)
+        additional_special_tokens = []
+        for token in self.all_special_tokens:
+            if isinstance(token, AddedToken):
+                token = token.content
+            if token not in self.special_tokens_map.values():
+                additional_special_tokens.append(token)
+        self.special_tokens_map[
+            "additional_special_tokens"] = additional_special_tokens
+
     def _build_special_tokens_map_extended(self, **kwargs):
         for identifier, token in kwargs.items():
             if identifier.endswith('_token') and isinstance(token, AddedToken):
@@ -731,7 +741,6 @@ class PretrainedTokenizer(object):
         no_split_token = set(self.all_special_tokens)
         text = self.prepare_for_tokenization(text, **kwargs)
         tokens = self.tokens_trie.split(text)
-
         for i, token in enumerate(tokens):
             if token in no_split_token:
                 tok_extended = all_special_tokens_extended.get(token, None)
@@ -943,15 +952,7 @@ class PretrainedTokenizer(object):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
-        tokenizer.add_tokens(tokenizer.all_special_tokens, special_tokens=True)
-        additional_special_tokens = []
-        for token in tokenizer.all_special_tokens:
-            if isinstance(token, AddedToken):
-                token = token.content
-            if token not in tokenizer.special_tokens_map.values():
-                additional_special_tokens.append(token)
-        tokenizer.special_tokens_map[
-            "additional_special_tokens"] = additional_special_tokens
+
         return tokenizer
 
     def save_pretrained(self, save_directory):

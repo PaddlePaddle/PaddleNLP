@@ -40,9 +40,6 @@ class BartTokenizer(GPTTokenizer):
         max_len (int, optional):
             The maximum value of the input sequence length.
             Defaults to `None`.
-        special_tokens (list, optional):
-            A list of special tokens not in the vocabulary.
-            Defaults to `None`.
         bos_token (str, optional):
             The beginning of sequence token that was used during pretraining. Can be
             used a sequence classifier token.
@@ -109,7 +106,6 @@ class BartTokenizer(GPTTokenizer):
                  merges_file,
                  errors='replace',
                  max_len=None,
-                 special_tokens=None,
                  bos_token="<s>",
                  eos_token="</s>",
                  cls_token="<s>",
@@ -153,8 +149,7 @@ class BartTokenizer(GPTTokenizer):
             mask_token=mask_token)
 
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                            max_len, special_tokens, pad_token,
-                                            eos_token)
+                                            max_len, pad_token, eos_token)
 
     def __call__(self,
                  text,
