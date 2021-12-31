@@ -392,8 +392,8 @@ def do_train(args):
                         % (global_step, epoch, step, loss_return[0],
                            reader_cost_avg.get_average(),
                            train_cost_avg.get_average(),
-                           total_samples / args.logging_steps, total_samples /
-                           (args.logging_steps * train_cost_avg.get_average())))
+                           total_samples / args.logging_steps, args.batch_size /
+                           (reader_cost_avg.get_average() + train_cost_avg.get_average())))
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()

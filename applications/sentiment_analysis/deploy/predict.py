@@ -129,7 +129,7 @@ class Predictor(object):
                     self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]
                 ]
                 text = ori_test_ds[idx]["text"]
-                aps = decoding(text, tag_seq)
+                aps = decoding(text[:args.max_seq_len-2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
                     aspect_text = self._concate_aspect_and_opinion(text, aspect,
