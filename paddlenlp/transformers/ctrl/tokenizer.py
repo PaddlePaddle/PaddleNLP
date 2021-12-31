@@ -142,9 +142,7 @@ class CTRLTokenizer(PretrainedTokenizer):
         },
     }
     pretrained_init_configuration = {
-        "ctrl": {
-            "max_len": 256
-        },
+        "ctrl": {},
         "sshleifer-tiny-ctrl": {
             "max_len": 256
         }
