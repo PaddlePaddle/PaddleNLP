@@ -432,7 +432,7 @@ class WordTagTask(Task):
         for i, pred_tags in enumerate(batch_pred_tags):
             pred_words, pred_word = [], []
             text = batch_texts[i]
-            for j, tag in enumerate(pred_tags[self.summary_num:-1]):
+            for j, tag in enumerate(pred_tags[self.summary_num:]):
                 if j >= len(text):
                     break
                 pred_label = self._index_to_tags[tag]

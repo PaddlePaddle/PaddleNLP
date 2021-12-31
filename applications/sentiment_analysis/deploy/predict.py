@@ -26,7 +26,7 @@ import paddle
 from paddle import inference
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepTokenizer
 from utils import decoding, read_test_file, load_dict
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
 from classification.data import convert_example_to_feature as convert_example_to_feature_cls
@@ -129,7 +129,7 @@ class Predictor(object):
                     self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]
                 ]
                 text = ori_test_ds[idx]["text"]
-                aps = decoding(text, tag_seq)
+                aps = decoding(text[:args.max_seq_len-2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
                     aspect_text = self._concate_aspect_and_opinion(text, aspect,

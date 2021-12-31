@@ -19,8 +19,7 @@ import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
-from model import SkepForTokenClassification
+from paddlenlp.transformers import SkepForTokenClassification, SkepTokenizer
 from data import read, load_dict, convert_example_to_feature
 
 
@@ -76,8 +75,7 @@ if __name__ == "__main__":
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForTokenClassification(skep, num_classes=len(label2id))
+    model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = ChunkEvaluator(label2id.keys())
