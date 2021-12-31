@@ -93,16 +93,15 @@ class T5Tokenizer(AlbertEnglishTokenizer):
                  unk_token="<unk>",
                  pad_token="<pad>",
                  extra_ids=100,
-                 additional_special_tokens=None,
+                 additional_special_tokens=[],
                  **kwargs):
 
         # Add extra_ids to the special token list
-        if extra_ids > 0 and additional_special_tokens is None:
-            additional_special_tokens = [
+        if extra_ids > 0 and len(additional_special_tokens) == 0:
+            self._additional_special_tokens = [
                 f"<extra_id_{i}>" for i in range(extra_ids)
             ]
-            self.add_tokens(additional_special_tokens, special_tokens=True)
-        elif extra_ids > 0 and additional_special_tokens is not None:
+        elif extra_ids > 0 and len(additional_special_tokens) != 0:
             # Check that we have the right number of extra_id special tokens
             extra_tokens = len(
                 set(
