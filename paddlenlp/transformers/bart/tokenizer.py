@@ -14,7 +14,7 @@
 # limitations under the License.
 import itertools
 from paddle.utils import try_import
-from .. import GPTTokenizer
+from .. import GPTTokenizer, AddedToken
 
 __all__ = ['BartTokenizer']
 
@@ -39,9 +39,6 @@ class BartTokenizer(GPTTokenizer):
             Defaults to `'replace'`.
         max_len (int, optional):
             The maximum value of the input sequence length.
-            Defaults to `None`.
-        special_tokens (list, optional):
-            A list of special tokens not in the vocabulary.
             Defaults to `None`.
         bos_token (str, optional):
             The beginning of sequence token that was used during pretraining. Can be
@@ -104,23 +101,55 @@ class BartTokenizer(GPTTokenizer):
     }
     pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
 
-    def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            errors='replace',
-            max_len=None,
-            special_tokens=None,
-            bos_token="<s>",
-            eos_token="</s>",
-            cls_token="<s>",
-            sep_token="</s>",
-            unk_token="<unk>",
-            pad_token="<pad>",
-            mask_token="<mask>", ):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 errors='replace',
+                 max_len=None,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 cls_token="<s>",
+                 sep_token="</s>",
+                 unk_token="<unk>",
+                 pad_token="<pad>",
+                 mask_token="<mask>",
+                 **kwargs):
+
+        bos_token = AddedToken(
+            bos_token, lstrip=False,
+            rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(
+            eos_token, lstrip=False,
+            rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(
+            sep_token, lstrip=False,
+            rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(
+            cls_token, lstrip=False,
+            rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token)
+
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                            max_len, special_tokens, pad_token,
-                                            eos_token)
+                                            max_len, pad_token, eos_token)
 
     def __call__(self,
                  text,
@@ -150,53 +179,6 @@ class BartTokenizer(GPTTokenizer):
             bpe_tokens.extend(
                 bpe_token for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
-
-    def _tokenize(self, text):
-        """ Tokenize a string. """
-
-        def split_on_token(tok, text):
-            result = []
-            split_text = text.split(tok)
-            for i, sub_text in enumerate(split_text):
-                if tok == self.mask_token and i < len(split_text) - 1:
-                    sub_text = sub_text.rstrip()
-                if i == 0 and not sub_text:
-                    result.append(tok)
-                elif i == len(split_text) - 1:
-                    if sub_text:
-                        result.append(sub_text)
-                    else:
-                        pass
-                else:
-                    if sub_text:
-                        result.append(sub_text)
-                    result.append(tok)
-            return result
-
-        def split_on_tokens(tok_list, text):
-            """
-            Process special tokens.
-            Don't split special tokens when in Mask Filling task.
-            """
-            tokenized_text = []
-            text_list = [text]
-            for tok in tok_list:
-                tokenized_text = []
-                for sub_text in text_list:
-                    if sub_text not in self.all_special_tokens:
-                        tokenized_text.extend(split_on_token(tok, sub_text))
-                    else:
-                        tokenized_text.append(sub_text)
-                text_list = tokenized_text
-
-            return list(
-                itertools.chain.from_iterable((self._bpe_encode(
-                    token) if token not in self.all_special_tokens else [
-                        token
-                    ] for token in tokenized_text)))
-
-        tokenized_text = split_on_tokens(self.all_special_tokens, text)
-        return tokenized_text
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """

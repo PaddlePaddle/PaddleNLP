@@ -19,8 +19,7 @@ import unicodedata
 from shutil import copyfile
 
 from paddle.utils import try_import
-from .. import PretrainedTokenizer
-from .. import BertTokenizer
+from .. import PretrainedTokenizer, BertTokenizer, AddedToken
 
 __all__ = ['AlbertTokenizer']
 
@@ -235,6 +234,12 @@ class AlbertTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
+
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
+
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
@@ -280,7 +285,7 @@ class AlbertTokenizer(PretrainedTokenizer):
         Returns:
             int: The size of vocabulary.
         """
-        return self.tokenizer.vocab_size()
+        return self.tokenizer.vocab_size
 
     def _tokenize(self, text):
         return self.tokenizer._tokenize(text)
@@ -298,17 +303,16 @@ class AlbertTokenizer(PretrainedTokenizer):
         Examples:
             .. code-block::
 
-                from paddlenlp.transformers import AlbertTokenizer
+                from paddlenlp.transformers import RobertaTokenizer
 
-                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 tokens = tokenizer.tokenize('He was a puppeteer')
-                '''
-                ['▁he', '▁was', '▁a', '▁puppet', 'eer']
-                '''
+
         """
+
         return self.tokenizer.tokenize(text)
 
-    def convert_tokens_to_ids(self, tokens):
+    def _convert_token_to_id(self, token):
         """
         Converts a sequence of tokens (list of string) to a list of ids.
 
@@ -330,9 +334,9 @@ class AlbertTokenizer(PretrainedTokenizer):
                 ids = tokenizer.convert_tokens_to_ids(tokens)
                 #[24, 23, 21, 10956, 7911]
         """
-        return self.tokenizer.convert_tokens_to_ids(tokens)
+        return self.tokenizer._convert_token_to_id(token)
 
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+    def _convert_id_to_token(self, index):
         """
         Converts a sequence of tokens (list of string) to a list of ids.
 
@@ -354,8 +358,7 @@ class AlbertTokenizer(PretrainedTokenizer):
                 tokens = tokenizer.convert_ids_to_tokens(ids)
                 #['▁he', '▁was', '▁a', '▁puppet', 'eer']
         """
-        return self.tokenizer.convert_ids_to_tokens(
-            ids, skip_special_tokens=skip_special_tokens)
+        return self.tokenizer._convert_id_to_token(index)
 
     def convert_tokens_to_string(self, tokens):
         """
@@ -640,9 +643,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
         return new_pieces
 
-    def tokenize(self, text):
-        return self._tokenize(text)
-
     def _convert_token_to_id(self, token):
         """Converts a token (str) to an id using the vocab. """
         return self.sp_model.PieceToId(token)
@@ -650,23 +650,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
         return self.sp_model.IdToPiece(index)
-
-    def convert_tokens_to_ids(self, tokens):
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        if skip_special_tokens:
-            return [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""

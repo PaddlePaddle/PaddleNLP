@@ -120,7 +120,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",
-                 special_tokens_file=""):
+                 special_tokens_file="",
+                 **kwargs):
         mod = try_import('sentencepiece')
         self.spm_model = mod.SentencePieceProcessor()
 
@@ -241,32 +242,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             part_tokens = self.encode_pieces(self.spm_model, part_text)
             tokens.extend(part_tokens)
         return tokens
-
-    def tokenize(self, text, is_split_into_words=True):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): 
-                The text to be tokenized.
-            is_split_into_words (bool, optional):
-                Whether or not the input `text` has been pretokenized. If False, 
-                the input `text` will be pretokenized by `jieba` firstly. 
-                Defaults to True.
-        
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import UnifiedTransformerTokenizer
-
-                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
-                print(tokenizer.tokenize('欢迎使用百度飞桨！', is_split_into_words=False))
-                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
-        """
-        return self._tokenize(text, is_split_into_words=is_split_into_words)
 
     def merge_subword(self, tokens):
         # Merge subword.
