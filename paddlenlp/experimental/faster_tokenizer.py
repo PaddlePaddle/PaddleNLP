@@ -21,6 +21,7 @@ from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
+from paddlenlp.transformers.ppminilm.tokenizer import PPMiniLMTokenizer
 from paddlenlp.utils.log import logger
 
 __all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
@@ -71,11 +72,11 @@ class FasterTokenizer(nn.Layer):
         "ernie-1.0": ErnieTokenizer,
         "ernie-2.0-en": ErnieTokenizer,
         "ernie-2.0-large-en": ErnieTokenizer,
-        "ppminilm-6l-768h": ErnieTokenizer,
         "roberta-wwm-ext": RobertaTokenizer,
         "roberta-wwm-ext-large": RobertaTokenizer,
         "rbt3": RobertaTokenizer,
         "rbtl3": RobertaTokenizer,
+        "ppminilm-6l-768h": PPMiniLMTokenizer,
     }
 
     def __init__(self, vocab, do_lower_case=False, is_split_into_words=False):
@@ -85,8 +86,8 @@ class FasterTokenizer(nn.Layer):
             self.mod = importlib.import_module("paddle._C_ops")
         except Exception as e:
             logger.warning(
-                f"The paddlepaddle version is {paddle.__version__}, not the latest. "
-                "Please upgrade the paddlepaddle package (>= 2.2.1).")
+                "The paddlepaddle version is {paddle.__version__}, not the latest. Please upgrade the paddlepaddle package (>= 2.2.1)."
+            )
             self.mod = importlib.import_module("paddle.fluid.core.ops")
 
         vocab_buffer = to_vocab_buffer(vocab, "vocab")

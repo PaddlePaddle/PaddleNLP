@@ -11,11 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 import paddle
+import paddle.fluid.core as core
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from paddlenlp.utils.log import logger
+from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -89,7 +93,7 @@ class PPMiniLMPooler(nn.Layer):
         return pooled_output
 
 
-class PPMiniLMPretrainedModel(PretrainedModel):
+class PPMiniLMPretrainedModel(FasterPretrainedModel):
     r"""
     An abstract class for pretrained PPMiniLM models. It provides PPMiniLM related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
@@ -116,14 +120,22 @@ class PPMiniLMPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "vocab_file": "vocab.txt"
+    }
     pretrained_resource_files_map = {
         "model_state": {
             "ppminilm-6l-768h":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/ppminilm-6l-768h.pdparams",
+        },
+        "vocab_file": {
+            "ppminilm-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ppminilm-6l-768h/vocab.txt",
         }
     }
     base_model_prefix = "ppminilm"
+    use_faster_tokenizer = False
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -140,6 +152,47 @@ class PPMiniLMPretrainedModel(PretrainedModel):
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
+
+    def to_static(self,
+                  output_path,
+                  use_faster_tokenizer=True,
+                  is_text_pair=False):
+        self.eval()
+        self.use_faster_tokenizer = use_faster_tokenizer
+        # Convert to static graph with specific input description
+        if self.use_faster_tokenizer:
+            if is_text_pair:
+                model = paddle.jit.to_static(
+                    self,
+                    input_spec=[
+                        paddle.static.InputSpec(
+                            shape=[None, None],
+                            dtype=core.VarDesc.VarType.STRINGS),
+                        paddle.static.InputSpec(
+                            shape=[None, None],
+                            dtype=core.VarDesc.VarType.STRINGS)
+                    ])
+            else:
+
+                model = paddle.jit.to_static(
+                    self,
+                    input_spec=[
+                        paddle.static.InputSpec(
+                            shape=[None, None],
+                            dtype=core.VarDesc.VarType.STRINGS)
+                    ])
+        else:
+            model = paddle.jit.to_static(
+                self,
+                input_spec=[
+                    paddle.static.InputSpec(
+                        shape=[None, None], dtype="int64"),  # input_ids
+                    paddle.static.InputSpec(
+                        shape=[None, None], dtype="int64")  # segment_ids
+                ])
+        paddle.jit.save(model, output_path)
+        logger.info("Already save the static model to the path %s" %
+                    output_path)
 
 
 @register_base_model
@@ -202,6 +255,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
 
     def __init__(self,
                  vocab_size,
+                 vocab_file,
                  hidden_size=768,
                  num_hidden_layers=12,
                  num_attention_heads=12,
@@ -212,10 +266,27 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=2,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 do_lower_case=True,
+                 is_split_into_words=False,
+                 max_seq_len=512):
         super(PPMiniLMModel, self).__init__()
+        if not os.path.isfile(vocab_file):
+            raise ValueError(
+                "Can't find a vocabulary file at path '{}'. To load the "
+                "vocabulary from a pretrained model please use "
+                "`model = PPMiniLMModel.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                .format(vocab_file))
+        self.vocab = self.load_vocabulary(vocab_file)
+        self.do_lower_case = do_lower_case
+        self.max_seq_len = max_seq_len
+        self.is_split_into_words = is_split_into_words
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        self.tokenizer = FasterTokenizer(
+            self.vocab,
+            do_lower_case=self.do_lower_case,
+            is_split_into_words=self.is_split_into_words)
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(
                 mean=0.0, std=self.initializer_range))
@@ -304,6 +375,12 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        # Only for saving
+        if self.use_faster_tokenizer:
+            input_ids, token_type_ids = self.tokenizer(
+                text=input_ids,
+                text_pair=token_type_ids,
+                max_seq_len=self.max_seq_len)
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -380,6 +457,7 @@ class PPMiniLMForSequenceClassification(PPMiniLMPretrainedModel):
                 logits = model(**inputs)
 
         """
+        self.ppminilm.use_faster_tokenizer = self.use_faster_tokenizer
         _, pooled_output = self.ppminilm(
             input_ids,
             token_type_ids=token_type_ids,

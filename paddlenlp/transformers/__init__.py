@@ -21,8 +21,6 @@ from .bert.tokenizer import *
 from .bert_japanese.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
-from .ppminilm.modeling import *
-from .ppminilm.tokenizer import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
@@ -32,6 +30,8 @@ from .electra.tokenizer import *
 from .transformer.modeling import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .optimization import *
+from .ppminilm.modeling import *
+from .ppminilm.tokenizer import *
 from .bigbird.modeling import *
 from .bigbird.tokenizer import *
 from .unified_transformer.modeling import *
