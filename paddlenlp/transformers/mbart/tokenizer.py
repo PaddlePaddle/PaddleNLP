@@ -15,7 +15,7 @@
 import itertools
 from contextlib import contextmanager
 from paddle.utils import try_import
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['MBartTokenizer']
 
@@ -78,6 +78,11 @@ class MBartTokenizer(PretrainedTokenizer):
                 vocab_file, src_lang, tgt_lang, bos_token, eos_token, sep_token,
                 cls_token, unk_token, pad_token, mask_token, **kwargs)
         self.lang_code_to_id = self.tokenizer.lang_code_to_id
+        self._additional_special_tokens = list(self.lang_code_to_id.keys())
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
 
     def __call__(self,
                  text,
@@ -99,23 +104,33 @@ class MBartTokenizer(PretrainedTokenizer):
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)
 
+    @property
+    def vocab_size(self):
+        """
+        Return the size of vocabulary.
+
+        Returns:
+            int: The size of vocabulary.
+        """
+        return self.tokenizer.vocab_size
+
     def _tokenize(self, text):
         """ Tokenize a string. """
         return self.tokenizer._tokenize(text)
 
-    def convert_tokens_to_ids(self, tokens):
+    def _convert_token_to_id(self, token):
         """
         Converts a single token or a sequence of tokens to an index or a
         sequence of indices.
         """
-        return self.tokenizer.convert_tokens_to_ids(tokens)
+        return self.tokenizer._convert_token_to_id(token)
 
-    def convert_ids_to_tokens(self, ids):
+    def _convert_id_to_token(self, index):
         """
         Converts a single index or a sequence of indices to a token or a
         sequence of tokens.
         """
-        return self.tokenizer.convert_ids_to_tokens(ids)
+        return self.tokenizer._convert_id_to_token(index)
 
     def convert_tokens_to_string(self, tokens):
         """
@@ -269,52 +284,21 @@ class _MBartTokenizer(PretrainedTokenizer):
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)
 
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of vocabulary.
+
+        Returns:
+            int: The sum of size of vocabulary and the size of speical tokens.
+
+        """
+
+        return len(self.sp_model) + len(
+            self.lang_code_to_id) + self.fairseq_offset + 1
+
     def _tokenize(self, text):
-        """ Tokenize a string. """
-
-        def split_on_token(tok, text):
-            result = []
-            split_text = text.split(tok)
-            for i, sub_text in enumerate(split_text):
-                if tok == self.mask_token and i < len(split_text) - 1:
-                    sub_text = sub_text.rstrip()
-                if i == 0 and not sub_text:
-                    result.append(tok)
-                elif i == len(split_text) - 1:
-                    if sub_text:
-                        result.append(sub_text)
-                    else:
-                        pass
-                else:
-                    if sub_text:
-                        result.append(sub_text)
-                    result.append(tok)
-            return result
-
-        def split_on_tokens(tok_list, text):
-            """
-            Process special tokens: don't split special tokens.
-            """
-            tokenized_text = []
-            text_list = [text]
-            for tok in tok_list:
-                tokenized_text = []
-                for sub_text in text_list:
-                    if sub_text not in self.fairseq_tokens_to_ids.keys():
-                        tokenized_text.extend(split_on_token(tok, sub_text))
-                    else:
-                        tokenized_text.append(sub_text)
-                text_list = tokenized_text
-
-            return list(
-                itertools.chain.from_iterable((self.sp_model.encode(
-                    token, out_type=str
-                ) if token not in self.fairseq_tokens_to_ids.keys(
-                ) else [token] for token in tokenized_text)))
-
-        tokenized_text = split_on_tokens(self.fairseq_tokens_to_ids.keys(),
-                                         text)
-        return tokenized_text
+        return self.sp_model.encode(text, out_type=str)
 
     def _convert_token_to_id(self, token):
         """
@@ -333,26 +317,6 @@ class _MBartTokenizer(PretrainedTokenizer):
         if index in self.fairseq_ids_to_tokens:
             return self.fairseq_ids_to_tokens[index]
         return self.sp_model.IdToPiece(index - self.fairseq_offset)
-
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a single token or a sequence of tokens to an index or a
-        sequence of indices.
-        """
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids):
-        """
-        Converts a single index or a sequence of indices to a token or a
-        sequence of tokens.
-        """
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        return tokens
 
     def convert_tokens_to_string(self, tokens):
         """
@@ -509,51 +473,20 @@ class _MBart50Tokenizer(PretrainedTokenizer):
             return_overflowing_tokens, return_special_tokens_mask)
 
     def _tokenize(self, text):
-        """ Tokenize a string. """
+        return self.sp_model.encode(text, out_type=str)
 
-        def split_on_token(tok, text):
-            result = []
-            split_text = text.split(tok)
-            for i, sub_text in enumerate(split_text):
-                if tok == self.mask_token and i < len(split_text) - 1:
-                    sub_text = sub_text.rstrip()
-                if i == 0 and not sub_text:
-                    result.append(tok)
-                elif i == len(split_text) - 1:
-                    if sub_text:
-                        result.append(sub_text)
-                    else:
-                        pass
-                else:
-                    if sub_text:
-                        result.append(sub_text)
-                    result.append(tok)
-            return result
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of vocabulary.
 
-        def split_on_tokens(tok_list, text):
-            """
-            Process special tokens: don't split special tokens.
-            """
-            tokenized_text = []
-            text_list = [text]
-            for tok in tok_list:
-                tokenized_text = []
-                for sub_text in text_list:
-                    if sub_text not in self.fairseq_tokens_to_ids.keys():
-                        tokenized_text.extend(split_on_token(tok, sub_text))
-                    else:
-                        tokenized_text.append(sub_text)
-                text_list = tokenized_text
+        Returns:
+            int: The sum of size of vocabulary and the size of speical tokens.
 
-            return list(
-                itertools.chain.from_iterable((self.sp_model.encode(
-                    token, out_type=str
-                ) if token not in self.fairseq_tokens_to_ids.keys(
-                ) else [token] for token in tokenized_text)))
+        """
 
-        tokenized_text = split_on_tokens(self.fairseq_tokens_to_ids.keys(),
-                                         text)
-        return tokenized_text
+        return len(self.sp_model) + len(
+            self.lang_code_to_id) + self.fairseq_offset + 1
 
     def _convert_token_to_id(self, token):
         """
@@ -572,26 +505,6 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         if index in self.fairseq_ids_to_tokens:
             return self.fairseq_ids_to_tokens[index]
         return self.sp_model.IdToPiece(index - self.fairseq_offset)
-
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a single token or a sequence of tokens to an index or a
-        sequence of indices.
-        """
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids):
-        """
-        Converts a single index or a sequence of indices to a token or a
-        sequence of tokens.
-        """
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        return tokens
 
     def convert_tokens_to_string(self, tokens):
         """

@@ -19,8 +19,7 @@ import unicodedata
 from shutil import copyfile
 
 from paddle.utils import try_import
-from .. import PretrainedTokenizer
-from .. import BertTokenizer
+from .. import PretrainedTokenizer, BertTokenizer, AddedToken
 
 __all__ = ['AlbertTokenizer']
 
@@ -191,6 +190,12 @@ class AlbertTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
+
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
+
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
@@ -220,35 +225,12 @@ class AlbertTokenizer(PretrainedTokenizer):
         Returns:
             int: The size of vocabulary.
         """
-        return self.tokenizer.vocab_size()
+        return self.tokenizer.vocab_size
 
     def _tokenize(self, text):
         return self.tokenizer._tokenize(text)
 
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import AlbertTokenizer
-
-                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-                '''
-                ['▁he', '▁was', '▁a', '▁puppet', 'eer']
-                '''
-        """
-        return self.tokenizer.tokenize(text)
-
-    def convert_tokens_to_ids(self, tokens):
+    def _convert_token_to_id(self, token):
         """
         Converts a sequence of tokens (list of string) to a list of ids.
 
@@ -270,9 +252,9 @@ class AlbertTokenizer(PretrainedTokenizer):
                 ids = tokenizer.convert_tokens_to_ids(tokens)
                 #[24, 23, 21, 10956, 7911]
         """
-        return self.tokenizer.convert_tokens_to_ids(tokens)
+        return self.tokenizer._convert_token_to_id(token)
 
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+    def _convert_id_to_token(self, index):
         """
         Converts a sequence of tokens (list of string) to a list of ids.
 
@@ -294,8 +276,7 @@ class AlbertTokenizer(PretrainedTokenizer):
                 tokens = tokenizer.convert_ids_to_tokens(ids)
                 #['▁he', '▁was', '▁a', '▁puppet', 'eer']
         """
-        return self.tokenizer.convert_ids_to_tokens(
-            ids, skip_special_tokens=skip_special_tokens)
+        return self.tokenizer._convert_id_to_token(index)
 
     def convert_tokens_to_string(self, tokens):
         """

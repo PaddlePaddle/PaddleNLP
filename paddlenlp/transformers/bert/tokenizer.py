@@ -17,7 +17,7 @@ import copy
 import os
 import unicodedata
 
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
@@ -377,7 +377,8 @@ class BertTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -386,6 +387,8 @@ class BertTokenizer(PretrainedTokenizer):
                 "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
         self.do_lower_case = do_lower_case
+        if isinstance(unk_token, AddedToken):
+            unk_token = unk_token.content
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
@@ -417,32 +420,6 @@ class BertTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-        
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import BertTokenizer
-
-                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                tokens = berttokenizer.tokenize('He was a puppeteer')
-                
-                '''
-                ['he', 'was', 'a', 'puppet', '##eer']
-                '''
-
-        """
-
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """

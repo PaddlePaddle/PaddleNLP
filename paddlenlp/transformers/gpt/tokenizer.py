@@ -23,7 +23,7 @@ from paddle.utils import try_import
 
 from paddlenlp.utils.log import logger
 
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 
 __all__ = [
     'GPTTokenizer',
@@ -124,7 +124,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             unk_token='<unk>',
             bos_token='<bod>',
             eos_token='<eod>',
-            eol_token='\u2583',  # The token of newline.
+            eol_token='\u2583',
+            **kwargs  # The token of newline.
     ):
         self._model_file = model_file
         if not os.path.isfile(model_file):
@@ -314,9 +315,6 @@ class GPTTokenizer(PretrainedTokenizer):
         max_len (int, optional):
             The maximum value of the input sequence length.
             Defaults to `None`.
-        special_tokens (list, optional):
-            A list of special tokens not in the vocabulary.
-            Defaults to `None`.
 
     Examples:
         .. code-block::
@@ -374,11 +372,25 @@ class GPTTokenizer(PretrainedTokenizer):
             merges_file,
             errors='replace',
             max_len=None,
-            special_tokens=None,
             pad_token='<|endoftext|>',
             eos_token='<|endoftext|>',
-            eol_token='\u010a',  # The token of newline.
+            unk_token='<|endoftext|>',
+            eol_token='\u010a',
+            **kwargs  # The token of newline.
     ):
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+        eos_token = AddedToken(
+            eos_token, lstrip=False,
+            rstrip=False) if isinstance(eos_token, str) else eos_token
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+
+        self._build_special_tokens_map_extended(
+            bos_token=pad_token, eos_token=eos_token, unk_token=unk_token)
+
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
@@ -402,10 +414,6 @@ class GPTTokenizer(PretrainedTokenizer):
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
 
-        self.special_tokens = {}
-        self.special_tokens_decoder = {}
-        self.set_special_tokens(special_tokens)
-
     @property
     def vocab_size(self):
         """
@@ -417,25 +425,6 @@ class GPTTokenizer(PretrainedTokenizer):
         """
 
         return len(self.encoder)
-
-    def set_special_tokens(self, special_tokens):
-        """
-        Add a list of additional tokens to the encoder.
-        The additional tokens are indexed starting from the last index of the
-        current vocabulary in the order of the `special_tokens` list.
-
-        """
-        if not special_tokens:
-            self.special_tokens = {}
-            self.special_tokens_decoder = {}
-            return
-        self.special_tokens = dict((tok, len(self.encoder) + i)
-                                   for i, tok in enumerate(special_tokens))
-        self.special_tokens_decoder = {
-            v: k
-            for k, v in self.special_tokens.items()
-        }
-        logger.info("Special tokens {}".format(self.special_tokens))
 
     def bpe(self, token):
         if token in self.cache:
@@ -491,8 +480,7 @@ class GPTTokenizer(PretrainedTokenizer):
         return bpe_tokens
 
     def _convert_token_to_id(self, token):
-
-        return self.encoder.get(token, 0)
+        return self.encoder.get(token, self.encoder.get(self.unk_token))
 
     def _convert_id_to_token(self, index):
 

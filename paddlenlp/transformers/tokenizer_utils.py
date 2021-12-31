@@ -426,6 +426,7 @@ class PretrainedTokenizer(object):
     padding_side = 'right'
     pad_token_type_id = 0
     special_tokens_map_extended = {}
+    _additional_special_tokens = []
 
     def _wrap_init(self, original_init, *args, **kwargs):
         """
@@ -448,14 +449,15 @@ class PretrainedTokenizer(object):
         for identifier, value in init_dict.items():
             if identifier.endswith('_token'):
                 self.special_tokens_map[identifier] = value
-                self.tokens_trie.add(value)
             if identifier == "additional_special_tokens":
                 assert isinstance(value, (
                     list, tuple)), f"Value {value} is not a list or tuple"
+                self._additional_special_tokens += value
                 assert all(
                     isinstance(t, (str, AddedToken)) for t in
                     value), "One of the tokens is not a string or an AddedToken"
-                self.add_tokens(value, special_tokens=True)
+                self.special_tokens_map[
+                    identifier] = self._additional_special_tokens
 
     def _build_special_tokens_map_extended(self, **kwargs):
         for identifier, token in kwargs.items():
@@ -637,7 +639,7 @@ class PretrainedTokenizer(object):
         for attr_value in set_attr.values():
             all_toks = all_toks + (list(attr_value) if isinstance(attr_value, (
                 list, tuple)) else [attr_value])
-        all_toks = list(set(all_toks))
+        all_toks = list(OrderedDict.fromkeys(all_toks))
         return all_toks
 
     @property
@@ -675,8 +677,6 @@ class PretrainedTokenizer(object):
             add_special_tokens_extended = []
             for token in new_tokens:
                 if isinstance(token, AddedToken):
-                    if hasattr(self, "do_lower_case") and self.do_lower_case:
-                        token.content = token.content.lower()
                     if token.content not in add_special_tokens:
                         self.tokens_trie.add(token.content)
                         add_special_tokens_extended.append(token)
@@ -688,8 +688,6 @@ class PretrainedTokenizer(object):
                             self.added_tokens_decoder[len(self) -
                                                       1] = token.content
                 else:
-                    if hasattr(self, "do_lower_case") and self.do_lower_case:
-                        token = token.lower()
                     if token not in add_special_tokens:
                         self.tokens_trie.add(token)
                         add_special_tokens.append(token)
@@ -698,10 +696,9 @@ class PretrainedTokenizer(object):
                                     self.unk_token):
                             self.added_tokens_encoder[token] = len(self)
                             self.added_tokens_decoder[len(self) - 1] = token
+
             self.special_tokens_map_extended[
                 "additional_special_tokens"] = add_special_tokens_extended
-            self.special_tokens_map[
-                "additional_special_tokens"] = add_special_tokens
         else:
             for token in new_tokens:
                 if not isinstance(token, str):
@@ -725,12 +722,17 @@ class PretrainedTokenizer(object):
 
         return self._add_tokens(new_tokens, special_tokens=special_tokens)
 
+    def prepare_for_tokenization(self, text, **kwargs):
+        return text
+
     def tokenize(self, text, **kwargs):
         all_special_tokens_extended = dict(
             (t.content, t) for t in self.all_special_tokens_extended
             if isinstance(t, AddedToken))
         no_split_token = set(self.all_special_tokens)
+        text = self.prepare_for_tokenization(text, **kwargs)
         tokens = self.tokens_trie.split(text)
+
         for i, token in enumerate(tokens):
             if token in no_split_token:
                 tok_extended = all_special_tokens_extended.get(token, None)
@@ -750,7 +752,6 @@ class PretrainedTokenizer(object):
                         tokens[i + 1] = right.lstrip()
                     if left:
                         tokens[i - 1] = left.rstrip()
-
         tokenized_text = []
         for token in tokens:
             if not token:
@@ -943,6 +944,15 @@ class PretrainedTokenizer(object):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
+        tokenizer.add_tokens(tokenizer.all_special_tokens, special_tokens=True)
+        additional_special_tokens = []
+        for token in tokenizer.all_special_tokens:
+            if isinstance(token, AddedToken):
+                token = token.content
+            if token not in tokenizer.special_tokens_map.values():
+                additional_special_tokens.append(token)
+        tokenizer.special_tokens_map[
+            "additional_special_tokens"] = additional_special_tokens
         return tokenizer
 
     def save_pretrained(self, save_directory):
@@ -2003,11 +2013,6 @@ class BPETokenizer(PretrainedTokenizer):
             bpe_ids = self.encoder.encode(text)
         tokens = [str(bpe_id) for bpe_id in bpe_ids]
         return tokens
-
-    '''
-    def tokenize(self, text, is_sentencepiece=True):
-        return self._tokenize(text, is_sentencepiece)
-    '''
 
     def _get_encoder(self, encoder_json_path, vocab_bpe_path):
         with open(encoder_json_path, 'r') as f:
