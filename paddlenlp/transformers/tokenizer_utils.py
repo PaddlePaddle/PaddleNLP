@@ -185,7 +185,6 @@ class Trie:
             {"H": {"e": {"l": {"l": {"o": {"": 1, " ": {"友": {"達": {"": 1}}}}}}}}}
         """
         if not word:
-            # Prevent empty string
             return
         ref = self.data
         for char in word:
