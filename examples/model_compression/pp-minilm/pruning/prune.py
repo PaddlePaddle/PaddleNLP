@@ -199,6 +199,11 @@ def ppminilm_forward(self,
                      token_type_ids=None,
                      position_ids=None,
                      attention_mask=[None, None]):
+    if self.use_faster_tokenizer:
+        input_ids, token_type_ids = self.tokenizer(
+            text=input_ids,
+            text_pair=token_type_ids,
+            max_seq_len=self.max_seq_len)
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
     if attention_mask[0] is None:

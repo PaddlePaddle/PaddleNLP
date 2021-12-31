@@ -153,6 +153,12 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
+    def add_faster_tokenizer_op(self):
+        self.ppminilm.tokenizer = FasterTokenizer(
+            self.ppminilm.vocab,
+            do_lower_case=self.ppminilm.do_lower_case,
+            is_split_into_words=self.ppminilm.is_split_into_words)
+
     def to_static(self,
                   output_path,
                   use_faster_tokenizer=True,
@@ -161,16 +167,15 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
         self.use_faster_tokenizer = use_faster_tokenizer
         # Convert to static graph with specific input description
         if self.use_faster_tokenizer:
+            self.add_faster_tokenizer_op()
             if is_text_pair:
                 model = paddle.jit.to_static(
                     self,
                     input_spec=[
                         paddle.static.InputSpec(
-                            shape=[None, None],
-                            dtype=core.VarDesc.VarType.STRINGS),
+                            shape=[None], dtype=core.VarDesc.VarType.STRINGS),
                         paddle.static.InputSpec(
-                            shape=[None, None],
-                            dtype=core.VarDesc.VarType.STRINGS)
+                            shape=[None], dtype=core.VarDesc.VarType.STRINGS)
                     ])
             else:
 
@@ -178,8 +183,7 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
                     self,
                     input_spec=[
                         paddle.static.InputSpec(
-                            shape=[None, None],
-                            dtype=core.VarDesc.VarType.STRINGS)
+                            shape=[None], dtype=core.VarDesc.VarType.STRINGS)
                     ])
         else:
             model = paddle.jit.to_static(
@@ -283,10 +287,6 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
         self.is_split_into_words = is_split_into_words
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.tokenizer = FasterTokenizer(
-            self.vocab,
-            do_lower_case=self.do_lower_case,
-            is_split_into_words=self.is_split_into_words)
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(
                 mean=0.0, std=self.initializer_range))
