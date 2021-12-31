@@ -21,7 +21,7 @@ from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEn
 from paddle.fluid.data_feeder import convert_dtype
 
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieForSequenceClassification
+from paddlenlp.transformers import PPMiniLMForSequenceClassification
 from paddlenlp.transformers import TinyBertForPretraining
 from paddlenlp.transformers import BertForSequenceClassification
 
@@ -208,7 +208,7 @@ def to_distill(self,
     if return_qkv:
         # forward function of student class should be replaced for distributed training.
         TinyBertForPretraining._forward = minilm_pretraining_forward
-        ErnieForSequenceClassification._forward = minilm_pretraining_forward
+        PPMiniLMForSequenceClassification._forward = minilm_pretraining_forward
     else:
         TinyBertForPretraining._forward = tinybert_forward
 
@@ -216,7 +216,7 @@ def to_distill(self,
         if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
                               TransformerEncoder, TinyBertForPretraining,
                               BertForSequenceClassification,
-                              ErnieForSequenceClassification)):
+                              PPMiniLMForSequenceClassification)):
             layer.forward = layer._forward
             if isinstance(layer, TransformerEncoder):
                 layer.return_layer_outputs = return_layer_outputs
