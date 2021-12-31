@@ -167,7 +167,7 @@ custom_model/
 ```python
 from paddlenlp import Taskflow
 
-my_lac = Taskflow("lexical_analysis", model_path="./custom_model")
+my_lac = Taskflow("lexical_analysis", model_path="./custom_model/")
 ```
 
 更多使用方法请参考[Taskflow文档](../../docs/model_zoo/taskflow.md)。

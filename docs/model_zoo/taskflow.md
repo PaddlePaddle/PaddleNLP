@@ -127,13 +127,13 @@ custom_model/
 ```python
 from paddlenlp import Taskflow
 
-my_seg = Taskflow("word_segmentation", model_path="./custom_model")
+my_seg = Taskflow("word_segmentation", model_path="./custom_model/")
 ```
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `model_path`：模型参数文件路径，默认为None。
+* `model_path`：自定义模型路径，默认为None。
 
 ### 词性标注
 
@@ -195,7 +195,7 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 
 通过`model_path`定义用户自定义路径，文件组成：
 ```text
-data/
+custom_model/
 ├── model.pdparams
 ├── word.dict
 ├── tag.dic
@@ -207,14 +207,14 @@ data/
 ```python
 from paddlenlp import Taskflow
 
-my_tag = Taskflow("pos_tagging", model_path="./custom_model")
+my_tag = Taskflow("pos_tagging", model_path="./custom_model/")
 ```
 
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认值为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `model_path`：模型参数文件路径，默认为None。
+* `model_path`：自定义模型路径，默认为None。
 
 ### 命名实体识别
 
@@ -271,17 +271,17 @@ custom_model/
 
 使用Taskflow加载自定义模型进行一键预测：
 
-```shell
+```python
 from paddlenlp import Taskflow
 
-my_ner = Taskflow("ner", model_path="./custom_model")
+my_ner = Taskflow("ner", model_path="./custom_model/")
 ```
 
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `model_path`：模型参数文件路径，默认为None。
+* `model_path`：自定义模型路径，默认为None。
 
 ### 文本纠错
 
@@ -480,14 +480,14 @@ custom_model/
 ```python
 from paddlenlp import Taskflow
 
-my_wordtag = Taskflow("knowledge_mining", model_path="./custom_model")
+my_wordtag = Taskflow("knowledge_mining", model_path="./custom_model/")
 ```
 
 #### 自定义Term-Linking
 
 Taskflow支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking:
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 wordtag = Taskflow("knowledge_mining", term_schema_path="/path/to/your/termtree_type", term_data_path="/path/to/your/termtree_data")
@@ -497,7 +497,7 @@ wordtag = Taskflow("knowledge_mining", term_schema_path="/path/to/your/termtree_
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `linking`：实现基于词类的linking，默认为True。
-* `model_path`：模型参数文件路径，默认为None。
+* `model_path`：自定义模型路径，默认为None。
 * `term_schema_path`：使用自定义TermType词类体系，默认为None。
 * `term_data_path`：使用自定义百科知识树文件，默认为None。
 * `user_dict`：用户自定义词典文件，默认为None。

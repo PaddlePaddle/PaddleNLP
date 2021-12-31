@@ -424,7 +424,6 @@ class WordTagTask(Task):
                     continue
                 if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
                     sent_out.append(partial_word)
-                    print(tags)
                     tags_out.append(tag.split('-')[-1])
                     partial_word = sent[ind]
                     continue
