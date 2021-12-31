@@ -150,8 +150,12 @@ class CTRLTokenizer(PretrainedTokenizer):
 
     CONTROL_CODES = CONTROL_CODES
 
-    def __init__(self, vocab_file, merges_file, max_len=None,
-                 unk_token="<unk>"):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 max_len=None,
+                 unk_token="<unk>",
+                 **kwargs):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)

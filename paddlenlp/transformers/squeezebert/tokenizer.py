@@ -76,7 +76,8 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -111,16 +112,6 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        """
-        End-to-end tokenization for SqueezeBert models.
-        Args:
-            text (str): The text to be tokenized.
-        Returns:
-            list: A list of string representing converted tokens.
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """

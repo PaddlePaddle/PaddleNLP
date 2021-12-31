@@ -93,7 +93,8 @@ class BertJapaneseTokenizer(BertTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -166,8 +167,7 @@ class BertJapaneseTokenizer(BertTokenizer):
 
         if self.do_subword_tokenize:
             split_tokens = [
-                sub_token
-                for token in tokens
+                sub_token for token in tokens
                 for sub_token in self.wordpiece_tokenizer.tokenize(token)
             ]
         else:

@@ -20,7 +20,7 @@ from collections import OrderedDict
 from paddle.utils import try_import
 from typing import List, Optional
 
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
 
 SPIECE_UNDERLINE = "▁"
@@ -40,23 +40,6 @@ def _is_start_of_word(text):
     return bool(
         _is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(
             first_char))
-
-
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
 
 
 class LayoutXLMTokenizer(PretrainedTokenizer):
@@ -171,106 +154,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         vocab.update(self.added_tokens_encoder)
         return vocab
 
-    def special_tokens_map_extended(self):
-        set_attr = {}
-        for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
-            if hasattr(self, "_" + attr):
-                attr_value = getattr(self, "_" + attr)
-                if attr_value:
-                    set_attr[attr] = attr_value
-        return set_attr
-
-    def all_special_tokens_extended(self):
-        all_toks = []
-        set_attr = self.special_tokens_map_extended()
-        for attr_value in set_attr.values():
-            all_toks = all_toks + (list(attr_value) if isinstance(attr_value, (
-                list, tuple)) else [attr_value])
-        all_toks = list(OrderedDict.fromkeys(all_toks))
-        return all_toks
-
-    def tokenize(self, text, **kwargs) -> List[str]:
-        all_special_tokens_extended = dict(
-            (t.content, t) for t in self.all_special_tokens_extended()
-            if isinstance(t, AddedToken))
-
-        def split_on_token(tok, text):
-            result = []
-            if isinstance(tok, AddedToken):
-                tok_extended = all_special_tokens_extended.get(tok, None)
-                split_text = text.split(tok.content)
-            else:
-                tok_extended = None
-                split_text = text.split(tok)
-            full_word = ""
-            for i, sub_text in enumerate(split_text):
-                if isinstance(tok_extended, AddedToken):
-                    if tok_extended.single_word:
-                        # Try to avoid splitting on token
-                        if (i < len(split_text) - 1 and
-                                not _is_end_of_word(sub_text) and
-                                not _is_start_of_word(split_text[i + 1])):
-                            # Don't extract the special token
-                            full_word += sub_text + tok
-                        elif full_word:
-                            full_word += sub_text
-                            result.append(full_word)
-                            full_word = ""
-                            continue
-                    # Strip white spaces on the right
-                    if tok_extended.rstrip and i > 0:
-                        # A bit counter-intuitive but we strip the left of the string
-                        # since tok_extended.rstrip means the special token is eating all white spaces on its right
-                        sub_text = sub_text.lstrip()
-                    # Strip white spaces on the left
-                    if tok_extended.lstrip and i < len(split_text) - 1:
-                        sub_text = sub_text.rstrip()  # Opposite here
-                else:
-                    # We strip left and right by default
-                    if i < len(split_text) - 1:
-                        sub_text = sub_text.rstrip()
-                    if i > 0:
-                        sub_text = sub_text.lstrip()
-
-                if i == 0 and not sub_text:
-                    result.append(tok)
-                elif i == len(split_text) - 1:
-                    if sub_text:
-                        result.append(sub_text)
-                    else:
-                        pass
-                else:
-                    if sub_text:
-                        result.append(sub_text)
-                    result.append(tok)
-            return result
-
-        def split_on_tokens(tok_list, text):
-            if not text.strip():
-                return []
-            if not tok_list:
-                return self._tokenize(text)
-
-            tokenized_text = []
-            text_list = [text]
-            for tok in tok_list:
-                tokenized_text = []
-                for sub_text in text_list:
-                    if sub_text not in self.all_special_tokens_extended():
-                        tokenized_text.extend(split_on_token(tok, sub_text))
-                    else:
-                        tokenized_text.append(sub_text)
-                text_list = tokenized_text
-
-            return list(
-                itertools.chain.from_iterable((self._tokenize(
-                    token) if token not in self.all_special_tokens_extended(
-                    ) else [token] for token in tokenized_text)))
-
-        no_split_token = self.all_special_tokens_extended()
-        tokenized_text = split_on_tokens(no_split_token, text)
-        return tokenized_text
-
     def _tokenize(self, text):
         return self.sp_model.EncodeAsPieces(text)
 
@@ -293,23 +176,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
         out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
         return out_string
-
-    def convert_tokens_to_ids(self, tokens):
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        if skip_special_tokens:
-            return [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens
 
     def num_special_tokens_to_add(self, pair=False):
         token_ids_0 = []
