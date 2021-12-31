@@ -16,6 +16,7 @@
 from paddle.utils import try_import
 from ..albert.tokenizer import AlbertEnglishTokenizer
 import warnings
+import re
 
 __all__ = ['T5Tokenizer', ]
 
@@ -91,11 +92,32 @@ class T5Tokenizer(AlbertEnglishTokenizer):
                  eos_token="</s>",
                  unk_token="<unk>",
                  pad_token="<pad>",
+                 extra_ids=100,
+                 additional_special_tokens=None,
                  **kwargs):
+
+        # Add extra_ids to the special token list
+        if extra_ids > 0 and additional_special_tokens is None:
+            additional_special_tokens = [
+                f"<extra_id_{i}>" for i in range(extra_ids)
+            ]
+            self.add_tokens(additional_special_tokens, special_tokens=True)
+        elif extra_ids > 0 and additional_special_tokens is not None:
+            # Check that we have the right number of extra_id special tokens
+            extra_tokens = len(
+                set(
+                    filter(lambda x: bool("extra_id" in str(x)),
+                           additional_special_tokens)))
+            if extra_tokens != extra_ids:
+                raise ValueError(
+                    f"Both extra_ids ({extra_ids}) and additional_special_tokens ({additional_special_tokens}) are provided to T5Tokenizer. "
+                    "In this case the additional_special_tokens must include the extra_ids tokens"
+                )
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
+        self.extra_ids = extra_ids
         self.sentencepiece_model_file = sentencepiece_model_file
 
         spm = try_import("sentencepiece")
@@ -121,6 +143,10 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             pad_to_max_seq_len, truncation_strategy, return_position_ids,
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)
+
+    @property
+    def vocab_size(self):
+        return len(self.sp_model) + self.extra_ids
 
     def _add_eos_if_not_present(self, token_ids):
         """Do not add eos again if user already added it."""
@@ -254,6 +280,22 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         if clean_up_tokenization_spaces:
             text = self.clean_up_tokenization(text)
         return text
+
+    def _convert_token_to_id(self, token):
+        """Converts a token (str) in an id using the vocab."""
+        if token.startswith("<extra_id_"):
+            match = re.match(r"<extra_id_(\d+)>", token)
+            num = int(match.group(1))
+            return self.vocab_size - num - 1
+        return self.sp_model.piece_to_id(token)
+
+    def _convert_id_to_token(self, index):
+        """Converts an index (integer) in a token (str) using the vocab."""
+        if index < self.sp_model.get_piece_size():
+            token = self.sp_model.IdToPiece(index)
+        else:
+            token = f"<extra_id_{self.vocab_size - 1 - index}>"
+        return token
 
     def batch_decode(self,
                      sequences,
