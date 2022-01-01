@@ -69,9 +69,9 @@ experiment.add_argument('--save_folder', default='output/models_ag_news',
 experiment.add_argument('--log_config', default=True, action='store_true', help='Store experiment configuration')
 experiment.add_argument('--log_result', default=True, action='store_true', help='Store experiment result')
 experiment.add_argument('--log_interval', type=int, default=100,
-                        help='how many steps to wait before logging training status [default: 600]')
+                        help='how many steps to wait before logging training status [default: 100]')
 experiment.add_argument('--val_interval', type=int, default=600,
-                        help='how many steps to wait before vaidation [default: 5]')
+                        help='how many steps to wait before vaidation [default: 600]')
 experiment.add_argument('--save_interval', type=int, default=5,
                         help='how many epochs to wait before saving [default:5]')
 
