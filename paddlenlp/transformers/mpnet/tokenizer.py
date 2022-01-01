@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from ..bert.tokenizer import BertTokenizer
+from .. import AddedToken
 
 __all__ = ['MPNetTokenizer']
 
@@ -36,11 +37,14 @@ class MPNetTokenizer(BertTokenizer):
     def __init__(self,
                  vocab_file,
                  do_lower_case=True,
+                 bos_token="<s>",
+                 eos_token="</s>",
                  unk_token="[UNK]",
                  sep_token="</s>",
                  pad_token="<pad>",
                  cls_token="<s>",
-                 mask_token="<mask>"):
+                 mask_token="<mask>",
+                 **kwargs):
 
         super().__init__(
             vocab_file=vocab_file,
@@ -49,6 +53,38 @@ class MPNetTokenizer(BertTokenizer):
             sep_token=sep_token,
             pad_token=pad_token,
             cls_token=cls_token,
+            mask_token=mask_token)
+
+        bos_token = AddedToken(
+            bos_token, lstrip=False,
+            rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(
+            eos_token, lstrip=False,
+            rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(
+            sep_token, lstrip=False,
+            rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(
+            cls_token, lstrip=False,
+            rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
             mask_token=mask_token)
 
     def __call__(self,

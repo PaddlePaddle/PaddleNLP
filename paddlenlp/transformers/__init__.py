@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .model_utils import PretrainedModel, register_base_model
-from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char
+from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken
 from .attention_utils import create_bigbird_rand_mask_idx_list
 
 from .bert.modeling import *
@@ -21,6 +21,8 @@ from .bert.tokenizer import *
 from .bert_japanese.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
+from .ppminilm.modeling import *
+from .ppminilm.tokenizer import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
@@ -88,3 +90,7 @@ from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .funnel.modeling import *
+from .funnel.tokenizer import *
+from .ernie_m.modeling import *
+from .ernie_m.tokenizer import *

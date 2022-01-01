@@ -8,7 +8,7 @@ export CUDA_VISIBLE_DEVICES=$6
 export MODEL_PATH=$7
 
 python -u ./run_clue.py \
-    --model_type ernie  \
+    --model_type ppminilm  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
     --max_seq_length ${MAX_SEQ_LEN} \
