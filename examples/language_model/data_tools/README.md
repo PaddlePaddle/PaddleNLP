@@ -131,7 +131,7 @@ chinese words:
                         可选。是否需要WWM策略。一般而言，Bert/Ernie模型需要，GPT不需要。
   --cn_seg_func {lac,seg,jieba}
                         Words segment function for chinese words.
-                        默认jieba，jieba速度较快，lac模型更复杂。
+                        默认jieba，jieba速度较快，lac模型更准确，计算量高。
   --cn_splited          Is chinese corpus is splited in to words.
                         分词后的文本，可选。设置此选项则，cn_seg_func不起作用。
                         例如分词后文本串 "百度 手机助手 是 Android 手机 的 权威 资源平台"
@@ -194,12 +194,12 @@ sh run_static.sh
 
 # 附录
 
-## Clue corpus small 数据集处理教程
+## CLUECorpus2020 small 数据集处理教程
 **数据集简介**：可用于语言建模、预训练或生成型任务等，数据量超过14G，近4000个定义良好的txt文件、50亿个字。主要部分来自于nlp_chinese_corpus项目
 包含如下子语料库（总共14G语料）：新闻语料 news2016zh_corpus， 社区互动语料webText2019zh_corpus，维基百科语料wiki2019zh_corpus，评论数据-语料comments2019zh_corpus。
 
 **数据集下载**：
-用户可以通过官方githu网页下载，https://github.com/CLUEbenchmark/CLUE 。同时，为方便用户，我们也提供了aistudio数据集下载地址。[part1](https://aistudio.baidu.com/aistudio/datasetdetail/60598)，[part2](https://aistudio.baidu.com/aistudio/datasetdetail/124357)。使用aistudio版本的数据，下载好后，可以核对md5值：
+用户可以通过官方github网页下载，https://github.com/CLUEbenchmark/CLUE 。同时，为方便用户，我们也提供了aistudio数据集下载地址。[part1](https://aistudio.baidu.com/aistudio/datasetdetail/60598)，[part2](https://aistudio.baidu.com/aistudio/datasetdetail/124357)。使用aistudio版本的数据，下载好后，可以核对md5值：
 ```shell
 > md5sum ./*
  8a8be341ebce39cfe9524fb0b46b08c5  ./comment2019zh_corpus.zip
