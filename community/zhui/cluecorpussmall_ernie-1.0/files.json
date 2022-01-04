@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/zhui/cluecorpussmall_ernie-1.0/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/zhui/cluecorpussmall_ernie-1.0/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/zhui/cluecorpussmall_ernie-1.0/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/zhui/cluecorpussmall_ernie-1.0/vocab.txt",
+}

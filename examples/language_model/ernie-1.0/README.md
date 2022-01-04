@@ -40,12 +40,12 @@ python -u  -m paddle.distributed.launch \
     --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
-    --max_steps 4000000 \
+    --max_steps 1000000 \
     --save_steps 50000 \
     --checkpoint_steps 5000 \
-    --decay_steps 3960000 \
+    --decay_steps 990000 \
     --weight_decay 0.01 \
-    --warmup_rate 0.0025 \
+    --warmup_rate 0.01 \
     --grad_clip 1.0 \
     --logging_freq 20\
     --num_workers 2 \
@@ -81,6 +81,32 @@ python -u  -m paddle.distributed.launch \
 - 一般而言，需要设置 `mp_degree * sharding_degree` = 训练机器的总卡数。
 - 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。可以使用梯度累积的方式增大`global_batch_size`。设置`global_batch_size`为理论值的整数倍是，默认启用梯度累积。
 - 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
+
+
+### Clue corpus small 数据集训练结果
+
+数据准备部分参考[data_tools](../data_tools/)中的附录部分，根据文档，创建训练clue_corpus_small_14g数据集。
+使用本训练脚本, batch_size=512, max_steps=100w，详细训练日志请参考：https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/scalar?id=b0e19e554d68b9165a55901f0eb92812
+
+最终训练loss结果：
+
+|Loss | Train | Validation |
+|-|-|-|
+|loss |2.72 | 2.60 |
+|lm_loss|2.60 | 2.50 |
+|sop_loss|0.12 | 0.10 |
+
+训练集 lm_loss=2.60 左右, 验证集 lm_loss=2.50 左右。
+
+使用训练好的模型参数，在下游任务重进行finetune（需要先将静态图参数转换为动态图，请参考模型参数转换部分）。这里报告部分数据集上的finetune结果：
+
+|Dataset | Dev | Test|
+|--|--|--|
+XNLI-CN | 0.79269 | 0.78339 |
+ChnSentiCorp | 0.94495 | 0.95496 |
+PeoplesDailyNer | 0.95128 | 0.94035 |
+CMRC2018 | 72.05/85.67 | - |
+
 
 ### 其他
 #### 模型参数转换

@@ -1,0 +1,46 @@
+# 详细介绍
+本权重为使用PaddleNLP提供的ernie预训练教程，在clue corpus small 14g数据集上训练得到的权重。
+
+模型结构与ernie-1.0完全相同，batch_size=512, max_steps=100w, 训练得到。使用方法与原始ernie-1.0权重相同。
+
+# 使用示例
+
+示例一：
+```
+import paddle
+from paddlenlp.transformers import ErnieForMaskedLM, ErnieTokenizer
+tokenizer = ErnieTokenizer.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+model = ErnieForMaskedLM.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+
+tokens = ['[CLS]', '我', '的', '[MASK]','很', '可', '爱','。', '[SEP]']
+masked_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tokens)])
+segment_ids = paddle.to_tensor([[0] * len(tokens)])
+
+outputs = model(masked_ids, token_type_ids=segment_ids)
+prediction_scores = outputs
+prediction_index = paddle.argmax(prediction_scores[0, 3]).item()
+predicted_token = tokenizer.convert_ids_to_tokens([prediction_index])[0]
+print(tokens)
+#['[CLS]', '我', '的', '[MASK]', '很', '可', '爱', '。', '[SEP]']
+print(predicted_token)
+#猫
+```
+
+示例二：
+```python
+import paddle
+from paddlenlp.transformers import *
+
+tokenizer = AutoTokenizer.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+text = tokenizer('自然语言处理')
+
+# 语义表示
+model = AutoModel.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+# 文本分类 & 句对匹配
+model = AutoModelForSequenceClassification.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+# 序列标注
+model = AutoModelForTokenClassification.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+# 问答
+model = AutoModelForQuestionAnswering.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
+```
