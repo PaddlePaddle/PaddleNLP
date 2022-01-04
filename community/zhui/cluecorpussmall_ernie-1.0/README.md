@@ -3,10 +3,12 @@
 
 模型结构与ernie-1.0完全相同，batch_size=512, max_steps=100w, 训练得到。使用方法与原始ernie-1.0权重相同。
 
+预训练全流程参见：https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0/README.md
+
 # 使用示例
 
 示例一：
-```
+```python
 import paddle
 from paddlenlp.transformers import ErnieForMaskedLM, ErnieTokenizer
 tokenizer = ErnieTokenizer.from_pretrained('zhui/cluecorpussmall_ernie-1.0')
