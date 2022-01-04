@@ -273,7 +273,8 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
                  pad_token_id=0,
                  do_lower_case=True,
                  is_split_into_words=False,
-                 max_seq_len=512):
+                 max_seq_len=128,
+                 pad_to_max_seq_len=False):
         super(PPMiniLMModel, self).__init__()
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -286,6 +287,7 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
         self.max_seq_len = max_seq_len
         self.is_split_into_words = is_split_into_words
         self.pad_token_id = pad_token_id
+        self.pad_to_max_seq_len = pad_to_max_seq_len
         self.initializer_range = initializer_range
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(
@@ -380,7 +382,8 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
             input_ids, token_type_ids = self.tokenizer(
                 text=input_ids,
                 text_pair=token_type_ids,
-                max_seq_len=self.max_seq_len)
+                max_seq_len=self.max_seq_len,
+                pad_to_max_seq_len=self.pad_to_max_seq_len)
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id

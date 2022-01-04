@@ -193,7 +193,7 @@ def evaluate(model, metric, data_loader, width_mult, student=False):
     return res
 
 
-### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
+### monkey patch for ppminilm forward to accept [attention_mask, head_mask] as  attention_mask
 def ppminilm_forward(self,
                      input_ids,
                      token_type_ids=None,
@@ -292,7 +292,7 @@ def do_train(args):
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
 
-    # Step1: Initialize a dictionary to save the weights from the origin BERT model.
+    # Step1: Initialize a dictionary to save the weights from the origin PPMiniLM model.
     origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.

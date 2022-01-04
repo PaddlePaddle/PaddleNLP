@@ -213,19 +213,17 @@ class Predictor(object):
         if args.perf:
             for i in range(batch_num):
                 if 'sentence' in dataset[0]:
-                    output = self.predict_batch(
-                        [to_tensor([batches[i]], "sentence")])
+                    output = self.predict_batch([batches[i]])
                 else:
-                    sentence1 = to_tensor([batches1[i]], "sentence1")
-                    sentence2 = to_tensor([batches2[i]], "sentence2")
-                    output = self.predict_batch([sentence1, sentence2])
+                    output = self.predict_batch([batches1[i], batches2[i]])
                 if i > args.perf_warmup_steps:
                     break
             time1 = time.time()
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
+            if 'sentence' in dataset[0]:
+                for i in range(batch_num):
                     output = self.predict_batch([batches[i]])
-                else:
+            else:
+                for i in range(batch_num):
                     output = self.predict_batch([batches1[i], batches2[i]])
             print("task name: %s, time: %s, " %
                   (args.task_name, time.time() - time1))
@@ -282,8 +280,8 @@ class Predictor(object):
                     break
             time1 = time.time()
             for batch in batches:
-                self.convert_predict_batch(args, batch, tokenizer, batchify_fn,
-                                           dataset.label_list)
+                examples = self.convert_predict_batch(
+                    args, batch, tokenizer, batchify_fn, dataset.label_list)
                 input_ids, segment_ids, _ = batchify_fn(examples)
                 output = self.predict_batch([input_ids, segment_ids])
 

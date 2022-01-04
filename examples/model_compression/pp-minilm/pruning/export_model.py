@@ -31,7 +31,6 @@ import paddle.fluid.core as core
 
 from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger
-from paddlenlp.experimental import FasterTokenizer
 
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
