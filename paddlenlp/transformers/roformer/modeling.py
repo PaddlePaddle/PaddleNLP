@@ -19,7 +19,6 @@ import paddle.nn.functional as F
 from paddle import tensor
 from paddle.nn import Layer
 
-from ...ops.einsum import einsum
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -81,7 +80,7 @@ class MultiHeadAttentionWithRotary(Layer):
         pos_seq = paddle.arange(0, seq_len, dtype=dtype_float)
         indices = paddle.arange(0, self.head_dim, 2, dtype=dtype_float)
         indices = 1 / 10000**(indices / self.head_dim)
-        sinusoid_inp = einsum("i,d->id", pos_seq, indices)
+        sinusoid_inp = paddle.einsum("i,d->id", pos_seq, indices)
         pos_emb = paddle.concat(
             [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
         pos_emb = paddle.reshape(pos_emb, (1, 1, seq_len, self.head_dim))

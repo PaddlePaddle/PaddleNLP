@@ -107,7 +107,8 @@ class ElectraTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -145,26 +146,6 @@ class ElectraTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import ElectraTokenizer
-                tokenizer = ElectraTokenizer.from_pretrained('electra-small')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """
