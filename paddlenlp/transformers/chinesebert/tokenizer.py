@@ -252,7 +252,7 @@ class ChineseBertTokenizer(BertTokenizer):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                tokens = self._tokenize(text)
+                tokens = self.tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
@@ -483,7 +483,7 @@ class ChineseBertTokenizer(BertTokenizer):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                tokens = self._tokenize(text)
+                tokens = self.tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(

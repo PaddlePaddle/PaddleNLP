@@ -24,7 +24,6 @@ import numpy as np
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.autograd import PyLayer
-from ...ops.einsum import einsum
 from .. import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
 
@@ -909,8 +908,8 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
             self.num_attention_heads, self.attention_head_size, self.hidden_size
         ]).transpose(perm=[0, 2, 1])
         # only relevant for inference and no bias => we can use einsum here
-        query_key_vectors = einsum("balh,ahr->balr", hidden_states,
-                                   per_head_query_key)
+        query_key_vectors = paddle.einsum("balh,ahr->balr", hidden_states,
+                                          per_head_query_key)
         return query_key_vectors
 
     def _value_per_attn_head(self, hidden_states):
@@ -918,7 +917,8 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
             self.num_attention_heads, self.attention_head_size, self.hidden_size
         ]).transpose(perm=[0, 2, 1])
         # only relevant for inference and no bias => we can use einsum here
-        value_vectors = einsum("balh,ahr->balr", hidden_states, per_head_value)
+        value_vectors = paddle.einsum("balh,ahr->balr", hidden_states,
+                                      per_head_value)
         return value_vectors
 
     def _hash_vectors(self,
@@ -965,7 +965,8 @@ class LSHSelfAttention(nn.Layer, EfficientAttentionMixin):
         random_rotations = paddle.randn(
             shape=rotations_shape, dtype=vectors.dtype)
         # Output dim: Batch_Size x Num_Attn_Heads x Num_Hashes x Seq_Len x Num_Buckets/2
-        rotated_vectors = einsum("bmtd,mdhr->bmhtr", vectors, random_rotations)
+        rotated_vectors = paddle.einsum("bmtd,mdhr->bmhtr", vectors,
+                                        random_rotations)
 
         if isinstance(self.num_buckets, int) or len(self.num_buckets) == 1:
             rotated_vectors = paddle.concat(

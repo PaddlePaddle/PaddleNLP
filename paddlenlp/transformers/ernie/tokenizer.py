@@ -132,7 +132,8 @@ class ErnieTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -171,31 +172,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        r"""
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import ErnieTokenizer
-                tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-                '''
-                ['he', 'was', 'a', 'pu', '##pp', '##et', '##ee', '##r']
-                '''
-
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         r"""
@@ -417,7 +393,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         mod = try_import('sentencepiece')
         self.sp_model = mod.SentencePieceProcessor()
         self.word_dict = word_dict
@@ -502,27 +479,6 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             else:
                 in_vocab_tokens.append(unk_token)
         return in_vocab_tokens
-
-    def tokenize(self, text):
-        r"""
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-        .. code-block::
-
-            from paddlenlp.transformers import ErnieTinyTokenizer
-            tokenizer = ErnieTinyTokenizer.from_pretrained('ernie-tiny')
-            inputs = tokenizer.tokenize('He was a puppeteer')
-            #['▁h', '▁e', '▁was', '▁a', '▁pu', 'pp', 'e', '▁te', 'er']
-
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         r"""
