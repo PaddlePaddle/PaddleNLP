@@ -1,0 +1,51 @@
+===========================train_params===========================
+model_name:transformer_base
+python:python3.7
+gpu_list:0|0,1
+null:null
+null:null
+--max_iter:lite_train_lite_infer=100|lite_train_whole_infer=100
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
+##
+trainer:norm_train
+norm_train:./transformer/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --train_file ../examples/machine_translation/transformer/train.en ../examples/machine_translation/transformer/train.de --dev_file ../examples/machine_translation/transformer/dev.en ../examples/machine_translation/transformer/dev.de --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+pact_train:null
+fpgm_train:null
+distill_train:null
+null:null
+null:null
+##
+===========================eval_params=========================== 
+eval:../examples/machine_translation/transformer/predict.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --test_file ../examples/machine_translation/transformer/test.en ../examples/machine_translation/transformer/test.de --without_ft --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+null:null
+##
+===========================infer_params===========================
+null:null
+null:null
+norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+quant_export:null
+fpgm_export:null
+distill_export:null
+export1:null
+export2:null
+##
+infer_model:null
+infer_export:null
+infer_quant:null
+inference:../examples/machine_translation/transformer/deploy/python/inference.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --profile --test_file ../examples/machine_translation/transformer/test.en ../examples/machine_translation/transformer/test.de  --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+--device:gpu|cpu
+--use_mkl:True
+--threads:1|6
+--batch_size:32
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
