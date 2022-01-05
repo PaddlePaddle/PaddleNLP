@@ -18,7 +18,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
-from paddlenlp.ops.einsum import *
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -129,21 +128,21 @@ class XLNetRelativeAttention(Layer):
         # Content based attention score (refer to the Transformer-XL paper)
         # q_head = Exi * Wq; self.r_w_bias = u; k_head_h = Wke * Exj
         # a = Exi * Wq * Wke * Exj; c = u * Wke * Exj; ac = a + c
-        ac = einsum("ibnd,jbnd->bnij", q_head + self.r_w_bias, k_head_h)
+        ac = paddle.einsum("ibnd,jbnd->bnij", q_head + self.r_w_bias, k_head_h)
 
         # Position based attention score (refer to the Transformer-XL paper)
         # q_head = Exi * Wq; self.r_r_bias = v; k_head_r = Wkr * Rij
         # b = Exi * Wq * Wkr * Rij; d = v * Wkr * Rij; bd = b + d
-        bd = einsum("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
+        bd = paddle.einsum("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
         bd = self.rel_shift_bnij(bd, klen=ac.shape[3])
 
         # Segment based attention score
         if seg_mat is None:
             ef = 0
         else:
-            ef = einsum('ibnd,snd->ibns', q_head + self.r_s_bias,
-                        self.seg_embed)
-            ef = einsum('ijbs,ibns->bnij', seg_mat, ef)
+            ef = paddle.einsum('ibnd,snd->ibns', q_head + self.r_s_bias,
+                               self.seg_embed)
+            ef = paddle.einsum('ijbs,ibns->bnij', seg_mat, ef)
 
         # Merge attention scores and perform masking
         attn_score = (ac + bd + ef) * self.scale
@@ -161,7 +160,7 @@ class XLNetRelativeAttention(Layer):
             attn_prob = attn_prob * head_mask.transpose([2, 3, 0, 1])
 
         # Attention output
-        attn_vec = einsum("bnij,jbnd->ibnd", attn_prob, v_head_h)
+        attn_vec = paddle.einsum("bnij,jbnd->ibnd", attn_prob, v_head_h)
 
         if output_attentions:
             return attn_vec, attn_prob.transpose([2, 3, 0, 1])
@@ -173,7 +172,7 @@ class XLNetRelativeAttention(Layer):
         # Compute einsum4x4("ibnd,hnd->ibh", attn_vec, self.o)
         shape = attn_vec.shape
         attn_vec = attn_vec.reshape([shape[0], shape[1], -1])
-        attn_out = einsum("ibm,hm->ibh", attn_vec, self.o)
+        attn_out = paddle.einsum("ibm,hm->ibh", attn_vec, self.o)
 
         attn_out = self.dropout(attn_out)
         if residual:
@@ -258,7 +257,8 @@ class XLNetRelativeAttention(Layer):
             # Core attention ops
             if target_mapping is not None:
                 # Compute q_head_g = einsum4x4("mbnd,mlb->lbnd", q_head_g, target_mapping)
-                q_head_g = einsum("mbnd,mlb->lbnd", q_head_g, target_mapping)
+                q_head_g = paddle.einsum("mbnd,mlb->lbnd", q_head_g,
+                                         target_mapping)
                 attn_vec_g = self.rel_attn_core(
                     q_head_g,
                     k_head_h,
@@ -273,8 +273,8 @@ class XLNetRelativeAttention(Layer):
                     attn_vec_g, attn_prob_g = attn_vec_g
 
                 # Compute attn_vec_g = einsum4x4("lbnd,mlb->mbnd", attn_vec_g, target_mapping)
-                attn_vec_g = einsum("lbnd,mlb->mbnd", attn_vec_g,
-                                    target_mapping)
+                attn_vec_g = paddle.einsum("lbnd,mlb->mbnd", attn_vec_g,
+                                           target_mapping)
 
             else:
                 attn_vec_g = self.rel_attn_core(
@@ -781,7 +781,7 @@ class XLNetModel(XLNetPretrainedModel):
     @staticmethod
     def positional_embedding(pos_seq, inv_freq, bsz=None):
         # Compute sinusoid_inp = einsum4x4("i,d->id", pos_seq, inv_freq)
-        sinusoid_inp = einsum("i,d->id", pos_seq, inv_freq)
+        sinusoid_inp = paddle.einsum("i,d->id", pos_seq, inv_freq)
         pos_emb = paddle.concat(
             [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
         pos_emb = paddle.unsqueeze(pos_emb, axis=1)
