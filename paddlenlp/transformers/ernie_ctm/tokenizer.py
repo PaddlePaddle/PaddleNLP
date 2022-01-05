@@ -305,24 +305,3 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 token = token.lower()
             output_tokens.append(token)
         return output_tokens
-
-    def tokenize(self, text, **kwargs):
-        """
-        Converts a string to a list of tokens.
-        
-        Args:
-            text (str):
-                The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import ErnieCtmTokenizer
-                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-        """
-        return self._tokenize(text, **kwargs)
