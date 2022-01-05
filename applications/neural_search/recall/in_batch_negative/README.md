@@ -95,12 +95,16 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
     |—— evaluate.sh # 评估bash版本
     |—— run_build_index.sh # 构建索引bash版本
     |—— train_batch_neg.sh  # 训练bash版本
+    |—— export_to_serving.sh  # Paddle Inference转Serving的bash脚本
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
         |—— deploy.sh # Paddle Inference部署脚本
 |—— inference.py # 动态图抽取向量
-
+|—— export_to_serving.py # 静态图转Serving
+|—— rpc_client.py # Paddle Serving的Client端
+|—— web_service.py # Paddle Serving的 Serving端
+|—— config_nlp.yml # Paddle Serving的配置文件 
 ```
 
 <a name="数据准备"></a>
@@ -446,6 +450,49 @@ sh deploy.sh
 
 [0.959269642829895, 0.04725276678800583]
 ```
+
+### Paddle Serving部署
+
+首先把PaddleInference转换成Serving的格式：
+
+```
+python export_to_serving.py \
+    --params_path "output" \
+    --model_filename "inference.get_pooled_embedding.pdmodel" \
+    --params_filename "inference.get_pooled_embedding.pdiparams" \
+    --server_path "./serving_server" \
+    --client_path "./serving_client"
+
+```
+也可以运行下面的bash脚本：
+```
+sh scripts/export_to_serving.sh
+```
+
+然后启动server:
+
+```
+python web_service.py
+```
+启动客户端调用Server：
+
+```
+python rpc_client.py
+```
+模型的输出为：
+
+```
+{'0': '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据', '1': '试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比'}
+PipelineClient::predict pack_data time:1641385127.5016081
+PipelineClient::predict before time:1641385127.5022466
+['elementwise_div_1']
+(2, 256)
+[[ 0.07830612 -0.14036864  0.03433796 -0.14967982 -0.03386067  0.06630666
+   0.01357943  0.03531194  0.02411093  0.02000859  0.05724002 -0.08119463
+   ......
+```
+
+可以看到客户端发送了2条文本，返回了2个embedding向量
 
 ## Reference
 
