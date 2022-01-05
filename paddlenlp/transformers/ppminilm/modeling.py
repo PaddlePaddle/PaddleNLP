@@ -162,9 +162,11 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
     def to_static(self,
                   output_path,
                   use_faster_tokenizer=True,
-                  is_text_pair=False):
+                  is_text_pair=False,
+                  pad_to_max_seq_len=False):
         self.eval()
         self.use_faster_tokenizer = use_faster_tokenizer
+        self.pad_to_max_seq_len = pad_to_max_seq_len
         # Convert to static graph with specific input description
         if self.use_faster_tokenizer:
             self.add_faster_tokenizer_op()

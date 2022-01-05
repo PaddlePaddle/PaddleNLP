@@ -51,7 +51,8 @@ def ppminilm_forward(self,
         input_ids, token_type_ids = self.tokenizer(
             text=input_ids,
             text_pair=token_type_ids,
-            max_seq_len=self.max_seq_len)
+            max_seq_len=self.max_seq_len,
+            pad_to_max_seq_len=self.pad_to_max_seq_len)
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
