@@ -288,7 +288,7 @@ bash scripts/evaluate.sh
 ```
 
 参数含义说明
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `similar_text_pair`: 由相似文本对构成的评估集
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 

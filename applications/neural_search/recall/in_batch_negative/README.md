@@ -271,7 +271,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 * `hnsw_ef`: hnsw 算法相关参数，保持默认即可
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `recall_num`: 对 1 个文本召回的相似文本数量
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
 
 也可以使用下面的bash脚本：
@@ -474,7 +474,16 @@ sh scripts/export_to_serving.sh
 ```
 python web_service.py
 ```
-启动客户端调用Server：
+
+启动客户端调用 Server。
+
+首先修改需要预测的样本，并把它放入到 feed 字典中：
+
+```
+feed["0"] = "国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据"
+feed["1"] = "试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比"
+```
+然后运行：
 
 ```
 python rpc_client.py
