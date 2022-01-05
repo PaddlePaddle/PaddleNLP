@@ -249,6 +249,12 @@ class Taskflow(object):
         """
         return self.task_instance.help()
 
+    def task_path(self):
+        """
+        Return the path of current task
+        """
+        return self.task_instance._task_path
+
     @staticmethod
     def tasks():
         """

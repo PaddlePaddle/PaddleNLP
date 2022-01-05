@@ -31,13 +31,6 @@ from .utils import Customization
 from .task import Task
 from .models import BiGruCrf
 
-URLS = {
-    "lac_params": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/lac_params.tar.gz",
-        'ee9a3eaba5f74105410410e3c5b28fbc'
-    ],
-}
-
 usage = r"""
            from paddlenlp import Taskflow 
 
@@ -91,55 +84,49 @@ class LacTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "tags": "tag.dic",
+        "q2b": "q2b.dic",
+        "word": "word.dic",
+    }
+    resource_files_urls = {
+        "lac": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/model_state.pdparams", 
+                "3d4008c6c9d29424465829c9acf909bd"
+            ],
+            "tags": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/tag.dic",
+                "b11b616926b9f7f0a40a8087f84a8a99"
+            ],
+            "q2b": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/q2b.dic",
+                "4ef2cd16f8002fe7cd7dd31cdff47e0d"
+            ],
+            "word": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/word.dic",
+                "f1dfc68139bb6dd58c9c4313c341e436"
+            ],
+        }
+    }
+
     def __init__(self, 
                  task, 
                  model,
+                 user_dict=None,
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self._user_dict = self.kwargs[
-            'user_dict'] if 'user_dict' in self.kwargs else None
-        self._model_path = self.kwargs[
-            'user_path'] if 'user_path' in self.kwargs else None
-        if not self._model_path:
-            word_dict_path = download_file(
-                self._task_path, "lac_params" + os.path.sep + "word.dic",
-                URLS['lac_params'][0], URLS['lac_params'][1])
-            q2b_dict_path = download_file(
-                self._task_path, "lac_params" + os.path.sep + "q2b.dic",
-                URLS['lac_params'][0], URLS['lac_params'][1])
-            tag_dict_path = download_file(
-                self._task_path, "lac_params" + os.path.sep + "tag.dic",
-                URLS['lac_params'][0], URLS['lac_params'][1])
-        else:
-            self._task_path = self._model_path
-            word_dict_path = os.path.join(self._task_path, "word.dic")
-            tag_dict_path = os.path.join(self._task_path, "tag.dic")
-            q2b_dict_path = os.path.join(self._task_path, "q2b.dic")
-        self._word_vocab = load_vocab(word_dict_path)
-        self._tag_vocab = load_vocab(tag_dict_path)
-        self._q2b_vocab = load_vocab(q2b_dict_path)
-        self._id2word_dict = dict(
-            zip(self._word_vocab.values(), self._word_vocab.keys()))
-        self._id2tag_dict = dict(
-            zip(self._tag_vocab.values(), self._tag_vocab.keys()))
-
-        if not self._model_path:
-            self._get_inference_model()
-        else:
-            self._load_custom_model(self._model_path)
+        self._user_dict = user_dict
+        self._check_task_files()
+        self._construct_vocabs()
+        self._get_inference_model()
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
-
-    def _load_custom_model(self, task_path):
-        """
-        Load custom model from the path specified by the user.
-        """
-        self._params_path = os.path.join(self._task_path, "model.pdparams")
-        self._get_inference_model(self._params_path)
 
     def _construct_input_spec(self):
         """
@@ -152,20 +139,32 @@ class LacTask(Task):
                 shape=[None], dtype="int64", name='length')
         ]
 
+    def _construct_vocabs(self):
+        word_dict_path = os.path.join(self._task_path, "word.dic")
+        tag_dict_path = os.path.join(self._task_path, "tag.dic")
+        q2b_dict_path = os.path.join(self._task_path, "q2b.dic")
+        self._word_vocab = load_vocab(word_dict_path)
+        self._tag_vocab = load_vocab(tag_dict_path)
+        self._q2b_vocab = load_vocab(q2b_dict_path)
+        self._id2word_dict = dict(
+            zip(self._word_vocab.values(), self._word_vocab.keys()))
+        self._id2tag_dict = dict(
+            zip(self._tag_vocab.values(), self._tag_vocab.keys()))
+
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
         model_instance = BiGruCrf(self.kwargs['emb_dim'],
                                   self.kwargs['hidden_size'],
-                                  len(self._word_vocab), len(self._tag_vocab))
-        if not self._params_path:
-            # Load the model parameter for the predict
-            state_dict = paddle.load(
-                os.path.join(self._task_path, "lac_params", "model.pdparams"))
-            model_instance.set_dict(state_dict)
-            model_instance.eval()
+                                  len(self._word_vocab), 
+                                  len(self._tag_vocab))
+        # Load the model parameter for the predict
+        state_dict = paddle.load(
+            os.path.join(self._task_path, "model_state.pdparams"))
+        model_instance.set_dict(state_dict)
         self._model = model_instance
+        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """

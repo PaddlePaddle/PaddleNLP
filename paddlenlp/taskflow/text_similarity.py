@@ -81,12 +81,6 @@ class TextSimilarityTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = BertTokenizer.from_pretrained(model)
-    
-    def _load_custom_model(self, task_path):
-        """
-        Load custom model from the path specified by the user.
-        """
-        return None
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]

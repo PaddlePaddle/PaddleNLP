@@ -106,25 +106,6 @@ LABEL_TO_SCHEMA = {
     "汉语拼音": ["汉语拼音"],
 }
 
-URLS = {
-    "TermTree.V1.0": [
-        "https://bj.bcebos.com/kg-concept/TermTree/TermTree.V1.0.tar.gz",
-        "3514221be5017b3b4349daa6435f7b5e"
-    ],
-    "termtree_type": [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/termtree_type.csv",
-        "062cb9ac24f4135bf836e2a2fc5a1209"
-    ],
-    "termtree_tags_pos": [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/termtree_tags_pos.txt",
-        "87db06ae6ca42565157045ab3e9a996f"
-    ],
-    "name_category_map.json": [
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/name_category_map.json",
-        "c60810205993d307d919a26a3b96786f",
-    ],
-}
-
 usage = r"""
           from paddlenlp import Taskflow 
 
@@ -174,50 +155,59 @@ class WordTagTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
 
     """
+
+    resource_files_names = {
+        "model_state": "model_state.pdparms",
+        "termtree_schema": "termtree_type.csv",
+        "termtree_data": "termtree_data",
+        "tags": "tags.txt",
+    }
+    resource_files_urls = {
+        "wordtag": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
+                "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "termtree_schema": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
+                "062cb9ac24f4135bf836e2a2fc5a1209"       
+            ],
+            "termtree_data": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_data",
+                "a0efe723f84cf90540ac727be5b62e59"
+            ],
+            "tags": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
+                "87db06ae6ca42565157045ab3e9a996f"
+            ],
+        }
+    }
+
     def __init__(self, 
                  model, 
                  task,
                  batch_size=1,
-                 model_path=None,
+                 params_path=None,
+                 tag_path=None,
                  term_schema_path=None,
                  term_data_path=None,
                  user_dict=None,
                  linking=True,
                  **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._model_path = model_path
+        self._tag_path = tag_path
+        self._params_path = params_path
         self._term_schema_path = term_schema_path
         self._term_data_path = term_data_path
         self._user_dict = user_dict
         self._linking = linking
-        if not self._model_path:
-            self._tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
-                                     URLS['termtree_tags_pos'][0],
-                                     URLS['termtree_tags_pos'][1])
-        else:
-            self._task_path = self._model_path
-            self._tag_path = os.path.join(self._task_path, "tags.txt")
-        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
-
+        self._check_task_files()
+        self._load_task_resources()
         self._construct_tokenizer(model)
-        if self._term_schema_path is None:
-            term_schema_path = download_file(self._task_path, "termtree_type.csv",
-                                            URLS['termtree_type'][0],
-                                            URLS['termtree_type'][1])
-        if self._term_data_path is None:
-            term_data_path = download_file(self._task_path, "TermTree.V1.0",
-                                        URLS['TermTree.V1.0'][0],
-                                        URLS['TermTree.V1.0'][1])
-        if self._linking is True:
-            self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
-                                            self._linking)
         self._usage = usage
         self._summary_num = 2
+        self._get_inference_model()
 
-        if not self._model_path:
-            self._get_inference_model()
-        else:
-            self._load_custom_model(self._model_path)
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -253,6 +243,20 @@ class WordTagTask(Task):
                 i += 1
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
         return tags_to_idx, idx_to_tags, all_tags
+
+    def _load_task_resources(self):
+        if self._tag_path is None:
+            self._tag_path = os.path.join(self._task_path, "tags.txt")
+        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
+        if self._term_schema_path is None:
+            self._term_schema_path = os.path.join(self._task_path, "termtree_type.csv")
+        if self._term_data_path is None:
+            self._term_data_path = os.path.join(self._task_path, "termtree_data")
+        if self._linking is True:
+            self._termtree = TermTree.from_dir(
+                self._term_schema_path, 
+                self._term_data_path,
+                self._linking)
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -508,8 +512,14 @@ class WordTagTask(Task):
         config_keys = ErnieCtmWordtagModel.pretrained_init_configuration[
             self.model]
         self.kwargs.update(config_keys)
-        model_instance.eval()
+        if self._params_path is None:
+            model_path = os.path.join(self._task_path, "model_state.pdparams")
+        else:
+            model_path = self._params_path
+        state_dict = paddle.load(model_path)
+        model_instance.set_dict(state_dict)
         self._model = model_instance
+        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """
@@ -527,13 +537,6 @@ class WordTagTask(Task):
         inputs = self._check_input_text(inputs)
         outputs = self._preprocess_text(inputs)
         return outputs
-
-    def _load_custom_model(self, task_path):
-        """
-        Load custom model from the path specified by the user.
-        """
-        self._params_path = os.path.join(self._task_path, "model.pdparams")
-        self._get_inference_model(self._params_path)
 
     def _run_model(self, inputs):
         """
@@ -575,6 +578,24 @@ class NPTagTask(Task):
         batch_size(int): Numbers of examples a batch.
         linking(bool): Returns the categories. If `linking` is True, the fine-grained label (label) will link with the coarse-grained label (category).
     """
+
+    resource_files_names = {
+        "model_state": "model_state.pdparms",
+        "name_category_map": "name_category_map.json",
+    }
+    resource_files_urls = {
+        "nptag": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_state.pdparams",
+                "05ed1906b42126d3e04b4ac5c210b010"
+            ],
+            "name_category_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/",
+                "c60810205993d307d919a26a3b96786f"       
+            ],
+        }
+    }
+
     def __init__(self,
                  task,
                  model,
@@ -708,19 +729,16 @@ class NPTagTask(Task):
                                     name="token_type_ids"),  # token_type_ids
         ]
 
-    def _load_custom_model(self, task_path):
-        """
-        Load custom model from the path specified by the user.
-        """
-        return None
-
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
         model_instance = ErnieCtmNptagModel.from_pretrained(model)
-        model_instance.eval()
+        model_path = os.path.join(self._task_path, "model_state.pdparams")
+        state_dict = paddle.load(model_path)
+        model_instance.set_dict(state_dict)
         self._model = model_instance
+        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """

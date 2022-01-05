@@ -54,6 +54,23 @@ class NERTask(WordTagTask):
 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparms",
+        "tags": "tags.txt",
+    }
+    resource_files_urls = {
+        "wordtag": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
+                "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "tags": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
+                "87db06ae6ca42565157045ab3e9a996f"
+            ],
+        }
+    }
+
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         if self._user_dict:
