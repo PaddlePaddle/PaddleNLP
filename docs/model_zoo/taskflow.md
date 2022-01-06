@@ -113,7 +113,7 @@ my_seg("平原上的火焰计划于年末上映")
 
 用户可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
-通过`task_path`定义用户自定义路径，文件组成：
+通过`task_path`指定用户自定义路径，文件组成：
 ```text
 custom_task_path/
 ├── model_state.pdparams
@@ -133,7 +133,7 @@ my_seg = Taskflow("word_segmentation", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义任务路径，默认为None。
+* `task_path`：自定义模型路径，默认为None。
 
 ### 词性标注
 
