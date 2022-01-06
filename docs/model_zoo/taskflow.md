@@ -5,18 +5,18 @@
     - [任务清单](#任务清单)
   - [用法](#用法)
     - [查看使用示例](#查看使用示例)
-    - [中文分词](#1.中文分词)
-    - [词性标注](#2.词性标注)
-    - [命名实体识别](#3.命名实体识别)
-    - [文本纠错](#4.文本纠错)
-    - [句法分析](#5.句法分析)
-    - [情感分析](#6.情感分析)
+    - [中文分词](#1、中文分词)
+    - [词性标注](#2、词性标注)
+    - [命名实体识别](#3、命名实体识别)
+    - [文本纠错](#4、文本纠错)
+    - [句法分析](#5、句法分析)
+    - [情感分析](#6、情感分析)
     - [文本相似度](#7.文本相似度)
-    - [『解语』- 词类知识标注](#8.『解语』- 词类知识标注)
-    - [『解语』- 名词短语标注](#9.『解语』- 名词短语标注)
-    - [生成式问答](#10.生成式问答)
-    - [智能写诗](#11.智能写诗)
-    - [开放域对话](#12.开放域对话)
+    - [『解语』-词类知识标注](#8、『解语』-词类知识标注)
+    - [『解语』-名词短语标注](#9、『解语』-名词短语标注)
+    - [生成式问答](#10、生成式问答)
+    - [智能写诗](#11、智能写诗)
+    - [开放域对话](#12、开放域对话)
   - [FAQ](#FAQ)
 
 ## 介绍
@@ -34,8 +34,8 @@
 | 句法分析 | 自动对联(TODO) |
 | 情感分析 |  |
 | 文本相似度 |  |
-| 『解语』- 词类知识标注 |  |
-| 『解语』- 名词短语标注 |  |
+| 『解语』-词类知识标注 |  |
+| 『解语』-名词短语标注 |  |
 
 随着版本迭代会持续开放更多的应用场景。
 
@@ -69,7 +69,7 @@ seg.help()
         '''
 ```
 
-### 1.中文分词
+### 1、中文分词
 
 ```python
 from paddlenlp import Taskflow
@@ -135,7 +135,7 @@ my_seg = Taskflow("word_segmentation", task_path="./custom_task/")
 * `user_dict`：用户自定义词典文件，默认为None。
 * `task_path`：自定义任务路径，默认为None。
 
-### 2.词性标注
+### 2、词性标注
 
 ```python
 from paddlenlp import Taskflow
@@ -215,7 +215,7 @@ my_tag = Taskflow("pos_tagging", task_path="./custom_task/")
 * `user_dict`：用户自定义词典文件，默认为None。
 * `task_path`：自定义任务路径，默认为None。
 
-### 3.命名实体识别
+### 3、命名实体识别
 
 ```python
 from paddlenlp import Taskflow
@@ -282,7 +282,7 @@ my_ner = Taskflow("ner", task_path="./custom_task/")
 * `user_dict`：用户自定义词典文件，默认为None。
 * `task_path`：自定义任务路径，默认为None。
 
-### 4.文本纠错
+### 4、文本纠错
 
 ```python
 from paddlenlp import Taskflow
@@ -300,7 +300,7 @@ corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇�
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 
-### 5.句法分析
+### 5、句法分析
 
 未分词输入:
 
@@ -379,7 +379,7 @@ cv2.imwrite('test.png', result)
 * `return_visual`：是否返回句法树的可视化结果，默认为False。
 
 
-### 6.情感分析
+### 6、情感分析
 
 ```python
 from paddlenlp import Taskflow
@@ -402,7 +402,7 @@ senta("作为老的四星酒店，房间依然很整洁，相当不错。机场�
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，可选有`bilstm`和`skep_ernie_1.0_large_ch`。
 
-### 7.文本相似度
+### 7、文本相似度
 
 ```python
 from paddlenlp import Taskflow
@@ -420,7 +420,7 @@ similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找�
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：最大序列长度，默认为128。
 
-### 8.『解语』- 词类知识标注
+### 8、『解语』-词类知识标注
 
 ```python
 from paddlenlp import Taskflow
@@ -493,7 +493,7 @@ my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task/")
 * `task_path`：自定义任务路径，默认为None。
 * `user_dict`：用户自定义词典文件，默认为None。
 
-### 9.『解语』- 名词短语标注
+### 9、『解语』-名词短语标注
 
 ```python
 from paddlenlp import Taskflow
@@ -517,7 +517,7 @@ nptag(["糖醋排骨", "红曲霉菌"])
 * `max_seq_len`：最大序列长度，默认为64。
 * `linking`：实现与WordTag类别标签的linking，默认为False。
 
-### 10.生成式问答
+### 10、生成式问答
 
 ```python
 from paddlenlp import Taskflow
@@ -534,7 +534,7 @@ qa(["中国国土面积有多大？", "中国的首都在哪里？"])
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 
-### 11.智能写诗
+### 11、智能写诗
 
 ```python
 from paddlenlp import Taskflow
@@ -551,7 +551,7 @@ poetry(["林密不见人", "举头邀明月"])
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 
-### 12.开放域对话
+### 12、开放域对话
 
 非交互模式：
 ```python
