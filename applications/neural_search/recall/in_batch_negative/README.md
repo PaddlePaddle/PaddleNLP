@@ -453,7 +453,7 @@ sh deploy.sh
 
 ### Paddle Serving部署
 
-首先把PaddleInference转换成Serving的格式：
+首先把静态图模型转换成Serving的格式：
 
 ```
 python export_to_serving.py \
@@ -461,7 +461,8 @@ python export_to_serving.py \
     --model_filename "inference.get_pooled_embedding.pdmodel" \
     --params_filename "inference.get_pooled_embedding.pdiparams" \
     --server_path "./serving_server" \
-    --client_path "./serving_client"
+    --client_path "./serving_client" \
+    --fetch_alias_names "output_embed"
 
 ```
 也可以运行下面的bash脚本：
@@ -492,9 +493,9 @@ python rpc_client.py
 
 ```
 {'0': '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据', '1': '试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比'}
-PipelineClient::predict pack_data time:1641385127.5016081
-PipelineClient::predict before time:1641385127.5022466
-['elementwise_div_1']
+PipelineClient::predict pack_data time:1641450851.3752182
+PipelineClient::predict before time:1641450851.375738
+['output_embed']
 (2, 256)
 [[ 0.07830612 -0.14036864  0.03433796 -0.14967982 -0.03386067  0.06630666
    0.01357943  0.03531194  0.02411093  0.02000859  0.05724002 -0.08119463

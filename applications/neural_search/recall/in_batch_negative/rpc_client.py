@@ -30,9 +30,7 @@ feed["0"] = "国有企业引入非国有资本对创新绩效的影响——基�
 feed["1"] = "试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比"
 print(feed)
 ret = client.predict(feed_dict=feed, fetch=["res"])
-
-# print(ret.value)
-result=np.array(eval(ret.value[0]))
+result = np.array(eval(ret.value[0]))
 print(ret.key)
 print(result.shape)
 print(result)

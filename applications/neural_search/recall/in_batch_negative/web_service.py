@@ -17,6 +17,7 @@ import numpy as np
 import sys
 _LOGGER = logging.getLogger()
 
+
 def convert_example(example,
                     tokenizer,
                     max_seq_length=512,
@@ -32,10 +33,12 @@ def convert_example(example,
         result += [input_ids, token_type_ids]
     return result
 
+
 class BertOp(Op):
     def init_op(self):
         import paddlenlp as ppnlp
-        self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+        self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+            'ernie-1.0')
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
@@ -43,10 +46,10 @@ class BertOp(Op):
         (_, input_dict), = input_dicts.items()
         print("input dict", input_dict)
         batch_size = len(input_dict.keys())
-        feed_res = []
         examples = []
         for i in range(batch_size):
-            input_ids, segment_ids = convert_example([input_dict[str(i)]], self.tokenizer)
+            input_ids, segment_ids = convert_example(
+                [input_dict[str(i)]], self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # input
@@ -54,22 +57,23 @@ class BertOp(Op):
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
         feed_dict = {}
-        feed_dict['input_ids']=input_ids
-        feed_dict['token_type_ids']=segment_ids
+        feed_dict['input_ids'] = input_ids
+        feed_dict['token_type_ids'] = segment_ids
         return feed_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         new_dict = {}
-        new_dict["elementwise_div_1"] = str(fetch_dict["elementwise_div_1"].tolist())
+        new_dict["output_embed"] = str(
+            fetch_dict["output_embed"].tolist())
         return new_dict, None, ""
 
 
 class BertService(WebService):
     def get_pipeline_response(self, read_op):
-        bert_op = BertOp(name="bert", input_ops=[read_op])
+        bert_op = BertOp(name="model", input_ops=[read_op])
         return bert_op
 
 
-bert_service = BertService(name="bert")
+bert_service = BertService(name="model")
 bert_service.prepare_pipeline_config("config_nlp.yml")
 bert_service.run_service()
