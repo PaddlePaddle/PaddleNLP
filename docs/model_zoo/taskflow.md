@@ -115,11 +115,11 @@ my_seg("平原上的火焰计划于年末上映")
 
 通过`task_path`定义用户自定义路径，文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── model_state.pdparams
 ├── word.dict
 ├── tag.dic
-└── q2b.dic 
+└── q2b.dic
 ```
 
 使用Taskflow加载自定义模型进行一键预测：
@@ -195,7 +195,7 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 
 通过`task_path`定义用户自定义路径，文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── model_state.pdparams
 ├── word.dict
 ├── tag.dic
@@ -263,7 +263,7 @@ my_ner("《长津湖》收尾，北美是最大海外票仓")
 
 通过`task_path`定义用户自定义路径，文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── model_state.pdparams
 └── tags.txt
 ```
@@ -470,7 +470,7 @@ my_wordtag("《长津湖》收尾，北美是最大海外票仓")
 
 通过`task_path`定义用户自定义路径，文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── model_state.pdparams
 ├── model_config.json
 ├── tags.txt
