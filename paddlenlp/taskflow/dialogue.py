@@ -108,12 +108,6 @@ class DialogueTask(Task):
             paddle.static.InputSpec(
                 shape=[None], dtype="int64", name='token_type_ids'),
         ]
-        
-    def _load_custom_model(self, task_path):
-        """
-        Load custom model from the path specified by the user.
-        """
-        return None
 
     def _construct_model(self, model):
         """
