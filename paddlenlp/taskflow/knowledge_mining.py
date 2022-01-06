@@ -594,7 +594,7 @@ class NPTagTask(Task):
                 "17c9e5216abfc9bd94c7586574a3cbc4"
             ],
             "name_category_map": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/name_category_map.json",
                 "c60810205993d307d919a26a3b96786f"       
             ],
         }

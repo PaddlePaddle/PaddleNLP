@@ -70,7 +70,7 @@ Taskflow支持使用自定义TermTree实现自定义Term-Linking，该示例中"
 
 通过`task_path`定义用户自定义路径，文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── termtree_type.csv
 └── termtree_data
 ```

@@ -123,7 +123,7 @@ Taskflow支持加载增量训练后的模型进行一键预测，通过`task_pat
 
 文件组成：
 ```text
-custom_task/
+custom_task_path/
 ├── model_state.pdparams
 ├── model_config.json
 └── tags.txt

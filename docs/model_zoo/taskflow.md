@@ -109,7 +109,7 @@ my_seg("平原上的火焰计划于年末上映")
 >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
 ```
 
-#### 任务定制化
+#### 自定义模型
 
 用户可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
@@ -189,7 +189,7 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
 ```
 
-#### 任务定制化
+#### 自定义模型
 
 用户可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
@@ -213,7 +213,7 @@ my_tag = Taskflow("pos_tagging", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义任务路径，默认为None。
+* `task_path`：自定义模型路径，默认为None。
 
 ### 命名实体识别
 
@@ -257,7 +257,7 @@ my_ner("《长津湖》收尾，北美是最大海外票仓")
 >>> [('《', 'w'), ('长津湖', '电影类_实体'), ('》', 'w'), ('收', '词汇用语'), ('尾', '术语类'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最', '修饰词'), ('大', '修饰词'), ('海外票仓', '场所类')]
 ```
 
-#### 任务定制化
+#### 自定义模型
 
 用户可以使用自己的数据训练自定义NER模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 
@@ -280,7 +280,7 @@ my_ner = Taskflow("ner", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义任务路径，默认为None。
+* `task_path`：自定义模型路径，默认为None。
 
 ### 文本纠错
 
@@ -463,7 +463,7 @@ my_wordtag("《长津湖》收尾，北美是最大海外票仓")
 >>> [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '电影类_实体', 'length': 3}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收', 'offset': 5, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '尾', 'offset': 6, 'wordtag_label': '术语类', 'length': 1, 'termid': '动物体构造_cb_动物尾巴'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1}, {'item': '大', 'offset': 12, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_大'}, {'item': '海外票仓', 'offset': 13, 'wordtag_label': '场所类', 'length': 4}]}]
 ```
 
-#### 任务定制化
+#### 自定义模型
 
 用户可以使用自己的数据训练自定义NER模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 除了自定义模型，Taskflow还支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking。
@@ -490,7 +490,7 @@ my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `linking`：实现基于词类的linking，默认为True。
-* `task_path`：自定义任务路径，默认为None。
+* `task_path`：自定义模型路径，默认为None。
 * `user_dict`：用户自定义词典文件，默认为None。
 
 ### 知识挖掘-名词短语标注
