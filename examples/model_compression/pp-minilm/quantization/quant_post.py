@@ -18,12 +18,14 @@ import os
 import time
 import argparse
 from functools import partial
+import distutils.util
 
 import paddle
-
 import paddleslim
+
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import PPMiniLMTokenizer
 
 sys.path.append("../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
@@ -72,6 +74,14 @@ parser.add_argument(
     type=int,
     help="The maximum total input sequence length after tokenization. Sequences longer "
     "than this will be truncated, sequences shorter will be padded.", )
+
+parser.add_argument(
+    "--use_faster_tokenizer",
+    type=distutils.util.strtobool,
+    default=True,
+    help="Whether to use FasterTokenizer to accelerate training or further inference."
+)
+
 parser.add_argument(
     "--model_name_or_path",
     default='ppminilm-6l-768h',
@@ -87,15 +97,33 @@ def quant_post(args, batch_size=8, algo='avg'):
     args.task_name = args.task_name.lower()
 
     dev_ds = load_dataset("clue", args.task_name, splits="dev")
-    trans_func = partial(
-        get_example_for_faster_tokenizer,
-        label_list=dev_ds.label_list,
-        max_seq_len=args.max_seq_length)
-
+    if args.use_faster_tokenizer:
+        trans_func = partial(
+            get_example_for_faster_tokenizer,
+            label_list=dev_ds.label_list,
+            max_seq_len=args.max_seq_length)
+    else:
+        tokenizer = PPMiniLMTokenizer.from_pretrained("ppminilm-6l-768h")
+        trans_func = partial(
+            convert_example,
+            tokenizer=tokenizer,
+            label_list=dev_ds.label_list,
+            max_seq_length=128,
+            is_test=True)
     dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_sampler = paddle.io.BatchSampler(dataset=dev_ds, batch_size=batch_size)
 
     def batch_generator_func():
+        batch_data = [[], []]
+        for data in dev_ds:
+            batch_data[0].append(data[0])
+            batch_data[1].append(data[1])
+            if len(batch_data[0]) == batch_size:
+                input_ids = Pad(axis=0, pad_val=0)(batch_data[0])
+                segment_ids = Pad(axis=0, pad_val=0)(batch_data[1])
+                yield [input_ids, segment_ids]
+                batch_data = [[], []]
+
+    def batch_generator_func_using_faster_tokenizer():
         if 'sentence' in dev_ds[0]:
             batch_data = []
         else:
@@ -124,7 +152,10 @@ def quant_post(args, batch_size=8, algo='avg'):
         save_params_filename=args.save_params_filename,
         algo=algo,
         hist_percent=0.9999,
-        data_loader=batch_generator_func,
+        batch_generator=batch_generator_func
+        if not args.use_faster_tokenizer else None,
+        data_loader=batch_generator_func_using_faster_tokenizer
+        if args.use_faster_tokenizer else None,
         model_filename=args.input_model_filename,
         params_filename=args.input_param_filename,
         quantizable_op_type=['matmul', 'matmul_v2'],
