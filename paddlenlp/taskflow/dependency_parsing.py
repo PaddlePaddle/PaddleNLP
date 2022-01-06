@@ -151,7 +151,7 @@ class DDParserTask(Task):
 
         self.use_cuda = use_cuda
         self.lac = LAC(mode="lac" if self.use_pos else "seg",
-                    use_cuda=self.use_cuda)
+                       use_cuda=self.use_cuda)
         if self.static_mode:
             self._get_inference_model()
         else:
@@ -161,7 +161,7 @@ class DDParserTask(Task):
         inputs = inputs[0]
         if not all([isinstance(i, list) and i and all(i) for i in inputs]):
             raise TypeError("Invalid input format.")
-        return inputs    
+        return inputs
 
     def from_segments(self, segmented_words):
         segmented_words = self._check_segmented_words(segmented_words)
@@ -212,8 +212,7 @@ class DDParserTask(Task):
         for text in inputs['words']:
             example = {"FORM": text}
             example = convert_example(
-                example,
-                vocabs=[self.word_vocab, self.rel_vocab])
+                example, vocabs=[self.word_vocab, self.rel_vocab])
             examples.append(example)
 
         batches = [
@@ -252,7 +251,7 @@ class DDParserTask(Task):
         inputs = self._check_input_text(inputs)
         while position < len(inputs):
             lac_results += self.lac.run(inputs[position:position +
-                                            self.batch_size])
+                                               self.batch_size])
             position += self.batch_size
 
         if not self.use_pos:

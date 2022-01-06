@@ -165,12 +165,10 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(
-                    args.save_dir, "model_%d" % global_step)
+                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                save_param_path = os.path.join(
-                    save_dir, 'model_state.pdparams')
+                save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 

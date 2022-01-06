@@ -104,7 +104,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— export_to_serving.py # 静态图转Serving
 |—— rpc_client.py # Paddle Serving的Client端
 |—— web_service.py # Paddle Serving的 Serving端
-|—— config_nlp.yml # Paddle Serving的配置文件 
+|—— config_nlp.yml # Paddle Serving的配置文件
 ```
 
 <a name="数据准备"></a>

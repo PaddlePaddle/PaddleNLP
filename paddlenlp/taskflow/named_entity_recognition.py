@@ -82,7 +82,8 @@ class NERTask(WordTagTask):
                     partial_word = sent[ind]
                     tags_out.append(tag.split('-')[1])
                     continue
-                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith(
+                        "O"):
                     sent_out.append(partial_word)
                     tags_out.append(tag.split('-')[1])
                     partial_word = sent[ind]

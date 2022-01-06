@@ -35,6 +35,7 @@ usage = r"""
          '''
          """
 
+
 class TextSimilarityTask(Task):
     """
     Text similarity task using SimBERT to predict the similarity of sentence pair.
@@ -44,12 +45,7 @@ class TextSimilarityTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    def __init__(self, 
-                 task, 
-                 model, 
-                 batch_size=1,
-                 max_seq_len=128,
-                 **kwargs):
+    def __init__(self, task, model, batch_size=1, max_seq_len=128, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._construct_tokenizer(model)
@@ -81,13 +77,12 @@ class TextSimilarityTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = BertTokenizer.from_pretrained(model)
-    
+
     def _check_input_text(self, inputs):
         inputs = inputs[0]
         if not all([isinstance(i, list) and i \
             and all(i) and len(i) == 2 for i in inputs]):
-            raise TypeError(
-                "Invalid input format.")
+            raise TypeError("Invalid input format.")
         return inputs
 
     def _preprocess(self, inputs):
@@ -106,7 +101,7 @@ class TextSimilarityTask(Task):
 
         for data in inputs:
             text1, text2 = data[0], data[1]
-            
+
             text1_encoded_inputs = self._tokenizer(
                 text=text1, max_seq_len=self._max_seq_len)
             text1_input_ids = text1_encoded_inputs["input_ids"]
@@ -116,9 +111,9 @@ class TextSimilarityTask(Task):
                 text=text2, max_seq_len=self._max_seq_len)
             text2_input_ids = text2_encoded_inputs["input_ids"]
             text2_token_type_ids = text2_encoded_inputs["token_type_ids"]
-            
-            examples.append((text1_input_ids, text1_token_type_ids, 
-                text2_input_ids, text2_token_type_ids))
+
+            examples.append((text1_input_ids, text1_token_type_ids,
+                             text2_input_ids, text2_token_type_ids))
 
         batches = [
             examples[idx:idx + self._batch_size]
@@ -145,7 +140,8 @@ class TextSimilarityTask(Task):
         results = []
         with static_mode_guard():
             for batch in inputs['data_loader']:
-                text1_ids, text1_segment_ids, text2_ids, text2_segment_ids = self._batchify_fn(batch)
+                text1_ids, text1_segment_ids, text2_ids, text2_segment_ids = self._batchify_fn(
+                    batch)
                 self.input_handles[0].copy_from_cpu(text1_ids)
                 self.input_handles[1].copy_from_cpu(text1_segment_ids)
                 self.predictor.run()
@@ -156,10 +152,10 @@ class TextSimilarityTask(Task):
                 self.predictor.run()
                 vecs_text2 = self.output_handle[1].copy_to_cpu()
 
-                vecs_text1 = vecs_text1 / (vecs_text1**2).sum(axis=1,
-                                                            keepdims=True)**0.5
-                vecs_text2 = vecs_text2 / (vecs_text2**2).sum(axis=1,
-                                                            keepdims=True)**0.5
+                vecs_text1 = vecs_text1 / (vecs_text1**2).sum(
+                    axis=1, keepdims=True)**0.5
+                vecs_text2 = vecs_text2 / (vecs_text2**2).sum(
+                    axis=1, keepdims=True)**0.5
                 similarity = (vecs_text1 * vecs_text2).sum(axis=1)
                 results.extend(similarity)
         inputs['result'] = results

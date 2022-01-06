@@ -76,7 +76,7 @@ def predict(ext_model,
         predictions = logits.argmax(axis=2).numpy()[0]
         tag_seq = [ext_id2label[idx] for idx in predictions][1:-1]
 
-        aps = decoding(input_text[:max_seq_len-2], tag_seq)
+        aps = decoding(input_text[:max_seq_len - 2], tag_seq)
 
         # predict sentiment for aspect with cls_model
         results = []

@@ -457,7 +457,7 @@ poetry(["林密不见人", "举头邀明月"])
 
 非交互模式：
 ```python
-from paddlenlp import Taskflow 
+from paddlenlp import Taskflow
 
 dialogue = Taskflow("dialogue")
 dialogue(["吃饭了吗"])

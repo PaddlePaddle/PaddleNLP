@@ -27,9 +27,7 @@ from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {
-    "gpt": (GPTForPretraining, GPTTokenizer),
-}
+MODEL_CLASSES = {"gpt": (GPTForPretraining, GPTTokenizer), }
 
 # yapf: disable
 parser = argparse.ArgumentParser()

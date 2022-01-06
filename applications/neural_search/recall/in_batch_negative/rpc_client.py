@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import yaml
-import requests
-import time
-import json
 from paddle_serving_server.pipeline import PipelineClient
 import numpy as np
 

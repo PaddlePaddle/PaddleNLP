@@ -32,7 +32,7 @@ from .task import Task
 
 URLS = {
     "bilstm_vocab": [
-        "https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt", 
+        "https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt",
         "df714f0bfd6d749f88064679b4c97fd5"
     ],
     "bilstm": [
@@ -206,7 +206,8 @@ class SentaTask(Task):
         This function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label
@@ -333,7 +334,8 @@ class SkepTask(Task):
         The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label

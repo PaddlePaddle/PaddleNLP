@@ -34,7 +34,7 @@ def convert_example(example,
     return result
 
 
-class BertOp(Op):
+class ErnieOp(Op):
     def init_op(self):
         import paddlenlp as ppnlp
         self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
@@ -48,8 +48,8 @@ class BertOp(Op):
         batch_size = len(input_dict.keys())
         examples = []
         for i in range(batch_size):
-            input_ids, segment_ids = convert_example(
-                [input_dict[str(i)]], self.tokenizer)
+            input_ids, segment_ids = convert_example([input_dict[str(i)]],
+                                                     self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # input
@@ -63,17 +63,16 @@ class BertOp(Op):
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         new_dict = {}
-        new_dict["output_embed"] = str(
-            fetch_dict["output_embed"].tolist())
+        new_dict["output_embed"] = str(fetch_dict["output_embed"].tolist())
         return new_dict, None, ""
 
 
-class BertService(WebService):
+class ErnieService(WebService):
     def get_pipeline_response(self, read_op):
-        bert_op = BertOp(name="model", input_ops=[read_op])
-        return bert_op
+        ernie_op = ErnieOp(name="model", input_ops=[read_op])
+        return ernie_op
 
 
-bert_service = BertService(name="model")
-bert_service.prepare_pipeline_config("config_nlp.yml")
-bert_service.run_service()
+ernie_service = ErnieService(name="model")
+ernie_service.prepare_pipeline_config("config_nlp.yml")
+ernie_service.run_service()

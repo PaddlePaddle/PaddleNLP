@@ -83,7 +83,7 @@ def predict_ext(ext_model_path, ext_label_path, test_path, max_seq_len):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text[:max_seq_len-2], tag_seq)
+            aps = decoding(text[:max_seq_len - 2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
