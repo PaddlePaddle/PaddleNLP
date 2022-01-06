@@ -127,7 +127,7 @@ custom_task/
 ```python
 from paddlenlp import Taskflow
 
-my_seg = Taskflow("word_segmentation", task_path="./custom_task/")
+my_seg = Taskflow("word_segmentation", task_path="./custom_task_path/")
 ```
 #### 可配置参数说明
 
@@ -207,7 +207,7 @@ custom_task/
 ```python
 from paddlenlp import Taskflow
 
-my_tag = Taskflow("pos_tagging", task_path="./custom_task/")
+my_tag = Taskflow("pos_tagging", task_path="./custom_task_path/")
 ```
 #### 可配置参数说明
 
@@ -273,7 +273,7 @@ custom_task/
 ```python
 from paddlenlp import Taskflow
 
-my_ner = Taskflow("ner", task_path="./custom_task/")
+my_ner = Taskflow("ner", task_path="./custom_task_path/")
 ```
 
 #### 可配置参数说明
@@ -483,7 +483,7 @@ custom_task/
 ```python
 from paddlenlp import Taskflow
 
-my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task/")
+my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")
 ```
 
 #### 可配置参数说明

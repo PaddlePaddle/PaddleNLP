@@ -80,7 +80,7 @@ custom_task/
 ```python
 from paddlenlp import Taskflow
 
-wordtag = Taskflow("knowledge_mining", task_path="./custom_task/")
+wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")
 
 wordtag("《平原上的火焰》是今年新上映的电影")
 # [{'text': '《平原上的火焰》是今年新上映的电影', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '平原上的火焰', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 6, 'termid': '影视作品_eb_平原上的火焰'}, {'item': '》', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 8, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '今年', 'offset': 9, 'wordtag_label': '时间类', 'length': 2, 'termid': '时间阶段_cb_今年'}, {'item': '新', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_新'}, {'item': '上映', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_上映'}, {'item': '的', 'offset': 14, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '电影', 'offset': 15, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]
