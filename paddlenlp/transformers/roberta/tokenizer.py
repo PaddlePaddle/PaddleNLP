@@ -17,7 +17,7 @@ import os
 import json
 from paddle.utils import try_import
 
-from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer
+from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer, AddedToken
 from ..gpt.tokenizer import bytes_to_unicode
 
 __all__ = ['RobertaTokenizer']
@@ -154,7 +154,8 @@ class RobertaTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         self.do_lower_case = do_lower_case
         self.vocab_file = vocab_file
@@ -162,11 +163,10 @@ class RobertaTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None and merges_file is not None:
             self.tokenizer = RobertaBPETokenizer(
-                vocab_file=vocab_file, merges_file=merges_file)
+                vocab_file=vocab_file, merges_file=merges_file, **kwargs)
         elif vocab_file is not None:
             self.tokenizer = RobertaChineseTokenizer(
-                vocab_file=vocab_file,
-                do_lower_case=True, )
+                vocab_file=vocab_file, do_lower_case=True, **kwargs)
             self.basic_tokenizer = self.tokenizer.basic_tokenizer
             self.wordpiece_tokenizer = self.tokenizer.wordpiece_tokenizer
         else:
@@ -498,7 +498,8 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -538,28 +539,6 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RobertaTokenizer
-
-                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-        """
-
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """
@@ -796,20 +775,53 @@ class RobertaBPETokenizer(GPTTokenizer):
         "tiny-distilroberta-base": {}
     }
 
-    def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            errors='replace',
-            max_len=None,
-            special_tokens=None,
-            bos_token="<s>",
-            eos_token="</s>",
-            cls_token="<s>",
-            sep_token="</s>",
-            unk_token="<unk>",
-            pad_token="<pad>",
-            mask_token="<mask>", ):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 errors='replace',
+                 max_len=None,
+                 special_tokens=None,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 cls_token="<s>",
+                 sep_token="</s>",
+                 unk_token="<unk>",
+                 pad_token="<pad>",
+                 mask_token="<mask>",
+                 **kwargs):
+
+        bos_token = AddedToken(
+            bos_token, lstrip=False,
+            rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(
+            eos_token, lstrip=False,
+            rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(
+            sep_token, lstrip=False,
+            rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(
+            cls_token, lstrip=False,
+            rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token)
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
@@ -835,10 +847,6 @@ class RobertaBPETokenizer(GPTTokenizer):
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
-
-        self.special_tokens = {}
-        self.special_tokens_decoder = {}
-        self.set_special_tokens(special_tokens)
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -933,30 +941,6 @@ class RobertaBPETokenizer(GPTTokenizer):
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
             'utf-8', errors=self.errors)
         return text
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts an index or a sequence indices to a single
-        token or a sequence of tokens.
-
-        Args:
-            ids (int|List[int]):
-                The token id (or token ids) to be converted to text.
-            skip_special_tokens (bool, optional):
-                Whether or not to skip the special tokens.
-                Defaults to `False`, which means we don't skip the special tokens.
-
-        Returns:
-            str|List[str]: The converted token or the sequence of tokens.
-        """
-
-        tokens = [self.decoder[id] for id in ids]
-        if skip_special_tokens and isinstance(tokens, list):
-            tokens = [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens
 
     def num_special_tokens_to_add(self, pair=False):
         """

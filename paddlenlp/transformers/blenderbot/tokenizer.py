@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .. import GPTTokenizer
+from .. import GPTTokenizer, AddedToken
 from paddle.utils import try_import
 
 __all__ = ['BlenderbotTokenizer']
@@ -88,20 +88,32 @@ class BlenderbotTokenizer(GPTTokenizer):
         }
     }
 
-    def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            errors='replace',
-            max_len=None,
-            special_tokens=None,
-            bos_token="<s>",
-            eos_token="</s>",
-            cls_token="<s>",
-            sep_token="</s>",
-            pad_token="<pad>",
-            eol_token='\u010a',
-            add_prefix=True, ):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 errors='replace',
+                 max_len=None,
+                 special_tokens=None,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 cls_token="<s>",
+                 sep_token="</s>",
+                 pad_token="<pad>",
+                 unk_token="<unk>",
+                 mask_token="<mask>",
+                 eol_token='\u010a',
+                 add_prefix=True,
+                 **kwargs):
+
+        sep_token = AddedToken(
+            sep_token,
+            lstrip=False,
+            rstrip=False,
+            single_word=False,
+            normalized=True) if isinstance(sep_token, str) else sep_token
+
+        self._build_special_tokens_map_extended(sep_token=sep_token)
+
         super(BlenderbotTokenizer, self).__init__(
             vocab_file=vocab_file,
             merges_file=merges_file,
@@ -139,8 +151,6 @@ class BlenderbotTokenizer(GPTTokenizer):
         Returns:
             list: A list of string representing converted tokens.
         """
-        if self.add_prefix:
-            text = " " + text
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
@@ -149,6 +159,11 @@ class BlenderbotTokenizer(GPTTokenizer):
                 bpe_token for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
-    def tokenize(self, text):
-        """ End-to-end tokenization for Blenderbot models. """
-        return self._tokenize(text)
+    def prepare_for_tokenization(self,
+                                 text,
+                                 is_split_into_words=False,
+                                 **kwargs):
+        add_prefix = kwargs.pop("add_prefix", self.add_prefix)
+        if is_split_into_words or add_prefix:
+            text = " " + text
+        return text

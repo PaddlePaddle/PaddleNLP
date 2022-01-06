@@ -844,10 +844,30 @@ class InferTransformerDecoding(nn.Layer):
                 _alpha=self._alpha)
 
         if self._decoding_strategy.startswith("beam_search"):
-            enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-                enc_output, self._beam_size)
-            memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-                memory_seq_lens, self._beam_size)
+            # TODO: Due to paddle.tile bug in static graph, tile_beam_merge_with_batch
+            # cannot work properly. These comments should be opened after PaddlePaddle v2.2.2.
+            if paddle.__version__ <= "2.1.3":
+                enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                    enc_output, self._beam_size)
+                memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                    memory_seq_lens, self._beam_size)
+            else:
+                enc_output_shape = paddle.shape(enc_output)
+                batch_size = enc_output_shape[0]
+                max_seq_len = enc_output_shape[1]
+                enc_output = enc_output.unsqueeze([1])
+                memory_seq_lens = memory_seq_lens.unsqueeze([1])
+                enc_output = paddle.expand(
+                    enc_output,
+                    shape=[
+                        batch_size, self._beam_size, max_seq_len, self._d_model
+                    ]
+                ).reshape(
+                    [batch_size * self._beam_size, max_seq_len, self._d_model])
+                memory_seq_lens = paddle.expand(
+                    memory_seq_lens,
+                    shape=[batch_size, self._beam_size]).reshape(
+                        [batch_size * self._beam_size])
 
         if trg_word is None:
             output_ids, parent_ids, sequence_length = parse_function(

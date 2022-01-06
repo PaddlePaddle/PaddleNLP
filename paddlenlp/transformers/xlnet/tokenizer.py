@@ -217,18 +217,6 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         return new_pieces
 
-    def tokenize(self, text):
-        # """
-        # Converts a string to a list of tokens.
-        #
-        # Args:
-        #     text (str):
-        #         The text to be tokenized.
-        # Returns:
-        #     List(str): A list of string representing converted tokens.
-        # """
-        return self._tokenize(text)
-
     def _convert_token_to_id(self, token):
         """Converts a token (str) to an id using the vocab. """
         return self.sp_model.PieceToId(token)
@@ -236,48 +224,6 @@ class XLNetTokenizer(PretrainedTokenizer):
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
         return self.sp_model.IdToPiece(index)
-
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a token (or a sequence of tokens) to a single integer id (or a sequence of ids),
-        using the vocabulary.
-
-        Args:
-            tokens (str or List[str]):
-                One or several token(s) to convert to token id(s).
-
-        Returns:
-            int or List[int] or tuple(int): The token id or list of token ids or tuple of token ids.
-        """
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts a single index or a sequence of indices to a token or
-        a sequence of tokens, using the vocabulary and added tokens.
-
-        Args:
-            ids (int or List[int]):
-                The token id (or token ids) to be converted to token(s).
-            skip_special_tokens (bool, optional):
-                Whether or not to remove special tokens in the decoding.
-                Defaults to `False` and we do not remove special tokens.
-
-        Returns:
-            str or List[str]: The decoded token(s).
-        """
-        if not isinstance(ids, (list, tuple)):
-            return self._convert_id_to_token(ids)
-        tokens = [self._convert_id_to_token(_id) for _id in ids]
-        if skip_special_tokens:
-            return [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens
 
     def convert_tokens_to_string(self, tokens):
         # Converts a sequence of tokens (strings for sub-words) in a single string.
