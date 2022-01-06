@@ -126,7 +126,7 @@ class Task(metaclass=abc.ABCMeta):
             for name in self.predictor.get_output_names()
         ]
 
-    def _get_inference_model(self, params_path=None):
+    def _get_inference_model(self):
         """
         Return the inference program, inputs and outputs in static mode. 
         """
@@ -135,9 +135,6 @@ class Task(metaclass=abc.ABCMeta):
         if not os.path.exists(inference_model_path + ".pdiparams"):
             with dygraph_mode_guard():
                 self._construct_model(self.model)
-                if params_path:
-                    state_dict = paddle.load(params_path)
-                    self._model.set_dict(state_dict)
                 self._construct_input_spec()
                 self._convert_dygraph_to_static()
 
