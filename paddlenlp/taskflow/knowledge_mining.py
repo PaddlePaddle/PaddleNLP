@@ -158,6 +158,7 @@ class WordTagTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparms",
+        "model_config": "model_config.json",
         "termtree_schema": "termtree_type.csv",
         "termtree_data": "termtree_data",
         "tags": "tags.txt",
@@ -167,6 +168,10 @@ class WordTagTask(Task):
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
                 "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
+                "aa47cdf7c270943a24495bd5ff59dc00"
             ],
             "termtree_schema": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
@@ -509,15 +514,9 @@ class WordTagTask(Task):
         model_instance = ErnieCtmWordtagModel.from_pretrained(
             model,
             num_tag=len(self._tags_to_index))
-        config_keys = ErnieCtmWordtagModel.pretrained_init_configuration[
-            self.model]
-        self.kwargs.update(config_keys)
-        if self._params_path is None:
-            model_path = os.path.join(self._task_path, "model_state.pdparams")
-        else:
-            model_path = self._params_path
-        state_dict = paddle.load(model_path)
-        model_instance.set_dict(state_dict)
+        if self._params_path is not None:
+            state_dict = paddle.load(self._params_path)
+            model_instance.set_dict(state_dict)
         self._model = model_instance
         self._model.eval()
 
@@ -581,6 +580,7 @@ class NPTagTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparms",
+        "model_config": "model_config.json",
         "name_category_map": "name_category_map.json",
     }
     resource_files_urls = {
@@ -588,6 +588,10 @@ class NPTagTask(Task):
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_state.pdparams",
                 "05ed1906b42126d3e04b4ac5c210b010"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_config.json",
+                "17c9e5216abfc9bd94c7586574a3cbc4"
             ],
             "name_category_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/",
@@ -608,15 +612,12 @@ class NPTagTask(Task):
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._linking = linking
+        self._check_task_files()
         self._construct_tokenizer(model)
         self._name_dict = None
         self._summary_num = 2
         self._max_cls_len = 5
-        name_dict_path = download_file(self._task_path,
-                                       "name_category_map.json",
-                                       URLS["name_category_map.json"][0],
-                                       URLS["name_category_map.json"][1])
-        self._construct_dict_map(name_dict_path)
+        self._construct_dict_map()
 
         self._get_inference_model()
         if paddle.get_device().startswith("gpu"):
@@ -648,10 +649,12 @@ class NPTagTask(Task):
         """
         return self._summary_num
 
-    def _construct_dict_map(self, name_dict_path):
+    def _construct_dict_map(self):
         """
         Construct dict map for the predictor.
         """
+        name_dict_path = os.path.join(
+            self._task_path, "name_category_map.json")
         with open(name_dict_path, encoding="utf-8") as fp:
             self._name_dict = json.load(fp)
         self._tree = BurkhardKellerTree()
@@ -733,10 +736,7 @@ class NPTagTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ErnieCtmNptagModel.from_pretrained(model)
-        model_path = os.path.join(self._task_path, "model_state.pdparams")
-        state_dict = paddle.load(model_path)
-        model_instance.set_dict(state_dict)
+        model_instance = ErnieCtmNptagModel.from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 

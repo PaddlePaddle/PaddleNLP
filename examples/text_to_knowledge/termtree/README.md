@@ -68,10 +68,19 @@ termtree.save("./")
 Taskflow支持使用自定义TermTree实现自定义Term-Linking，该示例中"平原上的火焰"的Term-Linking如下:
 作品类_实体(wordtag_label) -> 影视作品_eb_平原上的火焰(term_id)
 
+通过`task_path`定义用户自定义路径，文件组成：
+```text
+custom_task/
+├── termtree_type.csv
+└── termtree_data
+```
+
+使用Taskflow加载自定义TermTree来进行预测：
+
 ```python
 from paddlenlp import Taskflow
 
-wordtag = Taskflow("knowledge_mining", term_schema_path="termtree_type.csv", term_data_path="termtree_data")
+wordtag = Taskflow("knowledge_mining", task_path="./custom_task/")
 
 wordtag("《平原上的火焰》是今年新上映的电影")
 # [{'text': '《平原上的火焰》是今年新上映的电影', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '平原上的火焰', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 6, 'termid': '影视作品_eb_平原上的火焰'}, {'item': '》', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 8, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '今年', 'offset': 9, 'wordtag_label': '时间类', 'length': 2, 'termid': '时间阶段_cb_今年'}, {'item': '新', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_新'}, {'item': '上映', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_上映'}, {'item': '的', 'offset': 14, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '电影', 'offset': 15, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]

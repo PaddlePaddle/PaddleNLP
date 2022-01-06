@@ -56,6 +56,7 @@ class NERTask(WordTagTask):
 
     resource_files_names = {
         "model_state": "model_state.pdparms",
+        "model_config": "model_config.json",
         "tags": "tags.txt",
     }
     resource_files_urls = {
@@ -63,6 +64,10 @@ class NERTask(WordTagTask):
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
                 "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
+                "aa47cdf7c270943a24495bd5ff59dc00"
             ],
             "tags": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",

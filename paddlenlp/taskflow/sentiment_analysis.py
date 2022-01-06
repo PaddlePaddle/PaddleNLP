@@ -225,12 +225,19 @@ class SkepTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+    }
     resource_files_urls = {
         "skep_ernie_1.0_large_ch": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/model_state.pdparams",
                 "cf7aa5f5ffa834b329bbcb1dca54e9fc"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/model_config.json",
+                "847b84ab08611a2f5a01a22c18b0be23",
             ],
         }
     }
@@ -252,11 +259,9 @@ class SkepTask(Task):
         Construct the inference model for the predictor.
         """
         model_instance = SkepSequenceModel.from_pretrained(
-            model, num_classes=len(self._label_map))
-        model_path = os.path.join(self._task_path, "model_state.pdparams")
-        state_dict = paddle.load(model_path)
-        model_instance.set_state_dict(state_dict)
+            self._task_path, num_classes=len(self._label_map))
         self._model = model_instance
+        self._model.eval()
 
     def _construct_input_spec(self):
         """
