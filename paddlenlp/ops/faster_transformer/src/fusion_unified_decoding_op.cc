@@ -19,9 +19,10 @@ limitations under the License. */
 
 
 std::vector<paddle::Tensor> UnifiedDecodingForward(
-    const std::vector<paddle::Tensor>& cache_k,
-    const std::vector<paddle::Tensor>& cache_v,
+    const paddle::Tensor& input_ids,
+    const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
@@ -71,8 +72,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const std::string& hidden_act,
     const bool& rel_len,
     const bool& early_stopping) {
-  int batch_size = cache_k[0].shape()[0];
-  int max_out_len = rel_len ? max_len + cache_k[0].shape()[2] : max_len;
+  int batch_size = input_ids.shape()[0];
+  int max_out_len = rel_len ? max_len + input_ids.shape()[1] : max_len;
 
   std::vector<int64_t> output_dims;
   std::vector<int64_t> parent_ids_dims;
@@ -104,12 +105,12 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }
-  auto output_ids = paddle::Tensor(cache_k[0].place(), output_dims);
-  auto parent_ids = paddle::Tensor(cache_k[0].place(), parent_ids_dims);
+  auto output_ids = paddle::Tensor(input_ids.place(), output_dims);
+  auto parent_ids = paddle::Tensor(input_ids.place(), parent_ids_dims);
   auto sequence_length =
-      paddle::Tensor(cache_k[0].place(), sequence_length_dims);
+      paddle::Tensor(input_ids.place(), sequence_length_dims);
 
-  if (cache_k[0].place() == paddle::PlaceType::kGPU) {
+  if (input_ids.place() == paddle::PlaceType::kGPU) {
     auto mem_seq_length = paddle::Tensor(paddle::PlaceType::kGPU);
 
     if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
@@ -118,9 +119,10 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
       mem_seq_length = mem_seq_len;
     }
 
-    return UnifiedDecodingCUDAForward(cache_k,
-                                      cache_v,
+    return UnifiedDecodingCUDAForward(input_ids,
+                                      attn_mask,
                                       mem_seq_length,
+                                      input_type_id,
                                       type_id,
                                       logits_mask,
                                       word_embedding,
@@ -178,10 +180,12 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
 }
 
 std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
-    const std::vector<std::vector<int64_t>>& cache_k_shapes,
-    const std::vector<std::vector<int64_t>>& cache_v_shapes,
+    const std::vector<int64_t>& input_ids_shape,
+    const std::vector<int64_t>& attn_mask_shape,
     const std::vector<int64_t>& mem_seq_len_shape,
     const std::vector<int64_t>& logits_mask_shape,
+    const std::vector<int64_t>& input_type_id,
+    const std::vector<int64_t>& type_id,
     const std::vector<int64_t>& word_embedding_shape,
     const std::vector<std::vector<int64_t>>& self_ln_weight_shapes,
     const std::vector<std::vector<int64_t>>& self_ln_bias_shapes,
@@ -229,7 +233,7 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const std::string& hidden_act,
     const bool& rel_len,
     const bool& early_stopping) {
-  int batch_size = cache_k_shapes[0][0];
+  int batch_size = input_ids_shape[0];
 
   std::vector<int64_t> output_dims;
   std::vector<int64_t> sequence_length_dims({batch_size});
@@ -263,10 +267,12 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
 }
 
 std::vector<paddle::DataType> UnifiedDecodingInferDtype(
-    const std::vector<paddle::DataType>& cache_k,
-    const std::vector<paddle::DataType>& cache_v,
+    const paddle::DataType& input_ids,
+    const paddle::DataType& attn_mask,
     const paddle::DataType& mem_seq_len,
     const paddle::DataType& logits_mask,
+    const paddle::DataType& input_type_id,
+    const paddle::DataType& type_id,
     const paddle::DataType& word_embedding,
     const std::vector<paddle::DataType>& self_ln_weight,
     const std::vector<paddle::DataType>& self_ln_bias,
@@ -300,9 +306,10 @@ std::vector<paddle::DataType> UnifiedDecodingInferDtype(
 }
 
 PD_BUILD_OP(fusion_unified_decoding)
-    .Inputs({paddle::Vec("CacheK"),
-             paddle::Vec("CacheV"),
+    .Inputs({"InputIds",
+             "AttnMask",
              "MemSeqLen",
+             "InputTypeId",
              "TypeId",
              "LogitsMask",
              "WordEmbedding",

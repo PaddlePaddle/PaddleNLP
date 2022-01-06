@@ -28,9 +28,10 @@ limitations under the License. */
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> unified_decoding_kernel(
-    const std::vector<paddle::Tensor>& cache_k,
-    const std::vector<paddle::Tensor>& cache_v,
+    const paddle::Tensor& input_ids,
+    const paddle::Tensor& attn_mask,
     const paddle::Tensor& memory_sequence_length,
+    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_emb,
@@ -101,14 +102,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
           ? topp
           : 0.0;
 
-  auto cache_k0_dims = cache_k[0].shape();
+  auto input_ids_dims = input_ids.shape();
   int batch_size_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2" ||
                      decoding_strategy == "beam_search_v3")
-                        ? cache_k0_dims[0] / beam_width_
-                        : cache_k0_dims[0];
-  const int memory_max_seq_len = cache_k0_dims[2];
-  const int memory_hidden_dim = cache_k0_dims[3];
+                        ? input_ids_dims[0] / beam_width_
+                        : input_ids_dims[0];
+  const int memory_max_seq_len = input_ids_dims[1];
+  const int memory_hidden_dim = head_num_ * size_per_head_;
   const int vocab_size = word_emb.shape()[0];
 
   typedef PDTraits<D> traits_;
@@ -119,17 +120,36 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.cublas_handle = cublas_handle_;
   decoding_params.cublaslt_handle = cublaslt_handle_;
 
-  decoding_params.output_ids = output_ids.mutable_data<int>(cache_k[0].place());
-  decoding_params.parent_ids = parent_ids.mutable_data<int>(cache_k[0].place());
+  decoding_params.output_ids = output_ids.mutable_data<int>(input_ids.place());
+  decoding_params.parent_ids = parent_ids.mutable_data<int>(input_ids.place());
   decoding_params.sequence_length =
-      sequence_length.mutable_data<int>(cache_k[0].place());
+      sequence_length.mutable_data<int>(input_ids.place());
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
+  decoding_params.d_start_ids = const_cast<int *>(input_ids.data<int>());
+  decoding_params.d_attn_mask =
+      reinterpret_cast<DataType_*>(const_cast<data_t_ *>(attn_mask.data<data_t_>()));
+  decoding_params.d_start_lengths = memory_sequence_length.data<int>();
+
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
+  decoding_params.input_type_id = input_type_id.data<int>();
   decoding_params.type_id = type_id.data<int>();
+
+  if (decoding_strategy == "beam_search" ||
+      decoding_strategy == "beam_search_v2" ||
+      decoding_strategy == "beam_search_v3") {
+    decoding_params.request_batch_size = batch_size_ * beam_width_;
+  } else if (decoding_strategy == "sampling" ||
+             decoding_strategy == "topk_sampling" ||
+             decoding_strategy == "topp_sampling") {
+    decoding_params.request_batch_size = batch_size_;
+  }
+  decoding_params.max_input_len = memory_max_seq_len;
+  decoding_params.request_input_len = memory_max_seq_len;
+  decoding_params.request_output_len = max_seq_len_;
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
@@ -150,12 +170,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       params[i].request_batch_size = batch_size_;
       params[i].request_max_mem_seq_len = memory_max_seq_len;
     }
-
-    // cache
-    params[i].k_cache =
-        reinterpret_cast<const float*>(cache_k[i].data<float>());
-    params[i].v_cache =
-        reinterpret_cast<const float*>(cache_v[i].data<float>());
 
     // self attn
     params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
@@ -276,6 +290,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             activate,
             pos_bias,
             true /*prefix_lm*/);
+    unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
     delete unified_decoding_beam_search_;
@@ -309,6 +324,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             true, /*prefix_lm*/
             finished_candidate_num_,
             early_stopping);
+    unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
     delete unified_decoding_beam_search_;
@@ -354,9 +370,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
 }
 
 std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
-    const std::vector<paddle::Tensor>& cache_k,
-    const std::vector<paddle::Tensor>& cache_v,
+    const paddle::Tensor& input_ids,
+    const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
@@ -408,7 +425,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const bool& pos_bias,
     const std::string& hidden_act,
     const bool& early_stopping) {
-  auto stream = cache_k[0].stream();
+  auto stream = input_ids.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
@@ -420,9 +437,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
   switch (self_ln_weight[0].type()) {
     case paddle::DataType::FLOAT16: {
       ret = unified_decoding_kernel<paddle::DataType::FLOAT16>(
-          cache_k,
-          cache_v,
+          input_ids,
+          attn_mask,
           mem_seq_len,
+          input_type_id,
           type_id,
           logits_mask,
           word_embedding,
@@ -481,9 +499,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     }
     case paddle::DataType::FLOAT32: {
       ret = unified_decoding_kernel<paddle::DataType::FLOAT32>(
-          cache_k,
-          cache_v,
+          input_ids,
+          attn_mask,
           mem_seq_len,
+          input_type_id,
           type_id,
           logits_mask,
           word_embedding,

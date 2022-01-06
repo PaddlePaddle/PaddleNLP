@@ -74,6 +74,64 @@ void embeddings_kernel_launcher(T* from_tensor,
                                                     pos_bias);
 }
 
+template <typename T>
+__global__ void start_id_embedding_kernel(T* from_tensor,
+                                          const T* embedding_table,
+                                          const T* position_encoding_table,
+                                          const T* type_table,
+                                          const int* type_id,
+                                          const int* word_ids,
+                                          const int* memory_seq_len,
+                                          const int start_step,
+                                          const int max_length,
+                                          const int batch_size,
+                                          const int hidden_units) {
+  int bid = blockIdx.x;
+  int seq_id = blockIdx.y;
+
+  for(int index = threadIdx.x; index < hidden_units; index += blockDim.x) { 
+    // embedding lookup from word ids [batch, max_length] (part of [batch, max_length]) and [vocab, hidden] to generate embedding [batch, max_length, hidden]
+    int step;
+    if (seq_id < max_length - memory_seq_len[bid]) {
+      step = start_step;
+    } else {
+      step = start_step + (seq_id - max_length + memory_seq_len[bid]);
+    }
+    
+    from_tensor[bid * max_length * hidden_units + seq_id * hidden_units + index] =
+        embedding_table[word_ids[bid * max_length + seq_id] * hidden_units + index]
+        + position_encoding_table[(step - 1) * hidden_units + index]
+        + type_table[type_id[bid * max_length + seq_id] * hidden_units + index];
+  }
+}
+
+template <typename T>
+void start_ids_embeddings_kernel_launcher(T* from_tensor,
+                                const T* embedding_table,
+                                const T* position_encoding_table,
+                                const T* type_table,
+                                const int* type_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream) {
+  dim3 grid(batch_size, max_length);
+  dim3 block(min(hidden_units, 1024));
+  start_id_embedding_kernel<T><<<grid, block, 0, stream>>>(from_tensor,
+                                                           embedding_table,
+                                                           position_encoding_table,
+                                                           type_table,
+                                                           type_id,
+                                                           word_ids,
+                                                           memory_seq_len,
+                                                           start_step,
+                                                           max_length,
+                                                           batch_size,
+                                                           hidden_units);
+}
 
 template <typename T>
 __global__ void initial_cache_kernel(const float* cache_k,
@@ -320,6 +378,32 @@ template void embeddings_kernel_launcher(half* from_tensor,
                                          const int hidden_units,
                                          const bool pos_bias,
                                          cudaStream_t stream);
+
+template void start_ids_embeddings_kernel_launcher(float* from_tensor,
+                                const float* embedding_table,
+                                const float* position_encoding_table,
+                                const float* type_table,
+                                const int* type_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream);
+
+template void start_ids_embeddings_kernel_launcher(half* from_tensor,
+                                const half* embedding_table,
+                                const half* position_encoding_table,
+                                const half* type_table,
+                                const int* type_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream);
 
 template void init_cache_kernel_launcher(const float* cache_k,
                                          const float* cache_v,

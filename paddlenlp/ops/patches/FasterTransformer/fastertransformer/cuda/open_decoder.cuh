@@ -20,8 +20,8 @@ namespace fastertransformer {
 template <typename T>
 void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 T* v_dst,
-                                                const float* k_src,
-                                                const float* v_src,
+                                                const T* k_src,
+                                                const T* v_src,
                                                 const int* memory_seq_len,
                                                 const int local_batch_size,
                                                 const int memory_max_seq_len,

@@ -276,8 +276,7 @@ public:
                const int step,
                const int decoder_max_seq_len,
                const bool is_cross_attention,
-               const bool *finished = nullptr,
-               const int memory_max_seq_len = -1) {
+               const bool *finished = nullptr) {
 #ifndef NDEBUG
 // PRINT_FUNC_NAME_();
 #endif
@@ -300,23 +299,13 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
         PUSH_RANGE("Transformer/slf_attn")
-        if (memory_max_seq_len == -1) {
-          masked_multi_head_attention(norm_from_tensor_buf_,
-                                      key_cache_,
-                                      value_cache_,
-                                      masked_output_buf_,
-                                      finished,
-                                      step,
-                                      decoder_max_seq_len);
-        } else {
-          self_multi_head_attention(norm_from_tensor_buf_,
-                                    memory_sequence_length,
+        masked_multi_head_attention(norm_from_tensor_buf_,
                                     key_cache_,
                                     value_cache_,
                                     masked_output_buf_,
-                                    step + memory_max_seq_len,
-                                    memory_max_seq_len);
-        }
+                                    finished,
+                                    step,
+                                    decoder_max_seq_len);
         POP_RANGE
 
 #ifndef NDEBUG
@@ -436,23 +425,13 @@ public:
 #endif
       } else {
         // post-normalization
-        if (memory_max_seq_len == -1) {
-          masked_multi_head_attention(from_tensor,
-                                      key_cache_,
-                                      value_cache_,
-                                      masked_output_buf_,
-                                      finished,
-                                      step,
-                                      decoder_max_seq_len);
-        } else {
-          self_multi_head_attention(from_tensor,
-                                    memory_sequence_length,
+        masked_multi_head_attention(from_tensor,
                                     key_cache_,
                                     value_cache_,
                                     masked_output_buf_,
-                                    step + memory_max_seq_len,
-                                    memory_max_seq_len);
-        }
+                                    finished,
+                                    step,
+                                    decoder_max_seq_len);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -927,7 +906,8 @@ public:
                        const int seq_len,
                        const int ite,
                        const int max_seq_len,
-                       const bool is_final) {
+                       const bool is_final,
+                       const int* memory_sequence_length = nullptr) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -946,75 +926,159 @@ public:
 
       // set workspace
       DataType_ *norm_from_tensor_buf = (DataType_ *)workspace;
+      DataType_ *ffn_out_buf = (DataType_ *)workspace;
       DataType_ *attention_workspace = norm_from_tensor_buf + m * hidden_units_;
       DataType_ *masked_output_buf = attention_workspace + attn_work_space_size;
       DataType_ *norm_masked_output_buf = masked_output_buf + m * hidden_units_;
       DataType_ *ffn_inner_buf = norm_masked_output_buf + m * hidden_units_;
 
-      layer_norm(from_tensor,
-                 param_.self_layernorm.gamma,
-                 param_.self_layernorm.beta,
-                 norm_from_tensor_buf,
-                 m,
-                 hidden_units_,
-                 param_.stream);
+      if (normalization_before_) {
+        layer_norm(from_tensor,
+                  param_.self_layernorm.gamma,
+                  param_.self_layernorm.beta,
+                  norm_from_tensor_buf,
+                  m,
+                  hidden_units_,
+                  param_.stream);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-      PUSH_RANGE("Transformer/slf_attn")
-      unfused_masked_multi_head_attention(attention_workspace,
-                                          norm_from_tensor_buf,
-                                          key_cache_,
-                                          value_cache_,
-                                          masked_output_buf,
-                                          d_attn_mask,
-                                          local_batch_size,
-                                          seq_len,
-                                          ite,
-                                          max_seq_len,
-                                          is_final);
-      if (is_final) return;
-      POP_RANGE
+
+        PUSH_RANGE("Transformer/slf_attn")
+        unfused_masked_multi_head_attention(attention_workspace,
+                                            norm_from_tensor_buf,
+                                            key_cache_,
+                                            value_cache_,
+                                            masked_output_buf,
+                                            d_attn_mask,
+                                            local_batch_size,
+                                            seq_len,
+                                            ite,
+                                            max_seq_len,
+                                            is_final,
+                                            memory_sequence_length);
+        if (is_final) return;
+        POP_RANGE
+
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-      add_bias_input_layernorm_2_kernelLauncher(
-          from_tensor,
-          param_.ffn_layernorm.gamma,
-          param_.ffn_layernorm.beta,
-          param_.self_attention.attention_output_weight.bias,
-          masked_output_buf,
-          norm_masked_output_buf,
-          m,
-          hidden_units_,
-          param_.stream);
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            from_tensor,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf,
+            norm_masked_output_buf,
+            m,
+            hidden_units_,
+            param_.stream);
+
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-      // For GPT decoder
-      PUSH_RANGE("Transformer/MLP");
-      ffn(norm_masked_output_buf,
-          ffn_inner_buf,
-          decoder_output,
-          m,
-          4 * t_parallel_param_.local_hidden_units_,
-          hidden_units_,
-          ActivationType::GELU);
-      POP_RANGE
+
+        // For GPT decoder
+        PUSH_RANGE("Transformer/MLP");
+        ffn(norm_masked_output_buf,
+            ffn_inner_buf,
+            decoder_output,
+            m,
+            4 * t_parallel_param_.local_hidden_units_,
+            hidden_units_,
+            ActivationType::GELU);
+        POP_RANGE
+
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-      add_bias_input_kernelLauncher(decoder_output,
-                                    param_.ffn.output_weight.bias,
-                                    masked_output_buf,
-                                    m,
-                                    hidden_units_,
-                                    param_.stream);
+
+        add_bias_input_kernelLauncher(decoder_output,
+                                      param_.ffn.output_weight.bias,
+                                      masked_output_buf,
+                                      m,
+                                      hidden_units_,
+                                      param_.stream);
+      } else {
+        PUSH_RANGE("Transformer/slf_attn")
+        unfused_masked_multi_head_attention(attention_workspace,
+                                            from_tensor,
+                                            key_cache_,
+                                            value_cache_,
+                                            masked_output_buf,
+                                            d_attn_mask,
+                                            local_batch_size,
+                                            seq_len,
+                                            ite,
+                                            max_seq_len,
+                                            is_final,
+                                            memory_sequence_length);
+        if (is_final) return;
+        POP_RANGE
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            from_tensor,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf,
+            norm_masked_output_buf,
+            m,
+            hidden_units_,
+            param_.stream);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        // For GPT decoder
+        PUSH_RANGE("Transformer/MLP");
+        ffn(norm_masked_output_buf,
+            ffn_inner_buf,
+            ffn_out_buf,
+            m,
+            4 * t_parallel_param_.local_hidden_units_,
+            hidden_units_,
+            ActivationType::GELU);
+        POP_RANGE
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        add_bias_input_kernelLauncher(ffn_out_buf,
+                                      param_.ffn.output_weight.bias,
+                                      masked_output_buf,
+                                      m,
+                                      hidden_units_,
+                                      param_.stream);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        layer_norm(ffn_out_buf,
+                  param_.self_layernorm.gamma,
+                  param_.self_layernorm.beta,
+                  decoder_output,
+                  m,
+                  hidden_units_,
+                  param_.stream);
+      }
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -1025,171 +1089,6 @@ public:
     }
   }
 
-  void self_multi_head_attention(const DataType_ *from_tensor,
-                                 const int *memory_sequence_length,
-                                 DataType_ *key_cache_,
-                                 DataType_ *value_cache_,
-                                 DataType_ *decoder_output,
-                                 const int step,
-                                 const int memory_max_seq_len) {
-    int m = l_parallel_param_.local_batch_size;
-    int n = t_parallel_param_.local_hidden_units_;
-    int k = hidden_units_;
-
-
-    DataType_ alpha = (DataType_)1.0f, beta = (DataType_)0.0f;
-    if (is_fuse_QKV_in_batched_gemm_ == true) {
-      cublasGemmAlgo_t cublasAlgo =
-          static_cast<cublasGemmAlgo_t>(getAlgoIdFromMap(
-              cublasAlgoMap_,
-              3,
-              n,
-              m,
-              k,
-              std::is_same<float, DataType_>::value ? FLOAT_DATATYPE
-                                                    : HALF_DATATYPE));
-      check_cuda_error(cublasGemmBatchedEx(param_.cublas_handle,
-                                           CUBLAS_OP_N,
-                                           CUBLAS_OP_N,
-                                           n,
-                                           m,
-                                           k,
-                                           &alpha,
-                                           (const void *const *)qkv_kernel_,
-                                           AType_,
-                                           n,
-                                           (const void *const *)qkv_input_,
-                                           BType_,
-                                           k,
-                                           &beta,
-                                           (void *const *)qkv_buf_,
-                                           CType_,
-                                           n,
-                                           3,
-                                           computeType_,
-                                           cublasAlgo));
-    } else {
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.query_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          query_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.key_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          key_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.value_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          value_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-    }
-    self_attention_dispatch<DataType_>(memory_sequence_length,
-                                       key_buf_,
-                                       value_buf_,
-                                       query_buf_,
-                                       param_.self_attention.query_weight.bias,
-                                       key_cache_,
-                                       param_.self_attention.key_weight.bias,
-                                       value_cache_,
-                                       param_.self_attention.value_weight.bias,
-                                       context_buf_,
-                                       param_.request_batch_size,
-                                       head_num_,
-                                       size_per_head_,
-                                       step,
-                                       memory_max_seq_len,
-                                       param_.stream);
-
-
-    k = t_parallel_param_.local_hidden_units_;
-    n = hidden_units_;
-
-    cublasMM_cublasLtMM_wrapper_decoder(
-        param_.cublaslt_handle,
-        param_.cublas_handle,
-        CUBLAS_OP_N,
-        CUBLAS_OP_N,
-        n,
-        m,
-        k,
-        &alpha,
-        param_.self_attention.attention_output_weight.kernel,
-        AType_,
-        n,
-        context_buf_,
-        BType_,
-        k,
-        &beta,
-        decoder_output,
-        CType_,
-        n,
-        param_.stream,
-        cublasAlgoMap_,
-        cublas_workspace_);
-
-    PUSH_RANGE("Transformer/slf_attn/all2all_reduce")
-    all2all_reduce_sum(decoder_output,
-                       decoder_output,
-                       m * n,
-                       t_parallel_param_,
-                       param_.stream);
-    POP_RANGE
-  }
   void masked_multi_head_attention(const DataType_ *from_tensor,
                                    DataType_ *key_cache_,
                                    DataType_ *value_cache_,
@@ -1713,7 +1612,8 @@ public:
                                            const int seq_len,
                                            const int ite,
                                            const int max_seq_len,
-                                           const bool is_final) {
+                                           const bool is_final,
+                                           const int* memory_sequence_length = nullptr) {
     const DataType_ scalar = 1 / sqrtf(size_per_head_ * 1.0f);
     const int m = local_batch_size * seq_len;
 
@@ -1888,16 +1788,32 @@ public:
       // Use batch major
       // put k/v_buf from shape [B, H, L, Dh]
       // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
-      transpose_4d_batch_major_kernelLauncher(key_cache_,
-                                              value_cache_,
-                                              k_buf,
-                                              v_buf,
-                                              local_batch_size,
-                                              seq_len,
-                                              max_seq_len,
-                                              size_per_head_,
-                                              t_parallel_param_.local_head_num_,
-                                              param_.stream);
+      if (memory_sequence_length == nullptr) {
+        transpose_4d_batch_major_kernelLauncher(key_cache_,
+                                                value_cache_,
+                                                k_buf,
+                                                v_buf,
+                                                local_batch_size,
+                                                seq_len,
+                                                max_seq_len,
+                                                size_per_head_,
+                                                t_parallel_param_.local_head_num_,
+                                                param_.stream);
+      } else {
+        // Left pad to right pad. 
+        transpose_cache_batch_major_kernelLauncher(
+            key_cache_,
+            value_cache_,
+            k_buf,
+            v_buf,
+            memory_sequence_length,
+            local_batch_size,
+            seq_len,
+            max_seq_len,
+            size_per_head_,
+            t_parallel_param_.local_head_num_,
+            param_.stream);
+      }
     } else {
       printf("[ERROR] Can not decide on the cache config \n");
       exit(-1);

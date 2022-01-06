@@ -41,6 +41,8 @@ public:
   const T *trans_bias = nullptr;
 
   const T *memory_tensor = nullptr;
+
+  const int *input_type_id = nullptr;
   const int *type_id = nullptr;
   const int *memory_sequence_length = nullptr;
 

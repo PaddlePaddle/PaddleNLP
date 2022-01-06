@@ -29,9 +29,10 @@ limitations under the License. */
 
 
 std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
-    const std::vector<paddle::Tensor>& cache_k,
-    const std::vector<paddle::Tensor>& cache_v,
+    const paddle::Tensor& input_ids,
+    const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,

@@ -440,30 +440,30 @@ public:
                             : (args_.batch_size_ * args_.seq_len_ *
                                args_.hidden_units_);  // type T
 
-    if (args_.prefix_lm_) {
-      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        // Use batch major
-        // put k/v_buf from shape [B, H, L, Dh]
-        // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
-        transpose_cache_batch_major_kernelLauncher(
-            K_cache_[0] + layer * cache_size,
-            V_cache_[0] + layer * cache_size,
-            param[layer].k_cache,
-            param[layer].v_cache,
-            decoding_params.memory_sequence_length,
-            args_.batch_size_,
-            args_.memory_max_seq_len_,
-            args_.seq_len_ + args_.memory_max_seq_len_,
-            args_.size_per_head_,
-            args_.head_num_,
-            decoding_params.stream);
+//     if (args_.prefix_lm_) {
+//       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+//         // Use batch major
+//         // put k/v_buf from shape [B, H, L, Dh]
+//         // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
+//         transpose_cache_batch_major_kernelLauncher(
+//             K_cache_[0] + layer * cache_size,
+//             V_cache_[0] + layer * cache_size,
+//             param[layer].k_cache,
+//             param[layer].v_cache,
+//             decoding_params.memory_sequence_length,
+//             args_.batch_size_,
+//             args_.memory_max_seq_len_,
+//             args_.seq_len_ + args_.memory_max_seq_len_,
+//             args_.size_per_head_,
+//             args_.head_num_,
+//             decoding_params.stream);
 
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-      }
-    }
+// #ifndef NDEBUG
+//         cudaDeviceSynchronize();
+//         check_cuda_error(cudaGetLastError());
+// #endif
+//       }
+//     }
 
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       if (args_.normalization_before_) {
