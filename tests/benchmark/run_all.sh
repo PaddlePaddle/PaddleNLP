@@ -34,6 +34,7 @@ mode_item=$1   static|dygraph
 
 if [ ${mode_item} != "static" ] && [ ${mode_item} != "dygraph" ]; then
     echo "please set mode_item(static|dygraph)"
+    exit 1
 fi
 profile="off"
 model_list=(gpt2 gpt3)
