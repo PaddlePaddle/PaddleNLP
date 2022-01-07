@@ -30,13 +30,10 @@ function _set_params(){
 
     log_with_profiler=$log_file
     profiler_path=$log_profile
-    keyword="avg_batch_cost:" 
-    keyword_loss=""
-    separator=""
-    position=""
-    range=""
+    keyword="ips:" 
+    keyword_loss="loss:"
     skip_steps=20
-    model_mode=0
+    model_mode=-1
     ips_unit='tokens/s'
     index="1"
     gpu_num=$num_gpu_devices 
