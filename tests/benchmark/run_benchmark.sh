@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 set -xe
-
+# sp 8 fp32  200  ${model_item} ${mode_item} ${profile}
 # Test training benchmark for a model.
-# Usage：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} ${max_iter} ${model_name}
+# Usage：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} ${max_iter} ${model_item}
 
 function _set_params(){
     run_mode=${1:-"sp"}         # sp or mp
     batch_size=${2:-"2"}
     fp_item=${3:-"fp32"}        # fp32 or fp16
     max_iter=${4:-"100"}
-    model_name=${5:-"model_name"}
-    dygraph_name=${6:-"static"}
+    model_item=${5:-"gpt2"}
+    mode_item=${6:-"static"}
     need_profile=${7:-"off"}
-    gpt_repo=${8:-"gpt2"}
     
     mission_name="语义表示"
     direction_id=1
@@ -23,10 +22,10 @@ function _set_params(){
     num_gpu_devices=${#arr[*]}
 
     base_batch_size=$(($batch_size*1024))
-    model_name=${model_name}_${gpt_repo}_${run_mode}_bs${batch_size}_${fp_item}_${num_gpu_devices}_${dygraph_name}
-    log_file=${run_log_path}/${model_name}
-    log_folder=${run_log_path}/${model_name}_logdir
-    log_profile=${run_log_path}/${model_name}_model.profile
+    model_name=${model_item}_${mode_item}_bs${batch_size}_${fp_item}
+    log_file=${run_log_path}/${model_name}_${num_gpu_devices}_${run_mode}
+    log_folder=${run_log_path}/${model_item}_logdir
+    log_profile=${run_log_path}/${model_item}_model.profile
     OUTPUT_PATH=${run_log_path}/output
 
 
@@ -40,7 +39,7 @@ function _set_params(){
     skip_steps=20
     model_mode=0
     ips_unit='tokens/s'
-    index=""
+    index="1"
     gpu_num=$num_gpu_devices 
 }
 
@@ -55,7 +54,7 @@ function _train(){
 
     if [ $fp_item = "fp16" ]; then
         use_fp16_cmd="--use_amp true" 
-        if [ $dygraph_name = "dygraph" ] && [ $gpt_repo = "gpt3" ]; then
+        if [ $mode_item = "dygraph" ] && [ $model_item = "gpt3" ]; then
             use_fp16_cmd="--use_pure_fp16 true"
         fi
     fi
@@ -67,13 +66,13 @@ function _train(){
     fi
 
     script_cmd="run_pretrain_static.py"
-    if [ $dygraph_name = "dygraph" ]; then
+    if [ $mode_item = "dygraph" ]; then
         script_cmd="run_pretrain.py"
     fi
 
     base_path="examples/language_model/gpt/"
-    if [ $gpt_repo = 'gpt3' ]; then
-        base_path=examples/language_model/gpt-3/${dygraph_name}
+    if [ $model_item = 'gpt3' ]; then
+        base_path=examples/language_model/gpt-3/${mode_item}
     fi
     data_path=$(pwd)"/data"
 
@@ -128,20 +127,6 @@ function _train(){
     rm -r ${log_folder}
 }
 
-# function _analysis_log(){
-#     # gpu_num is 1, because we multiplied gpu num in the log
-#     python analysis.py --filename ${log_file} \
-#         --keyword "ips:" \
-#         --base_batch_size $(($batch_size*1024)) \
-#         --skip_steps 20 \
-#         --model_mode -1 \
-#         --model_name ${model_name}\
-#         --mission_name ${mission_name}\
-#         --direction_id ${direction_id} \
-#         --run_mode ${run_mode} \
-#         --gpu_num 1 \
-#         --ips_unit 'tokens/s'
-# }
-
+source ${BENCHMARK_ROOT}/scripts/run_model.sh
 _set_params $@
-_train
+_run
