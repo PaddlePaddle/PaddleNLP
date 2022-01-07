@@ -17,11 +17,11 @@ import paddle_serving_client.io as serving_io
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True,
-                    default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
+                    default='./checkpoint/model_900/model_state.pdparams', help="Path of saved model files. Program file and parameter files are saved in this directory.")
 parser.add_argument("--model_filename", type=str, required=True,
-                    default='inference.get_pooled_embedding.pdmodel', help="The path to model parameters to be loaded.")
+                    default='inference.get_pooled_embedding.pdmodel', help="The name of file to load the inference program. If it is None, the default filename __model__ will be used.")
 parser.add_argument("--params_filename", type=str, required=True,
-                    default='inference.get_pooled_embedding.pdiparams', help="The path to model parameters to be loaded.")
+                    default='inference.get_pooled_embedding.pdiparams', help="The name of file to load all parameters. It is only used for the case that all parameters were saved in a single binary file. If parameters were saved in separate files, set it as None. Default: None.")
 parser.add_argument("--server_path", type=str, default='./serving_server',
                     help="The path of server parameter in static graph to be saved.")
 parser.add_argument("--client_path", type=str, default='./serving_client',

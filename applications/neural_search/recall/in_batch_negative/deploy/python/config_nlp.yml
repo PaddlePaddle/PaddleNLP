@@ -13,9 +13,9 @@ dag:
 # http端口, rpc_port和http_port不允许同时为空。当rpc_port可用且http_port为空时，不自动生成http_port
 http_port: 18082
 # rpc端口, rpc_port和http_port不允许同时为空。当rpc_port为空且http_port不为空时，会自动将rpc_port设置为http_port+1
-rpc_port: 9998
+rpc_port: 8080
 op:
-  model:
+  ernie:
     # 并发数，is_thread_op=True时，为线程并发；否则为进程并发
     concurrency: 1
     # 当op配置没有server_endpoints时，从local_service_conf读取本地服务配置
@@ -29,4 +29,4 @@ op:
       # Fetch结果列表，以bert_seq128_model中fetch_var的alias_name为准, 如果没有设置则全部返回
       fetch_list:
       # 模型路径
-      model_config: serving_server/
+      model_config: ../../serving_server/

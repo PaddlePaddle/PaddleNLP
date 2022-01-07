@@ -91,20 +91,21 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— export_model.py # 动态图转换成静态图
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本
-    |—— predict.sh  # 预测bash版本
-    |—— evaluate.sh # 评估bash版本
-    |—— run_build_index.sh # 构建索引bash版本
-    |—— train_batch_neg.sh  # 训练bash版本
-    |—— export_to_serving.sh  # Paddle Inference转Serving的bash脚本
+    |—— predict.sh  # 预测 bash 版本
+    |—— evaluate.sh # 评估 bash 版本
+    |—— run_build_index.sh # 构建索引 bash 版本
+    |—— train_batch_neg.sh  # 训练 bash 版本
+    |—— export_to_serving.sh  # Paddle Inference 转 Serving 的 bash 脚本
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
-        |—— deploy.sh # Paddle Inference部署脚本
+        |—— deploy.sh # Paddle Inference 部署脚本
+        |—— rpc_client.py # Paddle Serving 的 Client 端
+        |—— web_service.py # Paddle Serving 的 Serving 端
+        |—— config_nlp.yml # Paddle Serving 的配置文件
 |—— inference.py # 动态图抽取向量
-|—— export_to_serving.py # 静态图转Serving
-|—— rpc_client.py # Paddle Serving的Client端
-|—— web_service.py # Paddle Serving的 Serving端
-|—— config_nlp.yml # Paddle Serving的配置文件
+|—— export_to_serving.py # 静态图转 Serving
+
 ```
 
 <a name="数据准备"></a>

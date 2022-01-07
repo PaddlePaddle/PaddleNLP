@@ -69,10 +69,10 @@ class ErnieOp(Op):
 
 class ErnieService(WebService):
     def get_pipeline_response(self, read_op):
-        ernie_op = ErnieOp(name="model", input_ops=[read_op])
+        ernie_op = ErnieOp(name="ernie", input_ops=[read_op])
         return ernie_op
 
 
-ernie_service = ErnieService(name="model")
+ernie_service = ErnieService(name="ernie")
 ernie_service.prepare_pipeline_config("config_nlp.yml")
 ernie_service.run_service()
