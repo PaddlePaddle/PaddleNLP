@@ -163,8 +163,8 @@ if __name__ == "__main__":
     test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
         Stack(dtype="int64"),  # seq_len
         Stack(dtype="int64")  # label
     ): fn(samples)
