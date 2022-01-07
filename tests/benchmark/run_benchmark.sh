@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -xe
-# sp 8 fp32  200  ${model_item} ${mode_item} ${profile}
 # Test training benchmark for a model.
 # Usage：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} ${max_iter} ${model_item}
 
