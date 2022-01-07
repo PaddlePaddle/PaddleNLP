@@ -16,8 +16,8 @@ import argparse
 import paddle_serving_client.io as serving_io
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True,
-                    default='./checkpoint/model_900/model_state.pdparams', help="Path of saved model files. Program file and parameter files are saved in this directory.")
+parser.add_argument("--dirname", type=str, required=True,
+                    default='./output', help="Path of saved model files. Program file and parameter files are saved in this directory.")
 parser.add_argument("--model_filename", type=str, required=True,
                     default='inference.get_pooled_embedding.pdmodel', help="The name of file to load the inference program. If it is None, the default filename __model__ will be used.")
 parser.add_argument("--params_filename", type=str, required=True,
@@ -36,9 +36,8 @@ parser.add_argument("--show_proto", type=bool, default=True,
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    dirname = args.params_path
     serving_io.inference_model_to_serving(
-        dirname,
+        dirname=args.dirname,
         serving_server=args.server_path,
         serving_client=args.client_path,
         model_filename=args.model_filename,

@@ -458,7 +458,7 @@ sh deploy.sh
 
 ```
 python export_to_serving.py \
-    --params_path "output" \
+    --dirname "output" \
     --model_filename "inference.get_pooled_embedding.pdmodel" \
     --params_filename "inference.get_pooled_embedding.pdiparams" \
     --server_path "./serving_server" \
@@ -466,7 +466,17 @@ python export_to_serving.py \
     --fetch_alias_names "output_embed"
 
 ```
-也可以运行下面的bash脚本：
+
+参数含义说明
+* `dirname`: 需要转换的模型文件存储路径，Program 结构文件和参数文件均保存在此目录。
+* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名
+* `params_filename`: 存储需要转换的模型所有参数的文件名称。当且仅当所有模型参数被保>存在一个单独的二进制文件中，它才需要被指定。如果模型参数是存储在各自分离的文件中，设置它的值为 None
+* `server_path`: 转换后的模型文件和配置文件的存储路径。默认值为 serving_server
+* `client_path`: 转换后的客户端配置文件存储路径。默认值为 serving_client
+* `fetch_alias_names`: 模型输出的别名设置，比如输入的 input_ids 等，都可以指定成其他名字，默认不指定
+* `feed_alias_names`: 模型输入的别名设置，比如输出 pooled_out 等，都可以重新指定成其他模型，默认不指定
+
+也可以运行下面的 bash 脚本：
 ```
 sh scripts/export_to_serving.sh
 ```
@@ -479,11 +489,13 @@ python web_service.py
 
 启动客户端调用 Server。
 
-首先修改需要预测的样本，并把它放入到 feed 字典中：
+首先修改rpc_client.py中需要预测的样本：
 
 ```
-feed["0"] = "国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据"
-feed["1"] = "试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比"
+list_data = [
+    "国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据",
+    "试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比"
+]
 ```
 然后运行：
 
@@ -503,7 +515,7 @@ PipelineClient::predict before time:1641450851.375738
    ......
 ```
 
-可以看到客户端发送了2条文本，返回了2个embedding向量
+可以看到客户端发送了2条文本，返回了2个 embedding 向量
 
 ## Reference
 
