@@ -51,6 +51,6 @@ do
             fi
             CUDA_VISIBLE_DEVICES=0 bash tests/benchmark/run_benchmark.sh sp ${bs_item} ${fp_item}  200  ${model_item} ${mode_item} ${profile} | tee ${log_path}/${model_item}_${mode_item}_bs${bs_item}_${fp_item}_1gpus 2>&1
             sleep 10
-            CUDA_VISIBLE_DEVICES=0 bash tests/benchmark/run_benchmark.sh mp ${bs_item} ${fp_item}  200  ${model_item} ${mode_item} ${profile} | tee ${log_path}/${model_item}_${mode_item}_bs${bs_item}_${fp_item}_8gpus8p 2>&1
+            CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash tests/benchmark/run_benchmark.sh mp ${bs_item} ${fp_item}  200  ${model_item} ${mode_item} ${profile} | tee ${log_path}/${model_item}_${mode_item}_bs${bs_item}_${fp_item}_8gpus8p 2>&1
 done
 done
