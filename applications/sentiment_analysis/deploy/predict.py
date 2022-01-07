@@ -100,7 +100,7 @@ class Predictor(object):
             convert_example_to_feature_ext,
             tokenizer=self.tokenizer,
             label2id=self.ext_label2id,
-            max_seq_len=args.max_seq_len,
+            max_seq_len=args.ext_max_seq_len,
             is_test=True)
         test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
         batch_list = [
@@ -109,9 +109,9 @@ class Predictor(object):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id),
-            Stack(dtype="int64"), ): fn(samples)
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
+            Stack(dtype="int64")): fn(samples)
 
         results = []
         for bid, batch_data in enumerate(batch_list):
@@ -129,7 +129,7 @@ class Predictor(object):
                     self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]
                 ]
                 text = ori_test_ds[idx]["text"]
-                aps = decoding(text[:args.max_seq_len-2], tag_seq)
+                aps = decoding(text[:args.ext_max_seq_len-2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
                     aspect_text = self._concate_aspect_and_opinion(text, aspect,
@@ -149,7 +149,7 @@ class Predictor(object):
             convert_example_to_feature_cls,
             tokenizer=self.tokenizer,
             label2id=self.cls_label2id,
-            max_seq_len=args.max_seq_len,
+            max_seq_len=args.cls_max_seq_len,
             is_test=True)
         test_ds = test_ds.map(trans_func, lazy=False)
         batch_list = [
@@ -158,8 +158,8 @@ class Predictor(object):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id),
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
             Stack(dtype="int64")): fn(samples)
 
         results = []
@@ -234,7 +234,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set that you want to predict.")
     parser.add_argument('--save_path', type=str, required=True, default=None, help="The saving path of predict results.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--ext_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for extraction model.")
+    parser.add_argument("--cls_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for classification model.")
     parser.add_argument("--use_tensorrt", action='store_true', help="Whether to use inference engin TensorRT.")
     parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],help='The tensorrt precision.')
     parser.add_argument("--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.")

@@ -45,12 +45,12 @@ def format_print(results):
     print()
 
 
-def predict(ext_model,
+def predict(args,
+            ext_model,
             cls_model,
             tokenizer,
             ext_id2label,
-            cls_id2label,
-            max_seq_len=512):
+            cls_id2label):
 
     ext_model.eval()
     cls_model.eval()
@@ -67,7 +67,7 @@ def predict(ext_model,
         encoded_inputs = tokenizer(
             list(input_text),
             is_split_into_words=True,
-            max_seq_len=max_seq_len, )
+            max_seq_len=args.ext_max_seq_len)
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
         token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
 
@@ -76,7 +76,7 @@ def predict(ext_model,
         predictions = logits.argmax(axis=2).numpy()[0]
         tag_seq = [ext_id2label[idx] for idx in predictions][1:-1]
 
-        aps = decoding(input_text[:max_seq_len-2], tag_seq)
+        aps = decoding(input_text[:args.ext_max_seq_len-2], tag_seq)
 
         # predict sentiment for aspect with cls_model
         results = []
@@ -89,7 +89,7 @@ def predict(ext_model,
             encoded_inputs = tokenizer(
                 aspect_text,
                 text_pair=input_text,
-                max_seq_len=max_seq_len,
+                max_seq_len=args.cls_max_seq_len,
                 return_length=True)
             input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
             token_type_ids = paddle.to_tensor(
@@ -115,7 +115,8 @@ if __name__ == "__main__":
     parser.add_argument("--cls_model_path", type=str, default=None, help="The path of classification model path that you want to load.")
     parser.add_argument("--ext_label_path", type=str, default=None, help="The path of extraction label dict.")
     parser.add_argument("--cls_label_path", type=str, default=None, help="The path of classification label dict.")
-    parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--ext_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for extraction model.")
+    parser.add_argument("--cls_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for classification model.")
     args = parser.parse_args()
     # yapf: enbale
 
@@ -139,4 +140,4 @@ if __name__ == "__main__":
     print("classification model loaded.")
 
     # do predict
-    predict(ext_model, cls_model, tokenizer, ext_id2label, cls_id2label,  max_seq_len=args.max_seq_len)
+    predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label)
