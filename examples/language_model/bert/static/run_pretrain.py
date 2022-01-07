@@ -35,6 +35,9 @@ from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from dataset import create_data_holder, create_pretraining_dataset
 
+from paddle.fluid import core
+import sys
+
 MODEL_CLASSES = {"bert": (BertForPretraining, BertTokenizer)}
 
 
@@ -373,6 +376,19 @@ def do_train(args):
             total_samples = 0
             batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
+
+                # if step == 10:
+                #     core.nvprof_start()
+                #     core.nvprof_enable_record_event()
+                #     core.nvprof_nvtx_push(str(step))
+                # if step == 15:
+                #     core.nvprof_nvtx_pop()
+                #     core.nvprof_stop()
+                #     sys.exit()
+                # if step >= 10 and step < 15:
+                #     core.nvprof_nvtx_pop()
+                #     core.nvprof_nvtx_push(str(step))
+
                 train_reader_cost = time.time() - batch_start
                 reader_cost_avg.record(train_reader_cost)
                 global_step += 1
@@ -421,4 +437,5 @@ def do_train(args):
 if __name__ == "__main__":
     args = parse_args()
     print (args)
+    print("=======================>start static mode")
     do_train(args)

@@ -37,6 +37,8 @@ from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainin
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
+from paddle.fluid import core
+import sys
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -353,6 +355,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params)
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        model = paddle.amp.decorate(models=model, level='O2')
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
@@ -409,6 +412,19 @@ def do_train(args):
             total_samples = 0
             batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
+
+                # if step == 10:
+                #     core.nvprof_start()
+                #     core.nvprof_enable_record_event()
+                #     core.nvprof_nvtx_push(str(step))
+                # if step == 15:
+                #     core.nvprof_nvtx_pop()
+                #     core.nvprof_stop()
+                #     sys.exit()
+                # if step >= 10 and step < 15:
+                #     core.nvprof_nvtx_pop()
+                #     core.nvprof_nvtx_push(str(step))
+
                 train_reader_cost = time.time() - batch_start
                 reader_cost_avg.record(train_reader_cost)
                 global_step += 1
@@ -417,7 +433,8 @@ def do_train(args):
                  masked_lm_scale) = batch
                 with paddle.amp.auto_cast(
                         args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu"]):
+                        custom_white_list=["layer_norm", "softmax", "gelu"],
+                        level='O2'):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
@@ -433,7 +450,7 @@ def do_train(args):
                     loss.backward()
                     optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_grad()
+                optimizer.clear_grad(set_to_zero=False)
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
