@@ -81,18 +81,18 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
     }
     pretrained_init_configuration = {"blenderbot_small-90M": {}}
 
-    def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            errors='replace',
-            max_len=None,
-            special_tokens=None,
-            bos_token="__start__",
-            eos_token="__end__",
-            unk_token="__unk__",
-            pad_token="__null__",
-            eol_token="__newln__", ):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 errors='replace',
+                 max_len=None,
+                 special_tokens=None,
+                 bos_token="__start__",
+                 eos_token="__end__",
+                 unk_token="__unk__",
+                 pad_token="__null__",
+                 eol_token="__newln__",
+                 **kwargs):
         super(BlenderbotSmallTokenizer, self).__init__(
             vocab_file=vocab_file,
             merges_file=merges_file,
@@ -178,28 +178,6 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
             words.append(word)
         return " ".join(words)
 
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a sequence of tokens into ids.
-        Args：
-            tokens (list[int]): List of token ids.
-
-        Returns:
-            list: Converted id list.
-        """
-        ids = []
-        if isinstance(tokens, str):
-            if tokens in self.special_tokens:
-                return self.special_tokens[tokens]
-            else:
-                return self.encoder.get(tokens, self.unk_id)
-        for token in tokens:
-            if token in self.special_tokens:
-                ids.append(self.special_tokens[token])
-            else:
-                ids.append(self.encoder.get(token, self.unk_id))
-        return ids
-
     def convert_tokens_to_string(self, tokens):
         """
         Converts a sequence of tokens (list of string) to a single string.
@@ -238,25 +216,3 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
                              .replace(" 'm", "'m").replace(" 's", "'s")
                              .replace(" 've", "'ve").replace(" 're", "'re"))
         return output_string
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts a token id or a sequence of token ids (integer) to a token or
-        a sequence of tokens (str) by using the `vocab` attribute (an instance
-        of `Vocab`).
-
-        Args:
-            ids (int` or `list[int]):
-                A token id or a sequence of token ids.
-            skip_special_tokens (bool, optional):
-                Whether to skip and not decode special tokens when converting. Defaults to `False`.
-        Returns:
-            str: Converted token or token sequence.
-        """
-        tokens = [self.decoder[i] for i in ids]
-        if skip_special_tokens and isinstance(tokens, list):
-            tokens = [
-                token for token in tokens
-                if token not in self.all_special_tokens
-            ]
-        return tokens

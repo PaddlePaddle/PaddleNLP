@@ -46,7 +46,7 @@ def parse_args():
         ],
         help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling', 'beam_search_v2']. "
     )
-    parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
+    parser.add_argument("--beam_size", default=4, type=int, help="Beam size. ")
     parser.add_argument(
         "--topk",
         default=4,
