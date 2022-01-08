@@ -2,7 +2,7 @@
 
 本项目中，无论是评论观点抽取模型，还是属性级情感分类模型，使用的均是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目提供了开源小模型 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 及量化加速方案，大幅提升预测性能。
 
-在本项目中，我们基于 PP-MiniLM 中文特色小模型进行 fine-tune 属性级情感分类模型，然后使用 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型量化，减小模型规模，加快模型预测性能。
+在本项目中，我们基于 PP-MiniLM 中文特色小模型进行 fine-tune 属性级情感分类模型，然后使用 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型量化，减小模型规模，加快模型预测性能。 
 
 ## 1. 基于 PP-MiniLM 训练属性级情感分类模型
 
@@ -35,18 +35,18 @@
 在分类模型训练过程中，总共训练了10轮，并选择了评估 F1 得分最高的 best 模型， 下表展示了训练过程中使用的训练参数。我们同时开源了相应的模型，可点击下表的 `PP-MiniLM_cls` 进行下载，下载后将模型重命名为 `best.pdparams`，然后放入父目录的 `checkpoints/pp_checkpoints` 中。
 |Model|训练参数配置|MD5|
 | ------------ | ------------ |-----------|
-|[PP-MiniLM_cls](https://bj.bcebos.com/paddlenlp/models/best_mini.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|d04fc43efa61c77f47c23ef042dcb325|
+|[PP-MiniLM_cls](https://bj.bcebos.com/paddlenlp/models/best_mini.pdparams)|<div style="width: 150pt"> learning_rate: 3e-5, batch_size: 16, max_seq_len:256, epochs：10 </div>|643d358620e84879921b42d326f97aae|
 
 我们基于训练过程中的 best 模型在 `cls_data` 验证集 `dev` 和测试集 `test` 上进行了评估测试，模型效果如下表所示:
 |Model|数据集|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
-|PP-MiniLM|dev_set|0.98624|0.99183|0.98903|
-|PP-MiniLM|test_set|0.98379|0.98859|0.98618|
+|PP-MiniLM|dev_set|0.98668|0.99115|0.98891|
+|PP-MiniLM|test_set|0.98263|0.98766|0.98514|
 
 **备注**：以上数据是基于全量数据训练和测试结果，并非 Demo 数据集。
 
 ### 1.4 模型训练
-在训练之前需要下载 PP-MiniLM 小模型（包括模型和 tokenizer ），然后统一放入父目录的 `checkpoints/ppminilm/` 文件夹下，接下来便可以通过运行以下命令进行分类小模型训练：
+通过运行以下命令进行分类小模型训练，模型训练后会默认保存到父目录的`checkpoints/pp_checkpoints/`文件夹下：
 ```shell
 sh run_train.sh
 ```
@@ -75,7 +75,7 @@ sh run_quant.sh
 最后，对量化后的小模型可使用 `performance_test.py` 进行评估， 该脚本主要用于性能测试，如果需要做评估，需要设置 `--eval`，如下所示：
 ```shell
 python  performance_test.py \
-        --base_model_path "../checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --model_path "../checkpoints/pp_checkpoints/quant/infer" \
         --test_path "../data/cls_data/test.txt" \
         --label_path "../data/cls_data/label.dict" \
@@ -99,7 +99,7 @@ python  performance_test.py \
 首先，设置 `--collect_shape` 参数，生成 shape range info 文件：
 ```shell
 python  performance_test.py \
-        --base_model_path "../checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --model_path "../checkpoints/pp_checkpoints/quant/infer" \
         --test_path "../data/cls_data/test.txt" \
         --label_path "../data/cls_data/label.dict" \
@@ -110,10 +110,10 @@ python  performance_test.py \
         --int8 \
         --collect_shape
 ```
-然后，基于 shape range info 文件进行预测：
+然后，开始进行性能测试：
 ```shell
 python  performance_test.py \
-        --base_model_path "../checkpoints/pp_minilm" \
+        --base_model_name "ppminilm-6l-768h" \
         --model_path "../checkpoints/pp_checkpoints/quant/infer" \
         --test_path "../data/cls_data/test.txt" \
         --label_path "../data/cls_data/label.dict" \
@@ -132,5 +132,5 @@ python  performance_test.py \
 |Model|运行时间(s)|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
 |SKEP-Large|1.00x|0.98497|0.99139|0.98817|
-|PP-MiniLM|4.95x|0.98379|0.98859|0.98618|
-|量化 PP-MiniLM|8.93x|0.98312|0.98953|0.98631|
+|PP-MiniLM|4.95x|0.98263|0.98766|0.98514|
+|量化 PP-MiniLM|8.93x|0.97696|0.98720|0.98205|
