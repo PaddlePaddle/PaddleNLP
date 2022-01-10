@@ -33,30 +33,109 @@ from encode import convert_example, after_padding
 from decode import post_process, beam_search_infilling
 from model import StackModel
 
-# yapf: disable
 parser = argparse.ArgumentParser('seq2seq model with ERNIE-GEN')
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: "+ ", ".join(list(ErnieTokenizer.pretrained_init_configuration.keys())))
-parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.",)
-parser.add_argument('--max_encode_len', type=int, default=5, help="The max encoding sentence length")
-parser.add_argument('--max_decode_len', type=int, default=5, help="The max decoding sentence length")
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.1, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-parser.add_argument("--num_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
-parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion.")
-parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
-parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
-parser.add_argument('--beam_width', type=int, default=1, help="Beam search width")
-parser.add_argument('--noise_prob', type=float, default=0., help='Probability of token be repalced')
-parser.add_argument('--use_random_noice', action='store_true', help='If set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
-parser.add_argument('--label_smooth', type=float, default=0., help="The soft label smooth rate")
-parser.add_argument('--length_penalty', type=float, default=1.0, help="The length penalty during decoding")
-parser.add_argument('--init_checkpoint', type=str, default=None, help='Checkpoint to warm start from')
-parser.add_argument('--save_dir', type=str, default=None, help='Model output directory')
-parser.add_argument("--max_steps",default=-1,type=int,help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-# yapf: enable
+parser.add_argument(
+    "--model_name_or_path",
+    default=None,
+    type=str,
+    required=True,
+    help="Path to pre-trained model or shortcut name selected in the list: " +
+    ", ".join(list(ErnieTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument(
+    "--output_dir",
+    default=None,
+    type=str,
+    required=True,
+    help="The output directory where the model predictions and checkpoints will be written.",
+)
+parser.add_argument(
+    '--max_encode_len',
+    type=int,
+    default=5,
+    help="The max encoding sentence length")
+parser.add_argument(
+    '--max_decode_len',
+    type=int,
+    default=5,
+    help="The max decoding sentence length")
+parser.add_argument(
+    "--batch_size",
+    default=8,
+    type=int,
+    help="Batch size per GPU/CPU for training.", )
+parser.add_argument(
+    "--learning_rate",
+    default=5e-5,
+    type=float,
+    help="The initial learning rate for Adam.")
+parser.add_argument(
+    "--weight_decay",
+    default=0.1,
+    type=float,
+    help="Weight decay if we apply some.")
+parser.add_argument(
+    "--adam_epsilon",
+    default=1e-8,
+    type=float,
+    help="Epsilon for Adam optimizer.")
+parser.add_argument(
+    "--num_epochs",
+    default=3,
+    type=int,
+    help="Total number of training epochs to perform.", )
+parser.add_argument(
+    "--warmup_proportion",
+    default=0.1,
+    type=float,
+    help="Linear warmup proportion.")
+parser.add_argument(
+    "--logging_steps", type=int, default=1, help="Log every X updates steps.")
+parser.add_argument(
+    "--save_steps",
+    type=int,
+    default=100,
+    help="Save checkpoint every X updates steps.")
+parser.add_argument(
+    "--device",
+    default="gpu",
+    type=str,
+    choices=["cpu", "gpu", "xpu"],
+    help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument(
+    '--beam_width', type=int, default=1, help="Beam search width.")
+parser.add_argument(
+    '--noise_prob',
+    type=float,
+    default=0.,
+    help='Probability of token be repalced.')
+parser.add_argument(
+    '--use_random_noice',
+    action='store_true',
+    help='If set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`.'
+)
+parser.add_argument(
+    '--label_smooth',
+    type=float,
+    default=0.,
+    help="The soft label smooth rate.")
+parser.add_argument(
+    '--length_penalty',
+    type=float,
+    default=1.0,
+    help="The length penalty during decoding.")
+parser.add_argument(
+    '--init_checkpoint',
+    type=str,
+    default=None,
+    help='Checkpoint to warm start from.')
+parser.add_argument(
+    '--save_dir', type=str, default=None, help='Model output directory.')
+parser.add_argument(
+    "--max_steps",
+    default=-1,
+    type=int,
+    help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+)
 
 args = parser.parse_args()
 
