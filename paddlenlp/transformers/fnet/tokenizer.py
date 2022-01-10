@@ -96,8 +96,8 @@ class FNetTokenizer(AlbertEnglishTokenizer):
     }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "fnet-base": "https://huggingface.co/HJHGJGHHG/paddle-fnet-base/resolve/main/spiece.model",
-            "fnet-large": "https://huggingface.co/HJHGJGHHG/paddle-fnet-large/resolve/main/spiece.model",
+            "fnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-base/spiece.model",
+            "fnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-large/spiece.model",
         }
     }
     pretrained_init_configuration = {
