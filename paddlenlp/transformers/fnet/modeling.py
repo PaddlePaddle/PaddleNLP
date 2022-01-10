@@ -22,20 +22,6 @@ from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "FNetBasicOutput",
-    "FNetOutput",
-    "FNetIntermediate",
-    "FNetLayer",
-    "FNetEncoder",
-    "FNetPooler",
-    "FNetEmbeddings",
-    "FNetBasicFourierTransform",
-    "FNetFourierTransform",
-    "FNetPredictionHeadTransform",
-    "FNetLMPredictionHead",
-    "FNetOnlyMLMHead",
-    "FNetOnlyNSPHead",
-    "FNetPreTrainingHeads",
     "FNetPretrainedModel",
     "FNetModel",
     "FNetForSequenceClassification",
@@ -396,8 +382,8 @@ class FNetPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "fnet-base": "https://huggingface.co/HJHGJGHHG/paddle-fnet-base/resolve/main/model_state.pdparams",
-            "fnet-large": "https://huggingface.co/HJHGJGHHG/paddle-fnet-large/resolve/main/model_state.pdparams"
+            "fnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-base/model_state.pdparams",
+            "fnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-large/model_state.pdparams",
         }
     }
     base_model_prefix = "fnet"
