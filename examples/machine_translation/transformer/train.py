@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 from pprint import pprint
 from attrdict import AttrDict
+import inspect
 
 import paddle
 import paddle.distributed as dist
@@ -195,7 +196,10 @@ def do_train(args):
                 scaled.backward()  # do backward
 
                 scaler.minimize(optimizer, scaled)  # update parameters
-                optimizer.clear_grad(set_to_zero=False)
+                if 'set_to_zero' in inspect.getfullargspec(optimizer.clear_grad).args:
+                    optimizer.clear_grad(set_to_zero=False)
+                else:
+                    optimizer.clear_grad()
             else:
                 logits = transformer(src_word=src_word, trg_word=trg_word)
                 sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
@@ -204,7 +208,7 @@ def do_train(args):
                 avg_cost.backward()
 
                 optimizer.step()
-                optimizer.clear_grad(set_to_zero=False)
+                optimizer.clear_grad()
 
             train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
