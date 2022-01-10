@@ -111,9 +111,11 @@ my_seg("平原上的火焰计划于年末上映")
 
 #### 自定义任务
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/word_sementation/lac/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/word_sementation/lac/`。
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、标签字典）：
 ```text
@@ -193,9 +195,11 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 
 #### 自定义任务
 
-用户也可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+任务的默认路径为`$HOME/.paddlenlp/taskflow/word_sementation/lac/`，默认路径下包含了执行该任务需要的所有文件。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/pos_tagging/lac/`。
+用户也可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、标签字典）：
 ```text
@@ -263,9 +267,11 @@ my_ner("《长津湖》收尾，北美是最大海外票仓")
 
 #### 自定义任务
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/ner/wordtag/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义NER模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/ner/wordtag/`。
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、标签文件）：
 ```text
@@ -304,9 +310,11 @@ corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇�
 
 #### 自定义任务
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义模型，参考[文本纠错训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc)。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0/`。
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、拼音字典文件）：
 ```text
@@ -369,9 +377,11 @@ ddp.from_segments([['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球
 
 #### 自定义任务
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义模型，参考[句法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser/`。
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、字典文件）：
 ```text
@@ -454,7 +464,9 @@ senta("作为老的四星酒店，房间依然很整洁，相当不错。机场�
 
 - 自定义bilstm模型
 
-通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/bilstm/`。
+任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/bilstm/`，默认路径下包含了执行该任务需要的所有文件。
+
+通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、字典文件）：
 ```text
@@ -473,9 +485,11 @@ my_senta = Taskflow("sentiment_analysis", task_path="./custom_task_path/")
 
 - 自定义SKEP模型
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义模型，参考[SKEP情感分类任务](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep)。
 
-通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/`。
+通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径需要有如下文件（用户自己的模型权重、模型参数配置文件）：
 ```text
@@ -562,10 +576,12 @@ my_wordtag("《长津湖》收尾，北美是最大海外票仓")
 
 #### 自定义任务
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag/`，默认路径下包含了执行该任务需要的所有文件。
+
 用户也可以使用自己的数据训练自定义模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 除了自定义模型，Taskflow还支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking。
 
-可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag/`。
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径包含如下文件（用户自己的模型权重、模型参数配置、标签、百科知识树文件）：
 ```text
@@ -614,7 +630,11 @@ nptag(["糖醋排骨", "红曲霉菌"])
 
 #### 自定义任务
 
-- 自定义
+任务的默认路径为`$HOME/.paddlenlp/taskflow/knowledge_mining/nptag/`，默认路径下包含了执行该任务需要的所有文件。
+
+用户也可以使用自己的数据训练自定义模型，参考[名词短语标注训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag)。
+
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
 
 自定义路径包含如下文件（用户自己的模型权重、模型参数配置、标签文件）：
 ```text
