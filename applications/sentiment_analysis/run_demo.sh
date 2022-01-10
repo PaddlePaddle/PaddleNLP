@@ -5,5 +5,6 @@ python  demo.py \
         --cls_model_path "./checkpoints/cls_checkpoints/best.pdparams" \
         --ext_label_path "./data/ext_data/label.dict" \
         --cls_label_path "./data/cls_data/label.dict" \
-        --max_seq_len 256
+        --ext_max_seq_len 512 \
+        --cls_max_seq_len 256
 

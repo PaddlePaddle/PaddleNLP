@@ -203,41 +203,42 @@ def convert_example_to_feature(
 
 
 class DuIEDataset(paddle.io.Dataset):
-    """
-    Dataset of DuIE.
-    """
-
-    def __init__(
-            self,
-            input_ids: List[Union[List[int], np.ndarray]],
-            seq_lens: List[Union[List[int], np.ndarray]],
-            tok_to_orig_start_index: List[Union[List[int], np.ndarray]],
-            tok_to_orig_end_index: List[Union[List[int], np.ndarray]],
-            labels: List[Union[List[int], np.ndarray, List[str], List[Dict]]]):
+    def __init__(self,
+                 data,
+                 label_map,
+                 tokenizer,
+                 max_length=512,
+                 pad_to_max_length=False):
         super(DuIEDataset, self).__init__()
 
-        self.input_ids = input_ids
-        self.seq_lens = seq_lens
-        self.tok_to_orig_start_index = tok_to_orig_start_index
-        self.tok_to_orig_end_index = tok_to_orig_end_index
-        self.labels = labels
+        self.data = data
+        self.chn_punc_extractor = ChineseAndPunctuationExtractor()
+        self.tokenizer = tokenizer
+        self.max_seq_length = max_length
+        self.pad_to_max_length = pad_to_max_length
+        self.label_map = label_map
 
     def __len__(self):
-        if isinstance(self.input_ids, np.ndarray):
-            return self.input_ids.shape[0]
-        else:
-            return len(self.input_ids)
+        return len(self.data)
 
     def __getitem__(self, item):
+
+        example = json.loads(self.data[item])
+        input_feature = convert_example_to_feature(
+            example, self.tokenizer, self.chn_punc_extractor, self.label_map,
+            self.max_seq_length, self.pad_to_max_length)
         return {
-            "input_ids": np.array(self.input_ids[item]),
-            "seq_lens": np.array(self.seq_lens[item]),
-            "tok_to_orig_start_index":
-            np.array(self.tok_to_orig_start_index[item]),
-            "tok_to_orig_end_index": np.array(self.tok_to_orig_end_index[item]),
+            "input_ids": np.array(
+                input_feature.input_ids, dtype="int64"),
+            "seq_lens": np.array(
+                input_feature.seq_len, dtype="int64"),
+            "tok_to_orig_start_index": np.array(
+                input_feature.tok_to_orig_start_index, dtype="int64"),
+            "tok_to_orig_end_index": np.array(
+                input_feature.tok_to_orig_end_index, dtype="int64"),
             # If model inputs is generated in `collate_fn`, delete the data type casting.
             "labels": np.array(
-                self.labels[item], dtype=np.float32),
+                input_feature.labels, dtype="float32"),
         }
 
     @classmethod
@@ -255,30 +256,10 @@ class DuIEDataset(paddle.io.Dataset):
         ), f"{label_map_path} dose not exists or is not a file."
         with open(label_map_path, 'r', encoding='utf8') as fp:
             label_map = json.load(fp)
-        chineseandpunctuationextractor = ChineseAndPunctuationExtractor()
-
-        input_ids, seq_lens, tok_to_orig_start_index, tok_to_orig_end_index, labels = (
-            [] for _ in range(5))
-        dataset_scale = sum(1 for line in open(
-            file_path, 'r', encoding="UTF-8"))
-        logger.info("Preprocessing data, loaded from %s" % file_path)
         with open(file_path, "r", encoding="utf-8") as fp:
-            lines = fp.readlines()
-            for line in tqdm(lines):
-                example = json.loads(line)
-                input_feature = convert_example_to_feature(
-                    example, tokenizer, chineseandpunctuationextractor,
-                    label_map, max_length, pad_to_max_length)
-                input_ids.append(input_feature.input_ids)
-                seq_lens.append(input_feature.seq_len)
-                tok_to_orig_start_index.append(
-                    input_feature.tok_to_orig_start_index)
-                tok_to_orig_end_index.append(
-                    input_feature.tok_to_orig_end_index)
-                labels.append(input_feature.labels)
-
-        return cls(input_ids, seq_lens, tok_to_orig_start_index,
-                   tok_to_orig_end_index, labels)
+            data = fp.readlines()
+            return cls(data, label_map, tokenizer, max_length,
+                       pad_to_max_length)
 
 
 @dataclass

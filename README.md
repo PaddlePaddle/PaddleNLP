@@ -13,7 +13,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！**12.28-12.30**直播课[直通车](https://paddleqiyeban.wjx.cn/vj/txe5jBZ.aspx?udsid=178736)！:tada: 
+* [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 * [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
 * [2021-12-12] 飞桨新产品**端到端问答工具**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA)全新发布！:tada:
 
@@ -312,13 +312,14 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 - 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例等。
 
-### QQ
+### WeChat
 
-- 现在就加入PaddleNLP的QQ技术交流群，一起交流NLP技术吧！⬇️
+- 现在就加入PaddleNLP的技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
-  <img src="./docs/imgs/qq.png" width="200" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/148375398-f9a1b4db-66ba-4325-8a1d-abfc47780c7c.png" width="200" height="200" />
 </div>  
+
 
 ## 版本更新
 
