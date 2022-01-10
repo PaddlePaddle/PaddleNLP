@@ -72,6 +72,11 @@ def parse_args():
         default=None,
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--num_workers",
+        default=0,
+        type=int,
+        help="The num_workers for Dataloader. ")
     args = parser.parse_args()
     return args
 
@@ -120,7 +125,8 @@ def do_train(args):
         args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
 
     # Define optimizer
-    if 'use_multi_tensor' not in inspect.getfullargspec(paddle.optimizer.Adam.__init__).args:
+    if 'use_multi_tensor' not in inspect.getfullargspec(
+            paddle.optimizer.Adam.__init__).args:
         optimizer = paddle.optimizer.Adam(
             learning_rate=scheduler,
             beta1=args.beta1,
@@ -151,13 +157,14 @@ def do_train(args):
             os.path.join(args.init_from_pretrain_model, "transformer.pdparams"))
         transformer.set_state_dict(model_dict)
         print("loaded from pre-trained model.")
-    
+
     # for amp training
-    amp_level='O1'
+    amp_level = 'O1'
     if args.use_amp and args.use_pure_fp16:
-        amp_level='O2'
+        amp_level = 'O2'
     if args.use_amp:
-        scaler = paddle.amp.GradScaler(enable=True, init_loss_scaling=args.scale_loss)
+        scaler = paddle.amp.GradScaler(
+            enable=True, init_loss_scaling=args.scale_loss)
         transformer = paddle.amp.decorate(models=transformer, level=amp_level)
 
     # for distributed training
@@ -188,7 +195,11 @@ def do_train(args):
             (src_word, trg_word, lbl_word) = input_data
 
             if args.use_amp:
-                with paddle.amp.auto_cast(custom_black_list={'scale', 'reduce_sum', 'elementwise_div'} if amp_level=='O2' else {}, level=amp_level):
+                with paddle.amp.auto_cast(
+                        custom_black_list={
+                            'scale', 'reduce_sum', 'elementwise_div'
+                        } if amp_level == 'O2' else {},
+                        level=amp_level):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
@@ -197,7 +208,8 @@ def do_train(args):
                 scaled.backward()  # do backward
 
                 scaler.minimize(optimizer, scaled)  # update parameters
-                if 'set_to_zero' in inspect.getfullargspec(optimizer.clear_grad).args:
+                if 'set_to_zero' in inspect.getfullargspec(
+                        optimizer.clear_grad).args:
                     optimizer.clear_grad(set_to_zero=False)
                 else:
                     optimizer.clear_grad()
@@ -255,11 +267,15 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        with paddle.amp.auto_cast(custom_black_list={'scale', 'reduce_sum', 'elementwise_div'} if amp_level=='O2' else {}, level=amp_level):
+                        with paddle.amp.auto_cast(
+                                custom_black_list={
+                                    'scale', 'reduce_sum', 'elementwise_div'
+                                } if amp_level == 'O2' else {},
+                                level=amp_level):
                             logits = transformer(
                                 src_word=src_word, trg_word=trg_word)
                             sum_cost, avg_cost, token_num = criterion(logits,
-                                                                    lbl_word)
+                                                                      lbl_word)
                         total_sum_cost += sum_cost.numpy()
                         total_token_num += token_num.numpy()
                         total_avg_cost = total_sum_cost / total_token_num
@@ -320,6 +336,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.num_workers = ARGS.num_workers
     pprint(args)
 
     do_train(args)
