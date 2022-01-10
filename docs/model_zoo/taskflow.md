@@ -44,7 +44,7 @@
 ### 环境依赖
 - python >= 3.6
 - paddlepaddle >= 2.2.0
-- paddlenlp >= 2.1.0
+- paddlenlp >= 2.2.0
 
 ## 用法
 
@@ -109,15 +109,17 @@ my_seg("平原上的火焰计划于年末上映")
 >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
 ```
 
-#### 自定义模型
+#### 自定义任务
 
-用户可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+用户也可以使用自己的数据训练自定义中文分词模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
-通过`task_path`指定用户自定义路径，文件组成：
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/word_sementation/lac/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、标签字典）：
 ```text
 custom_task_path/
 ├── model_state.pdparams
-├── word.dict
+├── word.dic
 ├── tag.dic
 └── q2b.dic
 ```
@@ -133,7 +135,7 @@ my_seg = Taskflow("word_segmentation", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义模型路径，默认为None。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 词性标注
 
@@ -189,17 +191,19 @@ my_tag("赛里木湖是新疆海拔最高的高山湖泊")
 >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
 ```
 
-#### 自定义模型
+#### 自定义任务
 
-用户可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
+用户也可以使用自己的数据训练自定义词性标注模型，参考[词法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)。
 
-通过`task_path`定义用户自定义路径，文件组成：
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/pos_tagging/lac/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、标签字典）：
 ```text
 custom_task_path/
 ├── model_state.pdparams
-├── word.dict
+├── word.dic
 ├── tag.dic
-└── q2b.dic 
+└── q2b.dic
 ```
 
 使用Taskflow加载自定义模型进行一键预测：
@@ -213,7 +217,7 @@ my_tag = Taskflow("pos_tagging", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义模型路径，默认为None。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 命名实体识别
 
@@ -257,11 +261,13 @@ my_ner("《长津湖》收尾，北美是最大海外票仓")
 >>> [('《', 'w'), ('长津湖', '电影类_实体'), ('》', 'w'), ('收', '词汇用语'), ('尾', '术语类'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最', '修饰词'), ('大', '修饰词'), ('海外票仓', '场所类')]
 ```
 
-#### 自定义模型
+#### 自定义任务
 
-用户可以使用自己的数据训练自定义NER模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
+用户也可以使用自己的数据训练自定义NER模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 
-通过`task_path`定义用户自定义路径，文件组成：
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/ner/wordtag/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、标签文件）：
 ```text
 custom_task_path/
 ├── model_state.pdparams
@@ -280,7 +286,7 @@ my_ner = Taskflow("ner", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
-* `task_path`：自定义模型路径，默认为None。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 文本纠错
 
@@ -296,9 +302,31 @@ corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇�
 >>> [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 'errors': [{'position': 3, 'correction': {'竟': '境'}}]}, {'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。', 'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。', 'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}]
 ```
 
+#### 自定义任务
+
+用户也可以使用自己的数据训练自定义模型，参考[文本纠错训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc)。
+
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、拼音字典文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+└── pinyin_vocab.txt
+```
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_ner = Taskflow("text_correction", task_path="./custom_task_path/")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 句法分析
 
@@ -339,6 +367,28 @@ ddp.from_segments([['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球
 >>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
 ```
 
+#### 自定义任务
+
+用户也可以使用自己的数据训练自定义模型，参考[句法分析训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)。
+
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、字典文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+├── rel_vocab.json
+└── word_vocab.json
+```
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_ddp = Taskflow("dependency_parsing", task_path="./custom_task_path/")
+```
+
 #### 依存关系可视化：
 
 ```python
@@ -372,12 +422,13 @@ cv2.imwrite('test.png', result)
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：选择任务使用的模型，可选有`ddparser`，`ddparser-ernie-1.0`和`ddparser-ernie-gram-zh`。
 * `tree`：确保输出结果是正确的依存句法树，默认为True。
 * `prob`：是否输出每个弧对应的概率值，默认为False。
 * `use_pos`：是否返回词性标签，默认为False。
 * `use_cuda`：是否使用GPU进行切词，默认为False。
 * `return_visual`：是否返回句法树的可视化结果，默认为False。
-
+* `task_path`：自定义任务路径，默认为None。
 
 ### 情感分析
 
@@ -397,10 +448,55 @@ senta("作为老的四星酒店，房间依然很整洁，相当不错。机场�
 >>> [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive', 'score': 0.984320878982544}]
 ```
 
+#### 自定义任务
+
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
+
+- 自定义bilstm模型
+
+通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/bilstm/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、字典文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+└── vocab.txt
+```
+
+使用Taskflow加载自定义bilstm模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_senta = Taskflow("sentiment_analysis", task_path="./custom_task_path/")
+```
+
+- 自定义SKEP模型
+
+用户也可以使用自己的数据训练自定义模型，参考[SKEP情感分类任务](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep)。
+
+通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/`。
+
+自定义路径需要有如下文件（用户自己的模型权重、模型参数配置文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+└── model_config.json
+```
+
+使用Taskflow加载自定义SKEP模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch", task_path="./custom_task_path/")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，可选有`bilstm`和`skep_ernie_1.0_large_ch`。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 文本相似度
 
@@ -419,6 +515,7 @@ similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找�
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：最大序列长度，默认为128。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 知识挖掘-词类知识标注
 
@@ -463,12 +560,14 @@ my_wordtag("《长津湖》收尾，北美是最大海外票仓")
 >>> [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '电影类_实体', 'length': 3}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收', 'offset': 5, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '尾', 'offset': 6, 'wordtag_label': '术语类', 'length': 1, 'termid': '动物体构造_cb_动物尾巴'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1}, {'item': '大', 'offset': 12, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_大'}, {'item': '海外票仓', 'offset': 13, 'wordtag_label': '场所类', 'length': 4}]}]
 ```
 
-#### 自定义模型
+#### 自定义任务
 
-用户可以使用自己的数据训练自定义NER模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
+用户也可以使用自己的数据训练自定义模型，参考[WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
 除了自定义模型，Taskflow还支持使用[自定义TermTree](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree)来实现自定义Term-Linking。
 
-通过`task_path`定义用户自定义路径，文件组成：
+可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致，该任务的默认路径为`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag/`。
+
+自定义路径包含如下文件（用户自己的模型权重、模型参数配置、标签、百科知识树文件）：
 ```text
 custom_task_path/
 ├── model_state.pdparams
@@ -477,6 +576,8 @@ custom_task_path/
 ├── termtree_type.csv
 └── termtree_data
 ```
+**NOTE**: 因为该任务包含自定义模型与自定义TermTree两部分，若用户只想使用自己的WordTag模型而使用默认TermTree，则路径下只需要有`model_state.pdparams`、`model_config.json`和`tags.txt`即可；
+若用户只使用自定义的TermTree而使用默认的WordTag模型，则路径下只需要有`termtree_type.csv`和`termtree_data`即可。
 
 使用Taskflow加载自定义模型进行一键预测：
 
@@ -490,7 +591,7 @@ my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `linking`：实现基于词类的linking，默认为True。
-* `task_path`：自定义模型路径，默认为None。
+* `task_path`：自定义任务路径，默认为None。
 * `user_dict`：用户自定义词典文件，默认为None。
 
 ### 知识挖掘-名词短语标注
@@ -511,11 +612,32 @@ nptag(["糖醋排骨", "红曲霉菌"])
 >>> [{'text': '糖醋排骨', 'label': '菜品', 'category': '饮食类_菜品'}, {'text': '红曲霉菌', 'label': '微生物', 'category': '生物类_微生物'}]
 ```
 
+#### 自定义任务
+
+- 自定义
+
+自定义路径包含如下文件（用户自己的模型权重、模型参数配置、标签文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+├── model_config.json
+└── name_category_map.json
+```
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_nptag = Taskflow("knowledge_mining", model="nptag", task_path="./custom_task_path/")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：最大序列长度，默认为64。
 * `linking`：实现与WordTag类别标签的linking，默认为False。
+* `task_path`：自定义任务路径，默认为None。
 
 ### 生成式问答
 
@@ -605,3 +727,7 @@ from paddlenlp import Taskflow
 ner = Taskflow("ner", home_path="/workspace")
 ```
 通过以上方式即可将ner任务相关文件保存至`/workspace`路径下。
+
+### Q2 Taskflow如何自定义任务？
+
+**A:** 参考具体任务中的`自定义任务`说明，用户可按照示例在特定路径配置任务所需的模型权重、字典等文件，然后通过`task_path`指定自定义任务路径以一键装载任务相关文件。自然语言生成任务暂时不支持自定义任务。
