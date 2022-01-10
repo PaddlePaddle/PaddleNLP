@@ -20,7 +20,6 @@ import math
 import random
 import time
 import json
-import distutils.util
 from functools import partial
 
 import numpy as np
@@ -119,11 +118,6 @@ def parse_args():
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument(
-        "--save_inference_model_with_tokenizer",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to save inference model with tokenizer.")
-    parser.add_argument(
         "--n_gpu",
         type=int,
         default=1,
@@ -166,7 +160,7 @@ def do_train(args):
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
-    model.use_faster_tokenizer = True
+    model.use_faster_tokenizer = args.use_faster_tokenizer
 
     origin_model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
@@ -203,7 +197,7 @@ def do_train(args):
     if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
         is_text_pair = False
 
-    if args.save_inference_model_with_tokenizer:
+    if args.use_faster_tokenizer:
         ofa_model.model.add_faster_tokenizer_op()
         if is_text_pair:
             origin_model_new = ofa_model.export(
@@ -220,6 +214,7 @@ def do_train(args):
                 input_dtypes=core.VarDesc.VarType.STRINGS,
                 origin_model=origin_model)
     else:
+        ofa_model.model.use_faster_tokenizer = args.use_faster_tokenizer
         origin_model_new = ofa_model.export(
             best_config,
             input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
@@ -238,10 +233,9 @@ def do_train(args):
     model_to_save.save_pretrained(output_dir)
 
     if args.static_sub_model != None:
-        origin_model_new.use_faster_tokenizer = True
         origin_model_new.to_static(
             args.static_sub_model,
-            use_faster_tokenizer=args.save_inference_model_with_tokenizer,
+            use_faster_tokenizer=args.use_faster_tokenizer,
             is_text_pair=is_text_pair)
 
 
