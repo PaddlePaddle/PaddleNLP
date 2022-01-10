@@ -258,8 +258,8 @@ def do_train(args):
 
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=train_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(

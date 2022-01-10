@@ -26,7 +26,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
 def parse_args():
@@ -258,8 +258,8 @@ class Predictor(object):
         for example in data:
             example = convert_example(
                 example,
+                label_list,
                 tokenizer,
-                label_list=label_list,
                 max_seq_length=args.max_seq_length)
             examples.append(example)
 
@@ -321,9 +321,7 @@ def main():
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     else:
         trans_func = partial(
-            get_example_for_faster_tokenizer,
-            label_list=dev_ds.label_list,
-            is_test=False)
+            convert_example, label_list=dev_ds.label_list, is_test=False)
         dev_ds = dev_ds.map(trans_func, lazy=True)
     if not args.use_faster_tokenizer:
         batchify_fn = lambda samples, fn=Tuple(

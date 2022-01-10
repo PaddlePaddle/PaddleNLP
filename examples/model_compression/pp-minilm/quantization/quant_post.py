@@ -28,7 +28,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import PPMiniLMTokenizer
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES, get_example_for_faster_tokenizer
+from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 parser = argparse.ArgumentParser()
 
@@ -98,16 +98,13 @@ def quant_post(args, batch_size=8, algo='avg'):
 
     dev_ds = load_dataset("clue", args.task_name, splits="dev")
     if args.use_faster_tokenizer:
-        trans_func = partial(
-            get_example_for_faster_tokenizer,
-            label_list=dev_ds.label_list,
-            max_seq_len=args.max_seq_length)
+        trans_func = partial(convert_example, label_list=dev_ds.label_list)
     else:
         tokenizer = PPMiniLMTokenizer.from_pretrained("ppminilm-6l-768h")
         trans_func = partial(
             convert_example,
-            tokenizer=tokenizer,
             label_list=dev_ds.label_list,
+            tokenizer=tokenizer,
             max_seq_length=128,
             is_test=True)
     dev_ds = dev_ds.map(trans_func, lazy=True)

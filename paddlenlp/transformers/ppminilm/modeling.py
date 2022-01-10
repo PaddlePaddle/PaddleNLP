@@ -162,11 +162,9 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
     def to_static(self,
                   output_path,
                   use_faster_tokenizer=True,
-                  is_text_pair=False,
-                  pad_to_max_seq_len=False):
+                  is_text_pair=False):
         self.eval()
         self.use_faster_tokenizer = use_faster_tokenizer
-        self.pad_to_max_seq_len = pad_to_max_seq_len
         # Convert to static graph with specific input description
         if self.use_faster_tokenizer:
             self.add_faster_tokenizer_op()
@@ -180,7 +178,6 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
                             shape=[None], dtype=core.VarDesc.VarType.STRINGS)
                     ])
             else:
-
                 model = paddle.jit.to_static(
                     self,
                     input_spec=[
@@ -318,11 +315,16 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-            token_type_ids (Tensor, optional):
+            input_ids (Tensor, List[string]):
+                If `input_ids` is a Tensor object, it is an indices of input
+                sequence tokens in the vocabulary. They are numerical
+                representations of tokens that build the input sequence. It's
+                data type should be `int64` and has a shape of [batch_size, sequence_length].
+                If `input_ids` is a list of string, `self.use_faster_tokenizer`
+                should be True, and the network contains `faster_tokenizer`
+                operator.
+            token_type_ids (Tensor, string, optional):
+                If `token_type_ids` is a Tensor object:
                 Segment token indices to indicate different portions of the inputs.
                 Selected in the range ``[0, type_vocab_size - 1]``.
                 If `type_vocab_size` is 2, which means the inputs have two portions.
@@ -333,6 +335,10 @@ class PPMiniLMModel(PPMiniLMPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
+
+                If `token_type_ids` is a list of string: `self.use_faster_tokenizer`
+                should be True, and the network contains `faster_tokenizer` operator.
+
             position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 max_position_embeddings - 1]``.

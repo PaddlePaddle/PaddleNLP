@@ -212,8 +212,8 @@ def do_eval(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=dev_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
@@ -274,8 +274,8 @@ def do_train(args):
 
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=train_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
