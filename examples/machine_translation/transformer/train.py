@@ -120,13 +120,14 @@ def do_train(args):
         args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
 
     # Define optimizer
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=scheduler,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=float(args.eps),
-        parameters=transformer.parameters())
-    if hasattr(optimizer, '_use_multi_tensor'):
+    if 'use_multi_tensor' not in inspect.getfullargspec(paddle.optimizer.Adam.__init__).args:
+        optimizer = paddle.optimizer.Adam(
+            learning_rate=scheduler,
+            beta1=args.beta1,
+            beta2=args.beta2,
+            epsilon=float(args.eps),
+            parameters=transformer.parameters())
+    else:
         optimizer = paddle.optimizer.Adam(
             learning_rate=scheduler,
             beta1=args.beta1,
