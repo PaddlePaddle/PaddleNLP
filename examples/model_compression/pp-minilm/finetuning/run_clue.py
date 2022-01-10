@@ -138,16 +138,6 @@ def parse_args():
         default=False,
         help="Whether do train.")
     parser.add_argument(
-        "--save_inference_model",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to save inference model.")
-    parser.add_argument(
-        "--save_inference_model_with_tokenizer",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to save inference model with tokenizer.")
-    parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
@@ -212,8 +202,8 @@ def do_eval(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=dev_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
@@ -274,8 +264,8 @@ def do_train(args):
 
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=train_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
@@ -384,18 +374,6 @@ def do_train(args):
     print("best_acc: ", best_acc)
 
 
-def export_model(args):
-    save_path = os.path.join(args.output_dir, "inference")
-    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
-    is_text_pair = True
-    if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
-        is_text_pair = False
-    model.to_static(
-        save_path,
-        use_faster_tokenizer=args.save_inference_model_with_tokenizer,
-        is_text_pair=is_text_pair)
-
-
 def print_arguments(args):
     """print arguments"""
     print('-----------  Configuration Arguments -----------')
@@ -409,7 +387,5 @@ if __name__ == "__main__":
     print_arguments(args)
     if args.do_train:
         do_train(args)
-        if args.save_inference_model:
-            export_model(args)
     if args.do_eval:
         do_eval(args)

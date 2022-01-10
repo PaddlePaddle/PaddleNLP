@@ -21,6 +21,7 @@ import random
 import time
 import json
 from functools import partial
+import distutils.util
 
 import numpy as np
 import paddle
@@ -132,11 +133,17 @@ def parse_args():
         type=float,
         default=1.0,
         help="depth mult you want to export")
+    parser.add_argument(
+        "--use_faster_tokenizer",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to use FasterTokenizer to accelerate training or further inference."
+    )
     args = parser.parse_args()
     return args
 
 
-def do_train(args):
+def do_export(args):
     paddle.set_device("gpu" if args.n_gpu else "cpu")
     args.model_type = args.model_type.lower()
     args.task_name = args.task_name.lower()
@@ -214,7 +221,7 @@ def do_train(args):
                 input_dtypes=core.VarDesc.VarType.STRINGS,
                 origin_model=origin_model)
     else:
-        ofa_model.model.use_faster_tokenizer = args.use_faster_tokenizer
+        # ofa_model.model.use_faster_tokenizer = args.use_faster_tokenizer
         origin_model_new = ofa_model.export(
             best_config,
             input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
@@ -250,4 +257,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    do_train(args)
+    do_export(args)
