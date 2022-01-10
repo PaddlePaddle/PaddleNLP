@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import os
 import argparse
 import random
@@ -303,7 +302,8 @@ def do_train(args):
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 evaluate(model, dev_data_loader, tokenizer,
-                         args.ignore_pad_token_for_loss, args.max_target_length)
+                         args.ignore_pad_token_for_loss, args.min_target_length,
+                         args.max_target_length)
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(
