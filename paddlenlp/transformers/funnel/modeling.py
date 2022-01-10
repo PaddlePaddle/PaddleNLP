@@ -21,7 +21,6 @@ from collections import OrderedDict
 import numpy as np
 from paddle import nn
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss, LayerNorm
-from paddlenlp.ops.einsum import einsum
 from .. import PretrainedModel as PreTrainedModel
 import paddle
 import os
@@ -1423,14 +1422,14 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape batch_size x sea_len x n_head x d_model
-            q_r_attention = einsum("binh,dnh->bind", q_head + u, w_r)
+            q_r_attention = paddle.einsum("binh,dnh->bind", q_head + u, w_r)
             q_r_attention_1 = q_r_attention * phi.unsqueeze(1)  # [:, None]
             q_r_attention_2 = q_r_attention * pi.unsqueeze(1)  # [:, None]
 
             # Shape batch_size x n_head x seq_len x context_len
-            positional_attn = einsum("bind,jd->bnij", q_r_attention_1,
-                                     psi) + einsum("bind,jd->bnij",
-                                                   q_r_attention_2, omega)
+            positional_attn = paddle.einsum(
+                "bind,jd->bnij", q_r_attention_1, psi) + paddle.einsum(
+                    "bind,jd->bnij", q_r_attention_2, omega)
         else:
             shift = 2 if q_head.shape[1] != context_len else 1
             # Notations from the paper, appending A.2.1, final formula (https://arxiv.org/abs/2006.03236)
@@ -1442,9 +1441,10 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape max_rel_len x n_head x d_model
-            r_head = einsum("td,dnh->tnh", r, w_r)
+            r_head = paddle.einsum("td,dnh->tnh", r, w_r)
             # Shape batch_size x n_head x seq_len x max_rel_len
-            positional_attn = einsum("binh,tnh->bnit", q_head + v, r_head)
+            positional_attn = paddle.einsum("binh,tnh->bnit", q_head + v,
+                                            r_head)
             # Shape batch_size x n_head x seq_len x context_len
             positional_attn = _relative_shift_gather(positional_attn,
                                                      context_len, shift)
@@ -1466,8 +1466,8 @@ class FunnelRelMultiheadAttention(nn.Layer):
         r_s_bias = self.r_s_bias * self.scale
 
         # Shape batch_size x n_head x seq_len x 2
-        token_type_bias = einsum("bind,snd->bnis", q_head + r_s_bias,
-                                 self.seg_embed)
+        token_type_bias = paddle.einsum("bind,snd->bnis", q_head + r_s_bias,
+                                        self.seg_embed)
 
         # Shape batch_size x n_head x seq_len x context_len
         # token_type_mat = token_type_mat[:, None].expand([batch_size, q_head.shape[2], seq_len, context_len])
@@ -1516,7 +1516,8 @@ class FunnelRelMultiheadAttention(nn.Layer):
         r_w_bias = self.r_w_bias * self.scale
         # Shapes batch_size x n_head x seq_len x context_len
 
-        content_score = einsum("bind,bjnd->bnij", q_head + r_w_bias, k_head)
+        content_score = paddle.einsum("bind,bjnd->bnij", q_head + r_w_bias,
+                                      k_head)
 
         positional_attn = self.relative_positional_attention(
             position_embeds, q_head, context_len, cls_mask)
@@ -1540,7 +1541,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         attn_prob = self.attention_dropout(attn_prob)
 
         # attention output, shape batch_size x seq_len x n_head x d_head
-        attn_vec = einsum("bnij,bjnd->bind", attn_prob, v_head)
+        attn_vec = paddle.einsum("bnij,bjnd->bind", attn_prob, v_head)
 
         # Shape shape batch_size x seq_len x d_model
         attn_out = self.post_proj(

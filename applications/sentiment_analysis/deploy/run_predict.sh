@@ -8,7 +8,6 @@ python  predict.py \
         --cls_label_path "../data/cls_data/label.dict" \
         --test_path "../data/test.txt" \
         --save_path "../data/sentiment_results.json" \
-        --batch_size 16 \
-        --max_seq_len 256
-
-
+        --batch_size 8 \
+        --ext_max_seq_len 512 \
+        --cls_max_seq_len 256
