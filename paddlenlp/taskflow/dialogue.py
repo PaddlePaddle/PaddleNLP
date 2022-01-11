@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import contextlib
 from collections import deque
+
 import numpy as np
 import paddle
 
@@ -59,6 +61,24 @@ class DialogueTask(Task):
         model(string): The model name in the task.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
+
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",    
+    }
+    resource_files_urls = {
+        "plato-mini": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dialogue/plato-mini/model_state.pdparams",
+                "450be85b9b7f0bc03b12252a75af04f3"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dialogue/plato-mini/model_config.json",
+                "5e853fda9a9b573815ad112e494a65af"
+            ],
+        }
+    }
+
     def __init__(self, 
                  task, 
                  model, 
@@ -68,6 +88,7 @@ class DialogueTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
+        self._check_task_files()
         self._construct_tokenizer(model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
@@ -92,7 +113,12 @@ class DialogueTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        self._model = UnifiedTransformerLMHeadModel.from_pretrained(model)
+        model_instance = UnifiedTransformerLMHeadModel.from_pretrained(
+            self._task_path)
+        model_path = os.path.join(self._task_path, "model_state.pdparams")
+        state_dict = paddle.load(model_path)
+        model_instance.set_state_dict(state_dict)
+        self._model = model_instance
         self._model.eval()
 
     def _construct_tokenizer(self, model):

@@ -24,21 +24,6 @@ from .utils import download_file, dygraph_mode_guard
 from .task import Task
 from .models import BiAffineParser
 
-URLS = {
-    "ddparser": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser.tar.gz",
-        "bcb79081d9e6f46c3dbc0dbfcce445ec",
-    ],
-    "ddparser-ernie-1.0": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz",
-        "77640972889c68fcb0459611e932530b",
-    ],
-    "ddparser-ernie-gram-zh": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz",
-        "7f8326ccdf64d31f0482ad23fa3caacc",
-    ],
-}
-
 usage = r"""
            from paddlenlp import Taskflow 
 
@@ -97,6 +82,62 @@ class DDParserTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "word_vocab": "vocab.json",
+        "rel_vocab": "rel_vocab.json",
+    }
+    resource_files_urls = {
+        "ddparser": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/model_state.pdparams", 
+                "f388c91e85b5b4d0db40157a4ee28c08"
+            ],
+            "word_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/word_vocab.json",
+                "594694033b149cbb724cac0975df07e4"
+            ],
+            "rel_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/rel_vocab.json",
+                "0decf1363278705f885184ff8681f4cd"
+            ],
+        },
+        "ddparser-ernie-1.0": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/model_state.pdparams", 
+                "78a4d5c2add642a88f6fdbee3574f617"
+            ],
+            "word_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/word_vocab.json",
+                "17ed37b5b7ebb8475d4bff1ff8dac4b7"
+            ],
+            "rel_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/rel_vocab.json",
+                "0decf1363278705f885184ff8681f4cd"
+            ],
+        },
+        "ddparser-ernie-gram-zh": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/model_state.pdparams", 
+                "9d0a49026feb97fac22c8eec3e88f5c3"
+            ],
+            "word_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/word_vocab.json",
+                "38120123d39876337975cc616901c8b9"
+            ],
+            "rel_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/rel_vocab.json",
+                "0decf1363278705f885184ff8681f4cd"
+            ],
+        },
+        "font_file" : {
+            "font_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/SourceHanSansCN-Regular.ttf",
+                "cecb7328bc0b9412b897fb3fc61edcdb"
+            ]
+        }
+    }
+
     def __init__(self,
                  task,
                  model,
@@ -109,7 +150,6 @@ class DDParserTask(Task):
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self.static_mode = True
         self.model = model
 
         if self.model == "ddparser":
@@ -121,21 +161,13 @@ class DDParserTask(Task):
         else:
             raise ValueError("The encoding model should be one of \
                 ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh")
-        word_vocab_path = download_file(
-            self._task_path, self.model + os.path.sep + "word_vocab.json",
-            URLS[self.model][0], URLS[self.model][1])
-        rel_vocab_path = download_file(
-            self._task_path, self.model + os.path.sep + "rel_vocab.json",
-            URLS[self.model][0], URLS[self.model][1])
+        self._check_task_files()
+        self._construct_vocabs()
         self.font_file_path = download_file(
-            self._task_path,
-            self.model + os.path.sep + "SourceHanSansCN-Regular.ttf",
-            URLS[self.model][0], URLS[self.model][1])
-        self.word_vocab = Vocab.from_json(word_vocab_path)
-        self.rel_vocab = Vocab.from_json(rel_vocab_path)
-        self.word_pad_index = self.word_vocab.to_indices("[PAD]")
-        self.word_bos_index = self.word_vocab.to_indices("[CLS]")
-        self.word_eos_index = self.word_vocab.to_indices("[SEP]")
+            self._task_path, 
+            "SourceHanSansCN-Regular.ttf",
+            self.resource_files_urls["font_file"]["font_file"][0],
+            self.resource_files_urls["font_file"]["font_file"][1])
         self.tree = tree
         self.prob = prob
         self.use_pos = use_pos
@@ -152,10 +184,7 @@ class DDParserTask(Task):
         self.use_cuda = use_cuda
         self.lac = LAC(mode="lac" if self.use_pos else "seg",
                     use_cuda=self.use_cuda)
-        if self.static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+        self._get_inference_model()
 
     def _check_segmented_words(self, inputs):
         inputs = inputs[0]
@@ -183,6 +212,15 @@ class DDParserTask(Task):
                 shape=[None, None], dtype="int64"),
         ]
 
+    def _construct_vocabs(self):
+        word_vocab_path = os.path.join(self._task_path, "word_vocab.json")
+        rel_vocab_path = os.path.join(self._task_path, "rel_vocab.json")
+        self.word_vocab = Vocab.from_json(word_vocab_path)
+        self.rel_vocab = Vocab.from_json(rel_vocab_path)
+        self.word_pad_index = self.word_vocab.to_indices("[PAD]")
+        self.word_bos_index = self.word_vocab.to_indices("[CLS]")
+        self.word_eos_index = self.word_vocab.to_indices("[SEP]")        
+
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
@@ -194,9 +232,9 @@ class DDParserTask(Task):
             pad_index=self.word_pad_index,
             bos_index=self.word_bos_index,
             eos_index=self.word_eos_index, )
+        model_path = os.path.join(self._task_path, "model_state.pdparams")
         # Load the model parameter for the predict
-        state_dict = paddle.load(
-            os.path.join(self._task_path, self.model, "model.pdparams"))
+        state_dict = paddle.load(model_path)
         model_instance.set_dict(state_dict)
         model_instance.eval()
         self._model = model_instance
