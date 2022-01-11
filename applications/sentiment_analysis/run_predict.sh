@@ -7,6 +7,7 @@ python  predict.py \
         --ext_label_path "./data/ext_data/label.dict" \
         --cls_label_path "./data/cls_data/label.dict" \
         --save_path "./data/sentiment_results.json" \
-        --batch_size 16 \
-        --max_seq_len 256
+        --batch_size 8 \
+        --ext_max_seq_len 512 \
+        --cls_max_seq_len 256
 

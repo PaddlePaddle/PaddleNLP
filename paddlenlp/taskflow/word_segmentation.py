@@ -24,13 +24,6 @@ import numpy as np
 from .utils import download_file
 from .lexical_analysis import load_vocab, LacTask
 
-URLS = {
-    "word_segmentation_params": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/lac_params.tar.gz",
-        'ee9a3eaba5f74105410410e3c5b28fbc'
-    ],
-}
-
 usage = r"""
            from paddlenlp import Taskflow 
 
