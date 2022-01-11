@@ -116,6 +116,7 @@ class Task(metaclass=abc.ABCMeta):
                 "embedding_eltwise_layernorm_fuse_pass")
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
+        self._config.enable_memory_optim()
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_handles = [
             self.predictor.get_input_handle(name)
