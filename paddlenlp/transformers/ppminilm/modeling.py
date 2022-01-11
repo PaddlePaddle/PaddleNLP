@@ -173,25 +173,33 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
                     self,
                     input_spec=[
                         paddle.static.InputSpec(
-                            shape=[None], dtype=core.VarDesc.VarType.STRINGS),
-                        paddle.static.InputSpec(
-                            shape=[None], dtype=core.VarDesc.VarType.STRINGS)
+                            shape=[None],
+                            dtype=core.VarDesc.VarType.STRINGS,
+                            name="text"), paddle.static.InputSpec(
+                                shape=[None],
+                                dtype=core.VarDesc.VarType.STRINGS,
+                                name="text_pair")
                     ])
             else:
                 model = paddle.jit.to_static(
                     self,
                     input_spec=[
                         paddle.static.InputSpec(
-                            shape=[None], dtype=core.VarDesc.VarType.STRINGS)
+                            shape=[None],
+                            dtype=core.VarDesc.VarType.STRINGS,
+                            name="text")
                     ])
         else:
             model = paddle.jit.to_static(
                 self,
                 input_spec=[
                     paddle.static.InputSpec(
-                        shape=[None, None], dtype="int64"),  # input_ids
+                        shape=[None, None], dtype="int64",
+                        name="input_ids"),  # input_ids
                     paddle.static.InputSpec(
-                        shape=[None, None], dtype="int64")  # segment_ids
+                        shape=[None, None],
+                        dtype="int64",
+                        name="token_type_ids")  # segment_ids
                 ])
         paddle.jit.save(model, output_path)
         logger.info("Already save the static model to the path %s" %

@@ -189,7 +189,16 @@ sh run_clue.sh CLUEWSC2020 1e-4 32 50 128 0 ppminilm-6l-768h
 
 #### 导出微调后模型
 
-模型在训练完成之后，默认情况下参数 `--save_inference_model` 为 True，会自动保存预测模型。
+模型在训练完成之后，可以选择每个数据集下效果最好的模型进行导出：
+
+```shell
+export TASK_NAME=CLUEWSC2020
+export MODEL_PATH=ppminilm-6l-768h
+export LR=1e-4
+export BS=32
+
+python export_model.py --task_name ${TASK_NAME} --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/
+```
 
 静态图（部署）模型路径与动态图模型的路径相同，文件名为 `inference.pdmodel` , `inference.pdiparams` 和 `inference.pdiparams.info` 。
 

@@ -135,10 +135,7 @@ def quant_post(args, batch_size=8, algo='avg'):
                 batch_data[0].append(data['sentence1'])
                 batch_data[1].append(data['sentence2'])
                 if len(batch_data[0]) == batch_size:
-                    yield {
-                        "input_ids": batch_data[0],
-                        "token_type_ids": batch_data[1]
-                    }
+                    yield {"text": batch_data[0], "text_pair": batch_data[1]}
                     batch_data = [[], []]
 
     paddleslim.quant.quant_post_static(
