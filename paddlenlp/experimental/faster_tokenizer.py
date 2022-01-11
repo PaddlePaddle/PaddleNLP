@@ -99,7 +99,7 @@ class FasterTokenizer(nn.Layer):
                 text,
                 text_pair=None,
                 max_seq_len=0,
-                pad_to_max_seq_len=True):
+                pad_to_max_seq_len=False):
         if in_dygraph_mode():
             if isinstance(text, list) or isinstance(text, tuple):
                 text = to_tensor(list(text))
