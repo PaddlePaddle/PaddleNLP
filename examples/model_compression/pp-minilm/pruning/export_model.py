@@ -21,20 +21,23 @@ import random
 import time
 import json
 from functools import partial
+import distutils.util
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+import paddle.fluid.core as core
 
 from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger
+
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
 
 sys.path.append("../")
-from data import MODEL_CLASSES
+from data import MODEL_CLASSES, METRIC_CLASSES
 
 
 def ppminilm_forward(self,
@@ -44,14 +47,24 @@ def ppminilm_forward(self,
                      attention_mask=None):
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
+    if self.use_faster_tokenizer:
+        input_ids, token_type_ids = self.tokenizer(
+            text=input_ids,
+            text_pair=token_type_ids,
+            max_seq_len=self.max_seq_len,
+            pad_to_max_seq_len=self.pad_to_max_seq_len)
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
-    embedding_output = self.embeddings(input_ids, token_type_ids, position_ids)
-    encoded_layer = self.encoder(embedding_output, attention_mask)
-    pooled_output = self.pooler(encoded_layer)
+    embedding_output = self.embeddings(
+        input_ids=input_ids,
+        position_ids=position_ids,
+        token_type_ids=token_type_ids)
 
-    return encoded_layer, pooled_output
+    encoder_outputs = self.encoder(embedding_output, attention_mask)
+    sequence_output = encoder_outputs
+    pooled_output = self.pooler(sequence_output)
+    return sequence_output, pooled_output
 
 
 PPMiniLMModel.forward = ppminilm_forward
@@ -79,6 +92,13 @@ def parse_args():
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
             ], [])), )
+    parser.add_argument(
+        "--task_name",
+        default=None,
+        type=str,
+        required=True,
+        help="The name of the task to train selected in the list: " +
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--sub_model_output_dir",
         default=None,
@@ -113,24 +133,20 @@ def parse_args():
         type=float,
         default=1.0,
         help="depth mult you want to export")
+    parser.add_argument(
+        "--use_faster_tokenizer",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to use FasterTokenizer to accelerate training or further inference."
+    )
     args = parser.parse_args()
     return args
 
 
-def export_static_model(model, model_path, max_seq_length):
-    input_shape = [
-        paddle.static.InputSpec(
-            shape=[None, max_seq_length], dtype='int64'),
-        paddle.static.InputSpec(
-            shape=[None, max_seq_length], dtype='int64')
-    ]
-    net = paddle.jit.to_static(model, input_spec=input_shape)
-    paddle.jit.save(net, model_path)
-
-
-def do_train(args):
+def do_export(args):
     paddle.set_device("gpu" if args.n_gpu else "cpu")
     args.model_type = args.model_type.lower()
+    args.task_name = args.task_name.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config_path = os.path.join(args.model_name_or_path, 'model_config.json')
     cfg_dict = dict(json.loads(open(config_path).read()))
@@ -151,6 +167,7 @@ def do_train(args):
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
+    model.use_faster_tokenizer = args.use_faster_tokenizer
 
     origin_model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
@@ -183,11 +200,34 @@ def do_train(args):
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
 
-    origin_model_new = ofa_model.export(
-        best_config,
-        input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
-        input_dtypes=['int64', 'int64'],
-        origin_model=origin_model)
+    is_text_pair = True
+    if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
+        is_text_pair = False
+
+    if args.use_faster_tokenizer:
+        ofa_model.model.add_faster_tokenizer_op()
+        if is_text_pair:
+            origin_model_new = ofa_model.export(
+                best_config,
+                input_shapes=[[1], [1]],
+                input_dtypes=[
+                    core.VarDesc.VarType.STRINGS, core.VarDesc.VarType.STRINGS
+                ],
+                origin_model=origin_model)
+        else:
+            origin_model_new = ofa_model.export(
+                best_config,
+                input_shapes=[1],
+                input_dtypes=core.VarDesc.VarType.STRINGS,
+                origin_model=origin_model)
+    else:
+        # ofa_model.model.use_faster_tokenizer = args.use_faster_tokenizer
+        origin_model_new = ofa_model.export(
+            best_config,
+            input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
+            input_dtypes=['int64', 'int64'],
+            origin_model=origin_model)
+
     for name, sublayer in origin_model_new.named_sublayers():
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
@@ -200,8 +240,10 @@ def do_train(args):
     model_to_save.save_pretrained(output_dir)
 
     if args.static_sub_model != None:
-        export_static_model(origin_model_new, args.static_sub_model,
-                            args.max_seq_length)
+        origin_model_new.to_static(
+            args.static_sub_model,
+            use_faster_tokenizer=args.use_faster_tokenizer,
+            is_text_pair=is_text_pair)
 
 
 def print_arguments(args):
@@ -215,4 +257,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    do_train(args)
+    do_export(args)

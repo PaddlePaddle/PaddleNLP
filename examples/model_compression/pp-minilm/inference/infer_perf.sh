@@ -12,30 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-task = tnews
-echo Inference of orgin FP32 model
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt  --collect_shape --perf
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt --perf
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt --perf
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt --perf
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt --perf
-python  infer.py  --task_name ${task} --model_path  tnews/float  --use_trt --perf
+export task=TNEWS
+python infer.py  --task_name ${task} --model_path  ../finetuning/ppminilm-6l-768h/models/${task}/1e-4_64/inference  --use_trt  --collect_shape --perf
+python infer.py --task_name ${task} --model_path ../pruning/pruned_models/${task}/0.75/sub_static/float  --use_trt --collect_shape --perf
+python  infer.py  --task_name ${task} --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt  --collect_shape --perf
 
+echo Inference of orgin FP32 model
+for ((i=0;i<=4;i++));
+do
+    python infer.py  --task_name ${task} --model_path  ../finetuning/ppminilm-6l-768h/models/${task}/1e-4_64/inference  --use_trt --perf
+done
 
 echo After pruning
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --collect_shape --perf
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --perf
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --perf
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --perf
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --perf
-python infer.py --task_name ${task} --model_path ofa_models/TNEWS/0.75/sub_static/float  --use_trt --perf
+for ((i=0;i<=4;i++));
+do
+    python infer.py --task_name ${task} --model_path ../pruning/pruned_models/${task}/0.75/sub_static/float  --use_trt --perf
+done
 
 echo After quantization
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt  --collect_shape --perf
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
-python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
+for ((i=0;i<=4;i++));
+do
+    python  infer.py  --task_name tnews --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt --perf
+done
 
 
