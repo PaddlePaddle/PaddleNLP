@@ -18,11 +18,11 @@ import os
 import time
 import argparse
 from functools import partial
+import distutils.util
 
-import numpy as np
 import paddle
-
 import paddleslim
+
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import PPMiniLMTokenizer
@@ -68,6 +68,19 @@ parser.add_argument(
     default="float.pdiparams",
     required=False,
     help="File name of float model's parameters.")
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. Sequences longer "
+    "than this will be truncated, sequences shorter will be padded.", )
+
+parser.add_argument(
+    "--use_faster_tokenizer",
+    type=distutils.util.strtobool,
+    default=True,
+    help="Whether to use FasterTokenizer to accelerate training or further inference."
+)
 
 parser.add_argument(
     "--model_name_or_path",
@@ -83,21 +96,22 @@ def quant_post(args, batch_size=8, algo='avg'):
     exe = paddle.static.Executor(place)
     args.task_name = args.task_name.lower()
 
-    train_ds = load_dataset("clue", args.task_name, splits="dev")
-
-    tokenizer = PPMiniLMTokenizer.from_pretrained(args.model_name_or_path)
-
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=128,
-        is_test=True)
-    train_ds = train_ds.map(trans_func, lazy=True)
+    dev_ds = load_dataset("clue", args.task_name, splits="dev")
+    if args.use_faster_tokenizer:
+        trans_func = partial(convert_example, label_list=dev_ds.label_list)
+    else:
+        tokenizer = PPMiniLMTokenizer.from_pretrained("ppminilm-6l-768h")
+        trans_func = partial(
+            convert_example,
+            label_list=dev_ds.label_list,
+            tokenizer=tokenizer,
+            max_seq_length=128,
+            is_test=True)
+    dev_ds = dev_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():
         batch_data = [[], []]
-        for data in train_ds:
+        for data in dev_ds:
             batch_data[0].append(data[0])
             batch_data[1].append(data[1])
             if len(batch_data[0]) == batch_size:
@@ -105,6 +119,24 @@ def quant_post(args, batch_size=8, algo='avg'):
                 segment_ids = Pad(axis=0, pad_val=0)(batch_data[1])
                 yield [input_ids, segment_ids]
                 batch_data = [[], []]
+
+    def batch_generator_func_using_faster_tokenizer():
+        if 'sentence' in dev_ds[0]:
+            batch_data = []
+        else:
+            batch_data = [[], []]
+        for data in dev_ds:
+            if 'sentence' in data:
+                batch_data.append(data['sentence'])
+                if len(batch_data) == batch_size:
+                    yield {"input_ids": batch_data}
+                    batch_data = []
+            else:
+                batch_data[0].append(data['sentence1'])
+                batch_data[1].append(data['sentence2'])
+                if len(batch_data[0]) == batch_size:
+                    yield {"text": batch_data[0], "text_pair": batch_data[1]}
+                    batch_data = [[], []]
 
     paddleslim.quant.quant_post_static(
         exe,
@@ -114,7 +146,10 @@ def quant_post(args, batch_size=8, algo='avg'):
         save_params_filename=args.save_params_filename,
         algo=algo,
         hist_percent=0.9999,
-        batch_generator=batch_generator_func,
+        batch_generator=batch_generator_func
+        if not args.use_faster_tokenizer else None,
+        data_loader=batch_generator_func_using_faster_tokenizer
+        if args.use_faster_tokenizer else None,
         model_filename=args.input_model_filename,
         params_filename=args.input_param_filename,
         quantizable_op_type=['matmul', 'matmul_v2'],
