@@ -72,11 +72,6 @@ def parse_args():
         default=None,
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--num_workers",
-        default=0,
-        type=int,
-        help="The num_workers for Dataloader. ")
     args = parser.parse_args()
     return args
 
@@ -336,7 +331,6 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
-    args.num_workers = ARGS.num_workers
     pprint(args)
 
     do_train(args)
