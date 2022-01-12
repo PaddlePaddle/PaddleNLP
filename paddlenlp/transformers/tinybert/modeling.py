@@ -330,7 +330,7 @@ class TinyBertModel(TinyBertPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         embedding_output = self.embeddings(input_ids, token_type_ids)
         encoded_layer = self.encoder(embedding_output, attention_mask)

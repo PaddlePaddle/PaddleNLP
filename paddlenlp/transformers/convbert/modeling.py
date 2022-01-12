@@ -683,12 +683,12 @@ class ConvBertModel(ConvBertPretrainedModel):
         '''
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(dtype_float) * -1e9,
+                (input_ids == self.pad_token_id).astype(dtype_float) * -1e4,
                 axis=[1, 2])
         else:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(dtype_float)
-            attention_mask = (1.0 - attention_mask) * -1e9
+            attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
