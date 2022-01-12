@@ -221,7 +221,6 @@ def do_export(args):
                 input_dtypes=core.VarDesc.VarType.STRINGS,
                 origin_model=origin_model)
     else:
-        # ofa_model.model.use_faster_tokenizer = args.use_faster_tokenizer
         origin_model_new = ofa_model.export(
             best_config,
             input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],

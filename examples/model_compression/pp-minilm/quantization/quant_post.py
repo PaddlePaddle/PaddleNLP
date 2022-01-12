@@ -129,7 +129,7 @@ def quant_post(args, batch_size=8, algo='avg'):
             if 'sentence' in data:
                 batch_data.append(data['sentence'])
                 if len(batch_data) == batch_size:
-                    yield {"input_ids": batch_data}
+                    yield {"text": batch_data}
                     batch_data = []
             else:
                 batch_data[0].append(data['sentence1'])
