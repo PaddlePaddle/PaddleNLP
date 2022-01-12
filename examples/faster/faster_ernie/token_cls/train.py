@@ -76,18 +76,21 @@ def evaluate(model, criterion, metric, data_loader, label_num):
 
 def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
     texts, labels, seq_lens = [], [], []
+    batch_max_seq = max([len(example["tokens"]) for example in batch])
+    batch_max_seq = min(batch_max_seq, max_seq_len)
     for example in batch:
         texts.append("".join(example["tokens"]))
-        # 2 for [CLS] and [SEP]
-        seq_lens.append(len(example["tokens"]) + 2)
         label = example["labels"]
         if len(label) > max_seq_len - 2:
             label = label[:(max_seq_len - 2)]
         label = [no_entity_id] + label + [no_entity_id]
+        seq_lens.append(len(label))
         if len(label) < max_seq_len:
-            label += [ignore_label] * (max_seq_len - len(label))
+            # 2 for [CLS] and [SEP]
+            label += [ignore_label] * (batch_max_seq + 2 - len(label))
+            # batch_max_seq + 2 may be larger than max_seq_len
+            label = label[:max_seq_len]
         labels.append(label)
-
     labels = np.array(labels, dtype="int64")
     seq_lens = np.array(seq_lens)
     return texts, labels, seq_lens
