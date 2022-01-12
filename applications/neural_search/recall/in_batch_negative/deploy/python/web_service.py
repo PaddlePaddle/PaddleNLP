@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from paddle_serving_server.web_service import WebService, Op
+
 import logging
 import numpy as np
 import sys
+
+from paddle_serving_server.web_service import WebService, Op
+
 _LOGGER = logging.getLogger()
 
 
@@ -63,7 +66,8 @@ class ErnieOp(Op):
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         new_dict = {}
-        new_dict["output_embed"] = str(fetch_dict["output_embed"].tolist())
+        new_dict["output_embedding"] = str(fetch_dict["output_embedding"]
+                                           .tolist())
         return new_dict, None, ""
 
 

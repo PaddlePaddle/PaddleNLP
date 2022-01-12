@@ -27,7 +27,8 @@ for i, item in enumerate(list_data):
     feed[str(i)] = item
 
 print(feed)
-ret = client.predict(feed_dict=feed, fetch=["res"])
+ret = client.predict(feed_dict=feed)
+# print(ret)
 result = np.array(eval(ret.value[0]))
 print(ret.key)
 print(result.shape)
