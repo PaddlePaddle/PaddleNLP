@@ -30,7 +30,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
 cd -
 
-mode_item=$1   static|dygraph
+mode_item=$1   #static|dygraph
 
 if [ ${mode_item} != "static" ] && [ ${mode_item} != "dygraph" ]; then
     echo "please set mode_item(static|dygraph)"
@@ -45,9 +45,9 @@ do
     for fp_item in ${fp_list[@]}
     do
 	    if [ ${mode_item} == "static" ] && [ ${fp_item} == "fp16" ]; then
-	        bs_item=(16)
+	        bs_item=16
             else
-                bs_item=(8)
+                bs_item=8
             fi
             CUDA_VISIBLE_DEVICES=0 bash tests/benchmark/run_benchmark.sh sp ${bs_item} ${fp_item}  200  ${model_item} ${mode_item} ${profile} | tee ${log_path}/${model_item}_${mode_item}_bs${bs_item}_${fp_item}_1gpus 2>&1
             sleep 10
