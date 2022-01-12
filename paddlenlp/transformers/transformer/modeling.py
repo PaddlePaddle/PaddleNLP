@@ -583,7 +583,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores_dtype = beam_search_output.scores.dtype
         parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
         scores = paddle.ones(
-            shape=[batch_size, beam_size], dtype=scores_dtype) * -1e9
+            shape=[batch_size, beam_size], dtype=scores_dtype) * -1e4
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
@@ -770,7 +770,7 @@ class TransformerModel(nn.Layer):
         trg_max_len = paddle.shape(trg_word)[-1]
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         src_slf_attn_bias.stop_gradient = True
         trg_slf_attn_bias = self.transformer.generate_square_subsequent_mask(
             trg_max_len)
@@ -972,7 +972,7 @@ class InferTransformerModel(TransformerModel):
             src_max_len = paddle.shape(src_word)[-1]
             src_slf_attn_bias = paddle.cast(
                 src_word == self.bos_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
                 src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
@@ -1054,7 +1054,7 @@ class InferTransformerModel(TransformerModel):
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
             src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
@@ -1113,7 +1113,7 @@ class InferTransformerModel(TransformerModel):
         if trg_word is not None:
             scores_dtype = finished_scores.dtype
             scores = paddle.ones(
-                shape=[batch_size, beam_size * 2], dtype=scores_dtype) * -1e9
+                shape=[batch_size, beam_size * 2], dtype=scores_dtype) * -1e4
             scores = paddle.scatter(
                 scores.flatten(),
                 paddle.arange(
