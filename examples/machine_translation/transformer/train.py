@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 from pprint import pprint
 from attrdict import AttrDict
+import inspect
 
 import paddle
 import paddle.distributed as dist
@@ -119,12 +120,22 @@ def do_train(args):
         args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
 
     # Define optimizer
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=scheduler,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=float(args.eps),
-        parameters=transformer.parameters())
+    if 'use_multi_tensor' not in inspect.getfullargspec(
+            paddle.optimizer.Adam.__init__).args:
+        optimizer = paddle.optimizer.Adam(
+            learning_rate=scheduler,
+            beta1=args.beta1,
+            beta2=args.beta2,
+            epsilon=float(args.eps),
+            parameters=transformer.parameters())
+    else:
+        optimizer = paddle.optimizer.Adam(
+            learning_rate=scheduler,
+            beta1=args.beta1,
+            beta2=args.beta2,
+            epsilon=float(args.eps),
+            parameters=transformer.parameters(),
+            use_multi_tensor=True)
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -142,6 +153,16 @@ def do_train(args):
         transformer.set_state_dict(model_dict)
         print("loaded from pre-trained model.")
 
+    # for amp training
+    amp_level = 'O1'
+    if args.use_amp and args.use_pure_fp16:
+        amp_level = 'O2'
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(
+            enable=True, init_loss_scaling=args.scale_loss)
+        transformer = paddle.amp.decorate(models=transformer, level=amp_level)
+
+    # for distributed training
     if trainer_count > 1:
         transformer = paddle.DataParallel(transformer)
 
@@ -169,27 +190,33 @@ def do_train(args):
             (src_word, trg_word, lbl_word) = input_data
 
             if args.use_amp:
-                scaler = paddle.amp.GradScaler(
-                    init_loss_scaling=args.scale_loss)
-                with paddle.amp.auto_cast():
+                with paddle.amp.auto_cast(
+                        custom_black_list={
+                            'scale', 'reduce_sum', 'elementwise_div'
+                        } if amp_level == 'O2' else {},
+                        level=amp_level):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
+                tokens_per_cards = token_num.numpy()
                 scaled = scaler.scale(avg_cost)  # scale the loss
                 scaled.backward()  # do backward
 
                 scaler.minimize(optimizer, scaled)  # update parameters
-                optimizer.clear_grad()
+                if 'set_to_zero' in inspect.getfullargspec(
+                        optimizer.clear_grad).args:
+                    optimizer.clear_grad(set_to_zero=False)
+                else:
+                    optimizer.clear_grad()
             else:
                 logits = transformer(src_word=src_word, trg_word=trg_word)
                 sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
+                tokens_per_cards = token_num.numpy()
 
                 avg_cost.backward()
 
                 optimizer.step()
                 optimizer.clear_grad()
-
-            tokens_per_cards = token_num.numpy()
 
             train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
@@ -235,10 +262,15 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        logits = transformer(
-                            src_word=src_word, trg_word=trg_word)
-                        sum_cost, avg_cost, token_num = criterion(logits,
-                                                                  lbl_word)
+                        with paddle.amp.auto_cast(
+                                custom_black_list={
+                                    'scale', 'reduce_sum', 'elementwise_div'
+                                } if amp_level == 'O2' else {},
+                                level=amp_level):
+                            logits = transformer(
+                                src_word=src_word, trg_word=trg_word)
+                            sum_cost, avg_cost, token_num = criterion(logits,
+                                                                      lbl_word)
                         total_sum_cost += sum_cost.numpy()
                         total_token_num += token_num.numpy()
                         total_avg_cost = total_sum_cost / total_token_num
