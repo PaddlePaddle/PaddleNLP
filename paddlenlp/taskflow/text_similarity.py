@@ -44,6 +44,23 @@ class TextSimilarityTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+    }
+    resource_files_urls = {
+        "simbert-base-chinese": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_similarity/simbert-base-chinese/model_state.pdparams",
+                "27d9ef240c2e8e736bdfefea52af2542"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_similarity/simbert-base-chinese/model_config.json",
+                "1254bbd7598457a9dad0afcb2e24b70c"
+            ],
+        }
+    }
+
     def __init__(self, 
                  task, 
                  model, 
@@ -51,7 +68,7 @@ class TextSimilarityTask(Task):
                  max_seq_len=128,
                  **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = True
+        self._check_task_files()
         self._construct_tokenizer(model)
         self._get_inference_model()
         self._batch_size = batch_size
@@ -73,7 +90,8 @@ class TextSimilarityTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        self._model = BertModel.from_pretrained(model, pool_act='linear')
+        self._model = BertModel.from_pretrained(
+            self._task_path, pool_act='linear')
         self._model.eval()
 
     def _construct_tokenizer(self, model):
@@ -81,7 +99,7 @@ class TextSimilarityTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = BertTokenizer.from_pretrained(model)
-    
+
     def _check_input_text(self, inputs):
         inputs = inputs[0]
         if not all([isinstance(i, list) and i \
