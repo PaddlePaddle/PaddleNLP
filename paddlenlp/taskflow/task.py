@@ -19,7 +19,7 @@ from abc import abstractmethod
 import paddle
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from .utils import download_check, static_mode_guard, dygraph_mode_guard
+from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file
 
 
 class Task(metaclass=abc.ABCMeta):
@@ -45,10 +45,13 @@ class Task(metaclass=abc.ABCMeta):
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
         self._home_path = self.kwargs[
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
-        self._task_path = os.path.join(self._home_path, "taskflow", self.task,
-                                       self.model)
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model
+        if 'task_path' in self.kwargs:
+            self._task_path = self.kwargs['task_path']
+        else:
+            self._task_path = os.path.join(self._home_path, "taskflow", 
+                self.task, self.model)
         download_check(self._task_flag)
 
     @abstractmethod
@@ -89,6 +92,16 @@ class Task(metaclass=abc.ABCMeta):
         Construct the input spec for the convert dygraph model to static model.
         """
 
+    def _check_task_files(self):
+        """
+        Check files required by the task.
+        """
+        for file_id, file_name in self.resource_files_names.items():
+            path = os.path.join(self._task_path, file_name)
+            if not os.path.exists(path):
+                url = self.resource_files_urls[self.model][file_id]
+                download_file(self._task_path, file_name, url[0], url[1])
+
     def _prepare_static_mode(self):
         """
         Construct the input data and predictor in the PaddlePaddele static mode. 
@@ -98,8 +111,12 @@ class Task(metaclass=abc.ABCMeta):
             self._config.disable_gpu()
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
+            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
+            self._config.delete_pass(
+                "embedding_eltwise_layernorm_fuse_pass")
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
+        self._config.enable_memory_optim()
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_handles = [
             self.predictor.get_input_handle(name)

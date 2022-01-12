@@ -28,7 +28,7 @@ from ..transformers import ErnieTokenizer, ErnieModel
 from ..transformers import is_chinese_char
 from ..datasets import load_dataset
 from ..data import Stack, Pad, Tuple, Vocab
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+from .utils import download_file, add_docstrings, static_mode_guard
 from .models import ErnieForCSC
 from .task import Task
 
@@ -58,14 +58,6 @@ usage = r"""
 
          """
 
-URLS = {
-    "csc-ernie-1.0": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
-        None,  # md5
-        "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
-    ],
-}
-
 TASK_MODEL_MAP = {"csc-ernie-1.0": "ernie-1.0"}
 
 
@@ -78,23 +70,29 @@ class CSCTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "pinyin_vocab": "pinyin_vocab.txt"    
+    }
+    resource_files_urls = {
+        "csc-ernie-1.0": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/model_state.pdparams",
+                "cdc53e7e3985ffc78fedcdf8e6dca6d2"
+            ],
+            "pinyin_vocab": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt", 
+                "5599a8116b6016af573d08f8e686b4b2"
+            ],
+        }
+    }
+
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = True
         self._usage = usage
-        # Download pinyin vocab
-        pinyin_vocab_path = download_file(self._task_path, "pinyin_vocab.txt",
-                                          URLS[self.model][2])
-        self._pinyin_vocab = Vocab.load_vocabulary(
-            pinyin_vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-
-        if self._static_mode:
-            download_file(self._task_path,
-                          "static" + os.path.sep + "inference.pdiparams",
-                          URLS[self.model][0], URLS[self.model][1])
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+        self._check_task_files()
+        self._construct_vocabs()
+        self._get_inference_model()
         self._construct_tokenizer(model)
         try:
             import pypinyin
@@ -128,6 +126,11 @@ class CSCTask(Task):
                 shape=[None, None], dtype="int64", name='pinyin_ids'),
         ]
 
+    def _construct_vocabs(self):
+        pinyin_vocab_path = os.path.join(self._task_path, "pinyin_vocab.txt")
+        self._pinyin_vocab = Vocab.load_vocabulary(
+            pinyin_vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
@@ -138,12 +141,11 @@ class CSCTask(Task):
             pinyin_vocab_size=len(self._pinyin_vocab),
             pad_pinyin_id=self._pinyin_vocab[self._pinyin_vocab.pad_token])
         # Load the model parameter for the predict
-        model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1])
+        model_path = os.path.join(self._task_path, "model_state.pdparams")
         state_dict = paddle.load(model_path)
         model_instance.set_state_dict(state_dict)
-        model_instance.eval()
         self._model = model_instance
+        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """
@@ -175,24 +177,6 @@ class CSCTask(Task):
         outputs = {}
         outputs['batch_examples'] = batch_examples
         outputs['batch_texts'] = batch_texts
-        if not self._static_mode:
-
-            def read(inputs):
-                for text in inputs:
-                    example = {"source": text.strip()}
-                    input_ids, token_type_ids, pinyin_ids, length = self._convert_example(
-                        example)
-                    yield input_ids, token_type_ids, pinyin_ids, length
-
-            infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
-            outputs['data_loader'] = paddle.io.DataLoader(
-                infer_ds,
-                collate_fn=self._batchify_fn,
-                num_workers=self._num_workers,
-                batch_size=self._batch_size,
-                shuffle=False,
-                return_list=True)
-
         return outputs
 
     def _run_model(self, inputs):
@@ -200,36 +184,21 @@ class CSCTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                for examples in inputs['data_loader']:
-                    token_ids, token_type_ids, pinyin_ids, lengths = examples
-                    det_preds, char_preds = self._model(token_ids, pinyin_ids)
-                    det_preds = det_preds.numpy()
-                    char_preds = char_preds.numpy()
-                    lengths = lengths.numpy()
+        with static_mode_guard():
+            for examples in inputs['batch_examples']:
+                token_ids, token_type_ids, pinyin_ids, lengths = self._batchify_fn(
+                    examples)
+                self.input_handles[0].copy_from_cpu(token_ids)
+                self.input_handles[1].copy_from_cpu(pinyin_ids)
+                self.predictor.run()
+                det_preds = self.output_handle[0].copy_to_cpu()
+                char_preds = self.output_handle[1].copy_to_cpu()
 
-                    batch_result = []
-                    for i in range(len(lengths)):
-                        batch_result.append(
-                            (det_preds[i], char_preds[i], lengths[i]))
-                    results.append(batch_result)
-        else:
-            with static_mode_guard():
-                for examples in inputs['batch_examples']:
-                    token_ids, token_type_ids, pinyin_ids, lengths = self._batchify_fn(
-                        examples)
-                    self.input_handles[0].copy_from_cpu(token_ids)
-                    self.input_handles[1].copy_from_cpu(pinyin_ids)
-                    self.predictor.run()
-                    det_preds = self.output_handle[0].copy_to_cpu()
-                    char_preds = self.output_handle[1].copy_to_cpu()
-
-                    batch_result = []
-                    for i in range(len(lengths)):
-                        batch_result.append(
-                            (det_preds[i], char_preds[i], lengths[i]))
-                    results.append(batch_result)
+                batch_result = []
+                for i in range(len(lengths)):
+                    batch_result.append(
+                        (det_preds[i], char_preds[i], lengths[i]))
+                results.append(batch_result)
         inputs['batch_results'] = results
         return inputs
 
