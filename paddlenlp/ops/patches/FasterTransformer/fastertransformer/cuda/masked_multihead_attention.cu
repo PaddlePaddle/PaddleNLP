@@ -605,7 +605,6 @@ __global__ void masked_multihead_attention_kernel(Masked_multihead_attention_par
       qk *= params.inv_sqrt_dh;
       qk_max = qk;
       qk_smem[params.timestep] = qk;
-      if (bhi == 0) printf("qk:%f\n", qk);
     }
   }
 
