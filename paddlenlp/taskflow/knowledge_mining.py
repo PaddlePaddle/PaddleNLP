@@ -175,7 +175,7 @@ class WordTagTask(Task):
             ],
             "termtree_schema": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
-                "062cb9ac24f4135bf836e2a2fc5a1209"       
+                "062cb9ac24f4135bf836e2a2fc5a1209"
             ],
             "termtree_data": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_data",
@@ -188,8 +188,8 @@ class WordTagTask(Task):
         }
     }
 
-    def __init__(self, 
-                 model, 
+    def __init__(self,
+                 model,
                  task,
                  batch_size=1,
                  params_path=None,
@@ -252,16 +252,17 @@ class WordTagTask(Task):
     def _load_task_resources(self):
         if self._tag_path is None:
             self._tag_path = os.path.join(self._task_path, "tags.txt")
-        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
+        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(
+            self._tag_path)
         if self._term_schema_path is None:
-            self._term_schema_path = os.path.join(self._task_path, "termtree_type.csv")
+            self._term_schema_path = os.path.join(self._task_path,
+                                                  "termtree_type.csv")
         if self._term_data_path is None:
-            self._term_data_path = os.path.join(self._task_path, "termtree_data")
+            self._term_data_path = os.path.join(self._task_path,
+                                                "termtree_data")
         if self._linking is True:
             self._termtree = TermTree.from_dir(
-                self._term_schema_path, 
-                self._term_data_path,
-                self._linking)
+                self._term_schema_path, self._term_data_path, self._linking)
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -302,8 +303,8 @@ class WordTagTask(Task):
                             start = end + len(temp_text_list[i]) + 1
                             end = start
                         else:
-                            if start + len(
-                                    temp_text_list[i]) + 1 > max_text_len:
+                            if start + len(temp_text_list[
+                                    i]) + 1 > max_text_len:
                                 short_input_texts.extend(
                                     self._split_long_text_input(
                                         [text[start:end]], max_text_len))
@@ -328,8 +329,8 @@ class WordTagTask(Task):
         for text in input_texts:
             text_len = len(text)
             while True:
-                if len(single_results) == 0 or len(
-                        single_results["text"]) < text_len:
+                if len(single_results) == 0 or len(single_results[
+                        "text"]) < text_len:
                     if len(single_results) == 0:
                         single_results = copy.deepcopy(results[count])
                     else:
@@ -375,10 +376,11 @@ class WordTagTask(Task):
 
         def read(inputs):
             for text in inputs:
-                tokenized_output = self._tokenizer(list(text),
-                                                   return_length=True,
-                                                   is_split_into_words=True,
-                                                   max_seq_len=max_seq_length)
+                tokenized_output = self._tokenizer(
+                    list(text),
+                    return_length=True,
+                    is_split_into_words=True,
+                    max_seq_len=max_seq_length)
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
@@ -392,12 +394,13 @@ class WordTagTask(Task):
             Stack(dtype='int64'), # seq_len
         ): fn(samples)
 
-        infer_data_loader = paddle.io.DataLoader(infer_ds,
-                                                 collate_fn=batchify_fn,
-                                                 num_workers=num_workers,
-                                                 batch_size=batch_size,
-                                                 shuffle=False,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            infer_ds,
+            collate_fn=batchify_fn,
+            num_workers=num_workers,
+            batch_size=batch_size,
+            shuffle=False,
+            return_list=True)
 
         outputs = {}
         outputs['data_loader'] = infer_data_loader
@@ -431,7 +434,8 @@ class WordTagTask(Task):
                     partial_word = sent[ind]
                     tags_out.append(tag.split('-')[-1])
                     continue
-                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith(
+                        "O"):
                     sent_out.append(partial_word)
                     tags_out.append(tag.split('-')[-1])
                     partial_word = sent[ind]
@@ -440,7 +444,7 @@ class WordTagTask(Task):
 
             if len(sent_out) < len(tags_out):
                 sent_out.append(partial_word)
-    
+
             pred_words = []
             for s, t in zip(sent_out, tags_out):
                 pred_words.append({"item": s, "offset": 0, "wordtag_label": t})
@@ -469,8 +473,8 @@ class WordTagTask(Task):
                 if len(target_type_) == 2:
                     target_src = target_type_[1]
                 target_type = target_type_[0]
-                flag, term_id = self._termtree.find_term(
-                    item["item"], target_type)
+                flag, term_id = self._termtree.find_term(item["item"],
+                                                         target_type)
                 if flag is False:
                     continue
                 term_id = list(
@@ -481,14 +485,13 @@ class WordTagTask(Task):
                 if target_src is not None:
                     term_id = list(
                         filter(
-                            lambda d: self._termtree[d].base.startswith(
-                                target_src.lower()), term_id))
+                            lambda d: self._termtree[d].base.startswith(target_src.lower()),
+                            term_id))
                     if len(term_id) == 0:
                         continue
-                term_id.sort(key=lambda d: (self._termtree[
-                    d].termtype == target_type or target_type in self._termtree[
-                        d].subtype, self._termtree[d].term == item["item"]),
-                             reverse=True)
+                term_id.sort(
+                    key=lambda d: (self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype, self._termtree[d].term == item["item"]),
+                    reverse=True)
                 item["termid"] = term_id[0]
 
     def _construct_input_spec(self):
@@ -496,15 +499,14 @@ class WordTagTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="token_type_ids"),  # token_type_ids
-            paddle.static.InputSpec(shape=[None],
-                                    dtype="int64",
-                                    name="seq_len"),  # seq_len
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="input_ids"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(
+                shape=[None], dtype="int64", name="seq_len"),  # seq_len
         ]
 
     def _construct_model(self, model):
@@ -512,8 +514,7 @@ class WordTagTask(Task):
         Construct the inference model for the predictor.
         """
         model_instance = ErnieCtmWordtagModel.from_pretrained(
-            model,
-            num_tag=len(self._tags_to_index))
+            model, num_tag=len(self._tags_to_index))
         if self._params_path is not None:
             state_dict = paddle.load(self._params_path)
             model_instance.set_dict(state_dict)
@@ -595,7 +596,7 @@ class NPTagTask(Task):
             ],
             "name_category_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/name_category_map.json",
-                "c60810205993d307d919a26a3b96786f"       
+                "c60810205993d307d919a26a3b96786f"
             ],
         }
     }
@@ -630,8 +631,7 @@ class NPTagTask(Task):
             self._config.switch_use_feed_fetch_ops(False)
             self._config.disable_glog_info()
             # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
-            self._config.delete_pass(
-                "embedding_eltwise_layernorm_fuse_pass")
+            self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(self._config)
             self.input_handles = [
                 self.predictor.get_input_handle(name)
@@ -653,8 +653,7 @@ class NPTagTask(Task):
         """
         Construct dict map for the predictor.
         """
-        name_dict_path = os.path.join(
-            self._task_path, "name_category_map.json")
+        name_dict_path = os.path.join(self._task_path, "name_category_map.json")
         with open(name_dict_path, encoding="utf-8") as fp:
             self._name_dict = json.load(fp)
         self._tree = BurkhardKellerTree()
@@ -708,14 +707,12 @@ class NPTagTask(Task):
         if sorted:
             sorted_indices_in_topk = np.argsort(topk_values, axis=axis)
             if largest:
-                sorted_indices_in_topk = np.flip(sorted_indices_in_topk,
-                                                 axis=axis)
-            sorted_topk_values = np.take_along_axis(topk_values,
-                                                    sorted_indices_in_topk,
-                                                    axis=axis)
-            sorted_topk_indices = np.take_along_axis(topk_indices,
-                                                     sorted_indices_in_topk,
-                                                     axis=axis)
+                sorted_indices_in_topk = np.flip(
+                    sorted_indices_in_topk, axis=axis)
+            sorted_topk_values = np.take_along_axis(
+                topk_values, sorted_indices_in_topk, axis=axis)
+            sorted_topk_indices = np.take_along_axis(
+                topk_indices, sorted_indices_in_topk, axis=axis)
             return sorted_topk_values, sorted_topk_indices
         return topk_values, topk_indices
 
@@ -724,12 +721,12 @@ class NPTagTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="input_ids"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="token_type_ids"),  # token_type_ids
         ]
 
     def _construct_model(self, model):
@@ -763,9 +760,11 @@ class NPTagTask(Task):
 
         def read(inputs):
             for text in inputs:
-                if len(text) + self._max_cls_len + 1 + self._summary_num + 1 > self._max_seq_len:
-                    text = text[:(self._max_seq_len -
-                        (self._max_cls_len + 1 + self._summary_num + 1))]
+                if len(
+                        text
+                ) + self._max_cls_len + 1 + self._summary_num + 1 > self._max_seq_len:
+                    text = text[:(self._max_seq_len - (self._max_cls_len + 1 +
+                                                       self._summary_num + 1))]
 
                 tokens = list(text) + prompt_template
                 tokenized_output = self._tokenizer(
@@ -788,12 +787,13 @@ class NPTagTask(Task):
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 
-        infer_data_loader = paddle.io.DataLoader(infer_ds,
-                                                 collate_fn=batchify_fn,
-                                                 num_workers=num_workers,
-                                                 batch_size=self._batch_size,
-                                                 shuffle=False,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            infer_ds,
+            collate_fn=batchify_fn,
+            num_workers=num_workers,
+            batch_size=self._batch_size,
+            shuffle=False,
+            return_list=True)
 
         outputs = {}
         outputs['data_loader'] = infer_data_loader

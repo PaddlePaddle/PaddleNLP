@@ -68,16 +68,24 @@ if __name__ == "__main__":
 
     # Load train dataset.
     file_name = 'test.csv'
-    test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, file_name), is_test=True, lazy=False)
+    test_ds = load_dataset(
+        read_custom_data,
+        filename=os.path.join(args.data_path, file_name),
+        is_test=True,
+        lazy=False)
 
     # The dataset labels
-    label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+    label_info = [
+        'toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate'
+    ]
 
     # Load pretrained model
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
+        "bert-base-uncased")
 
     # Load bert tokenizer
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
+        'bert-base-uncased')
 
     model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 

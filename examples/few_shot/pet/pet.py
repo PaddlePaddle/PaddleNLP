@@ -200,7 +200,9 @@ def do_train(args):
                     input_ids=src_ids,
                     token_type_ids=token_type_ids,
                     masked_positions=new_masked_positions)
-                ce_loss = (mlm_loss_fn(prediction_scores, masked_lm_labels) + mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
+                ce_loss = (
+                    mlm_loss_fn(prediction_scores, masked_lm_labels) +
+                    mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
                 kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
                 loss = ce_loss + kl_loss * args.rdrop_coef
             else:
@@ -317,10 +319,11 @@ if __name__ == "__main__":
         choices=['ernie-1.0'],
         help="Language model")
     parser.add_argument(
-        "--rdrop_coef", 
-        default=0.0, 
-        type=float, 
-        help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
+        "--rdrop_coef",
+        default=0.0,
+        type=float,
+        help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works"
+    )
 
     args = parser.parse_args()
     do_train(args)
