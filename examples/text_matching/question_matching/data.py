@@ -56,7 +56,6 @@ def read_text_pair(data_path, is_test=False):
                 yield {'query1': data[0], 'query2': data[1]}
 
 
-
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 
     query, title = example["query1"], example["query2"]

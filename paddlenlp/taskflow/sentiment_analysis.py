@@ -207,7 +207,8 @@ class SentaTask(Task):
         This function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label
@@ -349,7 +350,8 @@ class SkepTask(Task):
         The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label

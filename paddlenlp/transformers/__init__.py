@@ -64,6 +64,8 @@ from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
+from .visualbert.modeling import *
+from .visualbert.tokenizer import *
 from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
 from .convbert.modeling import *

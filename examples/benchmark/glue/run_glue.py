@@ -311,7 +311,8 @@ def do_train(args):
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
-        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
     else:
         num_training_steps = len(train_data_loader) * args.num_train_epochs
         num_train_epochs = args.num_train_epochs

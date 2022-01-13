@@ -542,8 +542,8 @@ def print_scores(scores, etype):
 
     print("{:20} {:20} {:20} {:20} {:20} {:20}".format("", *levels))
     counts = [scores[level]['count'] for level in levels]
-    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format("count",
-                                                                 *counts))
+    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format("count", *
+                                                                 counts))
 
     if etype in ["all", "exec"]:
         print(
