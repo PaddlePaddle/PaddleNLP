@@ -37,47 +37,25 @@ class FunnelTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "funnel-transformer/small":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small/vocab.txt",
             "funnel-transformer/small-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small-base/vocab.txt",
             "funnel-transformer/medium":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium/vocab.txt",
             "funnel-transformer/medium-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium-base/vocab.txt",
             "funnel-transformer/intermediate":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate/vocab.txt",
             "funnel-transformer/intermediate-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate-base/vocab.txt",
             "funnel-transformer/large":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large/vocab.txt",
             "funnel-transformer/large-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large-base/vocab.txt",
             "funnel-transformer/xlarge":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge/vocab.txt",
             "funnel-transformer/xlarge-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/vocab.txt",
-        },
-        "tokenizer_file": {
-            "funnel-transformer/small":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small/tokenizer.json",
-            "funnel-transformer/small-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/small-base/tokenizer.json",
-            "funnel-transformer/medium":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium/tokenizer.json",
-            "funnel-transformer/medium-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/medium-base/tokenizer.json",
-            "funnel-transformer/intermediate":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate/tokenizer.json",
-            "funnel-transformer/intermediate-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/intermediate-base/tokenizer.json",
-            "funnel-transformer/large":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large/tokenizer.json",
-            "funnel-transformer/large-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/large-base/tokenizer.json",
-            "funnel-transformer/xlarge":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge/tokenizer.json",
-            "funnel-transformer/xlarge-base":
-            "https://bj.bcebos.com/paddlenlp/models/funnel-transformer/xlarge-base/tokenizer.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge-base/vocab.txt",
         },
     }
     pretrained_init_configuration = {

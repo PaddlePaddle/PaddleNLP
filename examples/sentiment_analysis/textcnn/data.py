@@ -51,7 +51,11 @@ def create_dataloader(dataset,
         dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
-def preprocess_prediction_data(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
+
+def preprocess_prediction_data(data,
+                               tokenizer,
+                               pad_token_id=0,
+                               max_ngram_filter_size=3):
     """
     It process the prediction data as the format used as training.
 
@@ -79,6 +83,7 @@ def preprocess_prediction_data(data, tokenizer, pad_token_id=0, max_ngram_filter
         examples.append(ids)
     return examples
 
+
 def convert_example(example, tokenizer):
     """convert_example"""
     input_ids = tokenizer.encode(example["text"])
@@ -86,6 +91,7 @@ def convert_example(example, tokenizer):
 
     label = np.array(example["label"], dtype="int64")
     return input_ids, label
+
 
 def read_custom_data(filename):
     """Reads data."""

@@ -202,8 +202,8 @@ def do_eval(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=dev_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
@@ -264,8 +264,8 @@ def do_train(args):
 
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=train_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
@@ -374,23 +374,6 @@ def do_train(args):
     print("best_acc: ", best_acc)
 
 
-def export_model(args):
-    save_path = os.path.join(args.output_dir, "inference")
-    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
-    model.eval()
-    # convert to static graph with specific input description
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
-        ])
-    # save converted static graph model
-    paddle.jit.save(model, save_path)
-
-
 def print_arguments(args):
     """print arguments"""
     print('-----------  Configuration Arguments -----------')
@@ -404,6 +387,5 @@ if __name__ == "__main__":
     print_arguments(args)
     if args.do_train:
         do_train(args)
-        export_model(args)
     if args.do_eval:
         do_eval(args)

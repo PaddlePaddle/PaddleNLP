@@ -391,9 +391,10 @@ def do_train(args):
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                         % (global_step, epoch, step, loss_return[0],
                            reader_cost_avg.get_average(),
-                           train_cost_avg.get_average(),
-                           total_samples / args.logging_steps, args.batch_size /
-                           (reader_cost_avg.get_average() + train_cost_avg.get_average())))
+                           train_cost_avg.get_average(), total_samples /
+                           args.logging_steps, args.batch_size / (
+                               reader_cost_avg.get_average() +
+                               train_cost_avg.get_average())))
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
@@ -420,5 +421,5 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    print (args)
+    print(args)
     do_train(args)

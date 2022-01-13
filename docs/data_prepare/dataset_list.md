@@ -54,8 +54,9 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [XNLI_CN](https://github.com/facebookresearch/XNLI) | 中文自然语言推理数据集（XNLI的子集），三分类任务. | `paddlenlp.datasets.load_dataset('xnli_cn')`|
 
 ## 文本匹配
-|  数据集名称   | 简介 | 调用方法 |
-|  ----  | --------- | ------ |
+
+|  数据集名称   | 简介 | 调用方法 |  
+|  ----  | --------- | ------ |  
 | [CAIL2019-SCM](https://github.com/china-ai-law-challenge/CAIL2019/tree/master/scm) | 相似法律案例匹配  | `paddlenlp.datasets.load_dataset('cail2019_scm')` |
 
 ## 序列标注
