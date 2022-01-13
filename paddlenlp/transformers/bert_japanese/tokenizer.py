@@ -167,7 +167,8 @@ class BertJapaneseTokenizer(BertTokenizer):
 
         if self.do_subword_tokenize:
             split_tokens = [
-                sub_token for token in tokens
+                sub_token
+                for token in tokens
                 for sub_token in self.wordpiece_tokenizer.tokenize(token)
             ]
         else:

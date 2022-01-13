@@ -18,6 +18,7 @@ import paddle.nn as nn
 
 class SharedDropout(nn.Layer):
     """SharedDropout"""
+
     def __init__(self, p=0.5, batch_first=True):
         super(SharedDropout, self).__init__()
 
@@ -45,6 +46,7 @@ class SharedDropout(nn.Layer):
 
 class IndependentDropout(nn.Layer):
     """IndependentDropout"""
+
     def __init__(self, p=0.5):
         super(IndependentDropout, self).__init__()
         self.p = p
@@ -52,10 +54,16 @@ class IndependentDropout(nn.Layer):
     def forward(self, *items):
         """Forward network"""
         if self.training and self.p > 0:
-            masks = [paddle.uniform(shape=x.shape[:2], min=0, max=1) >= self.p for x in items]
+            masks = [
+                paddle.uniform(
+                    shape=x.shape[:2], min=0, max=1) >= self.p for x in items
+            ]
             masks = [paddle.cast(x, 'float32') for x in masks]
             total = paddle.add(*masks)
             scale = len(items) / paddle.maximum(total, paddle.ones_like(total))
             masks = [mask * scale for mask in masks]
-            items = [item * paddle.unsqueeze(mask, axis=-1) for item, mask in zip(items, masks)]
+            items = [
+                item * paddle.unsqueeze(
+                    mask, axis=-1) for item, mask in zip(items, masks)
+            ]
         return items

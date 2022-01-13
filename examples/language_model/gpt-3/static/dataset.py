@@ -330,7 +330,7 @@ def create_pretrained_dataset(
             sample_lens=sample_lens,
             eos_id=eos_id,
             seed=args.seed,
-            use_pure_fp16= args.use_amp and args.amp_level=="O2")
+            use_pure_fp16=args.use_amp and args.amp_level == "O2")
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
