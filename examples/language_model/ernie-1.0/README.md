@@ -83,7 +83,7 @@ python -u  -m paddle.distributed.launch \
 - 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
 
 
-### Clue corpus small 数据集训练结果
+### CLUECorpusSmall 数据集训练结果
 
 数据准备部分参考[data_tools](../data_tools/)中的附录部分，根据文档，创建训练clue_corpus_small_14g数据集。
 使用本训练脚本, batch_size=512, max_steps=100w，详细训练日志请参考：https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/scalar?id=b0e19e554d68b9165a55901f0eb92812
@@ -118,6 +118,12 @@ python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/t
 python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_last/static_vars.pdparams
 ```
 在当前目录下，可以看到转换后的参数`ernie-1.0_converted.pdparams`, 也可以设置脚本中`--output_path`参数，指定输出路径。
+
+#### 为PaddleNLP贡献预训练参数
+PaddleNLP为开发者支持了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
+
+贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
 
 ### 参考文献
