@@ -1,13 +1,13 @@
 ## PaddleNLP常见问题汇总（持续更新）
 
 + [【精选】NLP精选5问](#NLP精选)
-  
+
   + [Q1.1 如何加载自己的本地数据集，以便使用PaddleNLP的功能？](#1-1)
   + [Q1.2 PaddleNLP会将内置的数据集、模型下载到默认路径，如何修改路径？](#1-2)
   + [Q1.3 PaddleNLP中如何保存、加载训练好的模型？](#1-3)
   + [Q1.4 当训练样本较少时，有什么推荐的方法能提升模型效果吗？](#1-4)
   + [Q1.5 如何提升模型的性能，提升QPS？](#1-5)
-  
+
 + [【理论篇】NLP通用问题](#NLP通用问题 )
 
   + [Q2.1 数据类别分布不均衡， 有哪些应对方法？](#2-2)
@@ -85,7 +85,7 @@ iter_ds = load_dataset(read, data_path='train.txt', lazy=True)
 
 <a name="1-2"></a>
 
-##### Q1.2 PaddleNLP会将内置的数据集、模型下载到默认路径，如何修改路径？ 
+##### Q1.2 PaddleNLP会将内置的数据集、模型下载到默认路径，如何修改路径？
 
 **A:** 内置的数据集、模型默认会下载到`$HOME/.paddlenlp/`下，通过配置环境变量可下载到指定路径：
 
@@ -99,14 +99,14 @@ iter_ds = load_dataset(read, data_path='train.txt', lazy=True)
 
 **A：**（1）PaddleNLP预训练模型
 
-​	保存：
+​    保存：
 
 ```python
 model.save_pretrained("./checkpoint')
 tokenizer.save_pretrained("./checkpoint')
 ```
 
-​	加载：
+​    加载：
 
 ```python
 model.from_pretrained("./checkpoint')
@@ -114,7 +114,7 @@ tokenizer.from_pretrained("./checkpoint')
 ```
 
 （2）常规模型
-	保存：
+    保存：
 
 ```python
 emb = paddle.nn.Embedding(10, 10)
@@ -122,7 +122,7 @@ layer_state_dict = emb.state_dict()
 paddle.save(layer_state_dict, "emb.pdparams") #保存模型参数
 ```
 
-​	加载：
+​    加载：
 ```python
 emb = paddle.nn.Embedding(10, 10)
 load_layer_state_dict = paddle.load("emb.pdparams") # 读取模型参数
@@ -170,7 +170,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 <a name="PaddleNLP实战问题"></a>
 
-## ⭐️【实战篇】PaddleNLP实战问题 
+## ⭐️【实战篇】PaddleNLP实战问题
 
 <a name="数据问题"></a>
 
@@ -229,7 +229,7 @@ model = BertModel.from_pretrained("./checkpoint")
 
 ##### Q3.3 如果训练中断，需要继续热启动训练，如何保证学习率和优化器能从中断地方继续迭代？
 
-**A:** 
+**A:**
 
  （1）完全恢复训练状态，可以先将`lr`、` optimizer`、`model`的参数保存下来：
 
@@ -251,7 +251,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 ##### Q3.4 如何冻结模型梯度？
 
-**A:** 
+**A:**
 有多种方法可以尝试：
 
 （1）可以直接修改 PaddleNLP 内部代码实现，在需要冻结梯度的地方用 `paddle.no_grad()` 包裹一下
@@ -418,7 +418,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 **A:** 其主要依赖于二次构造数据来进行finetune，同时要更新termtree信息。wordtag分为两个步骤：
 （1）通过BIOES体系进行分词；
 （2）将分词后的信息和TermTree进行匹配。
-	因此我们需要：
+    因此我们需要：
 （1）分词正确，这里可能依赖于wordtag的finetune数据，来让分词正确；
 （2）wordtag里面也需要把分词正确后term打上相应的知识信息。wordtag自定义TermTree的方式将在后续版本提供出来。
 
@@ -453,19 +453,19 @@ model.set_state_dict(paddle.load("xxx_para"))
 （2）通过`create_parameter()`设置参数。
 
 ``` python
-	class MyLayer(paddle.nn.Layer):
-	    def __init__(self):
-	        super(MyLayer, self).__init__()
-	        self._linear = paddle.nn.Linear(1, 1)
-	        w_tmp = self.create_parameter([1,1])
-	        self.add_parameter("w_tmp", w_tmp)
+    class MyLayer(paddle.nn.Layer):
+        def __init__(self):
+            super(MyLayer, self).__init__()
+            self._linear = paddle.nn.Linear(1, 1)
+            w_tmp = self.create_parameter([1,1])
+            self.add_parameter("w_tmp", w_tmp)
 
-	    def forward(self, input):
-	        return self._linear(input)
+        def forward(self, input):
+            return self._linear(input)
 
-	mylayer = MyLayer()
-	for name, param in mylayer.named_parameters():
-	    print(name, param)  
+    mylayer = MyLayer()
+    for name, param in mylayer.named_parameters():
+        print(name, param)  
 ```
 
 <a name="7-3"></a>
@@ -493,6 +493,3 @@ model.set_state_dict(paddle.load("xxx_para"))
 ##### Q5.6 如何可视化acc、loss曲线图、模型网络结构图等？
 
 **A:** 可使用[VisualDL](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/03_VisualDL/index_cn.html)进行可视化。其中acc、loss曲线图的可视化可参考[Scalar——折线图组件](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/03_VisualDL/visualdl_usage_cn.html#scalar)使用指南，模型网络结构的可视化可参考[Graph——网络结构组件](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/03_VisualDL/visualdl_usage_cn.html#graph)使用指南。
-
-
-

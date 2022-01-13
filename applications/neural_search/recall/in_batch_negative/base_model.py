@@ -28,8 +28,8 @@ class SemanticIndexBase(nn.Layer):
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
-        # if output_emb_size is not None, then add Linear layer to reduce embedding_size, 
-        # we recommend set output_emb_size = 256 considering the trade-off beteween 
+        # if output_emb_size is not None, then add Linear layer to reduce embedding_size,
+        # we recommend set output_emb_size = 256 considering the trade-off beteween
         # recall performance and efficiency
 
         self.output_emb_size = output_emb_size
@@ -105,8 +105,8 @@ class SemanticIndexBaseStatic(nn.Layer):
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
-        # if output_emb_size is not None, then add Linear layer to reduce embedding_size, 
-        # we recommend set output_emb_size = 256 considering the trade-off beteween 
+        # if output_emb_size is not None, then add Linear layer to reduce embedding_size,
+        # we recommend set output_emb_size = 256 considering the trade-off beteween
         # recall performance and efficiency
 
         self.output_emb_size = output_emb_size

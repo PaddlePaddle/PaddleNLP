@@ -132,7 +132,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 
 ```
 MILVUS_HOST='your milvus ip'
-MILVUS_PORT = 8530 
+MILVUS_PORT = 8530
 ```
 
 然后运行下面的命令把向量插入到Milvus库中：

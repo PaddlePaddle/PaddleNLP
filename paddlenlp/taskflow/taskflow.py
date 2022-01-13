@@ -274,4 +274,4 @@ class Taskflow(object):
                 if human.lower() == "exit":
                     exit()
                 robot = self.task_instance(human)[0]
-                print("[Bot]:%s"%robot)
+                print("[Bot]:%s" % robot)

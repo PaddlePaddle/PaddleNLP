@@ -48,10 +48,10 @@ termtree.save("./")
 
 #### API说明
 
-- ```python 
+- ```python
   def add_term()
   ```
-  
+
 - **参数**
  - term (str): 待增加的term名称。
  - base (str): term属于概念词（cb）还是实体词（eb）。

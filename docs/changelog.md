@@ -2,8 +2,8 @@
 
 - 丰富预训练模型
   * 新增多粒度语言知识预训练模型[ERNIE-Gram](https://arxiv.org/abs/2010.12148)，该模型在多项中文NLP任务取得SOTA成绩。
-  * 新增NeZha中文预训练模型，感谢 @jm12138 的高质量贡献！ 🎉 🎉 🎉 
-  * 新增GPT CPM-Distill中文小型化模型，感谢 @jm12138 的高质量贡献！🎉 🎉 🎉 
+  * 新增NeZha中文预训练模型，感谢 @jm12138 的高质量贡献！ 🎉 🎉 🎉
+  * 新增GPT CPM-Distill中文小型化模型，感谢 @jm12138 的高质量贡献！🎉 🎉 🎉
 
 - Bug Fix
   * 修复了`softmax_with_crossentropy` API导致的deprecated warning
