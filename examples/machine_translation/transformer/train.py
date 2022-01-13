@@ -154,10 +154,8 @@ def do_train(args):
         print("loaded from pre-trained model.")
 
     # for amp training
-    amp_level = 'O1'
-    if args.use_amp and args.use_pure_fp16:
-        amp_level = 'O2'
     if args.use_amp:
+        amp_level = 'O2' if args.use_pure_fp16 else 'O1'
         scaler = paddle.amp.GradScaler(
             enable=True, init_loss_scaling=args.scale_loss)
         transformer = paddle.amp.decorate(models=transformer, level=amp_level)
