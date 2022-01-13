@@ -70,13 +70,11 @@ def evaluate(model, metric, data_loader, tags, tags_to_idx):
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, seq_len, tags = batch
-        loss, seq_logits = model(input_ids,
-                              token_type_ids,
-                              lengths=seq_len,
-                              tag_labels=tags)
+        loss, seq_logits = model(
+            input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)
         loss = loss.mean()
         losses.append(loss.numpy())
-        
+
         correct = metric.compute(
             pred=seq_logits.reshape([-1, len(tags_to_idx)]),
             label=tags.reshape([-1]),
@@ -96,22 +94,24 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_custom_data,
-                            filename=os.path.join(args.data_dir, "train.txt"),
-                            is_test=False,
-                            lazy=False)
-    dev_ds = load_dataset(read_custom_data,
-                          filename=os.path.join(args.data_dir, "dev.txt"),
-                          is_test=False,
-                          lazy=False)
+    train_ds = load_dataset(
+        read_custom_data,
+        filename=os.path.join(args.data_dir, "train.txt"),
+        is_test=False,
+        lazy=False)
+    dev_ds = load_dataset(
+        read_custom_data,
+        filename=os.path.join(args.data_dir, "dev.txt"),
+        is_test=False,
+        lazy=False)
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
     model = ErnieCtmWordtagModel.from_pretrained(
-        "wordtag",
-        num_tag=len(tags_to_idx))
+        "wordtag", num_tag=len(tags_to_idx))
     model.crf_loss = LinearChainCrfLoss(
-        LinearChainCrf(len(tags_to_idx), 0.1, with_start_stop_tag=False))
+        LinearChainCrf(
+            len(tags_to_idx), 0.1, with_start_stop_tag=False))
 
     trans_func = partial(
         convert_example,
@@ -183,10 +183,7 @@ def do_train(args):
             input_ids, token_type_ids, seq_len, tags = batch
 
             loss, _ = model(
-                input_ids,
-                token_type_ids,
-                lengths=seq_len,
-                tag_labels=tags)
+                input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)
             loss = loss.mean()
             total_loss += loss
             loss.backward()
@@ -200,12 +197,13 @@ def do_train(args):
                 speed = float(args.logging_steps) / (end_time - start_time)
                 logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, total_loss / args.logging_steps, speed))
+                    % (global_step, epoch, total_loss / args.logging_steps,
+                       speed))
                 start_time = time.time()
                 total_loss = 0
 
-            if (global_step % args.save_steps == 0 
-                    or global_step == num_training_steps) and rank == 0:
+            if (global_step % args.save_steps == 0 or
+                    global_step == num_training_steps) and rank == 0:
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % (global_step))
                 if not os.path.exists(output_dir):

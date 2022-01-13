@@ -87,16 +87,13 @@ def do_predict(data,
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    data = [
-        '美人鱼是周星驰执导的一部电影',
-    ]
+    data = ['美人鱼是周星驰执导的一部电影', ]
 
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
     idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
 
     model = ErnieCtmWordtagModel.from_pretrained(
-        "wordtag",
-        num_tag=len(tags_to_idx))
+        "wordtag", num_tag=len(tags_to_idx))
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -104,11 +101,12 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = do_predict(data, 
-                         model, 
-                         tokenizer, 
-                         model.viterbi_decoder, 
-                         tags_to_idx, 
-                         idx_to_tags,
-                         batch_size=args.batch_size)
+    results = do_predict(
+        data,
+        model,
+        tokenizer,
+        model.viterbi_decoder,
+        tags_to_idx,
+        idx_to_tags,
+        batch_size=args.batch_size)
     print(results)

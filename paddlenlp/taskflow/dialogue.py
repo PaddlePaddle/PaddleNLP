@@ -53,6 +53,7 @@ usage = r"""
            '''           
          """
 
+
 class DialogueTask(Task):
     """
     Task of Chinese open domain dialogue.
@@ -64,7 +65,7 @@ class DialogueTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",    
+        "model_config": "model_config.json",
     }
     resource_files_urls = {
         "plato-mini": {
@@ -79,12 +80,7 @@ class DialogueTask(Task):
         }
     }
 
-    def __init__(self, 
-                 task, 
-                 model, 
-                 batch_size=1,
-                 max_seq_len=512,
-                 **kwargs):
+    def __init__(self, task, model, batch_size=1, max_seq_len=512, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
@@ -129,21 +125,26 @@ class DialogueTask(Task):
 
     def _batchify_fn(self, batch_examples):
         #padding = False if self._batch_size == 1 else True
-        pad_func = Pad(pad_val=self._tokenizer.pad_token_id, pad_right=False, dtype='int64')
+        pad_func = Pad(pad_val=self._tokenizer.pad_token_id,
+                       pad_right=False,
+                       dtype='int64')
 
         def pad_mask(batch_attention_mask):
             batch_size = len(batch_attention_mask)
             max_len = max(map(len, batch_attention_mask))
-            attention_mask = np.ones((batch_size, max_len, max_len), dtype='float32') * -1e9
+            attention_mask = np.ones(
+                (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
-                mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype='float32')
+                mask_data[-seq_len:, -seq_len:] = np.array(
+                    batch_attention_mask[i], dtype='float32')
             # In order to ensure the correct broadcasting mechanism, expand one
             # dimension to the second dimension (n_head of Transformer).
             attention_mask = np.expand_dims(attention_mask, axis=1)
             return attention_mask
 
-        input_ids = pad_func([example['input_ids'] for example in batch_examples])
+        input_ids = pad_func(
+            [example['input_ids'] for example in batch_examples])
         token_type_ids = pad_func(
             [example['token_type_ids'] for example in batch_examples])
         position_ids = pad_func(
@@ -160,9 +161,12 @@ class DialogueTask(Task):
                 inputs = [list(self.context)]
                 return inputs
             else:
-                raise ValueError("In the interactive mode, the input data shold be a string")
+                raise ValueError(
+                    "In the interactive mode, the input data shold be a string")
         elif not isinstance(inputs[0], list):
-            raise ValueError("If not in the interactive mode, the input data should be a list.")
+            raise ValueError(
+                "If not in the interactive mode, the input data should be a list."
+            )
         return inputs
 
     def _batchify(self, data, max_seq_len, batch_size):
@@ -170,15 +174,19 @@ class DialogueTask(Task):
         Generate input batches.
         """
         padding = False if batch_size == 1 else True
-        pad_func = Pad(pad_val=self._tokenizer.pad_token_id, pad_right=False, dtype=np.int64)
+        pad_func = Pad(pad_val=self._tokenizer.pad_token_id,
+                       pad_right=False,
+                       dtype=np.int64)
 
         def pad_mask(batch_attention_mask):
             batch_size = len(batch_attention_mask)
             max_len = max(map(len, batch_attention_mask))
-            attention_mask = np.ones((batch_size, max_len, max_len), dtype='float32') * -1e9
+            attention_mask = np.ones(
+                (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
-                mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype='float32')
+                mask_data[-seq_len:, -seq_len:] = np.array(
+                    batch_attention_mask[i], dtype='float32')
             # In order to ensure the correct broadcasting mechanism, expand one
             # dimension to the second dimension (n_head of Transformer).
             attention_mask = np.expand_dims(attention_mask, axis=1)
@@ -186,15 +194,26 @@ class DialogueTask(Task):
 
         def _parse_batch(batch_examples):
             if padding:
-                input_ids = pad_func([example['input_ids'] for example in batch_examples])
-                token_type_ids = pad_func([example['token_type_ids'] for example in batch_examples])
-                position_ids = pad_func([example['position_ids'] for example in batch_examples])
-                attention_mask = pad_mask([example['attention_mask'] for example in batch_examples])
+                input_ids = pad_func(
+                    [example['input_ids'] for example in batch_examples])
+                token_type_ids = pad_func(
+                    [example['token_type_ids'] for example in batch_examples])
+                position_ids = pad_func(
+                    [example['position_ids'] for example in batch_examples])
+                attention_mask = pad_mask(
+                    [example['attention_mask'] for example in batch_examples])
             else:
-                input_ids = np.asarray([example['input_ids'] for example in batch_examples], dtype=np.int64)
-                token_type_ids = np.asarray([example['token_type_ids'] for example in batch_examples], dtype=np.int64)
-                position_ids = np.asarray([example['position_ids'] for example in batch_examples], dtype=np.int64)
-                attention_mask = np.asarray([example['attention_mask'] for example in batch_examples])
+                input_ids = np.asarray(
+                    [example['input_ids'] for example in batch_examples],
+                    dtype=np.int64)
+                token_type_ids = np.asarray(
+                    [example['token_type_ids'] for example in batch_examples],
+                    dtype=np.int64)
+                position_ids = np.asarray(
+                    [example['position_ids'] for example in batch_examples],
+                    dtype=np.int64)
+                attention_mask = np.asarray(
+                    [example['attention_mask'] for example in batch_examples])
                 attention_mask = np.expand_dims(attention_mask, 0)
 
             return input_ids, token_type_ids, position_ids, attention_mask
@@ -218,7 +237,10 @@ class DialogueTask(Task):
         Convert input strings to tokens.
         """
         return self._tokenizer.dialogue_encode(
-            texts, max_seq_len=max_seq_len, add_start_token_as_response=True, is_split_into_words=False)
+            texts,
+            max_seq_len=max_seq_len,
+            add_start_token_as_response=True,
+            is_split_into_words=False)
 
     def _preprocess(self, inputs):
         """
@@ -248,22 +270,24 @@ class DialogueTask(Task):
         all_scores = []
 
         for batch in inputs["batches"]:
-            input_ids, token_type_ids, position_ids, attention_mask = map(paddle.to_tensor, batch)
-            ids, scores = self._model.generate(input_ids=input_ids, 
-                                                token_type_ids=token_type_ids,
-                                                position_ids=position_ids,
-                                                attention_mask=attention_mask,
-                                                max_length=64,
-                                                min_length=1,
-                                                decode_strategy='sampling',
-                                                temperature=1.0,
-                                                top_k=5,
-                                                top_p=1.0,
-                                                num_beams=0,
-                                                length_penalty=1.0,
-                                                early_stopping=False,
-                                                use_faster=False,
-                                                num_return_sequences=1)
+            input_ids, token_type_ids, position_ids, attention_mask = map(
+                paddle.to_tensor, batch)
+            ids, scores = self._model.generate(
+                input_ids=input_ids,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                max_length=64,
+                min_length=1,
+                decode_strategy='sampling',
+                temperature=1.0,
+                top_k=5,
+                top_p=1.0,
+                num_beams=0,
+                length_penalty=1.0,
+                early_stopping=False,
+                use_faster=False,
+                num_return_sequences=1)
             all_ids.extend([ids])
             all_scores.extend([scores])
         inputs['ids'] = all_ids
@@ -312,7 +336,7 @@ class DialogueTask(Task):
             if tri_gram in tri_grams:
                 return True
             tri_grams.add(tri_gram)
-        return False           
+        return False
 
     def _select_response(self,
                          ids,
@@ -328,13 +352,15 @@ class DialogueTask(Task):
         scores = scores.numpy()
 
         if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
-            raise ValueError("the length of `ids` is {}, but the `num_return_sequences` is {}".format(
-                len(ids), num_return_sequences))
+            raise ValueError(
+                "the length of `ids` is {}, but the `num_return_sequences` is {}".
+                format(len(ids), num_return_sequences))
 
         group = []
         tmp = []
         for pred, score in zip(ids, scores):
-            pred_token_ids, pred_tokens = self._post_process_response(pred, tokenizer)
+            pred_token_ids, pred_tokens = self._post_process_response(pred,
+                                                                      tokenizer)
             num_token = len(pred_token_ids)
             if keep_space:
                 response = " ".join(pred_tokens)
@@ -368,12 +394,13 @@ class DialogueTask(Task):
         results = []
         for ids, scores, text in zip(all_ids, all_scores, texts):
             results.extend(
-                self._select_response(ids, 
-                                      scores, 
-                                      self._tokenizer, 
-                                      num_return_sequences=1,
-                                      keep_space=False))
-        
+                self._select_response(
+                    ids,
+                    scores,
+                    self._tokenizer,
+                    num_return_sequences=1,
+                    keep_space=False))
+
         if self._interactive_mode:
             self.context.append(results[0].strip())
         return results

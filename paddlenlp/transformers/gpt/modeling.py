@@ -807,7 +807,7 @@ class GPTModel(GPTPretrainedModel):
         # TODO, use registered buffer
         causal_mask = paddle.tensor.triu(
             paddle.ones((paddle.shape(input_ids)[-1],
-                         paddle.shape(input_ids)[-1])) * -1e9,
+                         paddle.shape(input_ids)[-1])) * -1e4,
             diagonal=1)
 
         if attention_mask is not None:

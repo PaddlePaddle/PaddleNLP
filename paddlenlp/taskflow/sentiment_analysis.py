@@ -66,12 +66,12 @@ class SentaTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "vocab": "vocab.txt"    
+        "vocab": "vocab.txt"
     }
     resource_files_urls = {
         "bilstm": {
             "vocab": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/bilstm/vocab.txt", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/sentiment_analysis/bilstm/vocab.txt",
                 "df714f0bfd6d749f88064679b4c97fd5"
             ],
             "model_state": [
@@ -207,7 +207,8 @@ class SentaTask(Task):
         This function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label
@@ -349,7 +350,8 @@ class SkepTask(Task):
         The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
-        for text, label, score in zip(inputs['text'], inputs['result'], inputs['score']):
+        for text, label, score in zip(inputs['text'], inputs['result'],
+                                      inputs['score']):
             result = {}
             result['text'] = text
             result['label'] = label

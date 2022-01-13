@@ -448,7 +448,7 @@ class ElectraModel(ElectraPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(paddle.get_default_dtype()) * -1e9,
+                 ).astype(paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:

@@ -273,8 +273,8 @@ class DialogReader(object):
                 return self.sort_key(record)
             else:
                 return [
-                    max(max_len, l) for max_len, l in zip(max_lens,
-                                                          self.sort_key(record))
+                    max(max_len, l)
+                    for max_len, l in zip(max_lens, self.sort_key(record))
                 ]
 
         def get_batch(reader):

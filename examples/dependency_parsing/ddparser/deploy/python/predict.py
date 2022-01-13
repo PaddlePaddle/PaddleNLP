@@ -55,7 +55,7 @@ def flat_words(words, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(words[idx:idx+l])
+        sequences.append(words[idx:idx + l])
         idx += l
     words = Pad(pad_val=pad_index)(sequences)
 
@@ -74,7 +74,7 @@ def decode(s_arc, s_rel, mask, tree=True):
     bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
-    
+
     rel_preds = np.argmax(s_rel, axis=-1)
     rel_preds = [
         rel_pred[np.arange(len(arc_pred)), arc_pred]
@@ -124,20 +124,19 @@ class Predictor(object):
         examples = []
         for text in data:
             example = {
-                "FORM": text["FORM"], 
-                "CPOS": text["CPOS"], 
+                "FORM": text["FORM"],
+                "CPOS": text["CPOS"],
             }
             example = convert_example(
                 example,
                 vocabs=vocabs,
-                mode="test",
-            )
+                mode="test", )
             examples.append(example)
 
         batches = [
             examples[idx:idx + args.batch_size]
             for idx in range(0, len(examples), args.batch_size)
-        ]      
+        ]
 
         arcs, rels = [], []
         for batch in batches:
@@ -151,17 +150,17 @@ class Predictor(object):
             words = self.output_handle[2].copy_to_cpu()
 
             mask = np.logical_and(
-                np.logical_and(words != word_pad_index, words != word_bos_index),
-                words != word_eos_index, 
-            )
+                np.logical_and(words != word_pad_index,
+                               words != word_bos_index),
+                words != word_eos_index, )
 
             arc_preds, rel_preds = decode(s_arc, s_rel, mask, args.tree)
 
             arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
-            rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])        
+            rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
 
         arcs = [[str(s) for s in seq] for seq in arcs]
-        rels = [rel_vocab.to_tokens(seq) for seq in rels]   
+        rels = [rel_vocab.to_tokens(seq) for seq in rels]
         return arcs, rels
 
 
@@ -181,7 +180,8 @@ if __name__ == "__main__":
         for res, head, rel in zip(test_ds_copy, pred_arcs, pred_rels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
-            res = '\n'.join('\t'.join(map(str, line)) for line in zip(*res.values())) + '\n'
-            out_file.write("{}\n".format(res)) 
+            res = '\n'.join('\t'.join(map(str, line))
+                            for line in zip(*res.values())) + '\n'
+            out_file.write("{}\n".format(res))
     out_file.close()
     print("Results saved!")
