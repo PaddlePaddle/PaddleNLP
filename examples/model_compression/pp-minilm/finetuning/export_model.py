@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import argparse
 import os
+import sys
+import argparse
+import distutils.util
 
-import paddle
+from paddlenlp.transformers import PPMiniLMForSequenceClassification
 
-from run_clue import MODEL_CLASSES
+sys.path.append("../")
+from data import METRIC_CLASSES
 
 
 def parse_args():
@@ -25,54 +27,49 @@ def parse_args():
 
     # Required parameters
     parser.add_argument(
-        "--model_type",
+        "--task_name",
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        help="The name of the task to train selected in the list: " +
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
-        "--model_path",
-        default=None,
+        "--output_dir",
+        default="best_clue_model",
         type=str,
-        required=True,
-        help="Path of the trained model to be exported.", )
-    parser.add_argument(
-        "--output_path",
-        default=None,
-        type=str,
-        required=True,
-        help="The output file prefix used to save the exported inference model.",
+        help="The output directory where the model predictions and checkpoints will be written.",
     )
+    parser.add_argument(
+        "--save_inference_model_with_tokenizer",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to save inference model with tokenizer.")
+
     args = parser.parse_args()
     return args
 
 
-def main():
-    args = parse_args()
+def do_export(args):
+    save_path = os.path.join(args.output_dir, "inference")
+    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
+    is_text_pair = True
+    if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
+        is_text_pair = False
+    model.to_static(
+        save_path,
+        use_faster_tokenizer=args.save_inference_model_with_tokenizer,
+        is_text_pair=is_text_pair)
 
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    # build model and load trained parameters
-    model = model_class.from_pretrained(args.model_path)
-    # switch to eval model
-    model.eval()
-    # convert to static graph with specific input description
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
-        ])
-    # save converted static graph model
-    paddle.jit.save(model, args.output_path)
-    # also save tokenizer for inference usage
-    tokenizer = tokenizer_class.from_pretrained(args.model_path)
-    tokenizer.save_pretrained(os.path.dirname(args.output_path))
+def print_arguments(args):
+    """print arguments"""
+    print('-----------  Configuration Arguments -----------')
+    for arg, value in sorted(vars(args).items()):
+        print('%s: %s' % (arg, value))
+    print('------------------------------------------------')
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    print_arguments(args)
+    do_export(args)

@@ -31,7 +31,7 @@ from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer, ErnieModel
+from paddlenlp.transformers import PPMiniLMModel
 
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
 from paddleslim.nas.ofa.utils import nlp_utils
@@ -193,12 +193,17 @@ def evaluate(model, metric, data_loader, width_mult, student=False):
     return res
 
 
-### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
-def ernie_forward(self,
-                  input_ids,
-                  token_type_ids=None,
-                  position_ids=None,
-                  attention_mask=[None, None]):
+### monkey patch for ppminilm forward to accept [attention_mask, head_mask] as  attention_mask
+def ppminilm_forward(self,
+                     input_ids,
+                     token_type_ids=None,
+                     position_ids=None,
+                     attention_mask=[None, None]):
+    if self.use_faster_tokenizer:
+        input_ids, token_type_ids = self.tokenizer(
+            text=input_ids,
+            text_pair=token_type_ids,
+            max_seq_len=self.max_seq_len)
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
     if attention_mask[0] is None:
@@ -211,7 +216,7 @@ def ernie_forward(self,
     return encoded_layer, pooled_output
 
 
-ErnieModel.forward = ernie_forward
+PPMiniLMModel.forward = ppminilm_forward
 
 
 ### reorder weights according head importance and neuron importance
@@ -220,14 +225,15 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
     for layer, current_importance in enumerate(neuron_importance):
         # reorder heads
         idx = paddle.argsort(head_importance[layer], descending=True)
-        nlp_utils.reorder_head(model.ernie.encoder.layers[layer].self_attn, idx)
+        nlp_utils.reorder_head(model.ppminilm.encoder.layers[layer].self_attn,
+                               idx)
         # reorder neurons
         idx = paddle.argsort(
             paddle.to_tensor(current_importance), descending=True)
         nlp_utils.reorder_neuron(
-            model.ernie.encoder.layers[layer].linear1.fn, idx, dim=1)
+            model.ppminilm.encoder.layers[layer].linear1.fn, idx, dim=1)
         nlp_utils.reorder_neuron(
-            model.ernie.encoder.layers[layer].linear2.fn, idx, dim=0)
+            model.ppminilm.encoder.layers[layer].linear2.fn, idx, dim=0)
 
 
 def soft_cross_entropy(inp, target):
@@ -252,8 +258,8 @@ def do_train(args):
 
     trans_func = partial(
         convert_example,
-        tokenizer=tokenizer,
         label_list=train_ds.label_list,
+        tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -286,7 +292,7 @@ def do_train(args):
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
 
-    # Step1: Initialize a dictionary to save the weights from the origin BERT model.
+    # Step1: Initialize a dictionary to save the weights from the origin PPMiniLM model.
     origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.
@@ -305,9 +311,9 @@ def do_train(args):
         args.model_name_or_path, num_classes=num_labels)
 
     # Step4: Config about distillation.
-    mapping_layers = ['ernie.embeddings']
-    for idx in range(model.ernie.config['num_hidden_layers']):
-        mapping_layers.append('ernie.encoder.layers.{}'.format(idx))
+    mapping_layers = ['ppminilm.embeddings']
+    for idx in range(model.ppminilm.config['num_hidden_layers']):
+        mapping_layers.append('ppminilm.encoder.layers.{}'.format(idx))
 
     default_distill_config = {
         'lambda_distill': 0.1,
@@ -333,8 +339,8 @@ def do_train(args):
         ofa_model.model,
         dev_data_loader,
         loss_fct=criterion,
-        num_layers=model.ernie.config['num_hidden_layers'],
-        num_heads=model.ernie.config['num_attention_heads'])
+        num_layers=model.ppminilm.config['num_hidden_layers'],
+        num_heads=model.ppminilm.config['num_attention_heads'])
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
 
     if paddle.distributed.get_world_size() > 1:

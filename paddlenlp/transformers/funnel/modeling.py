@@ -15,14 +15,12 @@
 
 from .. import register_base_model
 import math
-from packaging import version
 from dataclasses import dataclass
 from dataclasses import fields
 from collections import OrderedDict
 import numpy as np
 from paddle import nn
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss, LayerNorm
-from paddlenlp.ops.einsum import einsum
 from .. import PretrainedModel as PreTrainedModel
 import paddle
 import os
@@ -1424,14 +1422,14 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape batch_size x sea_len x n_head x d_model
-            q_r_attention = einsum("binh,dnh->bind", q_head + u, w_r)
+            q_r_attention = paddle.einsum("binh,dnh->bind", q_head + u, w_r)
             q_r_attention_1 = q_r_attention * phi.unsqueeze(1)  # [:, None]
             q_r_attention_2 = q_r_attention * pi.unsqueeze(1)  # [:, None]
 
             # Shape batch_size x n_head x seq_len x context_len
-            positional_attn = einsum("bind,jd->bnij", q_r_attention_1,
-                                     psi) + einsum("bind,jd->bnij",
-                                                   q_r_attention_2, omega)
+            positional_attn = paddle.einsum(
+                "bind,jd->bnij", q_r_attention_1, psi) + paddle.einsum(
+                    "bind,jd->bnij", q_r_attention_2, omega)
         else:
             shift = 2 if q_head.shape[1] != context_len else 1
             # Notations from the paper, appending A.2.1, final formula (https://arxiv.org/abs/2006.03236)
@@ -1443,9 +1441,10 @@ class FunnelRelMultiheadAttention(nn.Layer):
             w_r = self.r_kernel
 
             # Shape max_rel_len x n_head x d_model
-            r_head = einsum("td,dnh->tnh", r, w_r)
+            r_head = paddle.einsum("td,dnh->tnh", r, w_r)
             # Shape batch_size x n_head x seq_len x max_rel_len
-            positional_attn = einsum("binh,tnh->bnit", q_head + v, r_head)
+            positional_attn = paddle.einsum("binh,tnh->bnit", q_head + v,
+                                            r_head)
             # Shape batch_size x n_head x seq_len x context_len
             positional_attn = _relative_shift_gather(positional_attn,
                                                      context_len, shift)
@@ -1467,8 +1466,8 @@ class FunnelRelMultiheadAttention(nn.Layer):
         r_s_bias = self.r_s_bias * self.scale
 
         # Shape batch_size x n_head x seq_len x 2
-        token_type_bias = einsum("bind,snd->bnis", q_head + r_s_bias,
-                                 self.seg_embed)
+        token_type_bias = paddle.einsum("bind,snd->bnis", q_head + r_s_bias,
+                                        self.seg_embed)
 
         # Shape batch_size x n_head x seq_len x context_len
         # token_type_mat = token_type_mat[:, None].expand([batch_size, q_head.shape[2], seq_len, context_len])
@@ -1517,7 +1516,8 @@ class FunnelRelMultiheadAttention(nn.Layer):
         r_w_bias = self.r_w_bias * self.scale
         # Shapes batch_size x n_head x seq_len x context_len
 
-        content_score = einsum("bind,bjnd->bnij", q_head + r_w_bias, k_head)
+        content_score = paddle.einsum("bind,bjnd->bnij", q_head + r_w_bias,
+                                      k_head)
 
         positional_attn = self.relative_positional_attention(
             position_embeds, q_head, context_len, cls_mask)
@@ -1541,7 +1541,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         attn_prob = self.attention_dropout(attn_prob)
 
         # attention output, shape batch_size x seq_len x n_head x d_head
-        attn_vec = einsum("bnij,bjnd->bind", attn_prob, v_head)
+        attn_vec = paddle.einsum("bnij,bjnd->bind", attn_prob, v_head)
 
         # Shape shape batch_size x seq_len x d_model
         attn_out = self.post_proj(
@@ -1768,6 +1768,69 @@ class FunnelPreTrainedModel(PreTrainedModel):
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
     """
+    model_config_file = "model_config.json"
+    pretrained_init_configuration = {
+        "funnel-transformer/small": {},  # B4-4-4H768
+        "funnel-transformer/small-base": {},  # B4-4-4H768, no decoder
+        "funnel-transformer/medium": {},  # B6-3x2-3x2H768
+        "funnel-transformer/medium-base": {},  # B6-3x2-3x2H768, no decoder
+        "funnel-transformer/intermediate": {},  # B6-6-6H768
+        "funnel-transformer/intermediate-base": {},  # B6-6-6H768, no decoder
+        "funnel-transformer/large": {},  # B8-8-8H1024
+        "funnel-transformer/large-base": {},  # B8-8-8H1024, no decoder
+        "funnel-transformer/xlarge-base": {},  # B10-10-10H1024
+        "funnel-transformer/xlarge": {},  # B10-10-10H1024, no decoder
+    }
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json"
+    }
+    pretrained_resource_files_map = {
+        "model_state": {
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small/model_state.pdparams",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small-base/model_state.pdparams",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium/model_state.pdparams",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium-base/model_state.pdparams",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate/model_state.pdparams",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate-base/model_state.pdparams",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large/model_state.pdparams",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large-base/model_state.pdparams",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge-base/model_state.pdparams",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge/model_state.pdparams",
+        },
+        "model_config": {
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small/model_config.json",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small-base/model_config.json",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium/model_config.json",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium-base/model_config.json",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate/model_config.json",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate-base/model_config.json",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large/model_config.json",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large-base/model_config.json",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge-base/model_config.json",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge/model_config.json",
+        },
+    }
 
     config_class = FunnelConfig
     base_model_prefix = "funnel"

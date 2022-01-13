@@ -32,7 +32,7 @@ from utils import convert_example
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--dataset", choices=["chnsenticorp", "xnli"], default="chnsenticorp", type=str, help="Dataset for classfication tasks.")
+parser.add_argument("--dataset", choices=["chnsenticorp", "xnli_cn"], default="chnsenticorp", type=str, help="Dataset for classfication tasks.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
@@ -128,7 +128,7 @@ def do_train():
         convert_example,
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length,
-        is_pair=args.dataset == "xnli")
+        is_pair=args.dataset == "xnli_cn")
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment

@@ -85,7 +85,8 @@ class ErnieDocTokenizer(ErnieTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         super(ErnieDocTokenizer, self).__init__(
             vocab_file,
             do_lower_case=do_lower_case,
@@ -170,7 +171,8 @@ class ErnieDocBPETokenizer(BPETokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         super(ErnieDocBPETokenizer, self).__init__(
             vocab_file,
             encoder_json_path=encoder_json_path,
@@ -180,3 +182,13 @@ class ErnieDocBPETokenizer(BPETokenizer):
             pad_token=pad_token,
             cls_token=cls_token,
             mask_token=mask_token)
+
+    @property
+    def vocab_size(self):
+        """
+        Return the size of vocabulary.
+
+        Returns:
+            int: The size of vocabulary.
+        """
+        return len(self.vocab)

@@ -1,4 +1,4 @@
-# 情感分析
+# 评论观点抽取与情感倾向性分析
 
 ## 1. 场景概述
 
@@ -59,19 +59,19 @@
 |SKEP-Large|test|0.98497|0.99139|0.98817|
 
 给定一段文本，使用我们提供的全流程预测脚本可以轻松获得情感分析结果，如下所示。
-```
-input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
-aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
-aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
-aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
-```
+
+- input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒  
+  - aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
+  - aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
+  - aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
+
 如果你想了解更多评论观点抽取模型和属性级情感分类模型的实现细节，请分别点击 [extraction](extraction/README.md) 和 [classification](classification/README.md)。
 
 
 ## 4. 情感分析实践
 以下是本项目运行的完整目录结构以及说明：
 
-```shell
+```
 .
 ├── extraction                         # 评价观点抽取模型包
 ├── classification                     # 细粒度情感分类模型包
@@ -87,33 +87,17 @@ aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
 ├── run_demo.sh                        # 运行demo，快速体验情感分析效果
 ├── run_predict.sh                     # 全流程预测命令
 ├── run_export_model.sh                # 动转静模型导出命令
-├── requirements.txt                   # 环境依赖
 └── README.md
 ```
 
 ### 4.1 运行环境和依赖安装
-(1) 运行环境  
-除非特殊说明，本实验默认是在以下配置环境研发运行的：
-```shell
-python version: 3.8
-CUDA Version: 10.2
-NVIDIA Driver Version: 440.64.00
-GPU： Tesla V100
-linux：CentOS Linux release 7.9.2009 (Core)
-```
-(2) 环境依赖  
-```
-python >= 3.6
-paddlenlp >= 2.2.1
-paddlepaddle-gpu >= 2.2.1
-```
+(1) 环境依赖  
 
-可以通过以下命令进行一键式软件环境安装：
-```shell
-pip install -r requirements.txt
-```
+- python >= 3.6
+- paddlenlp >= 2.2.2
+- paddlepaddle-gpu >= 2.2.1
 
-(3) 运行环境准备  
+(2) 运行环境准备  
 在运行之前，请在本目录下新建目录 `data` 和 `checkpoints`，分别用于存放数据和保存模型。
 
 本项目需要训练两个阶段的模型：评论观点抽取模型，属性级情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz)和[cls_data](https://bj.bcebos.com/v1/paddlenlp/data/cls_data.tar.gz)。
@@ -126,9 +110,9 @@ pip install -r requirements.txt
 另外，考虑到不同用户可能有不同的需求，本项目提供了如下的方式学习或使用本项目。
 
 **(1）快速体验效果**  
-如果你想快速体验本项目提供的情感分析能力，可使用本项目提供的 `demo.py` 脚本以交互式的方式进行体验。
+如果你想快速体验本项目提供的情感分析能力，可使用本项目提供的 `demo.sh` 脚本以交互式的方式进行体验。
 ```shell
-sh run_demo.py
+sh run_demo.sh
 ```
 
 **备注**：体验之前，请确保下载以上提到的 `ext_model` 和 `cls_model`，重命名后放入相应的目录中。
@@ -137,15 +121,14 @@ sh run_demo.py
 如果你有一批数据，不方便逐句输入，可使用本项目提供的正式预测脚本 `predict.py`， 以文件的形式进行输入，处理后该脚本会将结果文件保存到与输入文件相同的目录下，默认的结果文件名为 `sentiment_results.json`。
 
 本功能在预测时需要传入测试集文件路径，可将测试集文件命名为`test.txt`， 然后放入 `./data` 目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
-```
-蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
-酒店干净整洁，性价比很高
-酒店环境不错，非常安静，性价比还可以
-房间很大，环境不错
-```
+
+- 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
+- 酒店干净整洁，性价比很高
+- 酒店环境不错，非常安静，性价比还可以
+- 房间很大，环境不错  
 
 通过运行如下命令，便可进行批量文本情感分析预测：
-```python
+```shell
 sh run_predict.sh
 ```
 
@@ -171,10 +154,9 @@ sh run_predict.sh
 **（4）自定义模型训练**  
 如果你希望自己尝试进行评论观点抽取模型训练，可使用4.1节中提供的 `ext_data` Demo 数据，或自己业务的标注数据重新训练模型，本项目已将评论观点抽取模型的相关训练和测试代码放入 `extraction` 目录下， 请到该目录下执行模型训练即可，更多的实现细节和和使用方式，请参考[这里](extraction/README.md)。
 
-如果你希望自己尝试进行属性级情感分类模型训练，可使用4.1节中提供的 `cls_data` Demo 数据，或自己业务的标注数据重新训练模型，本项目已将属性级情感分类模型的相关训练和测试代码放入 `classification` 目录下，请到该目录下执行模型训练即可，更多的实现细节和使用方式，请参考[这里](extraction/README.md)。
+如果你希望自己尝试进行属性级情感分类模型训练，可使用4.1节中提供的 `cls_data` Demo 数据，或自己业务的标注数据重新训练模型，本项目已将属性级情感分类模型的相关训练和测试代码放入 `classification` 目录下，请到该目录下执行模型训练即可，更多的实现细节和使用方式，请参考[这里](classification/README.md)。
 
 在训练后，如果需要进行高性能预测，可参考（3）进行动转静，然后基于Paddle Inference 进行高性能预测。
-
 
 
 ## 5. 小模型优化策略
@@ -182,7 +164,7 @@ sh run_predict.sh
 
 本项目基于 PP-MiniLM 中文特色小模型进行 fine-tune 属性级情感分类模型，然后使用 PaddleSlim 对训练好的模型进行量化操作。
 
-在实验进行后，我们将 SKEP-Large、PP-MiniLM、量化PP-MiniLM 三个模型在性能和效果方面进行了对比，如下表所示。可以看到，三者在本任务数据集上的评估指标几乎相等，但是 PP-MiniLM 小模型运行速度较 SKEP-Large 提高了4倍，量化后的 PP-MiniLM 运行速度较 SKEP-Large 提高了近8倍。更多的详细信息请参考[这里](./speedup/README.md)。
+在实验进行后，我们将 SKEP-Large、PP-MiniLM、量化PP-MiniLM 三个模型在性能和效果方面进行了对比，如下表所示。可以看到，三者在本任务数据集上的评估指标几乎相等，但是 PP-MiniLM 小模型运行速度较 SKEP-Large 提高了4倍，量化后的 PP-MiniLM 运行速度较 SKEP-Large 提高了近8倍。更多的详细信息请参考[这里](./pp_minilm/README.md)。
 
 |Model|运行时间(s)|precision|Recall|F1|
 | ------------ | ------------ | ------------ |-----------|------------ |
@@ -190,6 +172,6 @@ sh run_predict.sh
 |PP-MiniLM|4.95x|0.98379|0.98859|0.98618|
 |量化 PP-MiniLM|8.93x|0.98312|0.98953|0.98631|
 
-## 4. 引用
+## 6. 引用
 
 [1] H. Tian et al., “SKEP: Sentiment Knowledge Enhanced Pre-training for Sentiment Analysis,” arXiv:2005.05635 [cs], May 2020, Accessed: Nov. 11, 2021.

@@ -25,9 +25,8 @@ import paddle.nn.functional as F
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.transformers import SkepTokenizer, SkepModel, LinearDecayWithWarmup
+from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, LinearDecayWithWarmup
 from evaluate import evaluate
-from model import SkepForTokenClassification
 from utils import set_seed
 from data import read, load_dict, convert_example_to_feature
 
@@ -59,10 +58,10 @@ def train():
     dev_ds = dev_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
         Stack(dtype="int64"),
-        Pad(axis=0, pad_val= -1)
+        Pad(axis=0, pad_val= -1, dtype="int64")
     ): fn(samples)
 
     train_batch_sampler = paddle.io.BatchSampler(
@@ -75,8 +74,8 @@ def train():
         dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
 
     # configure model training
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForTokenClassification(skep, num_classes=len(label2id))
+    model = SkepForTokenClassification.from_pretrained(
+        model_name, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(

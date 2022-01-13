@@ -88,7 +88,8 @@ class ErnieGramTokenizer(ErnieTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         super(ErnieGramTokenizer, self).__init__(
             vocab_file,
             do_lower_case=do_lower_case,

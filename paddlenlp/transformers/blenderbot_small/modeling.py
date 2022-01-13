@@ -336,7 +336,7 @@ class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             attention_mask.stop_gradient = True
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
@@ -671,7 +671,7 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
                                           "specified when generating attention_mask"
             memory_mask = paddle.cast(
                 input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             memory_mask.stop_gradient = True
         else:
             memory_mask = attention_mask

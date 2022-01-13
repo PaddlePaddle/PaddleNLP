@@ -23,7 +23,7 @@ import paddle
 import paddleslim
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import PPMiniLMTokenizer
 from data import convert_example_to_feature, read, load_dict
 
 
@@ -34,7 +34,7 @@ def quant_post(args):
     label2id, id2label = load_dict(args.label_path)
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.base_model_name)
+    tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature,
         tokenizer=tokenizer,
@@ -48,8 +48,8 @@ def quant_post(args):
             batch_data[0].append(data[0])
             batch_data[1].append(data[1])
             if len(batch_data[0]) == args.batch_size:
-                input_ids = Pad(axis=0, pad_val=0)(batch_data[0])
-                segment_ids = Pad(axis=0, pad_val=0)(batch_data[1])
+                input_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[0])
+                segment_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[1])
                 yield [input_ids, segment_ids]
                 batch_data = [[], []]
 

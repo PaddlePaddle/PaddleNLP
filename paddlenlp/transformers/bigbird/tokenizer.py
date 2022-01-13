@@ -20,7 +20,7 @@ import re
 import numpy as np
 from paddle.utils import try_import
 from paddlenlp.data import Vocab
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['BigBirdTokenizer']
 
@@ -85,7 +85,8 @@ class BigBirdTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(sentencepiece_model_file):
             raise ValueError(
@@ -112,6 +113,31 @@ class BigBirdTokenizer(PretrainedTokenizer):
         self.cls_id = vocab_dict[cls_token]
         self.sep_id = vocab_dict[sep_token]
         self.pad_id = vocab_dict[pad_token] if pad_token in vocab_dict else 0
+
+        unk_token = AddedToken(
+            unk_token, lstrip=False,
+            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(
+            pad_token, lstrip=False,
+            rstrip=False) if isinstance(pad_token, str) else pad_token
+        cls_token = AddedToken(
+            cls_token, lstrip=False,
+            rstrip=False) if isinstance(cls_token, str) else cls_token
+        sep_token = AddedToken(
+            sep_token, lstrip=False,
+            rstrip=False) if isinstance(sep_token, str) else sep_token
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(
+            mask_token, lstrip=True,
+            rstrip=False) if isinstance(mask_token, str) else mask_token
+
+        self._build_special_tokens_map_extended(
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token)
 
     @property
     def vocab_size(self):

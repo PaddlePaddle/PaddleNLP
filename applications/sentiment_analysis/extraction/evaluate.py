@@ -19,8 +19,7 @@ import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
-from model import SkepForTokenClassification
+from paddlenlp.transformers import SkepForTokenClassification, SkepTokenizer
 from data import read, load_dict, convert_example_to_feature
 
 
@@ -65,10 +64,10 @@ if __name__ == "__main__":
     test_ds = test_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
         Stack(dtype="int64"),
-        Pad(axis=0, pad_val= -1)
+        Pad(axis=0, pad_val=-1, dtype="int64")
     ): fn(samples)
 
     test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
@@ -76,8 +75,7 @@ if __name__ == "__main__":
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
-    skep = SkepModel.from_pretrained(model_name)
-    model = SkepForTokenClassification(skep, num_classes=len(label2id))
+    model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(label2id))
     model.load_dict(loaded_state_dict)
 
     metric = ChunkEvaluator(label2id.keys())

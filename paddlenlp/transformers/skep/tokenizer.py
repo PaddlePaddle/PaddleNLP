@@ -278,7 +278,8 @@ class SkepTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
@@ -335,30 +336,6 @@ class SkepTokenizer(PretrainedTokenizer):
                 split_tokens.append(str(token))
 
         return split_tokens
-
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import SkepTokenizer
-
-                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_2.0_large_en')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-                '''
-                ['he', 'was', 'a', 'puppet', '##eer']
-                '''
-
-        """
-        return self._tokenize(text)
 
     def num_special_tokens_to_add(self, pair=False):
         r"""

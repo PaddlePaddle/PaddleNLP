@@ -494,7 +494,7 @@ class BertModel(BertPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
@@ -545,7 +545,11 @@ class BertForQuestionAnswering(BertPretrainedModel):
         self.classifier = nn.Linear(self.bert.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -589,8 +593,8 @@ class BertForQuestionAnswering(BertPretrainedModel):
         sequence_output, _ = self.bert(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=None,
-            attention_mask=None)
+            position_ids=position_ids,
+            attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])

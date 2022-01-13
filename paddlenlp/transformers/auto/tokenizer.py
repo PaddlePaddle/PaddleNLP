@@ -40,6 +40,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ErnieDocTokenizer", "ernie_doc"),
     ("ErnieGramTokenizer", "ernie_gram"),
     ("ErnieTokenizer", "ernie"),
+    ("ErnieMTokenizer", "ernie_m"),
     ("GPTTokenizer", "gpt"),
     ("LayoutXLMTokenizer", "layoutxlm"),
     ("LayoutLMv2Tokenizer", "layoutlmv2"),

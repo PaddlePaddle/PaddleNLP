@@ -21,11 +21,9 @@ from collections import defaultdict
 import paddle
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
 from utils import decoding, load_dict, read_test_file
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
-from extraction.model import SkepForTokenClassification
-from classification.model import SkepForSequenceClassification
 from classification.data import convert_example_to_feature as convert_example_to_feature_cls
 
 
@@ -41,24 +39,24 @@ def concate_aspect_and_opinion(text, aspect, opinions):
     return aspect_text
 
 
-def predict_ext(ext_model_path, ext_label_path, test_path):
+def predict_ext(args):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(read_test_file, data_path=test_path, lazy=False)
+    ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
     trans_func = partial(
         convert_example_to_feature_ext,
         tokenizer=tokenizer,
         label2id=ext_label2id,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.ext_max_seq_len,
         is_test=True)
     test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
         Stack(dtype="int64"), ): fn(samples)
 
     test_batch_sampler = paddle.io.BatchSampler(
@@ -69,9 +67,8 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
-    ext_skep = SkepModel.from_pretrained(model_name)
-    ext_model = SkepForTokenClassification(
-        ext_skep, num_classes=len(ext_label2id))
+    ext_model = SkepForTokenClassification.from_pretrained(
+        model_name, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
@@ -86,7 +83,7 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text, tag_seq)
+            aps = decoding(text[:args.ext_max_seq_len-2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
@@ -101,7 +98,7 @@ def predict_ext(ext_model_path, ext_label_path, test_path):
     return results
 
 
-def predict_cls(cls_model_path, cls_label_path, ext_results):
+def predict_cls(args, ext_results):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     cls_label2id, cls_id2label = load_dict(args.cls_label_path)
@@ -112,7 +109,7 @@ def predict_cls(cls_model_path, cls_label_path, ext_results):
         convert_example_to_feature_cls,
         tokenizer=tokenizer,
         label2id=cls_label2id,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.cls_max_seq_len,
         is_test=True)
     test_ds = test_ds.map(trans_func, lazy=False)
 
@@ -130,9 +127,8 @@ def predict_cls(cls_model_path, cls_label_path, ext_results):
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
-    cls_skep = SkepModel.from_pretrained(model_name)
-    cls_model = SkepForSequenceClassification(
-        cls_skep, num_classes=len(cls_label2id))
+    cls_model = SkepForSequenceClassification.from_pretrained(
+        model_name, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 
@@ -189,16 +185,17 @@ if __name__ == "__main__":
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set that you want to predict.")
     parser.add_argument('--save_path', type=str, required=True, default=None, help="The saving path of predict results.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--ext_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for extraction model.")
+    parser.add_argument("--cls_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for classification model.")
     args = parser.parse_args()
     # yapf: enbale
 
     # predict with ext model
-    ext_results = predict_ext(args.ext_model_path, args.ext_label_path, args.test_path)
+    ext_results = predict_ext(args)
     print("predicting with extraction model done!")
 
     # predict with cls model
-    cls_results = predict_cls(args.cls_model_path, args.cls_label_path, ext_results)
+    cls_results = predict_cls(args, ext_results)
     print("predicting with classification model done!")
 
     # post_process prediction results 
