@@ -355,6 +355,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         temperature,
         1.0,
         true);
+    unified_decoding_sampling_->forward_context(params, decoding_params);
     unified_decoding_sampling_->forward(params, decoding_params);
 
     delete unified_decoding_sampling_;

@@ -33,8 +33,6 @@ __global__ void transpose_cache_batch_major(T* k_dst,
   const int batch_id = blockIdx.x;
   const int seq_id = blockIdx.y;
 
-  if (seq_id >= memory_seq_len[batch_id]) return;
-
   for (int id = threadIdx.x; id < head_num * size_per_head_split * x;
        id += blockDim.x) {
     int tmp_id = id;

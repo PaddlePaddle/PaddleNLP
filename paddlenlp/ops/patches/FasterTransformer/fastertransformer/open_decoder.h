@@ -708,7 +708,7 @@ public:
               m,
               4 * t_parallel_param_.local_hidden_units_,
               hidden_units_,
-              ActivationType::GELU);
+              act_);
           POP_RANGE
 
 #ifndef NDEBUG
@@ -991,7 +991,7 @@ public:
             m,
             4 * t_parallel_param_.local_hidden_units_,
             hidden_units_,
-            ActivationType::GELU);
+            act_);
         POP_RANGE
 
 #ifndef NDEBUG
@@ -1051,7 +1051,7 @@ public:
             m,
             4 * t_parallel_param_.local_hidden_units_,
             hidden_units_,
-            ActivationType::GELU);
+            act_);
         POP_RANGE
 
 #ifndef NDEBUG
