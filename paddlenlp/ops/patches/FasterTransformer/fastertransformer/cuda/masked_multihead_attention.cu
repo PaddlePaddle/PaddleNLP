@@ -751,21 +751,23 @@ __global__ void masked_multihead_attention_kernel(Masked_multihead_attention_par
   // The number of values processed per iteration of the loop.
   constexpr int V_PER_ITER = THREADS_PER_BLOCK / THREADS_PER_VALUE;
 
-  // Loop over the timesteps to compute the partial outputs.
-  for( int ti = vo; ti < params.timestep; ti += V_PER_ITER ) {
-
-    // Load the values from the cache.
-    V_vec v = *reinterpret_cast<const V_vec*>(&v_cache[ti*Dh]);
-    // Load the logits from shared memory.
+  // to solve THREADS_PER_BLOCK is not divisible by THREADS_PER_VALUE
+  if (vo < V_PER_ITER) {
+    // Loop over the timesteps to compute the partial outputs.
+    for (int ti = vo; ti < params.timestep; ti += V_PER_ITER) {
+      // Load the values from the cache.
+      V_vec v = *reinterpret_cast<const V_vec *>(&v_cache[ti * Dh]);
+      // Load the logits from shared memory.
 #if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
-    float logit = logits_smem[ti];
-    out = fma(logit, cast_to_float(v), out);
+      float logit = logits_smem[ti];
+      out = fma(logit, cast_to_float(v), out);
 #else
-    T logit = logits_smem[ti];
+      T logit = logits_smem[ti];
 
-    // Update the partial sums.
-    out = fma(logit, v, out);
-#endif    
+      // Update the partial sums.
+      out = fma(logit, v, out);
+#endif
+    }
   }
 
   // One group of threads computes the product(s) for the current timestep.
