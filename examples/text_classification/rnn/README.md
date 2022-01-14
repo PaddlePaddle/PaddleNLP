@@ -143,13 +143,13 @@ wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 CPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' \
+python train.py --vocab_path=./senta_word_dict.txt \
     --device=cpu \
     --network=bilstm \
     --lr=5e-4 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir='./checkpoints'
+    --save_dir=./checkpoints
 ```
 
 GPU 启动：
@@ -157,25 +157,25 @@ GPU 启动：
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
-    --vocab_path='./senta_word_dict.txt' \
+    --vocab_path=./senta_word_dict.txt \
     --device=gpu \
     --network=bilstm \
     --lr=5e-4 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir='./checkpoints'
+    --save_dir=./checkpoints
 ```
 
 XPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' \
+python train.py --vocab_path=./senta_word_dict.txt \
     --device=xpu \
     --network=lstm \
     --lr=5e-4 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir='./checkpoints'
+    --save_dir=./checkpoints
 ```
 
 以上参数表示：
@@ -227,7 +227,7 @@ python deploy/python/predict.py --model_file=static_graph_params.pdmodel --param
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path=./senta_word_dict.txt \
     --device=cpu \
     --network=bilstm \
     --params_path=checkpoints/final.pdparams
@@ -237,16 +237,16 @@ GPU启动：
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path=./senta_word_dict.txt \
     --device=gpu \
     --network=bilstm \
-    --params_path='./checkpoints/final.pdparams'
+    --params_path=/checkpoints/final.pdparams
 ```
 
 XPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path=./senta_word_dict.txt \
     --device=xpu \
     --network=lstm \
     --params_path=checkpoints/final.pdparams
