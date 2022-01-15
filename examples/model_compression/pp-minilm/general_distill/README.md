@@ -8,11 +8,11 @@
 
 任务无关知识蒸馏是用较大（层数更多、宽度更宽的）的基于 Transformer Layer 的预训练模型对较小（层数更少、宽度更窄的）的基于 Transformer Layer 的预训练模型进行蒸馏，从而得到更小、效果与较大模型更接近的预训练模型。
 
-PP-MiniLM 参考了 MiniLMv2 提出的 Multi-Head Self-Attention Relation Distillation 蒸馏策略。MiniLMv2 算法是用 24 层 large-size 的教师模型倒数几层的 Q-Q、K-K、V-V 之间的relation对6层学生模型最后一层 Q-Q、K-K、V-V 之间的relation进行蒸馏。具体的做法是，首先将学生、教师用于蒸馏的层上的 Q、K、V 的 Head 数进行统一，然后计算各自 Q—Q、K-K、V-V 的点积，最后对教师和学生的点积计算KL散度损失。由于relation的shape是 `[batch_size, head_num, seq_len, seq_len]`，因此可以认为这里的relation是一种Token与Token之间的关系。
+PP-MiniLM 参考了 MiniLMv2 提出的 Multi-Head Self-Attention Relation Distillation 蒸馏策略。MiniLMv2 算法是用 24 层 large-size 的教师模型倒数几层的 Q-Q、K-K、V-V 之间的relation对6层学生模型最后一层 Q-Q、K-K、V-V 之间的 relation 进行蒸馏。具体的做法是，首先将学生、教师用于蒸馏的层上的 Q、K、V 的 Head 数进行统一，然后计算各自 Q-Q、K-K、V-V 的点积，最后对教师和学生的点积计算KL散度损失。由于 relation 的 shape 是 `[batch_size, head_num, seq_len, seq_len]`，因此可以认为这里的relation是一种Token与Token之间的关系。
 
-本方案在MiniLMv2策略的基础上，做了进一步优化: 通过引入多视角的注意力关系知识来进一步提升模型效果。MiniLMv2 的自注意力关系知识仅建模了 Token 与 Token 之间的关系，PP-MiniLM 在此基础上额外引入了样本与样本间的自注意力关系知识，也就是挖掘出更多教师模型所蕴含的知识，从而进一步优化模型效果。
+本方案在 MiniLMv2 策略的基础上，做了进一步优化: 通过引入多视角的注意力关系知识来进一步提升模型效果。MiniLMv2 的自注意力关系知识仅建模了 Token 与 Token 之间的关系，PP-MiniLM 在此基础上额外引入了样本与样本间的自注意力关系知识，也就是挖掘出更多教师模型所蕴含的知识，从而进一步优化模型效果。
 
-具体来说，PP-MiniLM 利用了 `roberta-wwm-ext-large` 第 20 层的 Q-Q、K-K、V-V 之间的 Sample 与 Sampl 之间关系对 6 层学生模型 PP-MiniLM 第 6 层的 Q-Q、K-K、V-V 之间的 Sample 与 Sample 之间的关系进行蒸馏。与MiniLMv2不同的是，PP-MiniLM的策略需要在统一Q、K、V的Head数之后，对Q、K、V转置为 `[seq_len, head_num, batch_size, head_dim]`，这样Q—Q、K- K、V-V 的点积则可以表达样本间的关系。经过我们的实验，这种方法比使用原始 MiniLMv2 算法在 CLUE 上平均准确率高 0.36。
+具体来说，PP-MiniLM 利用了 `roberta-wwm-ext-large` 第 20 层的 Q-Q、K-K、V-V 之间的 Sample 与 Sampl 之间关系对 6 层学生模型 PP-MiniLM 第 6 层的 Q-Q、K-K、V-V 之间的 Sample 与 Sample 之间的关系进行蒸馏。与MiniLMv2不同的是，PP-MiniLM的策略需要在统一Q、K、V的Head数之后，对Q、K、V转置为 `[seq_len, head_num, batch_size, head_dim]`，这样Q-Q、K-K、V-V 的点积则可以表达样本间的关系。经过我们的实验，这种方法比使用原始 MiniLMv2 算法在 CLUE 上平均准确率高 0.36。
 
 
 ### 数据介绍

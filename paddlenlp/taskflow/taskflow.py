@@ -41,7 +41,6 @@ TASKS = {
             "wordtag": {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
-                "linking": True,
             },
             "nptag": {
                 "task_class": NPTagTask,
@@ -250,6 +249,12 @@ class Taskflow(object):
         """
         return self.task_instance.help()
 
+    def task_path(self):
+        """
+        Return the path of current task
+        """
+        return self.task_instance._task_path
+
     @staticmethod
     def tasks():
         """
@@ -269,4 +274,4 @@ class Taskflow(object):
                 if human.lower() == "exit":
                     exit()
                 robot = self.task_instance(human)[0]
-                print("[Bot]:%s"%robot)
+                print("[Bot]:%s" % robot)

@@ -160,7 +160,16 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help="Model file for retraining (default: None).")
+    parser.add_argument(
+        "--max_steps",
+        default=-1,
+        type=int,
+        help="If > 0: set total number of training steps to perform. Override config.max_iterations.",
+    )
     args = parser.parse_args()
 
     train_processor = Trainer()
-    train_processor.trainIters(config.max_iterations, args.model_file_path)
+    if args.max_steps > 0:
+        train_processor.trainIters(args.max_steps, args.model_file_path)
+    else:
+        train_processor.trainIters(config.max_iterations, args.model_file_path)

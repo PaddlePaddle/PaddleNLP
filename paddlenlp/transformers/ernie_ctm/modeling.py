@@ -29,8 +29,8 @@ else:
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieCtmPretrainedModel', 'ErnieCtmModel', 'ErnieCtmWordtagModel', 'ErnieCtmNptagModel',
-    'ErnieCtmForTokenClassification'
+    'ErnieCtmPretrainedModel', 'ErnieCtmModel', 'ErnieCtmWordtagModel',
+    'ErnieCtmNptagModel', 'ErnieCtmForTokenClassification'
 ]
 
 
@@ -286,7 +286,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             padding_idx=pad_token_id,
             cls_num=cls_num)
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
-                                                     hidden_size)                                                               
+                                                     hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -396,7 +396,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
 
         embedding_output = self.embeddings(
@@ -418,11 +418,14 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                     (sequence_output,
                      sequence_output[:, self.content_summary_index].clone(
                      ).unsqueeze([1]).expand_as(sequence_output)), 2)
-            else: 
-                content_output = paddle.expand(content_output.unsqueeze([1]), 
-                    shape=(sequence_output.shape[0], sequence_output.shape[1], sequence_output.shape[2]))
+            else:
+                content_output = paddle.expand(
+                    content_output.unsqueeze([1]),
+                    shape=(sequence_output.shape[0], sequence_output.shape[1],
+                           sequence_output.shape[2]))
 
-                sequence_output = paddle.concat((sequence_output, content_output), 2)
+                sequence_output = paddle.concat(
+                    (sequence_output, content_output), 2)
 
             sequence_output = self.feature_fuse(sequence_output)
 
@@ -445,10 +448,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             The learning rate of the crf. Defaults to `100`.
     """
 
-    def __init__(self,
-                 ernie_ctm,
-                 num_tag,
-                 crf_lr=100):
+    def __init__(self, ernie_ctm, num_tag, crf_lr=100):
         super(ErnieCtmWordtagModel, self).__init__()
         self.num_tag = num_tag
         self.ernie_ctm = ernie_ctm
@@ -525,10 +525,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
 
 class ErnieCtmMLMHead(Layer):
-    def __init__(self,
-                 embedding_size,
-                 vocab_size,
-                 hidden_size):
+    def __init__(self, embedding_size, vocab_size, hidden_size):
         super(ErnieCtmMLMHead, self).__init__()
         self.layer_norm = nn.LayerNorm(embedding_size)
 
@@ -560,8 +557,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             An instance of :class:`ErnieCtmModel`.
     """
 
-    def __init__(self,
-                 ernie_ctm):
+    def __init__(self, ernie_ctm):
         super(ErnieCtmNptagModel, self).__init__()
 
         self.ernie_ctm = ernie_ctm
@@ -569,9 +565,9 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             self.ernie_ctm.config["embedding_size"],
             self.ernie_ctm.config["vocab_size"],
             self.ernie_ctm.config["hidden_size"])
-        
+
         self.apply(self.init_weights)
-        
+
     def forward(self,
                 input_ids=None,
                 token_type_ids=None,
@@ -617,7 +613,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
         sequence_output = outputs[0]
         logits = self.predictions(sequence_output)
         return logits
-        
+
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
     r"""

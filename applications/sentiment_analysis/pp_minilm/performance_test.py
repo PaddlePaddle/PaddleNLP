@@ -163,8 +163,8 @@ if __name__ == "__main__":
     test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
         Stack(dtype="int64"),  # seq_len
         Stack(dtype="int64")  # label
     ): fn(samples)
@@ -180,13 +180,14 @@ if __name__ == "__main__":
 
     predictor = Predictor(args)
 
-    print("start to do performance task.")
-    times = []
-    for epoch_id in range(1, args.num_epochs + 1):
-        used_time = predictor.predict_perf(args, data_loader)
-        times.append(used_time)
-        print(f"epoch {epoch_id}, used_time: {used_time}")
-    print(f"the avg time of {args.num_epochs} epochs is {np.mean(times)}")
+    if args.num_epochs > 0:
+        print("start to do performance task.")
+        times = []
+        for epoch_id in range(1, args.num_epochs + 1):
+            used_time = predictor.predict_perf(args, data_loader)
+            times.append(used_time)
+            print(f"epoch {epoch_id}, used_time: {used_time}")
+        print(f"the avg time of {args.num_epochs} epochs is {np.mean(times)}")
 
     if args.eval:
         print("start to do evaluate task.")
@@ -194,5 +195,5 @@ if __name__ == "__main__":
         outputs, accuracy, precision, recall, F1 = predictor.predict(
             data_loader, metric)
         print(
-            f"evalute results - accuracy: {accuracy: .4f}, precision: {precision: .4f}, recall: {recall: .4f}, F1: {F1: .4f}"
+            f"evalute results - accuracy: {accuracy: .5f}, precision: {precision: .5f}, recall: {recall: .5f}, F1: {F1: .5f}"
         )

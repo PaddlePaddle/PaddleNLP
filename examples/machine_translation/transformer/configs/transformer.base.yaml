@@ -39,6 +39,8 @@ shuffle: True
 # shuffle_seed must be set when shuffle is True and using multi-cards to train. 
 # Otherwise, the number of batches cannot be guaranteed. 
 shuffle_seed: 128
+# For Dataloader num_workers
+num_workers: 0
 
 # Hyparams for training:
 # The number of epoches for training

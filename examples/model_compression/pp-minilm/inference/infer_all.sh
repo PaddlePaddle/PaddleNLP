@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl
+for task in AFQMC TNEWS IFLYTEK CMNLI OCNLI CLUEWSC2020 CSL
 do
     for bs in 4 8
     do

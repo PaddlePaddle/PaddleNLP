@@ -84,8 +84,8 @@ if __name__ == "__main__":
     pad_token_id = vocab.to_indices('[PAD]')
 
     model = TextCNNModel(
-        vocab_size, 
-        num_classes, 
+        vocab_size,
+        num_classes,
         padding_idx=pad_token_id,
         ngram_filter_sizes=(1, 2, 3))
 
@@ -95,14 +95,10 @@ if __name__ == "__main__":
     print("Loaded parameters from %s" % args.params_path)
 
     # Firstly pre-processing prediction data  and then do predict.
-    data = [
-        '你再骂我我真的不跟你聊了',
-        '你看看我附近有什么好吃的',
-        '我喜欢画画也喜欢唱歌'
-    ]
+    data = ['你再骂我我真的不跟你聊了', '你看看我附近有什么好吃的', '我喜欢画画也喜欢唱歌']
     tokenizer = JiebaTokenizer(vocab)
     examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
-    
+
     results = predict(
         model,
         examples,

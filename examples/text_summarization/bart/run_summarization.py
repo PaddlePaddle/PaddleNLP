@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import os
 import argparse
 import random
@@ -221,10 +220,10 @@ def do_train(args):
     train_batch_sampler = DistributedBatchSampler(
         train_set, batch_size=args.train_batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(),  # input_ids
-        Stack(),  # attention mask
-        Stack(),  # decoder_input_ids
-        Stack(),  # labels
+        Stack(dtype="int64"),  # input_ids
+        Stack(dtype="int64"),  # attention mask
+        Stack(dtype="int64"),  # decoder_input_ids
+        Stack(dtype="int64"),  # labels
     ): fn(samples)
     train_data_loader = DataLoader(
         dataset=train_set,
@@ -303,7 +302,8 @@ def do_train(args):
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 evaluate(model, dev_data_loader, tokenizer,
-                         args.ignore_pad_token_for_loss, args.max_target_length)
+                         args.ignore_pad_token_for_loss, args.min_target_length,
+                         args.max_target_length)
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(
