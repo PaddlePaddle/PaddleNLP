@@ -1,6 +1,6 @@
 import argparse
 import paddle
-from paddlenlp.transformers import AutoModel
+from paddlenlp.transformers import AutoModelForPretraining
 from paddlenlp.utils.log import logger
 
 paddle.set_device("cpu")
@@ -25,7 +25,7 @@ def init_dygraph_with_static(model, static_params_path):
 
 def main(args):
     logger.info("Loading model: %s" % args.model)
-    model = AutoModel.from_pretrained(args.model)
+    model = AutoModelForPretraining.from_pretrained(args.model)
     logger.info("Loading static params and trans paramters...")
     model_dict = init_dygraph_with_static(model, args.path)
     save_name = args.output_path
