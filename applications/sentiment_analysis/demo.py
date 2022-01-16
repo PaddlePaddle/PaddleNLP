@@ -45,12 +45,7 @@ def format_print(results):
     print()
 
 
-def predict(args,
-            ext_model,
-            cls_model,
-            tokenizer,
-            ext_id2label,
-            cls_id2label):
+def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
 
     ext_model.eval()
     cls_model.eval()
@@ -76,7 +71,7 @@ def predict(args,
         predictions = logits.argmax(axis=2).numpy()[0]
         tag_seq = [ext_id2label[idx] for idx in predictions][1:-1]
 
-        aps = decoding(input_text[:args.ext_max_seq_len-2], tag_seq)
+        aps = decoding(input_text[:args.ext_max_seq_len - 2], tag_seq)
 
         # predict sentiment for aspect with cls_model
         results = []

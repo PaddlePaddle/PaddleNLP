@@ -19,9 +19,14 @@ import paddle.nn.functional as F
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieModel', 'ErniePretrainedModel', 'ErnieForSequenceClassification',
-    'ErnieForTokenClassification', 'ErnieForQuestionAnswering',
-    'ErnieForPretraining', 'ErniePretrainingCriterion'
+    'ErnieModel',
+    'ErniePretrainedModel',
+    'ErnieForSequenceClassification',
+    'ErnieForTokenClassification',
+    'ErnieForQuestionAnswering',
+    'ErnieForPretraining',
+    'ErniePretrainingCriterion',
+    'ErnieForMaskedLM',
 ]
 
 
@@ -770,3 +775,87 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
             return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)
+
+
+class ErnieOnlyMLMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+        super().__init__()
+        self.predictions = ErnieLMPredictionHead(
+            hidden_size=hidden_size,
+            vocab_size=vocab_size,
+            activation=activation,
+            embedding_weights=embedding_weights)
+
+    def forward(self, sequence_output, masked_positions=None):
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        return prediction_scores
+
+
+class ErnieForMaskedLM(ErniePretrainedModel):
+    """
+    Ernie Model with a `masked language modeling` head on top.
+
+    Args:
+        ernie (:class:`ErnieModel`):
+            An instance of :class:`ErnieModel`.
+
+    """
+
+    def __init__(self, ernie):
+        super(ErnieForMaskedLM, self).__init__()
+        self.ernie = ernie
+        self.cls = ErnieOnlyMLMHead(
+            self.ernie.config["hidden_size"],
+            self.ernie.config["vocab_size"],
+            self.ernie.config["hidden_act"],
+            embedding_weights=self.ernie.embeddings.word_embeddings.weight)
+
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieForMaskedLM, ErnieTokenizer
+
+                tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+                model = ErnieForMaskedLM.from_pretrained('ernie-1.0')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+                # [1, 17, 18000]
+
+        """
+
+        outputs = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        sequence_output = outputs[0]
+        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        return prediction_scores

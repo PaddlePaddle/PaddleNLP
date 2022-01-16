@@ -365,7 +365,8 @@ class TermTree(object):
             self.__build_sons()
 
     @classmethod
-    def from_dir(cls, term_schema_path, term_data_path, linking=True) -> "TermTree":
+    def from_dir(cls, term_schema_path, term_data_path,
+                 linking=True) -> "TermTree":
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:

@@ -172,11 +172,11 @@ def generate(args):
         ignore_pad_token_for_loss=args.ignore_pad_token_for_loss,
         is_train=False)
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(),  # input_ids
-        Stack(),  # attention mask
+        Stack(dtype="int64"),  # input_ids
+        Stack(dtype="int64"),  # attention mask
         Stack(dtype="int32"),  # mem_seq_lens
-        Stack(),  # decoder_input_ids
-        Stack(),  # labels
+        Stack(dtype="int64"),  # decoder_input_ids
+        Stack(dtype="int64"),  # labels
     ): fn(samples)
 
     dataset = dataset.map(trans_func, lazy=True)

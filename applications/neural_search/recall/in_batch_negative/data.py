@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import os
-
 import paddle
-
 from paddlenlp.utils.log import logger
 
 
@@ -47,7 +45,7 @@ def convert_example(example,
                     pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
-        
+
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``

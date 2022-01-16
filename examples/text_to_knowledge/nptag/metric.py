@@ -20,6 +20,7 @@ class NPTagAccuracy(paddle.metric.Metric):
     """
     Accuracy for NPTag Prompt Model.
     """
+
     def __init__(self):
         super(NPTagAccuracy, self).__init__()
         self.reset()

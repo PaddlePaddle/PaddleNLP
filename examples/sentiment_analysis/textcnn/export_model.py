@@ -45,8 +45,8 @@ def main():
     pad_token_id = vocab.to_indices('[PAD]')
 
     model = TextCNNModel(
-        vocab_size, 
-        num_classes, 
+        vocab_size,
+        num_classes,
         padding_idx=pad_token_id,
         ngram_filter_sizes=(1, 2, 3))
 

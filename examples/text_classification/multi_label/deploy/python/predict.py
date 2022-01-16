@@ -124,7 +124,9 @@ if __name__ == "__main__":
         "Your bullshit is not welcome here.",
         "Thank you for understanding. I think very highly of you and would not revert without discussion.",
     ]
-    label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+    label_info = [
+        'toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate'
+    ]
 
     results = predictor.predict(
         data, tokenizer, batch_size=args.batch_size, threshold=args.threshold)
