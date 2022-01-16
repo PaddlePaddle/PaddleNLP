@@ -952,6 +952,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
+        self._use_fp16_decoding = use_fp16_decoding
         self.unk_token_id = self._model.unk_token_id
         self.mask_token_id = self._model.mask_token_id
         self.bos_token_id = self._model.bos_token_id
@@ -981,23 +982,28 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             hidden_act=self._hidden_act)
 
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      position_ids, attention_mask, **kwargs):
+                                      attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
-        decoding_type_id = token_type_ids[:, -1]
+        input_ids = paddle.cast(input_ids, dtype="int32")
+
+        token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        decoding_type_id = token_type_ids[:, -1].unsqueeze([1])
         token_type_ids = token_type_ids[:, :-1]
-        position_ids = position_ids[:, :-1]
+
         attention_mask = attention_mask[:, :, :-1, :-1]
+        attention_mask = paddle.cast(
+            attention_mask == 0,
+            dtype="float16" if self._use_fp16_decoding else "float32")
+
         seq_len = kwargs.get("seq_len") - 1
 
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
-            "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": True,
             "seq_len": seq_len,
-            "decoding_type_id": paddle.cast(
-                decoding_type_id, dtype="int32")
+            "decoding_type_id": decoding_type_id
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -1080,19 +1086,12 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         seq_len = model_inputs.pop('seq_len')
         decoding_type_id = model_inputs.pop('decoding_type_id')
 
-        outputs = self._model(**model_inputs)
-        if isinstance(outputs, tuple):
-            caches = outputs[1]
-        else:
-            raise RuntimeError('Not support.')
-
-        cache_k = [c.k for c in caches]
-        cache_v = [c.v for c in caches]
-
         return self.decoding(
-            cache_k=cache_k,
-            cache_v=cache_v,
+            input_ids=model_inputs["input_ids"],
+            attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
+            input_type_id=model_inputs["token_type_ids"],
+            decoding_type_id=decoding_type_id,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
@@ -1104,7 +1103,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             pad_token_id=pad_token_id,
             temperature=temperature,
             length_penalty=length_penalty,
-            decoding_type_id=decoding_type_id,
             forced_eos_token_id=forced_eos_token_id,
             pos_bias=False,
             early_stopping=early_stopping)

@@ -942,8 +942,8 @@ public:
                   param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         PUSH_RANGE("Transformer/slf_attn")
@@ -963,8 +963,8 @@ public:
         POP_RANGE
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         add_bias_input_layernorm_2_kernelLauncher(
@@ -979,8 +979,8 @@ public:
             param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         // For GPT decoder
@@ -995,8 +995,8 @@ public:
         POP_RANGE
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         add_bias_input_kernelLauncher(decoder_output,
@@ -1006,6 +1006,7 @@ public:
                                       hidden_units_,
                                       param_.stream);
       } else {
+
         PUSH_RANGE("Transformer/slf_attn")
         unfused_masked_multi_head_attention(attention_workspace,
                                             from_tensor,
@@ -1023,14 +1024,14 @@ public:
         POP_RANGE
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         add_bias_input_layernorm_2_kernelLauncher(
             from_tensor,
-            param_.ffn_layernorm.gamma,
-            param_.ffn_layernorm.beta,
+            param_.self_layernorm.gamma,
+            param_.self_layernorm.beta,
             param_.self_attention.attention_output_weight.bias,
             masked_output_buf,
             norm_masked_output_buf,
@@ -1039,8 +1040,8 @@ public:
             param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         // For GPT decoder
@@ -1055,29 +1056,29 @@ public:
         POP_RANGE
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         add_bias_input_kernelLauncher(ffn_out_buf,
                                       param_.ffn.output_weight.bias,
-                                      masked_output_buf,
+                                      norm_masked_output_buf,
                                       m,
                                       hidden_units_,
                                       param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         layer_norm(ffn_out_buf,
-                  param_.self_layernorm.gamma,
-                  param_.self_layernorm.beta,
-                  decoder_output,
-                  m,
-                  hidden_units_,
-                  param_.stream);
+                   param_.ffn_layernorm.gamma,
+                   param_.ffn_layernorm.beta,
+                   decoder_output,
+                   m,
+                   hidden_units_,
+                   param_.stream);
       }
 
 #ifndef NDEBUG

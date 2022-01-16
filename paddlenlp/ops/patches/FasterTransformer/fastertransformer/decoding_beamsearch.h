@@ -433,18 +433,48 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      start_ids_embeddings_kernel_launcher(from_tensor[0],
-                                           decoding_params.embedding_table,
-                                           decoding_params.position_encoding_table,
-                                           decoding_params.type_table,
-                                           decoding_params.input_type_id,
-                                           decoding_params.d_start_ids,
-                                           decoding_params.memory_sequence_length,
-                                           1,
-                                           input_len,
-                                           request_batch_size,
-                                           h_1,
-                                           decoding_params.stream);
+      if (args_.normalization_before_) {
+        start_ids_embeddings_kernel_launcher(from_tensor[0],
+                                            decoding_params.embedding_table,
+                                            decoding_params.position_encoding_table,
+                                            decoding_params.type_table,
+                                            decoding_params.input_type_id,
+                                            decoding_params.d_start_ids,
+                                            decoding_params.memory_sequence_length,
+                                            1,
+                                            input_len,
+                                            request_batch_size,
+                                            h_1,
+                                            decoding_params.stream);
+      } else {
+        // Memory reuse. from_tensor[1].
+        start_ids_embeddings_kernel_launcher(from_tensor[1],
+                                            decoding_params.embedding_table,
+                                            decoding_params.position_encoding_table,
+                                            decoding_params.type_table,
+                                            decoding_params.input_type_id,
+                                            decoding_params.d_start_ids,
+                                            decoding_params.memory_sequence_length,
+                                            1,
+                                            input_len,
+                                            request_batch_size,
+                                            h_1,
+                                            decoding_params.stream);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        layer_norm(from_tensor[1],
+                   decoding_params.layernorm.gamma,
+                   decoding_params.layernorm.beta,
+                   from_tensor[0],
+                   m,
+                   h_1,
+                   decoding_params.stream);
+
+      }
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
