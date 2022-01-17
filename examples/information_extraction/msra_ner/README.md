@@ -21,7 +21,9 @@ PaddleNLP集成的数据集MSRA-NER数据集对文件格式做了调整：每一
 export CUDA_VISIBLE_DEVICES=0
 
 python -u ./train.py \
+    --model_type bert \
     --model_name_or_path bert-base-multilingual-uncased \
+    --dataset msra_ner \
     --max_seq_length 128 \
     --batch_size 32 \
     --learning_rate 2e-5 \
@@ -33,7 +35,9 @@ python -u ./train.py \
 ```
 
 其中参数释义如下：
-- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](../../../docs/model_zoo/transformers.rst)中除ernie-gen以外的所有模型。若使用非BERT系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_type`: 指定模型的类型，可选的有 bert、ernie、ernie-ctm。
+- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](../../../docs/model_zoo/transformers.rst)中除ernie-gen以外的所有模型。若使用其他系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `dataset`: 目前支持 msra_ner 和 peoples_daily_ner 数据集。
 - `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
 - `batch_size`: 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate`: 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -46,7 +50,9 @@ python -u ./train.py \
 #### 多卡训练
 ```shell
 python -m paddle.distributed.launch --gpus "0,1" ./train.py \
+    --model_type bert \
     --model_name_or_path bert-base-multilingual-uncased \
+    --dataset msra_ner \
     --max_seq_length 128 \
     --batch_size 32 \
     --learning_rate 2e-5 \
@@ -77,7 +83,7 @@ Recall                        | 0.926683    |
 F1                            | 0.917734    |
 
 ### 模型评估
-
+目前支持bert类型模型，其他模型可修改为对应的Task和Tokenizer。支持msra_ner数据集。
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 
@@ -98,6 +104,7 @@ python -u ./eval.py \
 
 ### 模型预测
 
+目前支持bert类型模型，其他模型可修改为对应的Task和Tokenizer。支持msra_ner数据集。
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 
