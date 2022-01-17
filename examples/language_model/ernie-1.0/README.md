@@ -40,12 +40,12 @@ python -u  -m paddle.distributed.launch \
     --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
-    --max_steps 4000000 \
+    --max_steps 1000000 \
     --save_steps 50000 \
     --checkpoint_steps 5000 \
-    --decay_steps 3960000 \
+    --decay_steps 990000 \
     --weight_decay 0.01 \
-    --warmup_rate 0.0025 \
+    --warmup_rate 0.01 \
     --grad_clip 1.0 \
     --logging_freq 20\
     --num_workers 2 \
@@ -82,6 +82,32 @@ python -u  -m paddle.distributed.launch \
 - 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。可以使用梯度累积的方式增大`global_batch_size`。设置`global_batch_size`为理论值的整数倍是，默认启用梯度累积。
 - 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
 
+
+### CLUECorpusSmall 数据集训练结果
+
+数据准备部分参考[data_tools](../data_tools/)中的附录部分，根据文档，创建训练clue_corpus_small_14g数据集。
+使用本训练脚本, batch_size=512, max_steps=100w，详细训练日志请参考：https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/scalar?id=b0e19e554d68b9165a55901f0eb92812
+
+最终训练loss结果：
+
+|Loss | Train | Validation |
+|-|-|-|
+|loss |2.72 | 2.60 |
+|lm_loss|2.60 | 2.50 |
+|sop_loss|0.12 | 0.10 |
+
+训练集 lm_loss=2.60 左右, 验证集 lm_loss=2.50 左右。
+
+使用训练好的模型参数，在下游任务重进行finetune（需要先将静态图参数转换为动态图，请参考模型参数转换部分）。这里报告部分数据集上的finetune结果：
+
+|Dataset | Dev | Test|
+|--|--|--|
+XNLI-CN | 0.79269 | 0.78339 |
+ChnSentiCorp | 0.94495 | 0.95496 |
+PeoplesDailyNer | 0.95128 | 0.94035 |
+CMRC2018 | 72.05/85.67 | - |
+
+
 ### 其他
 #### 模型参数转换
 本示例提供了静态图训练脚本，但Paddle目前主要的使用方式是动态图。因此，本示例提供了静态图参数到动态图参数的转换脚本：
@@ -92,6 +118,12 @@ python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/t
 python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_last/static_vars.pdparams
 ```
 在当前目录下，可以看到转换后的参数`ernie-1.0_converted.pdparams`, 也可以设置脚本中`--output_path`参数，指定输出路径。
+
+#### 为PaddleNLP贡献预训练参数
+PaddleNLP为开发者支持了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
+
+贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
 
 ### 参考文献

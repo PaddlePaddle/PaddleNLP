@@ -133,7 +133,7 @@ class DialogueTask(Task):
             batch_size = len(batch_attention_mask)
             max_len = max(map(len, batch_attention_mask))
             attention_mask = np.ones(
-                (batch_size, max_len, max_len), dtype='float32') * -1e9
+                (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
                 mask_data[-seq_len:, -seq_len:] = np.array(
@@ -182,7 +182,7 @@ class DialogueTask(Task):
             batch_size = len(batch_attention_mask)
             max_len = max(map(len, batch_attention_mask))
             attention_mask = np.ones(
-                (batch_size, max_len, max_len), dtype='float32') * -1e9
+                (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
                 mask_data[-seq_len:, -seq_len:] = np.array(

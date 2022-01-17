@@ -210,7 +210,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 模型        | 简介      |
 | :------------ | ---------- |
-| [ERNIE-CSC](./examples/text_correction/ernie-csc):star1:  | [ERNIE-CSC](https://aclanthology.org/2021.findings-acl.198.pdf)是基于ERNIE预训练模型融合了拼音特征的端到端中文拼写纠错模型，在SIGHAN数据集上取得SOTA的效果。|
+| [ERNIE-CSC](./examples/text_correction/ernie-csc) :star2:  | [ERNIE-CSC](https://aclanthology.org/2021.findings-acl.198.pdf)是基于ERNIE预训练模型融合了拼音特征的端到端中文拼写纠错模型，在SIGHAN数据集上取得SOTA的效果。|
 
 #### 语义索引 (Semantic Indexing)
 

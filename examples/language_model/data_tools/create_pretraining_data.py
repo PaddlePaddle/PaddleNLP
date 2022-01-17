@@ -86,7 +86,7 @@ def get_args():
     group.add_argument(
         '--cn_seg_func',
         type=str,
-        default='lac',
+        default='jieba',
         choices=['lac', 'seg', 'jieba'],
         help='Words segment function for chinese words.')
     group.add_argument(
