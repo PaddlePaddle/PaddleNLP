@@ -336,7 +336,7 @@ cd ..
 
 #### 运行方式
 
-这里使用了动态 shape 功能，因此需要设置 TensorRT 子图输入shape 的范围。用户需要事先根据自己的模型结构和数据 shape 的范围，设置 TensorRT 子图输入的 shape 的最大、最小、以及最优的范围，可以参考[官方文档](https://paddleinference.paddlepaddle.org.cn/optimize/paddle_trt.html#dynamic-shape)中的说明，以及本案例中 infer.py 脚本中的 160 行 - 206 行）。
+这里使用了动态 shape 功能，因此需要设置 TensorRT 子图输入shape 的范围。用户需要事先根据自己的模型结构和数据 shape 的范围，设置 TensorRT 子图输入的 shape 的最大、最小、以及最优的范围，其中最优范围可以按照数据分布选择最常见的来设置。动态 shape 的设置可以参考[官方文档](https://paddleinference.paddlepaddle.org.cn/optimize/paddle_trt.html#dynamic-shape)中的教程，以及本案例中 infer.py 脚本中的 160 行 - 206 行）。
 
 INT8 预测运行脚本：
 
