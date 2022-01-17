@@ -58,7 +58,9 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 - batch sizes: 16, 32, 64;
 - learning rates: 3e-5, 5e-5, 1e-4
 
-2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值。
+2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值；
+
+3.性能测试的条件是：batch_size: 32, max_seq_len: 128。
 
 **方案流程**
 
@@ -197,7 +199,7 @@ export MODEL_PATH=ppminilm-6l-768h
 export LR=1e-4
 export BS=32
 
-python export_model.py --task_name ${TASK_NAME} --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/
+python export_model.py --task_name ${TASK_NAME} --model_path ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/
 ```
 
 静态图（部署）模型路径与动态图模型的路径相同，文件名为 `inference.pdmodel` , `inference.pdiparams` 和 `inference.pdiparams.info` 。
