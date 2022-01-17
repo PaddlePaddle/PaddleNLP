@@ -20,11 +20,6 @@ import zipfile
 
 import numpy as np
 
-complex_relation_label = [8, 10, 26, 32, 46]
-complex_relation_affi_label = [9, 11, 27, 28, 29, 33, 47]
-two_complex_relation = [8, 10, 32, 46]
-four_complex_relation = [26, 27, 28, 29]
-
 
 def find_entity(text_raw, id_, predictions, tok_to_orig_start_index,
                 tok_to_orig_end_index):
@@ -47,33 +42,30 @@ def find_entity(text_raw, id_, predictions, tok_to_orig_start_index,
     return list(set(entity_list))
 
 
-def decoding(example_batch,
-             id2spo,
-             logits_batch,
-             seq_len_batch,
-             tok_to_orig_start_index_batch,
-             tok_to_orig_end_index_batch):
+def decoding(example_batch, id2spo, logits_batch, seq_len_batch,
+             tok_to_orig_start_index_batch, tok_to_orig_end_index_batch):
     """
     model output logits -> formatted spo (as in data set file)
     """
-    num_predict = len(id2spo['predicate']) - 2
     formatted_outputs = []
     for (i, (example, logits, seq_len, tok_to_orig_start_index, tok_to_orig_end_index)) in \
-            enumerate(zip(example_batch, logits_batch, seq_len_batch, tok_to_orig_start_index_batch,
-                          tok_to_orig_end_index_batch)):
+            enumerate(zip(example_batch, logits_batch, seq_len_batch, tok_to_orig_start_index_batch, tok_to_orig_end_index_batch)):
 
-        logits = logits[1:seq_len + 1]  # slice between [CLS] and [SEP] to get valid logits
+        logits = logits[1:seq_len +
+                        1]  # slice between [CLS] and [SEP] to get valid logits
         logits[logits >= 0.5] = 1
         logits[logits < 0.5] = 0
         tok_to_orig_start_index = tok_to_orig_start_index[1:seq_len + 1]
         tok_to_orig_end_index = tok_to_orig_end_index[1:seq_len + 1]
         predictions = []
         for token in logits:
-            predictions.append(np.argwhere(token == 1).tolist())  # 返回对应的索引值
+            predictions.append(np.argwhere(token == 1).tolist())
 
         # format predictions into example-style output
         formatted_instance = {}
         text_raw = example['text']
+        complex_relation_label = [8, 10, 26, 32, 46]
+        complex_relation_affi_label = [9, 11, 27, 28, 29, 33, 47]
 
         # flatten predictions then retrival all valid subject id
         flatten_predictions = []
@@ -81,9 +73,9 @@ def decoding(example_batch,
             for layer_2 in layer_1:
                 flatten_predictions.append(layer_2[0])
         subject_id_list = []
-        for cls_label in list(set(flatten_predictions)):  # 这个多标签的分类类别，前面的55个类别是头实体B，后面的是尾实体B
-            if 1 < cls_label <= num_predict + 1 and (cls_label + num_predict) in flatten_predictions:
-                subject_id_list.append(cls_label)  # 类别头实体的id也刚好和关系类别的id重合
+        for cls_label in list(set(flatten_predictions)):
+            if 1 < cls_label <= 56 and (cls_label + 55) in flatten_predictions:
+                subject_id_list.append(cls_label)
         subject_id_list = list(set(subject_id_list))
 
         # fetch all valid spo by subject id
@@ -95,7 +87,7 @@ def decoding(example_batch,
                 subjects = find_entity(text_raw, id_, predictions,
                                        tok_to_orig_start_index,
                                        tok_to_orig_end_index)
-                objects = find_entity(text_raw, id_ + num_predict, predictions,
+                objects = find_entity(text_raw, id_ + 55, predictions,
                                       tok_to_orig_start_index,
                                       tok_to_orig_end_index)
                 for subject_ in subjects:
@@ -116,7 +108,7 @@ def decoding(example_batch,
                 subjects = find_entity(text_raw, id_, predictions,
                                        tok_to_orig_start_index,
                                        tok_to_orig_end_index)
-                objects = find_entity(text_raw, id_ + num_predict, predictions,
+                objects = find_entity(text_raw, id_ + 55, predictions,
                                       tok_to_orig_start_index,
                                       tok_to_orig_end_index)
                 for subject_ in subjects:
@@ -125,24 +117,24 @@ def decoding(example_batch,
                         object_type_dict = {
                             '@value': id2spo['object_type'][id_].split('_')[0]
                         }
-                        if id_ in two_complex_relation and id_ + 1 in subject_id_list:
-                            id_affi = id_ + 1  # 连续一个类别对应两个个尾实体的一类，只要出现一个就把暗含的其他的一起找出来
+                        if id_ in [8, 10, 32, 46
+                                   ] and id_ + 1 in subject_id_list:
+                            id_affi = id_ + 1
                             object_dict[id2spo['object_type'][id_affi].split(
-                                '_')[1]] = find_entity(text_raw, id_affi + num_predict,
+                                '_')[1]] = find_entity(text_raw, id_affi + 55,
                                                        predictions,
                                                        tok_to_orig_start_index,
                                                        tok_to_orig_end_index)[0]
                             object_type_dict[id2spo['object_type'][
                                 id_affi].split('_')[1]] = id2spo['object_type'][
                                     id_affi].split('_')[0]
-                        elif id_ == four_complex_relation[0]:  # 连续一个类别对应四个个尾实体的一类
-                            for id_affi in four_complex_relation[1:]:
+                        elif id_ == 26:
+                            for id_affi in [27, 28, 29]:
                                 if id_affi in subject_id_list:
                                     object_dict[id2spo['object_type'][id_affi].split('_')[1]] = \
-                                        find_entity(text_raw, id_affi + num_predict, predictions,
-                                                    tok_to_orig_start_index, tok_to_orig_end_index)[0]
+                                    find_entity(text_raw, id_affi + 55, predictions, tok_to_orig_start_index, tok_to_orig_end_index)[0]
                                     object_type_dict[id2spo['object_type'][id_affi].split('_')[1]] = \
-                                        id2spo['object_type'][id_affi].split('_')[0]
+                                    id2spo['object_type'][id_affi].split('_')[0]
                         spo_list.append({
                             "predicate": id2spo['predicate'][id_],
                             "object_type": object_type_dict,
@@ -165,25 +157,27 @@ def write_prediction_results(formatted_outputs, file_path):
             json_str = json.dumps(formatted_instance, ensure_ascii=False)
             f.write(json_str)
             f.write('\n')
-    zipfile_path = file_path + '.zip'
-    f = zipfile.ZipFile(zipfile_path, 'w', zipfile.ZIP_DEFLATED)
-    f.write(file_path)
-    f.close()
+        zipfile_path = file_path + '.zip'
+        f = zipfile.ZipFile(zipfile_path, 'w', zipfile.ZIP_DEFLATED)
+        f.write(file_path)
 
     return zipfile_path
 
 
 def get_precision_recall_f1(golden_file, predict_file):
     r = os.popen(
-        'python ./re_official_evaluation.py --golden_file={} --predict_file={}'.
+        'python3 ./re_official_evaluation.py --golden_file={} --predict_file={}'.
         format(golden_file, predict_file))
     result = r.read()
     r.close()
     precision = float(
-        re.search("\"precision\", \"value\":(.*?)}", result).group(1))
+        re.search("\"precision\", \"value\":.*?}", result).group(0).lstrip(
+            "\"precision\", \"value\":").rstrip("}"))
     recall = float(
-        re.search("\"recall\", \"value\":(.*?)}", result).group(1))
+        re.search("\"recall\", \"value\":.*?}", result).group(0).lstrip(
+            "\"recall\", \"value\":").rstrip("}"))
     f1 = float(
-        re.search("\"f1-score\", \"value\":(.*?)}", result).group(1))
+        re.search("\"f1-score\", \"value\":.*?}", result).group(0).lstrip(
+            "\"f1-score\", \"value\":").rstrip("}"))
 
     return precision, recall, f1

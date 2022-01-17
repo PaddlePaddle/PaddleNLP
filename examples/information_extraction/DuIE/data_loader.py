@@ -15,11 +15,11 @@
 import collections
 import json
 import os
-import paddle
-import numpy as np
-
 from typing import Optional, List, Union, Dict
 from dataclasses import dataclass
+
+import numpy as np
+import paddle
 from tqdm import tqdm
 
 from paddlenlp.transformers import ErnieTokenizer
@@ -35,8 +35,7 @@ InputFeature = collections.namedtuple("InputFeature", [
 
 def parse_label(spo_list, label_map, tokens, tokenizer):
     # 2 tags for each predicate + I tag + O tag
-    num_predict = len(label_map.keys()) - 2
-    num_labels = 2 * num_predict + 2
+    num_labels = 2 * (len(label_map.keys()) - 2) + 2
     seq_len = len(tokens)
     # initialize tag
     labels = [[0] * num_labels for i in range(seq_len)]
@@ -46,14 +45,14 @@ def parse_label(spo_list, label_map, tokens, tokenizer):
             # assign relation label
             if spo['predicate'] in label_map.keys():
                 # simple relation
-                label_subject = label_map[spo['predicate']]  # 关系的头实体，刚好相差关系的数量
-                label_object = label_subject + num_predict  # 关系的尾实体，刚好相差关系的数量
+                label_subject = label_map[spo['predicate']]
+                label_object = label_subject + 55
                 subject_tokens = tokenizer._tokenize(spo['subject'])
                 object_tokens = tokenizer._tokenize(spo['object']['@value'])
             else:
                 # complex relation
-                label_subject = label_map[spo['predicate'] + '_' + spo_object]  # 存在一个头实体（关系）对应多个尾实体的情况
-                label_object = label_subject + num_predict
+                label_subject = label_map[spo['predicate'] + '_' + spo_object]
+                label_object = label_subject + 55
                 subject_tokens = tokenizer._tokenize(spo['subject'])
                 object_tokens = tokenizer._tokenize(spo['object'][spo_object])
 
@@ -115,7 +114,7 @@ def parse_label(spo_list, label_map, tokens, tokenizer):
                             break
 
     # if token wasn't assigned as any "B"/"I" tag, give it an "O" tag for outside
-    for i in range(seq_len):  # 如果没有做任何标记第一个字符置一
+    for i in range(seq_len):
         if labels[i] == [0] * num_labels:
             labels[i][0] = 1
 
@@ -127,8 +126,8 @@ def convert_example_to_feature(
         tokenizer: ErnieTokenizer,
         chineseandpunctuationextractor: ChineseAndPunctuationExtractor,
         label_map,
-        max_length: Optional[int] = 512,
-        pad_to_max_length: Optional[bool] = None):
+        max_length: Optional[int]=512,
+        pad_to_max_length: Optional[bool]=None):
     spo_list = example['spo_list'] if "spo_list" in example.keys() else None
     text_raw = example['text']
 
@@ -186,10 +185,12 @@ def convert_example_to_feature(
     tok_to_orig_start_index = [-1] + tok_to_orig_start_index + [-1]
     tok_to_orig_end_index = [-1] + tok_to_orig_end_index + [-1]
     if seq_len < max_length:
-        tokens += ["[PAD]"] * (max_length - seq_len - 2)
-        labels += outside_label * (max_length - len(labels))
-        tok_to_orig_start_index += [-1] * (max_length - len(tok_to_orig_start_index))
-        tok_to_orig_end_index += [-1] * (max_length - len(tok_to_orig_end_index))
+        tokens = tokens + ["[PAD]"] * (max_length - seq_len - 2)
+        labels = labels + outside_label * (max_length - len(labels))
+        tok_to_orig_start_index = tok_to_orig_start_index + [-1] * (
+            max_length - len(tok_to_orig_start_index))
+        tok_to_orig_end_index = tok_to_orig_end_index + [-1] * (
+            max_length - len(tok_to_orig_end_index))
 
     token_ids = tokenizer.convert_tokens_to_ids(tokens)
 
@@ -202,10 +203,12 @@ def convert_example_to_feature(
 
 
 class DuIEDataset(paddle.io.Dataset):
-    """
-    Dataset of DuIE.
-    """
-    def __init__(self, data, label_map, tokenizer, max_length=512, pad_to_max_length=False):
+    def __init__(self,
+                 data,
+                 label_map,
+                 tokenizer,
+                 max_length=512,
+                 pad_to_max_length=False):
         super(DuIEDataset, self).__init__()
 
         self.data = data
@@ -222,19 +225,21 @@ class DuIEDataset(paddle.io.Dataset):
 
         example = json.loads(self.data[item])
         input_feature = convert_example_to_feature(
-            example, self.tokenizer, self.chn_punc_extractor,
-            self.label_map, self.max_seq_length, self.pad_to_max_length)
+            example, self.tokenizer, self.chn_punc_extractor, self.label_map,
+            self.max_seq_length, self.pad_to_max_length)
         return {
-            "input_ids": np.array(input_feature.input_ids, dtype="int64"),
-            "seq_lens": np.array(input_feature.seq_len, dtype="int64"),
-            "tok_to_orig_start_index":
-            np.array(input_feature.tok_to_orig_start_index, dtype="int64"),
-            "tok_to_orig_end_index":
-            np.array(input_feature.tok_to_orig_end_index, dtype="int64"),
+            "input_ids": np.array(
+                input_feature.input_ids, dtype="int64"),
+            "seq_lens": np.array(
+                input_feature.seq_len, dtype="int64"),
+            "tok_to_orig_start_index": np.array(
+                input_feature.tok_to_orig_start_index, dtype="int64"),
+            "tok_to_orig_end_index": np.array(
+                input_feature.tok_to_orig_end_index, dtype="int64"),
             # If model inputs is generated in `collate_fn`, delete the data type casting.
-            "labels": np.array(input_feature.labels, dtype="float32"),
+            "labels": np.array(
+                input_feature.labels, dtype="float32"),
         }
-
 
     @classmethod
     def from_file(cls,
@@ -251,10 +256,10 @@ class DuIEDataset(paddle.io.Dataset):
         ), f"{label_map_path} dose not exists or is not a file."
         with open(label_map_path, 'r', encoding='utf8') as fp:
             label_map = json.load(fp)
-
         with open(file_path, "r", encoding="utf-8") as fp:
             data = fp.readlines()
-            return cls(data, label_map, tokenizer, max_length, pad_to_max_length)
+            return cls(data, label_map, tokenizer, max_length,
+                       pad_to_max_length)
 
 
 @dataclass
