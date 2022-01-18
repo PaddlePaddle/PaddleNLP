@@ -80,7 +80,8 @@ def parse_args():
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--batch_size",
         default=8,
@@ -115,7 +116,8 @@ def parse_args():
         help="Total number of training epochs to perform.", )
     parser.add_argument(
         "--max_steps",
-        default=-1,
+        default=-
+        1,
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
@@ -134,8 +136,8 @@ def parse_args():
         type=int,
         default=500,
         help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--seed", type=int, default=1000, help="random seed for initialization")
+    parser.add_argument("--seed", type=int, default=1000,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -163,7 +165,14 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(epoch, global_step, model, loss_fct, metric, data_loader, width_mult=1.0):
+def evaluate(
+        epoch,
+        global_step,
+        model,
+        loss_fct,
+        metric,
+        data_loader,
+        width_mult=1.0):
     model.eval()
     metric.reset()
     losses = []
@@ -188,54 +197,27 @@ def evaluate(epoch, global_step, model, loss_fct, metric, data_loader, width_mul
     if width_mult == 100:
         if isinstance(metric, ChunkEvaluator):
             print(
-                "teacher model, eval loss: %f, precision: %s, recall: %s, f1: %s"
-                % (
-                    eval_loss,
-                    res[0],
-                    res[1],
-                    res[2],
-                   ),
-                end='')
+                "teacher model, eval loss: %f, precision: %s, recall: %s, f1: %s" %
+                (eval_loss, res[0], res[1], res[2], ), end='')
             with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
                 fp.write(
-                    'epoch:%s, step: %s, teacher model, eval loss: %f, precision: %s, recall: %s, f1: %s\n'
-                    % (
-                        epoch,
-                        global_step,
-                        eval_loss,
-                        res[0],
-                        res[1],
-                        res[2],
-                       ))
+                    'epoch:%s, step: %s, teacher model, eval loss: %f, precision: %s, recall: %s, f1: %s\n' %
+                    (epoch, global_step, eval_loss, res[0], res[1], res[2], ))
     else:
         if isinstance(metric, ChunkEvaluator):
             print(
-                "width_mult: %s, eval loss: %f, precision: %s, recall: %s, f1: %s,"
-                % (
-                    width_mult,
-                    eval_loss,
-                    res[0],
-                    res[1],
-                    res[2],
-                  ),
-                end='')
+                "width_mult: %s, eval loss: %f, precision: %s, recall: %s, f1: %s," %
+                (width_mult, eval_loss, res[0], res[1], res[2], ), end='')
             with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
                 fp.write(
-                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, precision: %s, recall: %s, f1: %s\n'
-                    % (
-                        epoch,
-                        global_step,
-                        width_mult,
-                        eval_loss,
-                        res[0],
-                        res[1],
-                        res[2],
-                      ))
+                    'epoch:%s, step: %s, width_mult: %s, eval loss: %f, precision: %s, recall: %s, f1: %s\n' %
+                    (epoch, global_step, width_mult, eval_loss, res[0], res[1], res[2], ))
     model.train()
     return res, eval_loss
 
 
-# monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
+# monkey patch for bert forward to accept [attention_mask, head_mask] as
+# attention_mask
 def bert_forward(self,
                  input_ids,
                  token_type_ids=None,
@@ -331,8 +313,10 @@ def do_train(args):
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
+        # input
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),
+        # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),
         'seq_len': Stack(dtype='int64'),  # seq_len
         'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
@@ -358,8 +342,10 @@ def do_train(args):
         return_list=True)
 
     batchify_fn_d = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
+        # input
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),
+        # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),
         'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
 
@@ -373,7 +359,8 @@ def do_train(args):
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
 
-    # Step1: Initialize a dictionary to save the weights from the origin BERT model.
+    # Step1: Initialize a dictionary to save the weights from the origin BERT
+    # model.
     origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.
@@ -430,8 +417,10 @@ def do_train(args):
         num_training_steps = len(train_data_loader) * args.num_train_epochs
         num_train_epochs = args.num_train_epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_steps)
+    lr_scheduler = LinearDecayWithWarmup(
+        args.learning_rate,
+        num_training_steps,
+        args.warmup_steps)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -483,9 +472,9 @@ def do_train(args):
             if global_step % args.logging_steps == 0:
                 if paddle.distributed.get_rank() == 0:
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, loss,
-                           args.logging_steps / (time.time() - tic_train)))
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
+                        (global_step, epoch, step, loss, args.logging_steps / (
+                            time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0:
@@ -504,18 +493,21 @@ def do_train(args):
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
 
-                    eval_result, eval_loss = \
-                        evaluate(epoch, global_step, ofa_model, criterion, metric, dev_data_loader, width_mult)
+                    eval_result, eval_loss = evaluate(
+                        epoch, global_step, ofa_model, criterion, metric, dev_data_loader, width_mult)
                     print("eval done total : %s s" %
                           (time.time() - tic_eval))
 
-                    output_dir = os.path.join(args.output_dir, "model_%s" % width_mult)
+                    output_dir = os.path.join(
+                        args.output_dir, "model_%s" %
+                        width_mult)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     if paddle.distributed.get_rank() == 0:
                         if eval_result[2] > best_f1[idx]:
                             best_f1[idx] = eval_result[2]
-                            # need better way to get inner model of DataParallel
+                            # need better way to get inner model of
+                            # DataParallel
                             model_to_save = model._layers if isinstance(
                                 model, paddle.DataParallel) else model
                             model_to_save.save_pretrained(output_dir)
@@ -523,15 +515,15 @@ def do_train(args):
                             with open(os.path.join(output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
                                 fp.write(
                                     'epoch:%s, step: %s, width_mult: %s, '
-                                    'eval loss: %f,precision: %s, recall: %s, f1: %s,\n'
-                                    % (epoch,
-                                       global_step,
-                                       width_mult,
-                                       eval_loss,
-                                       eval_result[0],
-                                       eval_result[1],
-                                       eval_result[2],
-                                       ))
+                                    'eval loss: %f,precision: %s, recall: %s, f1: %s,\n' %
+                                    (epoch,
+                                     global_step,
+                                     width_mult,
+                                     eval_loss,
+                                     eval_result[0],
+                                        eval_result[1],
+                                        eval_result[2],
+                                     ))
             if global_step >= num_training_steps:
                 return
 

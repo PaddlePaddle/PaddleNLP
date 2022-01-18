@@ -38,7 +38,8 @@ def bert_forward(self,
             (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
     else:
         if attention_mask.ndim == 2:
-            # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+            # attention_mask [batch_size, sequence_length] -> [batch_size, 1,
+            # 1, sequence_length]
             attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
     embedding_output = self.embeddings(
@@ -106,7 +107,8 @@ def parse_args():
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--n_gpu",
         type=int,

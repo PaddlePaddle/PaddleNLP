@@ -27,28 +27,86 @@ from paddlenlp.data import Stack, Pad, Dict
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
-                    help="Path to pre-trained model or shortcut name selected in the list:"
-                         " " + ", ".join(list(BertTokenizer.pretrained_init_configuration.keys())))
-parser.add_argument("--output_dir", default=None, type=str, required=True,
-                    help="The output directory where the model predictions and checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int,
-                    help="The maximum total input sequence length after tokenization. "
-                         "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
-parser.add_argument("--max_steps", default=-1, type=int,
-                    help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
-parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
-parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"],
-                    help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument(
+    "--model_name_or_path",
+    default=None,
+    type=str,
+    required=True,
+    help="Path to pre-trained model or shortcut name selected in the list:"
+    " " +
+    ", ".join(
+        list(
+            BertTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument(
+    "--output_dir",
+    default=None,
+    type=str,
+    required=True,
+    help="The output directory where the model predictions and checkpoints will be written.")
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. "
+    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=8, type=int,
+                    help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--learning_rate",
+    default=5e-5,
+    type=float,
+    help="The initial learning rate for Adam.")
+parser.add_argument(
+    "--weight_decay",
+    default=0.0,
+    type=float,
+    help="Weight decay if we apply some.")
+parser.add_argument(
+    "--adam_epsilon",
+    default=1e-8,
+    type=float,
+    help="Epsilon for Adam optimizer.")
+parser.add_argument(
+    "--max_grad_norm",
+    default=1.0,
+    type=float,
+    help="Max gradient norm.")
+parser.add_argument(
+    "--num_train_epochs",
+    default=3,
+    type=int,
+    help="Total number of training epochs to perform.",
+)
+parser.add_argument(
+    "--max_steps",
+    default=-
+    1,
+    type=int,
+    help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+)
+parser.add_argument("--warmup_steps", default=0, type=int,
+                    help="Linear warmup over warmup_steps.")
+parser.add_argument(
+    "--logging_steps",
+    type=int,
+    default=1,
+    help="Log every X updates steps.")
+parser.add_argument("--save_steps", type=int, default=100,
+                    help="Save checkpoint every X updates steps.")
+parser.add_argument(
+    "--seed",
+    type=int,
+    default=42,
+    help="random seed for initialization")
+parser.add_argument(
+    "--device",
+    default="gpu",
+    type=str,
+    choices=[
+        "cpu",
+        "gpu",
+        "xpu"],
+    help="The device to select to train the model, is must be cpu/gpu/xpu.")
 
 
 @paddle.no_grad()
@@ -72,7 +130,8 @@ def evaluate(model, loss_fct, metric, data_loader):
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
     eval_loss = np.mean(losses)
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" % (eval_loss, precision, recall, f1_score))
+    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
+          (eval_loss, precision, recall, f1_score))
     model.train()
     return f1_score, precision, recall, eval_loss
 
@@ -122,8 +181,10 @@ def do_train(args):
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
+        # input
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),
+        # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),
         'seq_len': Stack(dtype='int64'),  # seq_len
         'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
@@ -157,8 +218,10 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_steps)
+    lr_scheduler = LinearDecayWithWarmup(
+        args.learning_rate,
+        num_training_steps,
+        args.warmup_steps)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -210,8 +273,9 @@ def do_train(args):
                         model_to_save.save_pretrained(save_dir)
                         tokenizer.save_pretrained(save_dir)
                         with open(os.path.join(args.output_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
-                            fp.write('epoch=%d, f1_score=%f, precision=%f, recall=%f , eval_loss=%f\n' %
-                                     (epoch, f1_score, precision, recall, eval_loss))
+                            fp.write(
+                                'epoch=%d, f1_score=%f, precision=%f, recall=%f , eval_loss=%f\n' %
+                                (epoch, f1_score, precision, recall, eval_loss))
 
 
 if __name__ == "__main__":
