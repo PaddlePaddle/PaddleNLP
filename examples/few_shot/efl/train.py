@@ -107,10 +107,11 @@ def parse_args():
         default=100000,
         help="Inteval steps to save checkpoint")
     parser.add_argument(
-        "--rdrop_coef", 
-        default=0.0, 
-        type=float, 
-        help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
+        "--rdrop_coef",
+        default=0.0,
+        type=float,
+        help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works"
+    )
 
     return parser.parse_args()
 
@@ -231,7 +232,8 @@ def do_train():
             if args.rdrop_coef > 0:
                 prediction_scores_2 = model(
                     input_ids=src_ids, token_type_ids=token_type_ids)
-                ce_loss = (criterion(prediction_scores, labels) + criterion(prediction_scores_2, labels)) * 0.5
+                ce_loss = (criterion(prediction_scores, labels) + criterion(
+                    prediction_scores_2, labels)) * 0.5
                 kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
                 loss = ce_loss + kl_loss * args.rdrop_coef
             else:

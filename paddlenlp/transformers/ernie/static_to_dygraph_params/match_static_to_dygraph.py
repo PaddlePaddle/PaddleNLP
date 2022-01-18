@@ -87,6 +87,12 @@ def match_mlm_parameter(convert_parameter_name_dict):
     return convert_parameter_name_dict
 
 
+def match_last_fc_parameter(convert_parameter_name_dict):
+    convert_parameter_name_dict["classifier.weight"] = "_cls_out_w"
+    convert_parameter_name_dict["classifier.bias"] = "_cls_out_b"
+    return convert_parameter_name_dict
+
+
 def convert_static_to_dygraph_params(dygraph_params_save_path,
                                      static_params_dir,
                                      static_to_dygraph_param_name,
@@ -104,8 +110,8 @@ def convert_static_to_dygraph_params(dygraph_params_save_path,
             print(static_para_name, "not in static_to_dygraph_param_name")
             continue
         dygraph_para_name = static_to_dygraph_param_name[static_para_name]
-        value = np.load(path)
-        if "cls" in dygraph_para_name:
+        value = paddle.load(path).numpy()
+        if "cls" in dygraph_para_name or "classifier" in dygraph_para_name:
             # Note: cls.predictions parameters do not need add `model_name.` prefix
             state_dict[dygraph_para_name] = value
         else:

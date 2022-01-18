@@ -103,7 +103,7 @@ def create_data_loader(args, places=None):
                 pad_idx=args.bos_idx,
                 pad_seq=args.pad_seq,
                 dtype=args.input_dtype),
-            num_workers=0)
+            num_workers=args.num_workers)
         data_loaders[i] = (data_loader)
     return data_loaders
 
@@ -157,7 +157,7 @@ def create_infer_loader(args):
             pad_idx=args.bos_idx,
             pad_seq=args.pad_seq,
             dtype=args.input_dtype),
-        num_workers=0,
+        num_workers=args.num_workers,
         return_list=True)
     return data_loader, trg_vocab.to_tokens
 

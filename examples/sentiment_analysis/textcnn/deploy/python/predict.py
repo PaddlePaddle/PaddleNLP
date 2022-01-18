@@ -64,11 +64,7 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-    def predict(self,
-                data,
-                label_map,
-                batch_size=1,
-                pad_token_id=0):
+    def predict(self, data, label_map, batch_size=1, pad_token_id=0):
         """
         Predicts the data labels.
 
@@ -87,7 +83,8 @@ class Predictor(object):
 
         # Seperates data into some batches.
         batches = [
-            data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
+            data[idx:idx + batch_size]
+            for idx in range(0, len(data), batch_size)
         ]
         batchify_fn = lambda samples, fn=Pad(
             axis=0, pad_val=pad_token_id
@@ -117,15 +114,11 @@ if __name__ == "__main__":
     pad_token_id = vocab.to_indices('[PAD]')
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
-    
+
     # Firstly pre-processing prediction data and then do predict.
-    data = [
-        '你再骂我我真的不跟你聊了',
-        '你看看我附近有什么好吃的',
-        '我喜欢画画也喜欢唱歌'
-    ]
+    data = ['你再骂我我真的不跟你聊了', '你看看我附近有什么好吃的', '我喜欢画画也喜欢唱歌']
     examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
-    
+
     results = predictor.predict(
         examples,
         label_map,

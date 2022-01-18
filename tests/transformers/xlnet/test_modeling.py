@@ -41,10 +41,9 @@ def create_input_data(config, seed=None):
 
 
 class TestXLNetLMHeadModel(CommonTest):
-
     def set_input(self):
         self.config = copy.deepcopy(XLNetModel.pretrained_init_configuration[
-                                        'xlnet-base-cased'])
+            'xlnet-base-cased'])
         self.config['n_layer'] = 2
         self.config['vocab_size'] = 512
         self.config['classifier_dropout'] = 0.0
@@ -55,7 +54,8 @@ class TestXLNetLMHeadModel(CommonTest):
         self.input_ids = create_input_data(self.config)
 
     def set_output(self):
-        self.expected_shape = (self.config['batch_size'], self.config['seq_len'], self.config['d_model'])
+        self.expected_shape = (self.config['batch_size'],
+                               self.config['seq_len'], self.config['d_model'])
 
     def set_model_class(self):
         self.TEST_MODEL_CLASS = XLNetLMHeadModel
@@ -93,7 +93,8 @@ class TestXLNetForMultipleChoice(TestXLNetLMHeadModel):
         self.TEST_MODEL_CLASS = XLNetForMultipleChoice
 
     def set_output(self):
-        self.expected_logit_shape = (self.config['batch_size'] // self.config['num_choices'],
+        self.expected_logit_shape = (self.config['batch_size'] //
+                                     self.config['num_choices'],
                                      self.config['num_choices'])
 
     def test_forward(self):

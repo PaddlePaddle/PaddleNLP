@@ -539,19 +539,19 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
         if return_attention_mask:
             attention_mask = np.ones(
-                (sequence_length, sequence_length), dtype='float32') * -1e9
+                (sequence_length, sequence_length), dtype='float32') * -1e4
             start = len(source_ids)
             end = sequence_length
             attention_mask[:end, :start] = 0.0
             # Generate the lower triangular matrix using the slice of matrix
             tmp = np.triu(
                 np.ones(
-                    [end - start, end - start], dtype='float32') * -1e9, 1)
+                    [end - start, end - start], dtype='float32') * -1e4, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask
             if pad_length > 0:
                 new_mask = np.ones(
-                    (max_seq_len, max_seq_len), dtype='float32') * -1e9
+                    (max_seq_len, max_seq_len), dtype='float32') * -1e4
                 new_mask[-sequence_length:, -sequence_length:] = attention_mask
                 encoded_inputs["attention_mask"] = new_mask
             if return_tensors:

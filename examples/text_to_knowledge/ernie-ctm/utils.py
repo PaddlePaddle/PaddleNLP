@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 def reset_offset(pred_words):
     for i in range(0, len(pred_words)):
         if i > 0:
@@ -38,7 +39,8 @@ def decode(texts, all_pred_tags, summary_num, idx_to_tags):
                 pred_words.append({
                     "item": texts[i][j],
                     "offset": 0,
-                    "wordtag_label": label})
+                    "wordtag_label": label
+                })
             else:
                 pred_word.append(texts[i][j])
                 if pred_label.startswith("E"):
@@ -48,7 +50,7 @@ def decode(texts, all_pred_tags, summary_num, idx_to_tags):
                         "wordtag_label": label
                     })
                     del pred_word[:]
-        
+
         pred_words = reset_offset(pred_words)
         result = {"text": texts[i], "items": pred_words}
         batch_results.append(result)

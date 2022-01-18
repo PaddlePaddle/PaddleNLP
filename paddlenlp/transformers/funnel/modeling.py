@@ -1768,6 +1768,69 @@ class FunnelPreTrainedModel(PreTrainedModel):
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
     """
+    model_config_file = "model_config.json"
+    pretrained_init_configuration = {
+        "funnel-transformer/small": {},  # B4-4-4H768
+        "funnel-transformer/small-base": {},  # B4-4-4H768, no decoder
+        "funnel-transformer/medium": {},  # B6-3x2-3x2H768
+        "funnel-transformer/medium-base": {},  # B6-3x2-3x2H768, no decoder
+        "funnel-transformer/intermediate": {},  # B6-6-6H768
+        "funnel-transformer/intermediate-base": {},  # B6-6-6H768, no decoder
+        "funnel-transformer/large": {},  # B8-8-8H1024
+        "funnel-transformer/large-base": {},  # B8-8-8H1024, no decoder
+        "funnel-transformer/xlarge-base": {},  # B10-10-10H1024
+        "funnel-transformer/xlarge": {},  # B10-10-10H1024, no decoder
+    }
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json"
+    }
+    pretrained_resource_files_map = {
+        "model_state": {
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small/model_state.pdparams",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small-base/model_state.pdparams",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium/model_state.pdparams",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium-base/model_state.pdparams",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate/model_state.pdparams",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate-base/model_state.pdparams",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large/model_state.pdparams",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large-base/model_state.pdparams",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge-base/model_state.pdparams",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge/model_state.pdparams",
+        },
+        "model_config": {
+            "funnel-transformer/small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small/model_config.json",
+            "funnel-transformer/small-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/small-base/model_config.json",
+            "funnel-transformer/medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium/model_config.json",
+            "funnel-transformer/medium-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/medium-base/model_config.json",
+            "funnel-transformer/intermediate":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate/model_config.json",
+            "funnel-transformer/intermediate-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/intermediate-base/model_config.json",
+            "funnel-transformer/large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large/model_config.json",
+            "funnel-transformer/large-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/large-base/model_config.json",
+            "funnel-transformer/xlarge-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge-base/model_config.json",
+            "funnel-transformer/xlarge":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/funnel-transformer/xlarge/model_config.json",
+        },
+    }
 
     config_class = FunnelConfig
     base_model_prefix = "funnel"

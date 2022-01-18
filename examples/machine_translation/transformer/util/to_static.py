@@ -20,14 +20,14 @@ from paddle.jit import to_static
 from paddle.static import InputSpec
 import paddle
 
+
 def create_input_specs():
     src_word = paddle.static.InputSpec(
         name="src_word", shape=[None, None], dtype="int64")
     trg_word = paddle.static.InputSpec(
         name="trg_word", shape=[None, None], dtype="int64")
-    return [
-        src_word, trg_word
-    ]
+    return [src_word, trg_word]
+
 
 def apply_to_static(config, model):
     support_to_static = config.get('to_static', False)

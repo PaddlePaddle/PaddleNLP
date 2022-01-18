@@ -36,8 +36,7 @@ def parse_args():
         '--top_k',
         type=int,
         default=5,
-        help=
-        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
     parser.add_argument(
         '--temperature',
@@ -63,8 +62,7 @@ def parse_args():
         '--early_stopping',
         type=eval,
         default=False,
-        help=
-        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
+        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
     )
     parser.add_argument(
         '--min_dec_len',
