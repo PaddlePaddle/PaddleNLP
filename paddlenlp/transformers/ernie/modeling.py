@@ -19,14 +19,10 @@ import paddle.nn.functional as F
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieModel',
-    'ErniePretrainedModel',
-    'ErnieForSequenceClassification',
-    'ErnieForTokenClassification',
-    'ErnieForQuestionAnswering',
-    'ErnieForPretraining',
-    'ErniePretrainingCriterion',
-    'ErnieForMaskedLM',
+    'ErnieModel', 'ErniePretrainedModel', 'ErnieForSequenceClassification',
+    'ErnieForTokenClassification', 'ErnieForQuestionAnswering',
+    'ErnieForPretraining', 'ErniePretrainingCriterion', 'ErnieForMaskedLM',
+    'ErnieForMultipleChoice'
 ]
 
 
@@ -859,3 +855,80 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
         return prediction_scores
+
+
+class ErnieForMultipleChoice(ErniePretrainedModel):
+    """
+    Ernie Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+    
+    Args:
+        ernie (:class:`ErnieModel`):
+            An instance of ErnieModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Ernie.
+            If None, use the same value as `hidden_dropout_prob` of `ErnieModel`
+            instance `ernie`. Defaults to None.
+    """
+
+    def __init__(self, ernie, num_choices=2, dropout=None):
+        super(ErnieForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.ernie = ernie
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.ernie.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The ErnieForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, token_type_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits

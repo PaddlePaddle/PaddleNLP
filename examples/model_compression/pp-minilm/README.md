@@ -58,7 +58,9 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 - batch sizes: 16, 32, 64;
 - learning rates: 3e-5, 5e-5, 1e-4
 
-2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值。
+2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值；
+
+3.性能测试的条件是：batch_size: 32, max_seq_len: 128。
 
 **方案流程**
 
@@ -93,7 +95,6 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 ├── inference                    # 预测目录
 │ └── infer.py                   # 预测脚本
 │ └── infer_all.sh               # 批量预测量化模型启动脚本
-│ └── infer_perf.py              # 量化模型性能测试脚本
 │ └── infer_perf.sh              # 量化模型性能测试启动脚本
 ├── data.py                      # 数据处理脚本
 ├── pp-minilm.png                # PP-MiniLM 方案流程图
@@ -197,7 +198,7 @@ export MODEL_PATH=ppminilm-6l-768h
 export LR=1e-4
 export BS=32
 
-python export_model.py --task_name ${TASK_NAME} --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/
+python export_model.py --task_name ${TASK_NAME} --model_path ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/
 ```
 
 静态图（部署）模型路径与动态图模型的路径相同，文件名为 `inference.pdmodel` , `inference.pdiparams` 和 `inference.pdiparams.info` 。
@@ -335,7 +336,7 @@ cd ..
 
 #### 运行方式
 
-这里使用了动态 shape 功能，因此需要设置获取 shape 的范围。Paddle Inference 提供了相应的接口，即首先通过离线输入数据来统计出所有临时 tensor 的 shape 范围，TRT 子图的 tensor 输入 shape 范围可直接根据上一步 tune 出来的结果来设置，即可完成自动 shape 范围设置。统计完成后，只需设置统计结果路径，即可启用 `tuned_dynamic_shape` 功能。在本案例中，只需要先设置 `--collect_shape` 参数，运行 `infer.py`，然后再取消传入这个参数，再次运行 `infer.py`。例如：
+这里使用了动态 shape 功能，因此需要设置 TensorRT 子图输入shape 的范围。用户需要事先根据自己的模型结构和数据 shape 的范围，设置 TensorRT 子图输入的 shape 的最大、最小、以及最优的范围，其中最优范围可以按照数据分布选择最常见的来设置。动态 shape 的设置可以参考[官方文档](https://paddleinference.paddlepaddle.org.cn/optimize/paddle_trt.html#dynamic-shape)中的教程，以及本案例中 infer.py 脚本中的 160 行 - 206 行）。
 
 INT8 预测运行脚本：
 
@@ -345,8 +346,7 @@ cd inference
 export task=tnews
 export algo=mse
 export bs=4
-python infer.py --task_name ${task}  --model_path  ../quantization/${task}_quant_models/${algo}${bs}/int8  --int8 --use_trt --collect_shape # 生成shape range info文件
-python infer.py --task_name ${task}  --model_path  ../quantization/${task}_quant_models/${algo}${bs}/int8  --int8 --use_trt # load shape range info文件进行预测
+python infer.py --task_name ${task}  --model_path  ../quantization/${task}_quant_models/${algo}${bs}/int8  --int8 --use_trt
 ```
 如果想要批量对量化模型进行预测并输出不同量化策略产出模型的精度，可以使用如下的脚本批量预测：
 
@@ -357,7 +357,6 @@ sh infer_all.sh
 FP32 预测运行脚本：
 
 ```shell
-python infer.py --task_name ${task}  --model_path  $MODEL_PATH  --use_trt --collect_shape
 python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 ```
 
@@ -376,7 +375,7 @@ cd ..
 ```
 
 下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况。
-取 5 个非 `--collect_shape` 阶段打印出的时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 9.3 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.6 倍。
+取 5 个测试时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 9.3 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.6 倍。
 
 |                         | 平均耗时(s) | 加速比 |
 | ----------------------- | ----------- | ------ |
