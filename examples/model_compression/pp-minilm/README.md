@@ -60,7 +60,13 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值；
 
-3.性能测试的条件是：batch_size: 32, max_seq_len: 128；
+3.性能测试的条件是：
+
+- 硬件：NVIDIA Tesla T4 单卡；
+- 软件：CUDA 11.1, cuDNN 8.1, TensorRT 7.2, PaddlePaddle 2.2.2；
+- 实验配置：batch_size: 32, max_seq_len: 128；
+
+其中，除上表最后一行 PPMiniLM 裁剪 + 量化后的模型是对 INT8 模型进行预测，其余模型均基于 FP32 精度测试。
 
 4.PPMiniLM 模型均接入了FasterTokenizer，FasterTokenizer 对模型的精度没有影响，但是会加快推理速度。
 
@@ -332,7 +338,7 @@ cd ..
 
 想要得到更明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100)上进行测试，本案例基于 T4 测试。若在 V 系列 GPU 卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
 
-本案例是在 NVIDIA Tesla T4 单卡上，使用 cuda 11.1、cudnn 8.1、TensorRT 7.2 进行预测。
+本案例是在 NVIDIA Tesla T4 单卡上，使用 CUDA 11.1、cuDNN 8.1、TensorRT 7.2 进行预测。
 
 <a name="运行方式"></a>
 
