@@ -60,7 +60,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值；
 
-3.性能测试的条件是：
+3.性能测试的环境：
 
 - 硬件：NVIDIA Tesla T4 单卡；
 - 软件：CUDA 11.1, cuDNN 8.1, TensorRT 7.2, PaddlePaddle 2.2.2；
