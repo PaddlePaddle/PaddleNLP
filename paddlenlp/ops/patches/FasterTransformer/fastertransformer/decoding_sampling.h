@@ -99,7 +99,8 @@ public:
                    const float temperature = 1.0,
                    const float repeat_penalty = 1.0,
                    const bool prefix_lm = false,
-                   const bool is_mbart = false)
+                   const bool is_mbart = false,
+                   const int min_length = 0)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -120,6 +121,8 @@ public:
     args_.pos_bias_ = pos_bias;
     args_.temperature_ = temperature;
     args_.repeat_penalty_ = repeat_penalty;
+
+    args_.min_length_ = min_length;
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
@@ -903,7 +906,7 @@ public:
 #endif
         }
 
-        if (decoding_params.logits_mask) {
+        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(logits_buf_,
                                            finished_buf_,
                                            args_.batch_size_,
@@ -911,7 +914,9 @@ public:
                                            args_.vocab_size_padded_,
                                            args_.vocab_size_,
                                            decoding_params.stream,
-                                           decoding_params.logits_mask);
+                                           decoding_params.logits_mask,
+                                           (args_.min_length_ != 0 && step <= args_.min_length_),
+                                           args_.end_id_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());

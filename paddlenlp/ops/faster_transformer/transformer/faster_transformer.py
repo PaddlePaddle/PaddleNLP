@@ -869,6 +869,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 attention_mask,
                 seq_len=None,
                 max_length=128,
+                min_length=0,
                 top_k=4,
                 top_p=0.0,
                 decode_strategy="sampling",
@@ -943,7 +944,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             length_penalty=length_penalty,
             pos_bias=True,
             forced_eos_token_id=forced_eos_token_id,
-            early_stopping=early_stopping)
+            early_stopping=early_stopping,
+            min_length=min_length)
 
     generate = forward
 
@@ -1032,6 +1034,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 attention_mask,
                 seq_len=None,
                 max_length=128,
+                min_length=0,
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
@@ -1105,7 +1108,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             length_penalty=length_penalty,
             forced_eos_token_id=forced_eos_token_id,
             pos_bias=False,
-            early_stopping=early_stopping)
+            early_stopping=early_stopping,
+            min_length=min_length)
 
     generate = forward
 

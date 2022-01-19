@@ -94,6 +94,8 @@ struct DecodingArguments : public TransformerArguments {
   int start_id_;
   int end_id_;
   int vocab_size_padded_;
+
+  int min_length_{0};
 };
 
 struct DecodingSamplingArguments : public DecodingArguments {

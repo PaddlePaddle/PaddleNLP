@@ -107,7 +107,8 @@ public:
                      const bool prefix_lm = false,
                      const int finished_candidate_num = -1,
                      const bool early_stopping = false,
-                     const bool is_mbart = false)
+                     const bool is_mbart = false,
+                     const int min_length = 0)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -138,6 +139,8 @@ public:
     args_.pos_offset_ = pos_offset;
     args_.pos_bias_ = pos_bias;
     args_.act_ = act;
+
+    args_.min_length_ = min_length;
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
@@ -977,7 +980,7 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        if (decoding_params.logits_mask) {
+        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(
               tmp_logits_buf_,
               keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
@@ -986,7 +989,9 @@ public:
               args_.vocab_size_padded_,
               args_.vocab_size_,
               decoding_params.stream,
-              decoding_params.logits_mask);
+              decoding_params.logits_mask,
+              (args_.min_length_ != 0 && step <= args_.min_length_),
+              args_.end_id_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());

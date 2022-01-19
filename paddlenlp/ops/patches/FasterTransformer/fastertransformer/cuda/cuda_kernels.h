@@ -128,6 +128,8 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       int vocab_size_padded,
                                       int vocab_size,
                                       cudaStream_t stream,
-                                      const T* logits_mask);
+                                      const T* logits_mask = nullptr,
+                                      const bool min_penalty = false,
+                                      const int end_id = -1);
 
 }  // namespace fastertransformer
