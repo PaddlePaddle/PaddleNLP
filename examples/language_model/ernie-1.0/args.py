@@ -40,6 +40,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the training logs and checkpoints will be written.")
     parser.add_argument("--split", type=str, default='949,50,1', help="Train/valid/test data split.")
 
+    parser.add_argument("--binary_head", type=str2bool, default=True, help="True for NSP task.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--micro_batch_size", default=8, type=int, help="Batch size per device for one step training.", )
     parser.add_argument("--global_batch_size", default=None, type=int, help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size.")
