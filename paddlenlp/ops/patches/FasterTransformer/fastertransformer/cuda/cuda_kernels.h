@@ -105,7 +105,9 @@ void start_ids_embeddings_kernel_launcher(T* from_tensor,
                                 const int max_length,
                                 const int batch_size,
                                 const int hidden_units,
-                                cudaStream_t stream);
+                                cudaStream_t stream,
+                                const int* role_id = nullptr,
+                                const T* role_embedding_table = nullptr);
 
 template <typename T>
 void init_cache_kernel_launcher(const float* cache_k,

@@ -26,6 +26,15 @@ limitations under the License. */
 #include "pd_traits.h"
 
 
+const int64_t numel(const std::vector<int64_t>& tensor_shape) {
+    int size = tensor_shape.size();
+    int64_t numel_ = 1;
+    for (int i = 0; i < size; ++i) {
+        numel_ *= tensor_shape[i];
+    }
+    return numel_;
+}
+
 template <paddle::DataType D>
 std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& input_ids,
@@ -61,6 +70,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& position_encoding_table,
     const paddle::Tensor& type_embedding_weight,
+    const paddle::Tensor& role_id,
+    const paddle::Tensor& role_embedding_table,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -258,6 +269,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.type_table =
       reinterpret_cast<const DataType_*>(type_embedding_weight.data<data_t_>());
 
+  // For role embedding.
+  auto role_id_shape = role_id.shape();
+  if (role_id_shape.size() > 0 && numel(role_id_shape) > 0) {
+    decoding_params.role_id = role_id.data<int>();
+    decoding_params.role_embedding_table =
+        reinterpret_cast<const DataType_*>(role_embedding_table.data<data_t_>());
+  }
+
   ActivationType activate =
       (hidden_act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
 
@@ -413,6 +432,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& type_embedding_weight,
+    const paddle::Tensor& role_id,
+    const paddle::Tensor& role_embedding_table,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -481,6 +502,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           embedding_bias,
           positional_embedding_weight,
           type_embedding_weight,
+          role_id,
+          role_embedding_table,
           output_ids,
           parent_ids,
           sequence_length,
@@ -544,6 +567,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           embedding_bias,
           positional_embedding_weight,
           type_embedding_weight,
+          role_id,
+          role_embedding_table,
           output_ids,
           parent_ids,
           sequence_length,

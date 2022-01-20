@@ -266,10 +266,11 @@ def infer_unified_decoding(
         ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
         decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
         lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb, type_emb,
-        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
-        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _unk_id,
-        _mask_id, _temperature, _len_penalty, _normalize_before, _pos_bias,
-        _hidden_act, _rel_len, _early_stopping, _min_length):
+        role_id, role_emb, _decoding_strategy, _beam_size, _topk, _topp,
+        _n_head, _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
+        _diversity_rate, _unk_id, _mask_id, _temperature, _len_penalty,
+        _normalize_before, _pos_bias, _hidden_act, _rel_len, _early_stopping,
+        _min_length):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -305,7 +306,9 @@ def infer_unified_decoding(
         "EmbWeight": linear_weight,
         "EmbBias": linear_bias,
         "PositionEncEmb": pos_emb,
-        "TypeEmb": type_emb
+        "TypeEmb": type_emb,
+        "RoleId": role_id,
+        "RoleEmbedding": role_emb
     }
 
     attrs = {
@@ -1102,7 +1105,6 @@ class InferUnifiedDecoding(nn.Layer):
                  mask_id=30000,
                  normalize_before=True,
                  hidden_act="gelu"):
-        decoding_lib = "/paddle/fast_transformer/context/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             if "FasterTransformer" not in LOADED_EXT.keys():
@@ -1372,6 +1374,7 @@ class InferUnifiedDecoding(nn.Layer):
                 memory_seq_lens,
                 input_type_id,
                 decoding_type_id,
+                role_id=None,
                 beam_size=4,
                 topk=4,
                 topp=0.0,
@@ -1388,6 +1391,13 @@ class InferUnifiedDecoding(nn.Layer):
                 rel_len=False,
                 early_stopping=False,
                 min_length=0):
+        if role_id is None:
+            role_id = paddle.zeros(shape=[0], dtype="int64")
+            self.role_embedding_table = [
+                paddle.zeros(
+                    shape=[0], dtype="float32")
+            ]
+
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
             topk = 1
@@ -1440,6 +1450,8 @@ class InferUnifiedDecoding(nn.Layer):
             linear_bias=self.sub_modules["linear_bias"],
             pos_emb=self.sub_modules["pos_emb"],
             type_emb=self.sub_modules["type_emb"],
+            role_id=[role_id],
+            role_emb=self.role_embedding_table,
             _decoding_strategy=decoding_strategy,
             _beam_size=beam_size,
             _topk=topk,

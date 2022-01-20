@@ -392,7 +392,9 @@ public:
                                             input_len,
                                             request_batch_size,
                                             h_1,
-                                            decoding_params.stream);
+                                            decoding_params.stream,
+                                            decoding_params.role_id,
+                                            decoding_params.role_embedding_table);
       } else {
         // Memory reuse. from_tensor[1].
         start_ids_embeddings_kernel_launcher(from_tensor[1],

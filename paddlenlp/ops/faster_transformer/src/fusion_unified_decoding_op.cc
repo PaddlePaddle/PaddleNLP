@@ -52,6 +52,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& type_embedding_weight,
+    const paddle::Tensor& role_id,
+    const paddle::Tensor& role_embedding_table,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -153,6 +155,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       embedding_bias,
                                       positional_embedding_weight,
                                       type_embedding_weight,
+                                      role_id,
+                                      role_embedding_table,
                                       output_ids,
                                       parent_ids,
                                       sequence_length,
@@ -215,6 +219,8 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const std::vector<int64_t>& embedding_bias_shape,
     const std::vector<int64_t>& positional_embedding_weight_shape,
     const std::vector<int64_t>& type_embedding_weight_shape,
+    const std::vector<int64_t>& role_id_shape,
+    const std::vector<int64_t>& role_embedding_table_shape,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -302,7 +308,9 @@ std::vector<paddle::DataType> UnifiedDecodingInferDtype(
     const paddle::DataType& embedding_weight,
     const paddle::DataType& embedding_bias,
     const paddle::DataType& positional_embedding_weight,
-    const paddle::DataType& type_embedding_weight) {
+    const paddle::DataType& type_embedding_weight,
+    const paddle::DataType& role_id,
+    const paddle::DataType& role_embedding_table) {
   return {paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32};
@@ -341,7 +349,9 @@ PD_BUILD_OP(fusion_unified_decoding)
              "EmbWeight",
              "EmbBias",
              "PositionEncEmb",
-             "TypeEmb"})
+             "TypeEmb",
+             "RoleId",
+             "RoleEmbedding"})
     .Outputs({"OutputIds", "ParentIds", "SequenceLength"})
     .Attrs({"decoding_strategy: std::string",
             "beam_size: int",
