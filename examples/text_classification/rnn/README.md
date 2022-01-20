@@ -230,7 +230,7 @@ CPU启动：
 python predict.py --vocab_path=./senta_word_dict.txt \
     --device=cpu \
     --network=bilstm \
-    --params_path=checkpoints/final.pdparams
+    --params_path=./checkpoints/final.pdparams
 ```
 
 GPU启动：
@@ -240,7 +240,7 @@ export CUDA_VISIBLE_DEVICES=0
 python predict.py --vocab_path=./senta_word_dict.txt \
     --device=gpu \
     --network=bilstm \
-    --params_path=/checkpoints/final.pdparams
+    --params_path=./checkpoints/final.pdparams
 ```
 
 XPU启动：
@@ -249,7 +249,7 @@ XPU启动：
 python predict.py --vocab_path=./senta_word_dict.txt \
     --device=xpu \
     --network=lstm \
-    --params_path=checkpoints/final.pdparams
+    --params_path=./checkpoints/final.pdparams
 ```
 
 将待预测数据分词完毕后，如以下示例：
