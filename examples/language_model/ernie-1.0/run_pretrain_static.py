@@ -65,9 +65,10 @@ def create_pretrained_dataset(
         current_step=0, ):
 
     train_valid_test_num_samples = [
-        args.global_batch_size * args.max_steps, args.micro_batch_size *
-        (args.max_steps // args.eval_freq + 1) * args.eval_iters *
-        data_world_size, args.micro_batch_size * args.test_iters
+        args.global_batch_size * args.max_steps,
+        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
+        args.eval_iters * data_world_size,
+        args.micro_batch_size * args.test_iters * data_world_size
     ]
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=data_file,
@@ -542,7 +543,7 @@ def do_train(args):
         if not flag_loaded:
             logger.error("No checkpoint load.")
 
-    # load checkpoint vars 
+    # load checkpoint vars
     if os.path.exists(checkpoint_dir):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
             paddle.static.load(main_program,
