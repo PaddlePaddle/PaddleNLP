@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export MODEL_DIR=$1
+
 python export_to_serving.py \
-    --dirname ../finetuning/ppminilm-6l-768h_0119_beifen/models/TNEWS/1e-4_64/ \
+    --dirname  ${MODEL_DIR} \
     --model_filename inference.pdmodel \
     --params_filename inference.pdiparams \
     --server_path serving_server \
