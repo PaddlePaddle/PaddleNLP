@@ -24,6 +24,7 @@ from collections import namedtuple
 from multiprocess import Pool, RLock
 from datasets import load_dataset as load_hf_dataset
 from datasets import DatasetDict
+from datasets.features import ClassLabel
 import time
 
 import paddle.distributed as dist
@@ -91,16 +92,27 @@ def load_from_hf(path_or_read_func, name=None, splits=None, **kwargs):
                                 path_or_read_func +
                                 "' on PaddleNLP or HuggingFace")
     else:
+        label_list = []
         if isinstance(hf_datasets, DatasetDict):
             datasets = DatasetTuple(hf_datasets.keys())
             for split, ds in hf_datasets.items():
-                datasets[split] = MapDataset(ds)
+                for feature in ds.features.values():
+                    if isinstance(feature, ClassLabel):
+                        label_list = feature.names
+                datasets[split] = MapDataset(ds, label_list=label_list)
         elif isinstance(hf_datasets, list):
             datasets = DatasetTuple(splits)
             for i, split in enumerate(splits):
-                datasets[split] = MapDataset(hf_datasets[i])
+                for feature in hf_datasets[i].features.values():
+                    if isinstance(feature, ClassLabel):
+                        label_list = feature.names
+                datasets[split] = MapDataset(
+                    hf_datasets[i], label_list=label_list)
         else:
-            datasets = MapDataset(hf_datasets)
+            for feature in hf_datasets.features.values():
+                if isinstance(feature, ClassLabel):
+                    label_list = feature.names
+            datasets = MapDataset(hf_datasets, label_list=label_list)
     return datasets
 
 
