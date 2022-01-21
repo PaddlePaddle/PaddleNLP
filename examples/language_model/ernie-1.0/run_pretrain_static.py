@@ -237,12 +237,26 @@ def dist_optimizer(args, topo):
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
