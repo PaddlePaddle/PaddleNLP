@@ -75,8 +75,16 @@ class BlendableDataset(paddle.io.Dataset):
 
         local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(
         ))
-        if local_rank == 0:
-            compile_helper()
+
+        while True:
+            try:
+                import data_tools.helpers as helpers
+                break
+            except Exception as e:
+                if local_rank == 0:
+                    compile_helper()
+                print_rank_0('> wait for hepers to be compiled!')
+                time.sleep(1)
 
         import data_tools.helpers as helpers
         helpers.build_blending_indices(self.dataset_index,
