@@ -27,11 +27,11 @@
 <a name="PP-MiniLM中文小模型"></a>
 
 # PP-MiniLM 中文小模型
-[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT(12L768H) 的 9.3 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 CLUE 高 0.62。
+[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP) 联合 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT(12L768H) 的 8.88 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 CLUE 高 0.62。
 
 PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-agnostic Distillation)技术、裁剪(Pruning)技术、量化(Quantization)技术为核心，使得 PP-MiniLM **又快**、**又准**、**又小**。
 
-1. **推理速度快**: 依托 PaddleSlim 的裁剪、量化技术对 PP-MiniLM 小模型进行压缩、加速, 使得 PP-MiniLM 量化后模型 GPU 推理速度相比 BERT base 加速比高达 9.3；
+1. **推理速度快**: 依托 PaddleSlim 的裁剪、量化技术对 PP-MiniLM 小模型进行压缩、加速, 使得 PP-MiniLM 量化后模型 GPU 推理速度相比 BERT base 加速比高达 8.88；
 
 2. **精度高**: 我们以 [MiniLMv2](https://arxiv.org/abs/2012.15828) 提出的 Multi-Head Self-Attention Relation Distillation 技术为基础，通过引入样本间关系知识蒸馏做了进一步算法优化，6 层 PP-MiniLM 模型在 CLUE 数据集上比 12 层 `bert-base-chinese` 高 0.62%，比同等规模的 TinyBERT<sub>6,</sub>、UER-py RoBERTa 分别高 2.57%、2.24%；
 
@@ -43,13 +43,13 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 | Model                         | #Params | #FLOPs | Speedup | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CLUE 平均值 |
 | ----------------------------- | ------- | ------ | ------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- |
 | BERT-base, Chinese            | 102.3M  | 10.87B | 1.00x   | 74.14 | 56.81 | 61.10   | 81.19 | 74.85 | 79.93       | 81.47 | 72.78       |
-| TinyBERT<sub>6,</sub> Chinese | 59.7M   | 5.44B  | 2.04x   | 72.59 | 55.70 | 57.64   | 79.57 | 73.97 | 76.32       | 80.00 | 70.83       |
-| UER-py RoBERTa L6-H768        | 59.7M   | 5.44B  | 2.04x   | 69.62 | 66.45 | 59.91   | 76.89 | 71.36 | 71.05       | 82.87 | 71.16       |
-| RBT6, Chinese                 | 59.7M   | 5.44B  | 2.04x   | 73.93 | 56.63 | 59.79   | 79.28 | 73.12 | 77.30       | 80.80 | 71.55       |
-| ERNIE-Tiny                    | 90.7M   | 4.83B  | 2.30x   | 71.55 | 58.34 | 61.41   | 76.81 | 71.46 | 72.04       | 79.13 | 70.11       |
-| PP-MiniLM 6L-768H             | 59.7M   | 5.44B  | 2.12x   | 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18       | 79.17 | 73.69       |
-| PP-MiniLM 裁剪后              | 49.1M   | 4.08B  | 2.60x   | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86       | 78.53 | 73.44       |
-| PP-MiniLM 裁剪 + 量化后       | 49.2M   | -      | 9.26x   | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40       |
+| TinyBERT<sub>6,</sub> Chinese | 59.7M   | 5.44B  | 1.90x   | 72.59 | 55.70 | 57.64   | 79.57 | 73.97 | 76.32       | 80.00 | 70.83       |
+| UER-py RoBERTa L6-H768        | 59.7M   | 5.44B  | 1.90x   | 69.62 | 66.45 | 59.91   | 76.89 | 71.36 | 71.05       | 82.87 | 71.16       |
+| RBT6, Chinese                 | 59.7M   | 5.44B  | 1.90x   | 73.93 | 56.63 | 59.79   | 79.28 | 73.12 | 77.30       | 80.80 | 71.55       |
+| ERNIE-Tiny                    | 90.7M   | 4.83B  | 2.22x   | 71.55 | 58.34 | 61.41   | 76.81 | 71.46 | 72.04       | 79.13 | 70.11       |
+| PP-MiniLM 6L-768H             | 59.7M   | 5.44B  | 2.15x   | 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18       | 79.17 | 73.69       |
+| PP-MiniLM 裁剪后              | 49.1M   | 4.08B  | 2.74x   | 73.91 | 57.44 | 61.64   | 81.10 | 75.59 | 85.86       | 78.53 | 73.44       |
+| PP-MiniLM 裁剪 + 量化后       | 49.2M   | -      | 8.88x   | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40       |
 
 
 **NOTE：**
@@ -60,7 +60,15 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 
 2.量化后比量化前模型参数量多了 0.1M 是因为保存了 scale 值；
 
-3.性能测试的条件是：batch_size: 32, max_seq_len: 128。
+3.性能测试的环境：
+
+- 硬件：NVIDIA Tesla T4 单卡；
+- 软件：CUDA 11.1, cuDNN 8.1, TensorRT 7.2, PaddlePaddle 2.2.2；
+- 实验配置：batch_size: 32, max_seq_len: 128；
+
+其中，除上表最后一行 PPMiniLM 裁剪 + 量化后的模型是对 INT8 模型进行预测，其余模型均基于 FP32 精度测试。
+
+4.PPMiniLM 模型均接入了FasterTokenizer，FasterTokenizer 对模型的精度没有影响，但是会加快推理速度。
 
 **方案流程**
 
@@ -128,7 +136,7 @@ PP-MiniLM 是一个 6 层的预训练模型，使用 `from_pretrained`导入 PP-
 
 PP-MiniLM 预训练小模型在 CLUE 中的 7 个分类数据集的平均精度上比 12 层 `bert-base-chinese` 高 0.62%，比同等规模的 TinyBERT、UER-py RoBERTa 分别高 2.57%、2.24%，因此我们推荐将 PP-MiniLM 运用在中文下游任务上。当然，如果想对已有模型进一步压缩，也可以参考这里的压缩方案，因为压缩方案是通用的。
 
-本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于 TensorRT 的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达 `bert-base-chinese` 的 1.9 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 9.3 倍。
+本案例中会以 CLUE 中 7 个分类数据集为例介绍如何在下游任务上使用 PP-MiniLM。首先用 CLUE 中的数据集对预训练小模型 PP-MiniLM 进行微调，然后提供了一套压缩方案，即借助 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行裁剪和量化，进一步对模型规模进行压缩，最终使用基于 TensorRT 的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 预测库对量化后的模型进行预测部署。裁剪、量化前，6 层 PP-MiniLM 的推理速度达 `bert-base-chinese` 的 2.15 倍，在下游任务上压缩完成后，模型推理速度高达`bert-base-chinese`的 8.88 倍。
 
 <a name="数据介绍"></a>
 
@@ -330,7 +338,7 @@ cd ..
 
 想要得到更明显的加速效果，推荐在 NVIDA Tensor Core GPU（如 T4、A10、A100)上进行测试，本案例基于 T4 测试。若在 V 系列 GPU 卡上测试，由于其不支持 Int8 Tensor Core，加速效果将达不到本文档表格中的效果。
 
-本案例是在 NVIDIA Tesla T4 单卡上，使用 cuda 11.1、cudnn 8.1、TensorRT 7.2 进行预测。
+本案例是在 NVIDIA Tesla T4 单卡上，使用 CUDA 11.1、cuDNN 8.1、TensorRT 7.2 进行预测。
 
 <a name="运行方式"></a>
 
@@ -364,7 +372,7 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 
 #### 性能测试
 
-测试性能环境同上。本案例测试采用的是 CLUE TNEWS 数据集下量化方法为 `mse`、校准集数量为 4 得到的量化模型，在 TNEWS 的验证集上统计 5 次端到端预测的总耗时（前 20 个 steps 作为 warmup steps 跳过）并求平均。其中 `batch_size` 为 32，`max_seq_len` 为 128。
+测试性能环境同上。本案例测试采用的是 CLUE TNEWS 数据集下量化方法为 `mse`、校准集数量为 4 得到的量化模型，在 TNEWS 的验证集上统计 5 次端到端预测的总耗时（前 20 个 steps 作为 warmup steps）并求平均。其中 `batch_size` 为 32，`max_seq_len` 为 128。
 
 启动性能测试需要对 `infer.py` 脚本传入参数 `--perf`，运行性能测试脚本可以得到 PP-MiniLM、PP-MiniLM 裁剪后、PP-MiniLM 量化后模型预测的耗时：
 
@@ -375,14 +383,15 @@ cd ..
 ```
 
 下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况。
-取 5 个测试时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 9.3 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.6 倍。
+取 5 个测试时长取平均，可以发现借助 PaddleSlim 裁剪、量化后的模型是原 BERT<sub>base</sub>模型推理速度的 8.88 倍，其中裁剪后的模型是 BERT<sub>base</sub>推理速度的 2.74 倍。
 
 |                         | 平均耗时(s) | 加速比 |
 | ----------------------- | ----------- | ------ |
-| BERT<sub>base</sub>     | 19.4549112  | 1.00x  |
-| PP-MiniLM               | 9.10495186  | 2.12x  |
-| PP-MiniLM 裁剪后        | 7.45042658  | 2.60x  |
-| PP-MiniLM 裁剪 + 量化后 | 2.1215384   | 9.26x  |
+| BERT<sub>base</sub>     | 18.97986    | 1.00x  |
+| PP-MiniLM               | 8.82121     | 2.15x  |
+| PP-MiniLM 裁剪后        | 6.92274     | 2.74x  |
+| PP-MiniLM 裁剪 + 量化后 | 2.13698     | 8.88x  |
+
 
 
 <a name="参考文献"></a>

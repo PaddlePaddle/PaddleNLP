@@ -30,7 +30,7 @@ parser.add_argument("--feed_alias_names", type=str, default=None,
                     help='set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of feed vars')
 parser.add_argument("--fetch_alias_names", type=str, default=None,
                     help='set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of fetch vars')
-parser.add_argument("--show_proto", type=bool, default=True,
+parser.add_argument("--show_proto", type=bool, default=False,
                     help='If yes, you can preview the proto and then determine your feed var alias name and fetch var alias name.')
 # yapf: enable
 
