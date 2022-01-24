@@ -70,10 +70,10 @@ class XNLI(DatasetBuilder):
                                                      .trainer_endpoints[:])
             if ParallelEnv().current_endpoint in unique_endpoints:
                 file_num = len(os.listdir(fullname))
-                if file_num != 15:
+                if file_num != len(ALL_LANGUAGES):
                     logger.warning(
                         "Number of train files is %d != %d, decompress again." %
-                        (file_num, 15))
+                        (file_num, len(ALL_LANGUAGES)))
                     shutil.rmtree(fullname)
                     _decompress(
                         os.path.join(default_root, os.path.basename(url)))
@@ -86,7 +86,7 @@ class XNLI(DatasetBuilder):
 
     def _read(self, filename, split):
         """Reads data."""
-        language = self.config.get("language", "all_languages")
+        language = self.name
         if language == "all_languages":
             languages = ALL_LANGUAGES
         else:
