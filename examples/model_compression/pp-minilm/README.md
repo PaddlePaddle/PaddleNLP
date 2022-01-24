@@ -101,10 +101,17 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 ├── quantization                 # 离线量化目录
 │ └── quant_post.py              # 离线量化脚本
 │ └── quant.sh                   # 离线量化启动脚本
-├── inference                    # 预测目录
-│ └── infer.py                   # 预测脚本
-│ └── infer_all.sh               # 批量预测量化模型启动脚本
-│ └── infer_perf.sh              # 量化模型性能测试启动脚本
+├── deploy                       # 部署目录
+│ └── python                     # Paddle Inference 预测目录
+│   └── infer.py                 # Paddle Inference 预测脚本
+│   └── infer_all.sh             # 批量预测量化模型启动脚本
+│   └── infer_perf.sh            # 量化模型性能测试启动脚本
+│ └── serving                    # Paddle Serving 预测目录
+│   └── export_to_serving.py     # 导出 Paddle Serving 预测模型脚本
+│   └── web_service.py           # Paddle Serving 服务端启动脚本
+│   └── rpc_client.py            # Paddle Serving 客户端启动脚本
+│   └── config_nlp.yml           # Paddle Serving 预测配置文件
+│   └── README.md                # Paddle Serving 预测文档
 ├── data.py                      # 数据处理脚本
 ├── pp-minilm.png                # PP-MiniLM 方案流程图
 └── README.md                    # 文档，本文件
@@ -351,7 +358,8 @@ INT8 预测运行脚本：
 
 ```shell
 
-cd inference
+cd deploy/python
+
 export task=tnews
 export algo=mse
 export bs=4

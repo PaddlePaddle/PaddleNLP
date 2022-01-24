@@ -3,13 +3,13 @@
 Paddle Serving 可以实现在服务器端部署推理模型，客户端远程通过 RPC/HTTP 方式发送数据进行推理，实现模型推理的服务化，下面以RPC方式为例进行说明。
 
 ## 前提条件
-准备好 Inference 所需模型，需要2个文件：
+准备好 Inference 模型，需要2个文件：
 | 文件                          | 说明                                   |
 |-------------------------------|----------------------------------------|
 | ppminilm.pdiparams      | 模型权重文件，供推理时加载使用            |
 | ppminilm.pdmodel        | 模型结构文件，供推理时加载使用            |
 
-假设这 2 个文件已生成，其中模型是带有 FasterTokenizer 算子的模型，并放在在目录 `$MODEL_DIR` 下
+假设这 2 个文件已生成，其中模型是集成了 FasterTokenizer 算子的模型，并放在在目录 `$MODEL_DIR` 下
 
 ## 环境要求
 
@@ -18,7 +18,7 @@ Paddle Serving 可以实现在服务器端部署推理模型，客户端远程�
 pip install paddle-serving-app paddle-serving-client paddle-serving-server paddlepaddle
 ```
 
-如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前 CUDA、TensorRT 的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.7.0)
+如果服务器端可以使用GPU进行推理，则安装 server 的 gpu 版本，安装时要注意参考服务器当前 CUDA、TensorRT 的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.8.0)
 
 ```shell
 pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu paddlepaddle-gpu
@@ -57,7 +57,7 @@ python export_to_serving.py \
 
 ## 配置 config 文件
 
-在启动预测之前，需要按照自己的情况修改config文件中的配置，主要需要修改的配置释义如下：
+在启动预测之前，需要按照自己的情况修改 config 文件中的配置，主要需要修改的配置释义如下：
 
 - `rpc_port` : rpc端口。
 - `device_type` : 0 代表 cpu, 1 代表 gpu, 2 代表 tensorRT, 3 代表 arm cpu, 4 代表 kunlun xpu。
@@ -75,7 +75,7 @@ python web_service.py
 ```
 
 ## 启动 client 进行推理
-在客户端容器中，使用前面得到的serving_client目录启动client发起RPC推理请求。从命令行读取输入数据发起推理请求：
+在客户端容器中，使用前面得到的 serving_client 目录启动 client 发起 RPC 推理请求。从命令行读取输入数据发起推理请求：
 
 ```shell
 python client.py
