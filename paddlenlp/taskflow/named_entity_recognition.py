@@ -55,7 +55,7 @@ class NERTask(WordTagTask):
     """
 
     resource_files_names = {
-        "model_state": "model_state.pdparms",
+        "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "tags": "tags.txt",
     }
