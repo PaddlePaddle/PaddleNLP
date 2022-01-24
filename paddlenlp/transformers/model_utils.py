@@ -17,15 +17,16 @@ import io
 import json
 import os
 import six
-import logging
 import inspect
+from collections import OrderedDict
 
 import paddle
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from paddlenlp.utils.downloader import get_path_from_url, exists_in_hf, hf_bucket_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import load
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
@@ -34,6 +35,94 @@ __all__ = [
     'PretrainedModel',
     'register_base_model',
 ]
+
+
+def convert_weight_from_hf(weight_path, class_name):
+    import torch
+    pytorch_state_dict = torch.load(weight_path, map_location="cpu")
+    paddle_state_dict = OrderedDict()
+    hf_to_paddle = {
+        "embeddings.LayerNorm": "embeddings.layer_norm",
+        "encoder.layer": "encoder.layers",
+        "attention.self.query": "self_attn.q_proj",
+        "attention.self.key": "self_attn.k_proj",
+        "attention.self.value": "self_attn.v_proj",
+        "attention.output.dense": "self_attn.out_proj",
+        "intermediate.dense": "linear1",
+        "output.dense": "linear2",
+        "attention.output.LayerNorm": "norm1",
+        "output.LayerNorm": "norm2",
+        "predictions.decoder.": "predictions.decoder_",
+        "predictions.transform.dense": "predictions.transform",
+        "predictions.transform.LayerNorm": "predictions.layer_norm",
+    }
+    for k, v in pytorch_state_dict.items():
+        if k[-7:] == ".weight":
+            if ".embeddings." not in k and ".LayerNorm." not in k:
+                if v.ndim == 2:
+                    v = v.transpose(0, 1)
+        for hf_name, paddle_name in hf_to_paddle.items():
+            k = k.replace(hf_name, paddle_name)
+
+        if "bert." not in k and "cls." not in k and "classifier" not in k:
+            k = "bert." + k
+        paddle_state_dict[k] = paddle.to_tensor(v.data.numpy())
+
+    return paddle_state_dict
+
+
+def convert_config_from_hf(config_path, derived_parameters_dict, class_name):
+    default_config = {
+        "vocab_size": 28996,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 512,
+        "type_vocab_size": 2,
+        "initializer_range": 0.02,
+        "pad_token_id": 0,
+        "init_class": "BertModel"
+    }
+    with io.open(config_path, encoding="utf-8") as f:
+        init_kwargs = json.load(f)
+    base_config = default_config
+    for k, v in init_kwargs.items():
+        if k in base_config:
+            base_config[k] = v
+    if class_name == "BertModel":
+        return base_config
+    else:
+        derived_config = {"init_args": [base_config], "init_class": class_name}
+        for k, v in derived_parameters_dict.items():
+            if k == "self" or k == "bert":
+                continue
+            derived_config[k] = v.default
+
+        for k, v in init_kwargs.items():
+            if k in derived_config:
+                derived_config[k] = v
+        if "id2label" in init_kwargs:
+            derived_config["num_classes"] = len(init_kwargs["id2label"])
+    return derived_config
+
+
+# def get_tokenizer_class(config_file_path):
+#     with io.open(config_file_path, encoding="utf-8") as f:
+#         init_kwargs = json.load(f)
+#     tokenizer_class = init_kwargs.pop("tokenizer_class", None)
+#     model_type = init_kwargs.pop("model_type", None)
+#     if tokenizer_class is not None:
+#         return tokenizer_class.replace("Fast", "")
+#     elif model_type is not None:
+#         if model_type not in TYPE_TO_CLASS:
+#             logger.warning("Cannot figure out the correct tokenizer class for model type: %s" % model_type)
+#             return None
+#         return TYPE_TO_CLASS[model_type]
+#     return None
 
 
 def register_base_model(cls):
@@ -208,6 +297,17 @@ class PretrainedModel(Layer, GenerationMixin):
                 resource_files[file_id] = full_file_name
             resource_files["model_config_file"] = os.path.join(
                 pretrained_model_name_or_path, cls.model_config_file)
+        elif exists_in_hf(pretrained_model_name_or_path):
+            for file_id, file_name in cls.resource_files_names.items():
+                if file_id == "model_state":
+                    full_file_name = hf_bucket_url(
+                        pretrained_model_name_or_path, "pytorch_model.bin")
+                else:
+                    full_file_name = hf_bucket_url(
+                        pretrained_model_name_or_path, file_name)
+                resource_files[file_id] = full_file_name
+            resource_files["model_config_file"] = hf_bucket_url(
+                pretrained_model_name_or_path, "config.json")
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
@@ -249,11 +349,17 @@ class PretrainedModel(Layer, GenerationMixin):
         # Did we saved some inputs and kwargs to reload ?
         model_config_file = resolved_resource_files.pop("model_config_file",
                                                         None)
-        if model_config_file is not None:
+        if model_config_file is None:
+            init_kwargs = init_configuration
+        elif model_config_file.endswith("model_config.json"):
             with io.open(model_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
         else:
-            init_kwargs = init_configuration
+            assert model_config_file.endswith("config.json")
+            derived_parameters_dict = inspect.signature(cls.__init__).parameters
+            init_kwargs = convert_config_from_hf(
+                model_config_file, derived_parameters_dict, cls.__name__)
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
@@ -292,6 +398,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
             base_args = base_arg.pop("init_args", ())
             base_kwargs = base_arg
+
         if cls == cls.base_model_class:
             # Update with newly provided args and kwargs for base model
             base_args = base_args if not args else args
@@ -318,11 +425,11 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
-        assert weight_path.endswith(
-            ".pdparams"), "suffix of weight must be .pdparams"
-
-        state_dict = paddle.load(weight_path)
-
+        if weight_path.endswith(".pdparams"):
+            state_dict = paddle.load(weight_path)
+        else:
+            # assert weight_path.endswith("pytorch_model.bin")
+            state_dict = convert_weight_from_hf(weight_path, cls.__name__)
         # Make sure we are able to load base models as well as derived models
         # (with heads)
         start_prefix = ""

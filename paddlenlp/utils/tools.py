@@ -15,6 +15,106 @@
 import numpy as np
 import paddle
 from .log import logger
+import os
+import pickle
+from typing import Any, Dict, Union
+from contextlib import closing, contextmanager
+
+MAGIC_NUMBER = 0x1950a86a20f9469cfc6c
+PROTOCOL_VERSION = 1001
+pickle_load_args = dict()
+pickle_load_args['encoding'] = 'utf-8'
+_package_registry = []
+
+
+def _maybe_decode_ascii(bytes_str: Union[bytes, str]) -> str:
+    # When using encoding='bytes' in Py3, some **internal** keys stored as
+    # strings in Py2 are loaded as bytes. This function decodes them with
+    # ascii encoding, one that Py3 uses by default.
+    #
+    # NOTE: This should only be used on internal keys (e.g., `typename` and
+    #       `location` in `persistent_load` below!
+    if isinstance(bytes_str, bytes):
+        return bytes_str.decode('ascii')
+    return bytes_str
+
+
+def default_restore_location(storage, location):
+    for _, _, fn in _package_registry:
+        result = fn(storage, location)
+        if result is not None:
+            return result
+    raise RuntimeError("don't know how to restore data location")
+
+
+def _cpu_deserialize(obj, location):
+    if location == 'cpu':
+        return obj
+
+
+def register_package(priority, tagger, deserializer):
+    queue_elem = (priority, tagger, deserializer)
+    _package_registry.append(queue_elem)
+    _package_registry.sort()
+
+
+register_package(10, 'cpu', _cpu_deserialize)
+
+
+def persistent_load(saved_id):
+    assert isinstance(saved_id, tuple)
+    typename = _maybe_decode_ascii(saved_id[0])
+    data = saved_id[1:]
+
+    if typename == 'storage':
+        data_type, root_key, location, size, view_metadata = data
+        location = _maybe_decode_ascii(location)
+        if root_key not in deserialized_objects:
+            obj = data_type(size)
+            obj._torch_load_uninitialized = True
+            deserialized_objects[root_key] = default_restore_location(obj,
+                                                                      location)
+        storage = deserialized_objects[root_key]
+        if view_metadata is not None:
+            view_key, offset, view_size = view_metadata
+            if view_key not in deserialized_objects:
+                deserialized_objects[view_key] = storage[offset:offset +
+                                                         view_size]
+            return deserialized_objects[view_key]
+        else:
+            return storage
+    else:
+        raise RuntimeError("Unknown saved id type: %s" % saved_id[0])
+
+
+deserialized_objects: Dict[int, Any] = {}
+
+
+def load(model_path):
+    with open(model_path, 'rb') as f:
+        f.seek(0)
+        magic_number = pickle.load(f, **pickle_load_args)
+        if magic_number != MAGIC_NUMBER:
+            raise RuntimeError("Invalid magic number; corrupt file?")
+        protocol_version = pickle.load(f, **pickle_load_args)
+        if protocol_version != PROTOCOL_VERSION:
+            raise RuntimeError("Invalid protocol version: %s" %
+                               protocol_version)
+
+        _sys_info = pickle.load(f, **pickle_load_args)
+        unpickler = pickle.Unpickler(f, **pickle_load_args)
+        unpickler.persistent_load = persistent_load
+        result = unpickler.load()
+
+        deserialized_storage_keys = pickle.load(f, **pickle_load_args)
+
+        offset = f.tell()
+        for key in deserialized_storage_keys:
+            assert key in deserialized_objects
+            deserialized_objects[key]._set_from_file(f, offset, True)
+            if offset is not None:
+                offset = f.tell()
+    return result
 
 
 def static_params_to_dygraph(model, static_tensor_dict):

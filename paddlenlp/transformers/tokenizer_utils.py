@@ -19,25 +19,24 @@ import copy
 import io
 import json
 import os
-import six
 import unicodedata
 from shutil import copyfile
-from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
-
-from paddle.utils import try_import
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.log import logger
+from collections import OrderedDict
+from typing import Optional, List
 from dataclasses import dataclass, field
 
+import six
+from paddle.utils import try_import
 try:
     from functools import lru_cache
 except ImportError:
     from backports.functools_lru_cache import lru_cache
 
+from ..utils.downloader import get_path_from_url, exists_in_hf, hf_bucket_url, COMMUNITY_MODEL_PREFIX
+from ..utils.env import MODEL_HOME
+from ..utils.log import logger
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
-from collections import OrderedDict
 
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
@@ -836,6 +835,7 @@ class PretrainedTokenizer(object):
 
                 - Name of built-in pretrained model
                 - Name of a community-contributed pretrained model.
+                - Name of a pretrained model from HF model hub.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
             *args (tuple): position arguments for model `__init__`. If provided,
@@ -864,6 +864,7 @@ class PretrainedTokenizer(object):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         vocab_files = {}
         init_configuration = {}
+
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
@@ -880,6 +881,15 @@ class PretrainedTokenizer(object):
                     vocab_files[file_id] = full_file_name
             vocab_files["tokenizer_config_file"] = os.path.join(
                 pretrained_model_name_or_path, cls.tokenizer_config_file)
+        # From HF model hub
+        elif exists_in_hf(pretrained_model_name_or_path):
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = hf_bucket_url(pretrained_model_name_or_path,
+                                               file_name)
+                vocab_files[file_id] = full_file_name
+            # Todo: deal with situation where tokenizer_config_file doesn't exist
+            vocab_files["tokenizer_config_file"] = hf_bucket_url(
+                pretrained_model_name_or_path, "tokenizer_config.json")
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
@@ -908,6 +918,8 @@ class PretrainedTokenizer(object):
                     resolved_vocab_files[file_id] = get_path_from_url(
                         file_path, default_root)
                 except RuntimeError as err:
+                    if file_id == "tokenizer_config_file":
+                        continue
                     logger.error(err)
                     raise RuntimeError(
                         f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"

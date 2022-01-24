@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 import sys
+import io
 import os.path as osp
 import shutil
 import json
@@ -24,7 +25,7 @@ import time
 import uuid
 import threading
 from collections import OrderedDict
-from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
+from typing import Optional
 
 try:
     from tqdm import tqdm
@@ -51,11 +52,15 @@ except:
             sys.stderr.write('\n')
 
 
+from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS, MODEL_HOME
 from .log import logger
 
 __all__ = ['get_weights_path_from_url']
 
 COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/transformers/community/"
+
+HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
+HUGGINGFACE_CO_PREFIX = HUGGINGFACE_CO_RESOLVE_ENDPOINT + "/{model_id}/resolve/{revision}/{filename}"
 
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 
@@ -98,6 +103,49 @@ nlp_models = OrderedDict((
      'https://bert-models.bj.bcebos.com/multi_cased_L-12_H-768_A-12.tar.gz'),
     ('BERT-zh-base',
      'https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz'), ))
+
+
+def exists_in_hf(pretrained_model_name_or_path):
+    config_file = hf_bucket_url(pretrained_model_name_or_path, "config.json")
+    default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+    try:
+        config_file_path = get_path_from_url(config_file, default_root)
+    except RuntimeError:
+        return False
+    return config_file_path
+
+
+def get_modeling_class(pretrained_model_name_or_path):
+    default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+    config_file = hf_bucket_url(pretrained_model_name_or_path, "config.json")
+    config_file_path = get_path_from_url(config_file, default_root)
+    with io.open(config_file_path, encoding="utf-8") as f:
+        init_kwargs = json.load(f)
+
+
+def hf_bucket_url(model_id: str,
+                  filename: str,
+                  subfolder: Optional[str]=None,
+                  revision: Optional[str]=None,
+                  mirror=None) -> str:
+    if subfolder is not None:
+        filename = f"{subfolder}/{filename}"
+
+    if mirror:
+        if mirror in ["tuna", "bfsu"]:
+            raise ValueError(
+                "The Tuna and BFSU mirrors are no longer available. Try removing the mirror argument."
+            )
+        legacy_format = "/" not in model_id
+        if legacy_format:
+            return f"{mirror}/{model_id}-{filename}"
+        else:
+            return f"{mirror}/{model_id}/{filename}"
+
+    if revision is None:
+        revision = "main"
+    return HUGGINGFACE_CO_PREFIX.format(
+        model_id=model_id, revision=revision, filename=filename)
 
 
 def is_url(path):
@@ -167,6 +215,8 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
 
     if ParallelEnv().local_rank % 8 == 0:
         if tarfile.is_tarfile(fullpath) or zipfile.is_zipfile(fullpath):
+            if fullpath.endswith("pytorch_model.bin"):
+                return fullpath
             fullpath = _decompress(fullpath)
 
     return fullpath
