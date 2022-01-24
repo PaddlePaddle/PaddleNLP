@@ -86,7 +86,7 @@ def import_main_class(module_path):
 def load_from_hf(path_or_read_func, name=None, splits=None, **kwargs):
     try:
         hf_datasets = load_hf_dataset(
-            path_or_read_func, name=name, split=splits)
+            path_or_read_func, name=name, split=splits, **kwargs)
     except FileNotFoundError:
         raise FileNotFoundError("Couldn't find the dataset script for '" +
                                 path_or_read_func +
