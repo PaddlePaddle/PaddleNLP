@@ -48,18 +48,18 @@ args = parser.parse_args()
 
 @paddle.no_grad()
 def batch_predict(
-        model, 
+        model,
         data_loader,
         rel_vocab,
         word_pad_index,
         word_bos_index,
-        word_eos_index,
-    ):
-    
+        word_eos_index, ):
+
     model.eval()
     arcs, rels = [], []
     for inputs in data_loader():
-        if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
+        if args.encoding_model.startswith(
+                "ernie") or args.encoding_model == "lstm-pe":
             words = inputs[0]
             words, feats = flat_words(words)
             s_arc, s_rel, words = model(words, feats)
@@ -68,17 +68,21 @@ def batch_predict(
             s_arc, s_rel, words = model(words, feats)
 
         mask = paddle.logical_and(
-            paddle.logical_and(words != word_pad_index, words != word_bos_index),
-            words != word_eos_index,
-        )
+            paddle.logical_and(words != word_pad_index,
+                               words != word_bos_index),
+            words != word_eos_index, )
 
         lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
-        arcs.extend(paddle.split(paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
-        rels.extend(paddle.split(paddle.masked_select(rel_preds, mask), lens.numpy().tolist()))
+        arcs.extend(
+            paddle.split(
+                paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
+        rels.extend(
+            paddle.split(
+                paddle.masked_select(rel_preds, mask), lens.numpy().tolist()))
 
     arcs = [[str(s) for s in seq.numpy().tolist()] for seq in arcs]
-    rels = [rel_vocab.to_tokens(seq.numpy().tolist()) for seq in rels]           
+    rels = [rel_vocab.to_tokens(seq.numpy().tolist()) for seq in rels]
 
     return arcs, rels
 
@@ -87,11 +91,14 @@ def do_predict(args):
     paddle.set_device(args.device)
 
     if args.encoding_model == "ernie-gram-zh":
-        tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
+        tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
+            args.encoding_model)
     elif args.encoding_model.startswith("ernie"):
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
+        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+            args.encoding_model)
     elif args.encoding_model == "lstm-pe":
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
+        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+            "ernie-1.0")
     else:
         tokenizer = None
 
@@ -119,22 +126,22 @@ def do_predict(args):
         vocabs=[word_vocab, feat_vocab, rel_vocab],
         encoding_model=args.encoding_model,
         feat=args.feat,
-        mode="test",
-    )
+        mode="test", )
 
     test_data_loader, buckets = create_dataloader(
         test_ds,
         batch_size=args.batch_size,
         mode="test",
         n_buckets=args.n_buckets,
-        trans_fn=trans_fn,
-    )
+        trans_fn=trans_fn, )
 
     # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
+        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+            args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
-        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
+        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
+            args.encoding_model)
     else:
         pretrained_model = None
 
@@ -147,9 +154,8 @@ def do_predict(args):
         n_words=n_words,
         pad_index=word_pad_index,
         eos_index=word_eos_index,
-        pretrained_model=pretrained_model,
-    )
-    
+        pretrained_model=pretrained_model, )
+
     # Load saved model parameters
     if os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -160,17 +166,17 @@ def do_predict(args):
 
     # Start predict
     pred_arcs, pred_rels = batch_predict(
-        model,         
+        model,
         test_data_loader,
-        rel_vocab, 
+        rel_vocab,
         word_pad_index,
         word_bos_index,
-        word_eos_index,
-    )
+        word_eos_index, )
 
     # Restore the order of sentences in the buckets
     if buckets:
-        indices = np.argsort(np.array([i for bucket in buckets.values() for i in bucket]))
+        indices = np.argsort(
+            np.array([i for bucket in buckets.values() for i in bucket]))
     else:
         indices = range(len(pred_arcs))
     pred_heads = [pred_arcs[i] for i in indices]
@@ -180,10 +186,12 @@ def do_predict(args):
         for res, head, rel in zip(test_ds_copy, pred_heads, pred_deprels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
-            res = '\n'.join('\t'.join(map(str, line)) for line in zip(*res.values())) + '\n'
-            out_file.write("{}\n".format(res)) 
+            res = '\n'.join('\t'.join(map(str, line))
+                            for line in zip(*res.values())) + '\n'
+            out_file.write("{}\n".format(res))
     out_file.close()
     print("Results saved!")
+
 
 if __name__ == "__main__":
     do_predict(args)

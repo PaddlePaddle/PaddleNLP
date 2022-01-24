@@ -29,10 +29,13 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
-    label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+    label_info = [
+        'toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate'
+    ]
 
     # Load pretrained model
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
+        "bert-base-uncased")
 
     model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 

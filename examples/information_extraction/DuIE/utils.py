@@ -42,12 +42,8 @@ def find_entity(text_raw, id_, predictions, tok_to_orig_start_index,
     return list(set(entity_list))
 
 
-def decoding(example_batch,
-             id2spo,
-             logits_batch,
-             seq_len_batch,
-             tok_to_orig_start_index_batch,
-             tok_to_orig_end_index_batch):
+def decoding(example_batch, id2spo, logits_batch, seq_len_batch,
+             tok_to_orig_start_index_batch, tok_to_orig_end_index_batch):
     """
     model output logits -> formatted spo (as in data set file)
     """

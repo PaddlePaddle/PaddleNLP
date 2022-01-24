@@ -44,6 +44,8 @@ Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 la
 
 安装命令：`pip install attrdict pyyaml`
 
+**注意：如果需要使用混合精度训练，需要使用基于 PaddlePaddle develop 分支编译的包。**
+
 ## 数据准备
 
 公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
