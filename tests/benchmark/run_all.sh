@@ -38,7 +38,7 @@ if [ ${mode_item} != "static" ] && [ ${mode_item} != "dygraph" ]; then
 fi
 profile="off"
 model_list=(gpt2 gpt3)
-fp_list=(fp16 fp32)
+fp_list=(fp16)
 
 for model_item in ${model_list[@]}
 do
