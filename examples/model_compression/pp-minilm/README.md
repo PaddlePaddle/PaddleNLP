@@ -67,9 +67,9 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 - 软件：CUDA 11.1, cuDNN 8.1, TensorRT 7.2, PaddlePaddle 2.2.2；
 - 实验配置：batch_size: 32, max_seq_len: 128；
 
-其中，除上表最后两行 PPMiniLM 裁剪 + 量化后的模型是对 INT8 模型进行预测，其余模型均基于 FP32 精度测试。
+其中，除上表最后两行 PP-MiniLM 裁剪 + 量化后的模型是对 INT8 模型进行预测，其余模型均基于 FP32 精度测试。
 
-4.PPMiniLM 模型除上表最后一行，均接入了 FasterTokenizer。从表中可以看出 FasterTokenizer 对模型的精度没有影响，裁剪、量化后的模型相对 BERT-base 的加速比从 5.36 倍加速到 8.88 倍。
+4.PP-MiniLM 模型除上表最后一行，均接入了 FasterTokenizer。从表中可以看出 FasterTokenizer 对模型的精度没有影响，裁剪、量化后的模型相对 BERT-base 的加速比从 5.36 倍加速到 8.88 倍。
 
 **方案流程**
 
@@ -317,7 +317,7 @@ cd ..
 
 #### 量化后模型精度
 
-经过量化后，CLUE 上各个任务上的精度如下表，对 PPMiniLM 进行量化后，精度比原 FP32 模型下降 0.19；对裁剪后的模型进行量化，精度几乎无损（-0.04）：
+经过量化后，CLUE 上各个任务上的精度如下表，对 PP-MiniLM 进行量化后，精度比原 FP32 模型下降 0.19；对裁剪后的模型进行量化，精度几乎无损（-0.04）：
 
 | NO   | Model                   | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | Avg   |
 | ---- | ----------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----- |
@@ -327,7 +327,7 @@ cd ..
 | 2    | PP-MiniLM 裁剪 + 量化后 | 74.00 | 57.37 | 61.33   | 81.09 | 75.56 | 85.85       | 78.57 | 73.40 |
 
 
-**NOTE：** 实验 1 是补充实验，PPMiniLM 和 实验 2 中裁剪前的 PPMiniLM 模型精度不同。
+**NOTE：** 实验 1 是补充实验，PP-MiniLM 和 实验 2 中裁剪前的 PP-MiniLM 模型精度不同。
 
 最后，值得注意的是，PP-MiniLM 是基于 `roberta-wwm-ext-large` 做教师模型蒸馏得到的学生模型，如果你有更好的 24 层中文预训练模型，可以基于[任务无关蒸馏文档](general_distill/README.md)中介绍的蒸馏过程，训练出一个比 PP-MiniLM 精度更高，在下游任务上表现更好的 6 层小模型。
 
