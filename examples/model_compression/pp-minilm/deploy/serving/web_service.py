@@ -23,9 +23,8 @@ _LOGGER = logging.getLogger()
 
 class PPMiniLMOp(Op):
     def init_op(self):
-        import paddlenlp as ppnlp
-        self.tokenizer = ppnlp.transformers.PPMiniLMTokenizer.from_pretrained(
-            'ppminilm-6l-768h')
+        from paddlenlp.transformers import PPMiniLMTokenizer
+        self.tokenizer = PPMiniLMTokenizer.from_pretrained('ppminilm-6l-768h')
 
     def preprocess(self, input_dicts, data_id, log_id):
         (_, input_dict), = input_dicts.items()

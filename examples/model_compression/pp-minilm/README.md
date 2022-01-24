@@ -18,10 +18,11 @@
             * [原理简介](#原理简介)
             * [运行方式](#运行方式)
             * [量化后模型精度](#量化后模型精度)
-        * [预测](#预测)
+        * [使用 Paddle Inference 预测](#使用PaddleInference预测)
             * [环境要求](#环境要求)
             * [运行方式](#运行方式)
             * [性能测试](#性能测试)
+        * [使用 Paddle Serving 预测](#使用PaddleServing预测)
     * [参考文献](#参考文献)
 
 <a name="PP-MiniLM中文小模型"></a>
@@ -316,9 +317,9 @@ cd ..
 
 最后，值得注意的是，PP-MiniLM 是基于 `roberta-wwm-ext-large` 做教师模型蒸馏得到的学生模型，如果你有更好的 24 层中文预训练模型，可以基于[任务无关蒸馏文档](general_distill/README.md)中介绍的蒸馏过程，训练出一个比 PP-MiniLM 精度更高，在下游任务上表现更好的 6 层小模型。
 
-<a name="预测"></a>
+<a name="使用PaddleInference预测"></a>
 
-### 预测
+### 使用 Paddle Inference 进行预测
 
 预测部署借助 PaddlePaddle 安装包中自带的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 进行预测。
 
@@ -384,6 +385,12 @@ cd ..
 | PP-MiniLM 裁剪后        | 7.45042658  | 2.60x  |
 | PP-MiniLM 裁剪 + 量化后 | 2.1215384   | 9.26x  |
 
+
+<a name="使用PaddleServing预测"></a>
+
+### 使用 Paddle Serving 进行预测
+
+上面介绍的 Paddle Inference 为使用本地模型推理，Paddle Serving 可以实现在服务器端部署推理模型，客户端远程通过 RPC/HTTP 方式发送数据进行推理，实现模型推理的服务化。准备好静态图（推理模型）后，可参考 [Paddle Serving](deploy/serving/README.md) 推理步骤。
 
 <a name="参考文献"></a>
 
