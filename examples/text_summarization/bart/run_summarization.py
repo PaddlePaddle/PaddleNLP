@@ -220,10 +220,10 @@ def do_train(args):
     train_batch_sampler = DistributedBatchSampler(
         train_set, batch_size=args.train_batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(),  # input_ids
-        Stack(),  # attention mask
-        Stack(),  # decoder_input_ids
-        Stack(),  # labels
+        Stack(dtype="int64"),  # input_ids
+        Stack(dtype="int64"),  # attention mask
+        Stack(dtype="int64"),  # decoder_input_ids
+        Stack(dtype="int64"),  # labels
     ): fn(samples)
     train_data_loader = DataLoader(
         dataset=train_set,

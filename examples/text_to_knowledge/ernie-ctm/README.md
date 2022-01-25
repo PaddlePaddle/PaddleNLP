@@ -119,11 +119,20 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 
 ## 自定义模型一键预测
 
-Taskflow支持加载增量训练后的模型进行一键预测，通过`params_path`指定模型路径，通过`tag_path`指定标签文件路径即可
+Taskflow支持加载增量训练后的模型进行一键预测，通过`task_path`定义用户自定义路径即可。
+
+文件组成：
+```text
+custom_task_path/
+├── model_state.pdparams
+├── model_config.json
+└── tags.txt
+```
+
 ```shell
 from paddlenlp import Taskflow
 
-my_wordtag = Taskflow("knowledge_mining", params_path="./output/model_300/model_state.pdparams", tag_path="./data/tags.txt")
+my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")
 
 my_wordtag("美人鱼是周星驰执导的一部电影")
 # [{'text': '美人鱼是周星驰执导的一部电影', 'items': [{'item': '美人鱼', 'offset': 0, 'wordtag_label': '作品类_实体', 'length': 3, 'termid': '作品与出版物_eb_美人鱼'}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '周星驰', 'offset': 4, 'wordtag_label': '人物类_实体', 'length': 3, 'termid': '人物_eb_周星驰'}, {'item': '执导', 'offset': 7, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_执导'}, {'item': '的', 'offset': 9, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '一部', 'offset': 10, 'wordtag_label': '数量词', 'length': 2}, {'item': '电影', 'offset': 12, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '影视作品_cb_电影'}]}]

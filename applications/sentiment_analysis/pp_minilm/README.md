@@ -2,7 +2,7 @@
 
 本项目中，无论是评论观点抽取模型，还是属性级情感分类模型，使用的均是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，所以本项目提供了开源小模型 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 及量化加速方案，大幅提升预测性能。
 
-在本项目中，我们基于 PP-MiniLM 中文特色小模型进行 fine-tune 属性级情感分类模型，然后使用 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型量化，减小模型规模，加快模型预测性能。 
+在本项目中，我们基于 PP-MiniLM 中文特色小模型进行 fine-tune 属性级情感分类模型，然后使用 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型量化，减小模型规模，加快模型预测性能。
 
 ## 1. 基于 PP-MiniLM 训练属性级情感分类模型
 
