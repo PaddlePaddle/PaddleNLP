@@ -158,7 +158,8 @@ def do_train(args):
         amp_level = 'O2' if args.use_pure_fp16 else 'O1'
         scaler = paddle.amp.GradScaler(
             enable=True, init_loss_scaling=args.scale_loss)
-        transformer = paddle.amp.decorate(models=transformer, level=amp_level)
+        transformer = paddle.amp.decorate(
+            models=transformer, level=amp_level, save_dtype='float32')
 
     # for distributed training
     if trainer_count > 1:
