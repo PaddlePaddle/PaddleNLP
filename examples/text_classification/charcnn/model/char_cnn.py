@@ -9,33 +9,47 @@ class CharCNN(paddle.nn.Layer):
         hidden_dim = 256 if is_small else 1024
         output_dim = 1024 if is_small else 2048
         self.conv1 = nn.Sequential(
-            nn.Conv1D(num_features, hidden_dim, kernel_size=7, stride=1),
-            nn.ReLU(), nn.MaxPool1D(kernel_size=3, stride=3))
+            nn.Conv1D(
+                num_features, hidden_dim, kernel_size=7, stride=1),
+            nn.ReLU(),
+            nn.MaxPool1D(
+                kernel_size=3, stride=3))
         self.conv2 = nn.Sequential(
-            nn.Conv1D(hidden_dim, hidden_dim, kernel_size=7, stride=1),
-            nn.ReLU(), nn.MaxPool1D(kernel_size=3, stride=3))
+            nn.Conv1D(
+                hidden_dim, hidden_dim, kernel_size=7, stride=1),
+            nn.ReLU(),
+            nn.MaxPool1D(
+                kernel_size=3, stride=3))
 
         self.conv3 = nn.Sequential(
-            nn.Conv1D(hidden_dim, hidden_dim, kernel_size=3, stride=1),
+            nn.Conv1D(
+                hidden_dim, hidden_dim, kernel_size=3, stride=1),
             nn.ReLU())
 
         self.conv4 = nn.Sequential(
-            nn.Conv1D(hidden_dim, hidden_dim, kernel_size=3, stride=1),
+            nn.Conv1D(
+                hidden_dim, hidden_dim, kernel_size=3, stride=1),
             nn.ReLU())
 
         self.conv5 = nn.Sequential(
-            nn.Conv1D(hidden_dim, hidden_dim, kernel_size=3, stride=1),
+            nn.Conv1D(
+                hidden_dim, hidden_dim, kernel_size=3, stride=1),
             nn.ReLU())
 
         self.conv6 = nn.Sequential(
-            nn.Conv1D(hidden_dim, hidden_dim, kernel_size=3, stride=1),
-            nn.ReLU(), nn.MaxPool1D(kernel_size=3, stride=3))
+            nn.Conv1D(
+                hidden_dim, hidden_dim, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.MaxPool1D(
+                kernel_size=3, stride=3))
 
-        self.fc1 = nn.Sequential(nn.Linear(hidden_dim * 34, output_dim),
-                                 nn.ReLU(), nn.Dropout(p=dropout))
+        self.fc1 = nn.Sequential(
+            nn.Linear(hidden_dim * 34, output_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout))
 
-        self.fc2 = nn.Sequential(nn.Linear(output_dim, output_dim), nn.ReLU(),
-                                 nn.Dropout(p=dropout))
+        self.fc2 = nn.Sequential(
+            nn.Linear(output_dim, output_dim), nn.ReLU(), nn.Dropout(p=dropout))
 
         self.fc3 = nn.Linear(output_dim, num_classes)
         self.log_softmax = nn.LogSoftmax()

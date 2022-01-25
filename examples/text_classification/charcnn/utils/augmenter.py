@@ -8,6 +8,7 @@ class GeometricSynonymAug(SynonymAug):
     """
     Augmenter that leverage semantic meaning to substitute word, using geometric distribution to sample.
     """
+
     def _get_geometric_num(self, max_num=None, p=0.5):
         assert max_num is None or max_num > 0
         num = np.random.geometric(p)
@@ -66,7 +67,8 @@ class GeometricSynonymAug(SynonymAug):
             else:
                 for word_pos in word_poses:
                     candidates.extend(
-                        self.model.predict(pos[aug_idx][0], pos=word_pos))
+                        self.model.predict(
+                            pos[aug_idx][0], pos=word_pos))
 
             candidates = [
                 c for c in candidates if c.lower() != original_token.lower()
@@ -79,22 +81,22 @@ class GeometricSynonymAug(SynonymAug):
                     original_token=pos[aug_idx][0])  # the only line changed
                 candidate = candidate.replace("_", " ").replace("-",
                                                                 " ").lower()
-                substitute_token = self.align_capitalization(
-                    original_token, candidate)
+                substitute_token = self.align_capitalization(original_token,
+                                                             candidate)
 
                 if aug_idx == 0:
                     substitute_token = self.align_capitalization(
                         original_token, substitute_token)
 
                 change_seq += 1
-                doc.add_change_log(aug_idx,
-                                   new_token=substitute_token,
-                                   action=Action.SUBSTITUTE,
-                                   change_seq=self.parent_change_seq +
-                                   change_seq)
+                doc.add_change_log(
+                    aug_idx,
+                    new_token=substitute_token,
+                    action=Action.SUBSTITUTE,
+                    change_seq=self.parent_change_seq + change_seq)
 
         if self.include_detail:
-            return self.reverse_tokenizer(
-                doc.get_augmented_tokens()), doc.get_change_logs()
+            return self.reverse_tokenizer(doc.get_augmented_tokens(
+            )), doc.get_change_logs()
         else:
             return self.reverse_tokenizer(doc.get_augmented_tokens())
