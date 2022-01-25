@@ -4,7 +4,6 @@ import paddle.nn as nn
 
 
 class CharCNN(paddle.nn.Layer):
-
     def __init__(self, num_features, num_classes, dropout, is_small=False):
         super(CharCNN, self).__init__()
         hidden_dim = 256 if is_small else 1024

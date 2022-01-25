@@ -8,7 +8,6 @@ class GeometricSynonymAug(SynonymAug):
     """
     Augmenter that leverage semantic meaning to substitute word, using geometric distribution to sample.
     """
-
     def _get_geometric_num(self, max_num=None, p=0.5):
         assert max_num is None or max_num > 0
         num = np.random.geometric(p)

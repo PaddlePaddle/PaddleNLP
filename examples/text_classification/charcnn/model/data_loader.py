@@ -12,7 +12,6 @@ from utils.augmenter import GeometricSynonymAug
 
 
 class AGNEWs(Dataset):
-
     def __init__(self,
                  label_data_path,
                  alphabet_path,
