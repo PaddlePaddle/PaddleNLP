@@ -76,13 +76,14 @@ if __name__ == '__main__':
 
     # load testing data
     print("\nLoading testing data...")
-    test_dataset = AGNEWs(label_data_path=args.test_path,
-                          alphabet_path=args.alphabet_path)
+    test_dataset = AGNEWs(
+        label_data_path=args.test_path, alphabet_path=args.alphabet_path)
     print("Transferring testing data to iterator...")
-    test_loader = DataLoader(test_dataset,
-                             batch_size=args.batch_size,
-                             num_workers=args.num_workers,
-                             drop_last=True)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        drop_last=True)
 
     _, num_class_test = test_dataset.getClassWeight()
     print('\nNumber of testing samples: ' + str(test_dataset.__len__()))
@@ -90,8 +91,8 @@ if __name__ == '__main__':
         print("\tLabel {:d}:".format(i).ljust(15) + "{:d}".format(c).rjust(8))
 
     args.num_features = len(test_dataset.alphabet)
-    model = CharCNN(args.num_features, len(num_class_test), args.dropout,
-                    args.is_small)
+    model = CharCNN(args.num_features,
+                    len(num_class_test), args.dropout, args.is_small)
     print("=> loading weights from '{}'".format(args.model_path))
     assert os.path.isfile(
         args.model_path), "=> no checkpoint found at '{}'".format(
@@ -113,14 +114,13 @@ if __name__ == '__main__':
         predicates = paddle.argmax(logit, 1)
         accumulated_loss += F.nll_loss(logit, target).numpy()[0]
 
-        corrects += paddle.to_tensor((paddle.argmax(logit, 1) == target),
-                                     dtype='int64').sum().numpy()[0]
+        corrects += paddle.to_tensor(
+            (paddle.argmax(logit, 1) == target), dtype='int64').sum().numpy()[0]
         predicates_all += predicates.cpu().numpy().tolist()
         target_all += target.cpu().numpy().tolist()
 
     avg_loss = accumulated_loss / size
     accuracy = 100.0 * corrects / size
-    print(
-        '\rEvaluation - loss: {:.6f}  acc: {:.2f}%({}/{}) error: {:.2f}'.format(
-            avg_loss, accuracy, corrects, size, 100 - accuracy))
+    print('\rEvaluation - loss: {:.6f}  acc: {:.2f}%({}/{}) error: {:.2f}'.
+          format(avg_loss, accuracy, corrects, size, 100 - accuracy))
     print_f_score(predicates_all, target_all)
