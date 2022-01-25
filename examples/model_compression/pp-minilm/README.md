@@ -394,15 +394,14 @@ cd ..
 
 取 5 个测试时长取平均，可以发现裁剪、量化后的模型是原 BERT<sub>base</sub> 模型推理速度的 8.88 倍，其中只经过裁剪后的模型是 BERT<sub>base</sub> 推理速度的 2.74 倍，只经过量化后的模型是 BERT<sub>base</sub> 推理速度的 7.34 倍，接入 FasterTokenizer 前，裁剪、量化后的推理速度是原 BERT<sub>base</sub> 模型推理速度的 5.36 倍。
 
-|                                           | 平均耗时(s) | 加速比    |
-| ----------------------------------------- | ----------- | --------- |
-| BERT<sub>base</sub>                       | 18.97986    | 1.00x     |
-| PP-MiniLM                                 | 8.82121     | 2.15x     |
-| PP-MiniLM 量化后                          | 2.58599     | 7.34x     |
-| PP-MiniLM 裁剪后                          | 6.92274     | 2.74x     |
-| PP-MiniLM 裁剪 + 量化后                   | 2.13698     | **8.88x** |
-| PP-MiniLM 裁剪 + 量化后 - FasterTokenizer | 3.54076     | 5.36x     |
-
+|                                          | 平均耗时(s) | 加速比    |
+| ---------------------------------------- | ----------- | --------- |
+| BERT<sub>base</sub>                      | 18.97986    | 1.00x     |
+| PP-MiniLM + FasterTokenizer              | 8.82121     | 2.15x     |
+| PP-MiniLM  + FasterTokenizer 量化后      | 2.58599     | 7.34x     |
+| PP-MiniLM + FasterTokenizer 裁剪后       | 6.92274     | 2.74x     |
+| PP-MiniLM + FasterTokenizer 裁剪、量化后 | 2.13698     | **8.88x** |
+| PP-MiniLM 裁剪 + 量化后                  | 3.54076     | 5.36x     |
 
 <a name="参考文献"></a>
 
