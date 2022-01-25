@@ -51,6 +51,12 @@ def compile_helper():
 
 
 class BlendableDataset(paddle.io.Dataset):
+    """
+    The BlendableDataset is a wrapper which used to mix different dataset.
+    
+    The input is a list of dataset and corresponding weights for each dataset.
+    """
+
     def __init__(self, datasets, weights):
 
         self.datasets = datasets
@@ -473,11 +479,12 @@ def create_masked_lm_predictions(tokens,
             output_tokens[index] = masked_token
             masked_lms.append(
                 MaskedLmInstance(
-                    index=index, label=tokens[index]))
+                    index=index, label=backup_output_tokens[index]))
 
         masked_spans.append(
             MaskedLmInstance(
-                index=index_set, label=[tokens[index] for index in index_set]))
+                index=index_set,
+                label=[backup_output_tokens[index] for index in index_set]))
 
     assert len(masked_lms) <= num_to_predict
     np_rng.shuffle(ngram_indexes)
