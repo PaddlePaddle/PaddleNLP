@@ -77,11 +77,17 @@ def evaluate(model, criterion, metric, data_loader, label_num):
 def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
     texts, labels, seq_lens = [], [], []
     batch_max_seq = max([len(example["tokens"]) for example in batch])
-    batch_max_seq = min(batch_max_seq, max_seq_len)
+    #  Truncation: Handle max sequence length
+    #  If max_seq_len == 0, then do nothing and keep the real length.
+    #  If max_seq_len > 0 and
+    #  all the input sequence len is over the max_seq_len,
+    #  then we truncate it.
+    if max_seq_len > 0:
+        batch_max_seq = min(batch_max_seq, max_seq_len)
     for example in batch:
         texts.append("".join(example["tokens"]))
         label = example["labels"]
-        if len(label) > max_seq_len - 2:
+        if len(label) > max_seq_len - 2 and max_seq_len > 0:
             label = label[:(max_seq_len - 2)]
         label = [no_entity_id] + label + [no_entity_id]
         seq_lens.append(len(label))
