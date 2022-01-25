@@ -12,7 +12,13 @@ from utils.augmenter import GeometricSynonymAug
 
 
 class AGNEWs(Dataset):
-    def __init__(self, label_data_path, alphabet_path, l0=1014, data_augment=False, geo_aug=False):
+
+    def __init__(self,
+                 label_data_path,
+                 alphabet_path,
+                 l0=1014,
+                 data_augment=False,
+                 geo_aug=False):
         """Create AG's News dataset object.
 
         Arguments:
@@ -27,7 +33,8 @@ class AGNEWs(Dataset):
         self.load(label_data_path)
         self.data_augment = data_augment
         if self.data_augment:
-            self.aug = GeometricSynonymAug(aug_src='wordnet') if geo_aug else SynonymAug(aug_src='wordnet')
+            self.aug = GeometricSynonymAug(
+                aug_src='wordnet') if geo_aug else SynonymAug(aug_src='wordnet')
 
     def __len__(self):
         return len(self.label)
@@ -74,7 +81,9 @@ class AGNEWs(Dataset):
         num_samples = self.__len__()
         label_set = set(self.label)
         num_class = [self.label.count(c) for c in label_set]
-        class_weight = [num_samples / float(self.label.count(c)) for c in label_set]
+        class_weight = [
+            num_samples / float(self.label.count(c)) for c in label_set
+        ]
         return class_weight, num_class
 
     def dataAugment(self, text: str):

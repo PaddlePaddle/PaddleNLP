@@ -28,14 +28,13 @@ class GeometricSynonymAug(SynonymAug):
         :return: sampled word: str
         """
         word_list = list(set(word_list))
-
         """every synonym to a word or phrase is ranked by the semantic closeness to the most frequently seen meaning"""
         original_meaning = self.model.model.synsets(original_token)[0]
         closeness = {}
         for word in word_list:
-            closeness[word] = self.model.model.synsets(word)[0].wup_similarity(original_meaning)
+            closeness[word] = self.model.model.synsets(word)[0].wup_similarity(
+                original_meaning)
         word_list = sorted(word_list, key=lambda x: closeness[x], reverse=True)
-
         """The index s of the synonym chosen given a word is also determined by a another geometric distribution"""
         s = self._get_geometric_num(len(word_list))
         return word_list[s - 1]
@@ -67,24 +66,36 @@ class GeometricSynonymAug(SynonymAug):
                 candidates.extend(self.model.predict(pos[aug_idx][0]))
             else:
                 for word_pos in word_poses:
-                    candidates.extend(self.model.predict(pos[aug_idx][0], pos=word_pos))
+                    candidates.extend(
+                        self.model.predict(pos[aug_idx][0], pos=word_pos))
 
-            candidates = [c for c in candidates if c.lower() != original_token.lower()]
+            candidates = [
+                c for c in candidates if c.lower() != original_token.lower()
+            ]
 
             if len(candidates) > 0:
                 # candidate = self.sample(candidates, 1)[0]
-                candidate = self.geometric_sample(candidates, original_token=pos[aug_idx][0])  # the only line changed
-                candidate = candidate.replace("_", " ").replace("-", " ").lower()
-                substitute_token = self.align_capitalization(original_token, candidate)
+                candidate = self.geometric_sample(
+                    candidates,
+                    original_token=pos[aug_idx][0])  # the only line changed
+                candidate = candidate.replace("_", " ").replace("-",
+                                                                " ").lower()
+                substitute_token = self.align_capitalization(
+                    original_token, candidate)
 
                 if aug_idx == 0:
-                    substitute_token = self.align_capitalization(original_token, substitute_token)
+                    substitute_token = self.align_capitalization(
+                        original_token, substitute_token)
 
                 change_seq += 1
-                doc.add_change_log(aug_idx, new_token=substitute_token, action=Action.SUBSTITUTE,
-                                   change_seq=self.parent_change_seq + change_seq)
+                doc.add_change_log(aug_idx,
+                                   new_token=substitute_token,
+                                   action=Action.SUBSTITUTE,
+                                   change_seq=self.parent_change_seq +
+                                   change_seq)
 
         if self.include_detail:
-            return self.reverse_tokenizer(doc.get_augmented_tokens()), doc.get_change_logs()
+            return self.reverse_tokenizer(
+                doc.get_augmented_tokens()), doc.get_change_logs()
         else:
             return self.reverse_tokenizer(doc.get_augmented_tokens())
