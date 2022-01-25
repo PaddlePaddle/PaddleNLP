@@ -13,7 +13,7 @@ Paddle Serving 可以实现在服务器端部署推理模型，客户端远程�
 
 ## 环境要求
 
-使用 Paddle Serving 需要在服务器端安装相关模块：
+使用 Paddle Serving 需要在服务器端安装相关模块，需要 v0.8.0 之后的版本：
 ```shell
 pip install paddle-serving-app paddle-serving-client paddle-serving-server paddlepaddle
 ```
@@ -24,14 +24,14 @@ pip install paddle-serving-app paddle-serving-client paddle-serving-server paddl
 pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu paddlepaddle-gpu
 ```
 
-还需要在客户端安装相关模块：
+还需要在客户端安装相关模块，也需要 v0.8.0 之后的版本：
 ```shell
 pip install paddle-serving-app paddle-serving-client
 ```
 
 ## 从 Inference 模型生成 Serving 模型和配置
 
-以前提条件中准备好的Inference模型 `ppminilm.pdmodel`、`ppminilm.pdiparams` 为例：
+以前提条件中准备好的 Inference 模型 `ppminilm.pdmodel`、`ppminilm.pdiparams` 为例：
 
 ```shell
 python export_to_serving.py \
@@ -52,7 +52,7 @@ python export_to_serving.py \
 - `fetch_alias_names`: 模型输出的别名设置，比如输入的 input_ids 等，都可以指定成其他名字，默认不指定。
 - `feed_alias_names`: 模型输入的别名设置，比如输出 pooled_out 等，都可以重新指定成其他名字，默认不指定。
 
-执行命令后，会在当前目录下生成2个目录：serving_server 和 serving_client。serving_server 目录包含服务器端所需的模型和配置，需将其拷贝到服务器端；serving_client 目录包含客户端所需的配置，需将其拷贝到客户端。
+执行命令后，会在当前目录下生成 2 个目录：serving_server 和 serving_client。serving_server 目录包含服务器端所需的模型和配置，需将其拷贝到服务器端；serving_client 目录包含客户端所需的配置，需将其拷贝到客户端。
 
 
 ## 配置 config 文件
