@@ -56,7 +56,7 @@ class NLPCC13EVSAM05THU(DatasetBuilder):
             os.path.join('nlpcc13_evsam05_thu', 'test.conll'),
             '873223b42060ce16a7e24545e43a933f'),
     }
-    
+
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
@@ -74,14 +74,15 @@ class NLPCC13EVSAM05THU(DatasetBuilder):
             lines = []
             for line in f.readlines():
                 if not line.startswith(" "):
-                    if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
+                    if not line.startswith('#') and (len(line) == 1 or
+                                                     line.split()[0].isdigit()):
                         lines.append(line.strip())
                 else:
                     lines.append("")
 
         for i, line in enumerate(lines):
             if not line:
-                values = list(zip(*[j.split('\t') for j in lines[start:i]]))
+                values = list(zip(* [j.split('\t') for j in lines[start:i]]))
 
                 ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
                 if values:
@@ -89,10 +90,10 @@ class NLPCC13EVSAM05THU(DatasetBuilder):
                         "ID": ID,
                         "FORM": FORM,
                         "LEMMA": LEMMA,
-                        "CPOS": CPOS, 
+                        "CPOS": CPOS,
                         "POS": POS,
                         "FEATS": FEATS,
-                        "HEAD": HEAD, 
+                        "HEAD": HEAD,
                         "DEPREL": DEPREL,
-                    }  
-                start = i + 1                
+                    }
+                start = i + 1

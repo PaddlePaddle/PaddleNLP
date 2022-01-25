@@ -230,11 +230,13 @@ class Predictor(object):
             self.autolog.times.start()
 
         examples = []
-        for idx,text in enumerate(data):
-            input_ids, segment_ids = convert_example(
-                {idx:text[0]}, tokenizer)
-            title_ids,title_segment_ids=convert_example({idx:text[1]},tokenizer)
-            examples.append((input_ids, segment_ids,title_ids,title_segment_ids))
+        for idx, text in enumerate(data):
+            input_ids, segment_ids = convert_example({idx: text[0]}, tokenizer)
+            title_ids, title_segment_ids = convert_example({
+                idx: text[1]
+            }, tokenizer)
+            examples.append(
+                (input_ids, segment_ids, title_ids, title_segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
@@ -246,7 +248,8 @@ class Predictor(object):
         if args.benchmark:
             self.autolog.times.stamp()
 
-        query_ids, query_segment_ids,title_ids, title_segment_ids = batchify_fn(examples)
+        query_ids, query_segment_ids, title_ids, title_segment_ids = batchify_fn(
+            examples)
         self.input_handles[0].copy_from_cpu(query_ids)
         self.input_handles[1].copy_from_cpu(query_segment_ids)
         self.predictor.run()
@@ -259,10 +262,13 @@ class Predictor(object):
 
         if args.benchmark:
             self.autolog.times.stamp()
-            
+
         if args.benchmark:
             self.autolog.times.end(stamp=True)
-        result=[float(1 - spatial.distance.cosine(arr1, arr2)) for arr1, arr2 in zip(query_logits, title_logits)]
+        result = [
+            float(1 - spatial.distance.cosine(arr1, arr2))
+            for arr1, arr2 in zip(query_logits, title_logits)
+        ]
         return result
 
 
@@ -277,10 +283,10 @@ if __name__ == "__main__":
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
-    res=predictor.extract_embedding(corpus_list, tokenizer)
+    res = predictor.extract_embedding(corpus_list, tokenizer)
     print(res.shape)
     print(res)
-    corpus_list=[['中西方语言与文化的差异','中西方文化差异以及语言体现中西方文化,差异,语言体现'],
-                    ['中西方语言与文化的差异','飞桨致力于让深度学习技术的创新与应用更简单']]
-    res=predictor.predict(corpus_list,tokenizer)
+    corpus_list = [['中西方语言与文化的差异', '中西方文化差异以及语言体现中西方文化,差异,语言体现'],
+                   ['中西方语言与文化的差异', '飞桨致力于让深度学习技术的创新与应用更简单']]
+    res = predictor.predict(corpus_list, tokenizer)
     print(res)

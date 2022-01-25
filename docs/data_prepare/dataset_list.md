@@ -54,8 +54,9 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [XNLI_CN](https://github.com/facebookresearch/XNLI) | 中文自然语言推理数据集（XNLI的子集），三分类任务. | `paddlenlp.datasets.load_dataset('xnli_cn')`|
 
 ## 文本匹配
-|  数据集名称   | 简介 | 调用方法 |
-|  ----  | --------- | ------ |
+
+|  数据集名称   | 简介 | 调用方法 |  
+|  ----  | --------- | ------ |  
 | [CAIL2019-SCM](https://github.com/china-ai-law-challenge/CAIL2019/tree/master/scm) | 相似法律案例匹配  | `paddlenlp.datasets.load_dataset('cail2019_scm')` |
 
 ## 序列标注
@@ -64,6 +65,7 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  ----  | --------- | ------ |
 |  [MSRA_NER](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra) | MSRA 命名实体识别数据集| `paddlenlp.datasets.load_dataset('msra_ner')`|
 |  [People's Daily](https://github.com/OYE93/Chinese-NLP-Corpus/tree/master/NER/People's%20Daily) | 人民日报命名实体识别数据集| `paddlenlp.datasets.load_dataset('peoples_daily_ner')`|
+|  [CoNLL-2002](https://www.aclweb.org/anthology/W02-2024/) | 西班牙语和荷兰语实体识别数据集| `paddlenlp.datasets.load_dataset('conll2002', 'es')`|
 
 
 ## 机器翻译

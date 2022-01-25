@@ -105,7 +105,8 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         eval_steps += 1
         input_ids, seq_len, tok_to_orig_start_index, tok_to_orig_end_index, labels = batch
         logits = model(input_ids=input_ids)
-        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and((input_ids != 2))
+        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and(
+            (input_ids != 2))
         loss = criterion(logits, labels, mask)
         loss_all += loss.numpy().item()
         probs = F.sigmoid(logits)
@@ -113,13 +114,11 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         seq_len_batch = seq_len.numpy()
         tok_to_orig_start_index_batch = tok_to_orig_start_index.numpy()
         tok_to_orig_end_index_batch = tok_to_orig_end_index.numpy()
-        formatted_outputs.extend(decoding(example_all[current_idx: current_idx+len(logits)],
-                                          id2spo,
-                                          logits_batch,
-                                          seq_len_batch,
-                                          tok_to_orig_start_index_batch,
-                                          tok_to_orig_end_index_batch))
-        current_idx = current_idx+len(logits)
+        formatted_outputs.extend(
+            decoding(example_all[current_idx:current_idx + len(logits)], id2spo,
+                     logits_batch, seq_len_batch, tok_to_orig_start_index_batch,
+                     tok_to_orig_end_index_batch))
+        current_idx = current_idx + len(logits)
     loss_avg = loss_all / eval_steps
     print("eval loss: %f" % (loss_avg))
 
@@ -222,7 +221,7 @@ def do_train():
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
             global_step += 1
-            
+
             if global_step % logging_steps == 0 and rank == 0:
                 print(
                     "epoch: %d / %d, steps: %d / %d, loss: %f, speed: %.2f step/s"
@@ -264,7 +263,7 @@ def do_train():
 
 def do_predict():
     paddle.set_device(args.device)
-    
+
     # Reads label_map.
     label_map_path = os.path.join(args.data_path, "predicate2id.json")
     if not (os.path.exists(label_map_path) and os.path.isfile(label_map_path)):

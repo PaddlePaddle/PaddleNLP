@@ -54,10 +54,30 @@ class NERTask(WordTagTask):
 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+        "tags": "tags.txt",
+    }
+    resource_files_urls = {
+        "wordtag": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
+                "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
+                "aa47cdf7c270943a24495bd5ff59dc00"
+            ],
+            "tags": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
+                "87db06ae6ca42565157045ab3e9a996f"
+            ],
+        }
+    }
+
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._user_dict = self.kwargs[
-            'user_dict'] if 'user_dict' in self.kwargs else None
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -82,7 +102,8 @@ class NERTask(WordTagTask):
                     partial_word = sent[ind]
                     tags_out.append(tag.split('-')[1])
                     continue
-                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith(
+                        "O"):
                     sent_out.append(partial_word)
                     tags_out.append(tag.split('-')[1])
                     partial_word = sent[ind]

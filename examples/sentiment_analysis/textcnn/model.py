@@ -60,4 +60,3 @@ class TextCNNModel(nn.Layer):
         # Shape: (batch_size, num_classes)
         logits = self.output_layer(fc_out)
         return logits
-        

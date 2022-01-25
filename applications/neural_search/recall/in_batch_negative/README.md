@@ -91,15 +91,20 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 |—— export_model.py # 动态图转换成静态图
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本
-    |—— predict.sh  # 预测bash版本
-    |—— evaluate.sh # 评估bash版本
-    |—— run_build_index.sh # 构建索引bash版本
-    |—— train_batch_neg.sh  # 训练bash版本
+    |—— predict.sh  # 预测 bash 版本
+    |—— evaluate.sh # 评估 bash 版本
+    |—— run_build_index.sh # 构建索引 bash 版本
+    |—— train_batch_neg.sh  # 训练 bash 版本
+    |—— export_to_serving.sh  # Paddle Inference 转 Serving 的 bash 脚本
 |—— deploy
     |—— python
         |—— predict.py # PaddleInference
-        |—— deploy.sh # Paddle Inference部署脚本
+        |—— deploy.sh # Paddle Inference 部署脚本
+        |—— rpc_client.py # Paddle Serving 的 Client 端
+        |—— web_service.py # Paddle Serving 的 Serving 端
+        |—— config_nlp.yml # Paddle Serving 的配置文件
 |—— inference.py # 动态图抽取向量
+|—— export_to_serving.py # 静态图转 Serving
 
 ```
 
@@ -237,7 +242,7 @@ c. 获取Query的Embedding并查询相似结果
 
 d. 评估
 
-基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50。
+基于评估集 `dev.csv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50。
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
@@ -267,7 +272,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
 * `hnsw_ef`: hnsw 算法相关参数，保持默认即可
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `recall_num`: 对 1 个文本召回的相似文本数量
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
 
 也可以使用下面的bash脚本：
@@ -446,6 +451,71 @@ sh deploy.sh
 
 [0.959269642829895, 0.04725276678800583]
 ```
+
+### Paddle Serving部署
+
+Paddle Serving 的详细文档请参考 [Pipeline_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Python_Pipeline/Pipeline_Design_CN.md)和[Serving_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Serving_Design_CN.md),首先把静态图模型转换成Serving的格式：
+
+```
+python export_to_serving.py \
+    --dirname "output" \
+    --model_filename "inference.get_pooled_embedding.pdmodel" \
+    --params_filename "inference.get_pooled_embedding.pdiparams" \
+    --server_path "./serving_server" \
+    --client_path "./serving_client" \
+    --fetch_alias_names "output_embedding"
+
+```
+
+参数含义说明
+* `dirname`: 需要转换的模型文件存储路径，Program 结构文件和参数文件均保存在此目录。
+* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名
+* `params_filename`: 存储需要转换的模型所有参数的文件名称。当且仅当所有模型参数被保>存在一个单独的二进制文件中，它才需要被指定。如果模型参数是存储在各自分离的文件中，设置它的值为 None
+* `server_path`: 转换后的模型文件和配置文件的存储路径。默认值为 serving_server
+* `client_path`: 转换后的客户端配置文件存储路径。默认值为 serving_client
+* `fetch_alias_names`: 模型输出的别名设置，比如输入的 input_ids 等，都可以指定成其他名字，默认不指定
+* `feed_alias_names`: 模型输入的别名设置，比如输出 pooled_out 等，都可以重新指定成其他模型，默认不指定
+
+也可以运行下面的 bash 脚本：
+```
+sh scripts/export_to_serving.sh
+```
+
+然后启动server:
+
+```
+python web_service.py
+```
+
+启动客户端调用 Server。
+
+首先修改rpc_client.py中需要预测的样本：
+
+```
+list_data = [
+    "国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据",
+    "试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比"
+]
+```
+然后运行：
+
+```
+python rpc_client.py
+```
+模型的输出为：
+
+```
+{'0': '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据', '1': '试论翻译过程中的文化差异与语言空缺翻译过程,文化差异,语言空缺,文化对比'}
+PipelineClient::predict pack_data time:1641450851.3752182
+PipelineClient::predict before time:1641450851.375738
+['output_embedding']
+(2, 256)
+[[ 0.07830612 -0.14036864  0.03433796 -0.14967982 -0.03386067  0.06630666
+   0.01357943  0.03531194  0.02411093  0.02000859  0.05724002 -0.08119463
+   ......
+```
+
+可以看到客户端发送了2条文本，返回了2个 embedding 向量
 
 ## Reference
 

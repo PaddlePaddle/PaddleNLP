@@ -130,8 +130,8 @@ class DialogueDataset(IterableDataset):
             need_cal = True
             tgt_label.extend(sent[sent_b_index + 1:])
             tgt_pos.extend([
-                sent_index * max_len + i for i in range(sent_b_index,
-                                                        len(sent) - 1)
+                sent_index * max_len + i
+                for i in range(sent_b_index, len(sent) - 1)
             ])
         tgt_label = np.array(tgt_label).astype("int64")
         tgt_pos = np.array(tgt_pos).astype("int64")

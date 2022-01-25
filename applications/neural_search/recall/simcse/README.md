@@ -245,7 +245,7 @@ c. 获取Query的Embedding并查询相似结果
 
 d. 评估
 
-基于评估集 `same_semantic.tsv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
+基于评估集 `dev.csv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10，20，50.
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
@@ -288,7 +288,7 @@ bash scripts/evaluate.sh
 ```
 
 参数含义说明
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `similar_text_pair`: 由相似文本对构成的评估集
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 
