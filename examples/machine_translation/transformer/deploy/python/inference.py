@@ -112,6 +112,7 @@ class Predictor(object):
         self.input_handles = input_handles
         self.output_handles = output_handles
         self.autolog = autolog
+        self.use_auto_log = not isinstance(self.autolog, recorder.Recorder)
 
     @classmethod
     def create_predictor(cls, args, config=None, profile=False,
@@ -135,21 +136,25 @@ class Predictor(object):
 
         if profile:
             pid = os.getpid()
-            autolog = auto_log.AutoLogger(
-                model_name=args.model_name,
-                model_precision="fp32",
-                batch_size=args.infer_batch_size,
-                save_path=args.save_log_path,
-                inference_config=config,
-                data_shape="dynamic",
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
+            if args.mod is recorder:
+                autolog = recorder.Recorder(config, args.infer_batch_size,
+                                            args.model_name)
+            else:
+                autolog = auto_log.AutoLogger(
+                    model_name=args.model_name,
+                    model_precision="fp32",
+                    batch_size=args.infer_batch_size,
+                    save_path=args.save_log_path,
+                    inference_config=config,
+                    data_shape="dynamic",
+                    pids=pid,
+                    process_name=None,
+                    gpu_ids=0 if args.device == "gpu" else None,
+                    time_keys=[
+                        'preprocess_time', 'inference_time', 'postprocess_time'
+                    ],
+                    warmup=0,
+                    logger=logger)
         else:
             autolog = None
 
@@ -178,18 +183,30 @@ class Predictor(object):
         outputs = []
         samples = 0
         if self.autolog is not None:
-            self.autolog.times.start()
+            if self.use_auto_log:
+                self.autolog.times.start()
+            else:
+                cpu_rss_mb, gpu_rss_mb = 0, 0
+                gpu_id = 0 if self.autolog.use_gpu else None
+                gpu_util = 0
+                self.autolog.tic()
 
         for data in test_loader:
             samples += len(data[0])
 
-            if self.autolog is not None:
+            if self.autolog is not None and self.use_auto_log:
                 self.autolog.times.stamp()
 
             output = self.predict_batch(data)
 
             if self.autolog is not None:
-                self.autolog.times.stamp()
+                if self.use_auto_log:
+                    self.autolog.times.stamp()
+                else:
+                    cm, gm = recorder.Recorder.get_current_memory_mb(gpu_id)
+                    cpu_rss_mb += cm
+                    gpu_rss_mb += gm
+                    gpu_util += recorder.Recorder.get_current_gputil(gpu_id)
 
             finished_sequence = output[0].transpose([0, 2, 1])
             for ins in finished_sequence:
@@ -204,7 +221,17 @@ class Predictor(object):
                 outputs.append(n_best_seq)
 
         if self.autolog is not None:
-            self.autolog.times.end(stamp=True)
+            if self.use_auto_log:
+                self.autolog.times.end(stamp=True)
+            else:
+                self.autolog.toc(samples)
+                self.autolog.get_device_info(
+                    cpu_rss_mb=cpu_rss_mb / len(test_loader),
+                    gpu_rss_mb=gpu_rss_mb / len(test_loader)
+                    if self.autolog.use_gpu else 0,
+                    gpu_util=gpu_util / len(test_loader)
+                    if self.autolog.use_gpu else 0)
+
         return outputs
 
 
@@ -251,6 +278,12 @@ if __name__ == "__main__":
     pprint(args)
 
     if args.profile:
-        import auto_log
+        import importlib
+        import util.recorder as recorder
+        try:
+            mod = importlib.import_module("auto_log")
+        except ImportError:
+            mod = importlib.import_module("util.recorder")
+        args.mod = mod
 
     do_inference(args)
