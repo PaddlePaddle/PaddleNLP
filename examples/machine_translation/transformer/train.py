@@ -260,15 +260,23 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        with paddle.amp.auto_cast(
-                                custom_black_list={
-                                    'scale', 'reduce_sum', 'elementwise_div'
-                                } if amp_level == 'O2' else {},
-                                level=amp_level):
+                        if args.use_amp:
+                            with paddle.amp.auto_cast(
+                                    custom_black_list={
+                                        'scale', 'reduce_sum', 'elementwise_div'
+                                    } if amp_level == 'O2' else {},
+                                    level=amp_level):
+                                logits = transformer(
+                                    src_word=src_word, trg_word=trg_word)
+                                sum_cost, avg_cost, token_num = criterion(
+                                    logits, lbl_word)
+
+                        else:
                             logits = transformer(
                                 src_word=src_word, trg_word=trg_word)
                             sum_cost, avg_cost, token_num = criterion(logits,
                                                                       lbl_word)
+
                         total_sum_cost += sum_cost.numpy()
                         total_token_num += token_num.numpy()
                         total_avg_cost = total_sum_cost / total_token_num
