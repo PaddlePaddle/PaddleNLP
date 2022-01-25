@@ -13,6 +13,7 @@ from model.char_cnn import CharCNN
 from model.data_loader import AGNEWs
 from model.metric import print_f_score
 
+# yapf: disable
 parser = argparse.ArgumentParser(
     description='Character level CNN text classifier testing',
     formatter_class=argparse.RawTextHelpFormatter)
@@ -66,6 +67,7 @@ parser.add_argument('--cuda',
                     default=True,
                     help='enable the gpu')
 parser.add_argument('--device', type=str, default='gpu:0')
+# yapf: enable
 
 args = parser.parse_args()
 

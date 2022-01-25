@@ -16,6 +16,7 @@ from utils.utils import set_seed
 
 set_seed(42)
 
+# yapf disable
 parser = argparse.ArgumentParser(
     description='Character level CNN text classifier training')
 # data
@@ -162,6 +163,7 @@ experiment.add_argument(
     type=int,
     default=5,
     help='how many epochs to wait before saving [default:5]')
+# yapf: enable
 
 
 def train(train_loader, dev_loader, model, args):
