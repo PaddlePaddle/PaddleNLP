@@ -149,7 +149,7 @@ PP-MiniLM 预训练小模型在 CLUE 中的 7 个分类数据集的平均精度�
 
 ### 环境依赖
 
-压缩方案依赖 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 提供的裁剪、量化功能，因此需要安装 paddleslim。PaddleSlim 是个专注于深度学习模型压缩的工具库，提供剪裁、量化、蒸馏、和模型结构搜索等模型压缩策略，帮助用户快速实现模型的小型化。
+压缩方案依赖 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 提供的裁剪、量化功能，在本案例中需要安装 paddleslim 2.2.2 及之后的版本。PaddleSlim 是个专注于深度学习模型压缩的工具库，提供剪裁、量化、蒸馏、和模型结构搜索等模型压缩策略，帮助用户快速实现模型的小型化。
 
 ```shell
 pip install -U paddleslim -i https://pypi.org/simple
