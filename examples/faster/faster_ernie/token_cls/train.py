@@ -76,7 +76,8 @@ def evaluate(model, criterion, metric, data_loader, label_num):
 
 def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
     texts, labels, seq_lens = [], [], []
-    batch_max_seq = max([len(example["tokens"]) for example in batch])
+    # 2 for [CLS] and [SEP]
+    batch_max_seq = max([len(example["tokens"]) for example in batch]) + 2
     #  Truncation: Handle max sequence length
     #  If max_seq_len == 0, then do nothing and keep the real length.
     #  If max_seq_len > 0 and
@@ -87,15 +88,13 @@ def batchify_fn(batch, no_entity_id, ignore_label=-100, max_seq_len=512):
     for example in batch:
         texts.append("".join(example["tokens"]))
         label = example["labels"]
-        if len(label) > max_seq_len - 2 and max_seq_len > 0:
-            label = label[:(max_seq_len - 2)]
+        # 2 for [CLS] and [SEP]
+        if len(label) > batch_max_seq - 2:
+            label = label[:(batch_max_seq - 2)]
         label = [no_entity_id] + label + [no_entity_id]
         seq_lens.append(len(label))
-        if len(label) < max_seq_len:
-            # 2 for [CLS] and [SEP]
-            label += [ignore_label] * (batch_max_seq + 2 - len(label))
-            # batch_max_seq + 2 may be larger than max_seq_len
-            label = label[:max_seq_len]
+        if len(label) < batch_max_seq:
+            label += [ignore_label] * (batch_max_seq - len(label))
         labels.append(label)
     labels = np.array(labels, dtype="int64")
     seq_lens = np.array(seq_lens)
