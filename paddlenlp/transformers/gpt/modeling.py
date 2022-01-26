@@ -815,7 +815,6 @@ class GPTModel(GPTPretrainedModel):
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
-        print(attention_mask)
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1157,7 +1156,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 attention_mask = attention_mask[:, -1, -1, :]
             if "int" in paddle.fluid.data_feeder.convert_dtype(
                     attention_mask.dtype):
-                attention_mask = (1.0 - attention_mask) * -1e9
+                attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:

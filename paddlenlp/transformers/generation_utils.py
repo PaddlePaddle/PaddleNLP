@@ -426,7 +426,7 @@ class GenerationMixin(object):
                 attention_mask = nn.Pad2D(
                     [0, 0, 0, 1], mode='replicate')(attention_mask)
                 attention_mask = nn.Pad2D(
-                    [0, 1, 0, 0], value=-1e9)(attention_mask)
+                    [0, 1, 0, 0], value=-1e4)(attention_mask)
                 dtype = convert_dtype(attention_mask.dtype)
                 if 'int' in dtype:
                     attention_mask[:, :, -1, -1] = 1
