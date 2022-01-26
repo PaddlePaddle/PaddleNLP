@@ -80,17 +80,15 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_from_hf(path_or_read_func, name=None, splits=None, **kwargs):
+def load_from_hf(path, name=None, splits=None, **kwargs):
     from datasets import load_dataset as load_hf_dataset
     from datasets import DatasetDict
     from datasets.features import ClassLabel
     try:
-        hf_datasets = load_hf_dataset(
-            path_or_read_func, name=name, split=splits, **kwargs)
+        hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
     except FileNotFoundError:
-        raise FileNotFoundError("Couldn't find the dataset script for '" +
-                                path_or_read_func +
-                                "' on PaddleNLP or HuggingFace")
+        raise FileNotFoundError("Couldn't find the dataset script for '" + path
+                                + "' on PaddleNLP or HuggingFace")
     else:
         label_list = []
         if isinstance(hf_datasets, DatasetDict):
