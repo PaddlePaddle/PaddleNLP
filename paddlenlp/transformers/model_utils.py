@@ -21,6 +21,7 @@ import logging
 import inspect
 
 import paddle
+import numpy as np
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
@@ -321,7 +322,7 @@ class PretrainedModel(Layer, GenerationMixin):
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
 
-        state_dict = paddle.load(weight_path)
+        state_dict = paddle.load(weight_path, return_numpy=True)
 
         # Make sure we are able to load base models as well as derived models
         # (with heads)
@@ -354,6 +355,11 @@ class PretrainedModel(Layer, GenerationMixin):
         if len(unexpected_keys) > 0:
             logger.info("Weights from pretrained model not used in {}: {}".
                         format(model.__class__.__name__, unexpected_keys))
+        for k, v in model_to_load.state_dict().items():
+            if not isinstance(v, np.ndarray):
+                dtype = str(v.dtype)[7:]  # paddle.float16
+            # TODO(guosheng): add warnings for unmatched dtypes
+            state_to_load[k] = state_to_load[k].astype(dtype)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model
