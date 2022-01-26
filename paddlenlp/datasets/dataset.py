@@ -22,9 +22,6 @@ import sys
 import inspect
 from collections import namedtuple
 from multiprocess import Pool, RLock
-from datasets import load_dataset as load_hf_dataset
-from datasets import DatasetDict
-from datasets.features import ClassLabel
 import time
 
 import paddle.distributed as dist
@@ -84,6 +81,9 @@ def import_main_class(module_path):
 
 
 def load_from_hf(path_or_read_func, name=None, splits=None, **kwargs):
+    from datasets import load_dataset as load_hf_dataset
+    from datasets import DatasetDict
+    from datasets.features import ClassLabel
     try:
         hf_datasets = load_hf_dataset(
             path_or_read_func, name=name, split=splits, **kwargs)
