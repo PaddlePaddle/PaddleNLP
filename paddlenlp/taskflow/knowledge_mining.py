@@ -421,8 +421,8 @@ class WordTagTask(Task):
             sent = batch_texts[sent_index]
             tags = [
                 self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][
-                    self.summary_num:len(sent) + self.summary_num]
+                for index in batch_pred_tags[sent_index][self.summary_num:len(
+                    sent) + self.summary_num]
             ]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
