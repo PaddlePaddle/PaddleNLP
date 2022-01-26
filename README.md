@@ -1,7 +1,7 @@
 简体中文 | [English](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="718" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -210,7 +210,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 模型        | 简介      |
 | :------------ | ---------- |
-| [ERNIE-CSC](./examples/text_correction/ernie-csc):star1:  | [ERNIE-CSC](https://aclanthology.org/2021.findings-acl.198.pdf)是基于ERNIE预训练模型融合了拼音特征的端到端中文拼写纠错模型，在SIGHAN数据集上取得SOTA的效果。|
+| [ERNIE-CSC](./examples/text_correction/ernie-csc) :star2:  | [ERNIE-CSC](https://aclanthology.org/2021.findings-acl.198.pdf)是基于ERNIE预训练模型融合了拼音特征的端到端中文拼写纠错模型，在SIGHAN数据集上取得SOTA的效果。|
 
 #### 语义索引 (Semantic Indexing)
 
@@ -317,8 +317,9 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 - 现在就加入PaddleNLP的技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/148375398-f9a1b4db-66ba-4325-8a1d-abfc47780c7c.png" width="200" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/150080081-8611d041-2e83-440f-9e8c-ba483fea27b5.jpg" width="250" height="300" />
 </div>  
+
 
 
 ## 版本更新

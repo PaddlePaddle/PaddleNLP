@@ -90,7 +90,7 @@ class DDParserTask(Task):
     resource_files_urls = {
         "ddparser": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/model_state.pdparams", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/model_state.pdparams",
                 "f388c91e85b5b4d0db40157a4ee28c08"
             ],
             "word_vocab": [
@@ -104,7 +104,7 @@ class DDParserTask(Task):
         },
         "ddparser-ernie-1.0": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/model_state.pdparams", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/model_state.pdparams",
                 "78a4d5c2add642a88f6fdbee3574f617"
             ],
             "word_vocab": [
@@ -118,7 +118,7 @@ class DDParserTask(Task):
         },
         "ddparser-ernie-gram-zh": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/model_state.pdparams", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/model_state.pdparams",
                 "9d0a49026feb97fac22c8eec3e88f5c3"
             ],
             "word_vocab": [
@@ -130,7 +130,7 @@ class DDParserTask(Task):
                 "0decf1363278705f885184ff8681f4cd"
             ],
         },
-        "font_file" : {
+        "font_file": {
             "font_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/SourceHanSansCN-Regular.ttf",
                 "cecb7328bc0b9412b897fb3fc61edcdb"
@@ -164,8 +164,7 @@ class DDParserTask(Task):
         self._check_task_files()
         self._construct_vocabs()
         self.font_file_path = download_file(
-            self._task_path, 
-            "SourceHanSansCN-Regular.ttf",
+            self._task_path, "SourceHanSansCN-Regular.ttf",
             self.resource_files_urls["font_file"]["font_file"][0],
             self.resource_files_urls["font_file"]["font_file"][1])
         self.tree = tree
@@ -183,14 +182,14 @@ class DDParserTask(Task):
 
         self.use_cuda = use_cuda
         self.lac = LAC(mode="lac" if self.use_pos else "seg",
-                    use_cuda=self.use_cuda)
+                       use_cuda=self.use_cuda)
         self._get_inference_model()
 
     def _check_segmented_words(self, inputs):
         inputs = inputs[0]
         if not all([isinstance(i, list) and i and all(i) for i in inputs]):
             raise TypeError("Invalid input format.")
-        return inputs    
+        return inputs
 
     def from_segments(self, segmented_words):
         segmented_words = self._check_segmented_words(segmented_words)
@@ -219,7 +218,7 @@ class DDParserTask(Task):
         self.rel_vocab = Vocab.from_json(rel_vocab_path)
         self.word_pad_index = self.word_vocab.to_indices("[PAD]")
         self.word_bos_index = self.word_vocab.to_indices("[CLS]")
-        self.word_eos_index = self.word_vocab.to_indices("[SEP]")        
+        self.word_eos_index = self.word_vocab.to_indices("[SEP]")
 
     def _construct_model(self, model):
         """
@@ -250,8 +249,7 @@ class DDParserTask(Task):
         for text in inputs['words']:
             example = {"FORM": text}
             example = convert_example(
-                example,
-                vocabs=[self.word_vocab, self.rel_vocab])
+                example, vocabs=[self.word_vocab, self.rel_vocab])
             examples.append(example)
 
         batches = [
@@ -290,7 +288,7 @@ class DDParserTask(Task):
         inputs = self._check_input_text(inputs)
         while position < len(inputs):
             lac_results += self.lac.run(inputs[position:position +
-                                            self.batch_size])
+                                               self.batch_size])
             position += self.batch_size
 
         if not self.use_pos:

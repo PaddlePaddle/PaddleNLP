@@ -254,7 +254,7 @@ Taskflow提供的NER任务共包含66种词性及专名类别标签，标签集�
 <tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
 <tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
 <tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
- 
+
 </table>
 
 #### 自定义词典
@@ -584,7 +584,7 @@ wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
 <tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
 <tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
 <tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
- 
+
 </table>
 
 #### 自定义词典
@@ -739,7 +739,7 @@ poetry(["林密不见人", "举头邀明月"])
 
 非交互模式：
 ```python
-from paddlenlp import Taskflow 
+from paddlenlp import Taskflow
 
 dialogue = Taskflow("dialogue")
 dialogue(["吃饭了吗"])

@@ -189,7 +189,7 @@ def convert_example(example, tokenizer, max_seq_length=256):
 
 
 def get_test_dataloader(args, language, batchify_fn, trans_func):
-    test_ds = load_dataset("xnli", splits="test", language=language)
+    test_ds = load_dataset("xnli", language, splits="test")
     test_ds = test_ds.map(trans_func, lazy=True)
     test_batch_sampler = BatchSampler(
         test_ds, batch_size=args.batch_size, shuffle=False)
@@ -240,12 +240,12 @@ def do_train(args):
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
     if args.task_type == "cross-lingual-transfer":
-        train_ds = load_dataset("xnli", splits="train", language="en")
+        train_ds = load_dataset("xnli", "en", splits="train")
         train_ds = train_ds.map(trans_func, lazy=True)
     elif args.task_type == "translate-train-all":
         all_train_ds = []
         for language in all_languages:
-            train_ds = load_dataset("xnli", splits="train", language=language)
+            train_ds = load_dataset("xnli", language, splits="train")
             all_train_ds.append(train_ds.map(trans_func, lazy=True))
         train_ds = XnliDataset(all_train_ds)
     train_batch_sampler = DistributedBatchSampler(

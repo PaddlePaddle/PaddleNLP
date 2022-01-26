@@ -49,7 +49,7 @@ parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of" 
+parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of"
     "KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
 
 args = parser.parse_args()
@@ -82,14 +82,18 @@ def evaluate(model, criterion, metric, data_loader):
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch
         total_num += len(labels)
-        logits, _ = model(input_ids=input_ids, token_type_ids=token_type_ids, do_evaluate=True)
+        logits, _ = model(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            do_evaluate=True)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
 
-    print("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(np.mean(losses), accu, total_num))
+    print("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(
+        np.mean(losses), accu, total_num))
     model.train()
     metric.reset()
     return accu
@@ -175,7 +179,8 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            logits1, kl_loss = model(input_ids=input_ids, token_type_ids=token_type_ids)
+            logits1, kl_loss = model(
+                input_ids=input_ids, token_type_ids=token_type_ids)
             correct = metric.compute(logits1, labels)
             metric.update(correct)
             acc = metric.accumulate()
@@ -185,7 +190,7 @@ def do_train():
                 loss = ce_loss + kl_loss * args.rdrop_coef
             else:
                 loss = ce_loss
-            
+
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
@@ -202,17 +207,19 @@ def do_train():
             if global_step % args.eval_step == 0 and rank == 0:
                 accuracy = evaluate(model, criterion, metric, dev_data_loader)
                 if accuracy > best_accuracy:
-                    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+                    save_dir = os.path.join(args.save_dir,
+                                            "model_%d" % global_step)
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+                    save_param_path = os.path.join(save_dir,
+                                                   'model_state.pdparams')
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
                     best_accuracy = accuracy
-            
-            if global_step ==  args.max_steps:
+
+            if global_step == args.max_steps:
                 return
-              
+
 
 if __name__ == "__main__":
     do_train()
