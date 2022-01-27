@@ -366,9 +366,7 @@ PD_BUILD_OP(fusion_unified_decoding)
              "PositionEncEmb",
              "TypeEmb",
              "RoleIds",
-             "RoleEmbedding",
-             "PositionIds",
-             "DecPostionIds"})
+             "RoleEmbedding"})
     .Outputs({"OutputIds", "ParentIds", "SequenceLength", "OutputScores"})
     .Attrs({"decoding_strategy: std::string",
             "beam_size: int",
