@@ -15,7 +15,10 @@
 """Tokenization classes for LUKE."""
 
 from typing import Optional, Union, List, Dict
-import regex as re
+try:
+    import regex as re
+except:
+    import re
 import sys
 import json
 import itertools
