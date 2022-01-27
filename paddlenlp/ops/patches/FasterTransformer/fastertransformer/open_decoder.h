@@ -1060,25 +1060,17 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        add_bias_input_kernelLauncher(ffn_out_buf,
-                                      param_.ffn.output_weight.bias,
-                                      norm_masked_output_buf,
-                                      m,
-                                      hidden_units_,
-                                      param_.stream);
+        add_bias_input_layernorm_2_kernelLauncher(
+            norm_masked_output_buf,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            param_.ffn.output_weight.bias,
+            ffn_out_buf,
+            decoder_output,
+            m,
+            hidden_units_,
+            param_.stream);
 
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-
-        layer_norm(ffn_out_buf,
-                   param_.ffn_layernorm.gamma,
-                   param_.ffn_layernorm.beta,
-                   decoder_output,
-                   m,
-                   hidden_units_,
-                   param_.stream);
       }
 
 #ifndef NDEBUG
