@@ -259,26 +259,26 @@ def infer_gpt_decoding(
 
 
 def infer_unified_decoding(
-        input_ids, attn_mask, memory_seq_lens, input_type_id, type_id,
+        input_ids, attn_mask, memory_seq_lens, type_id, decoding_type_id,
         logits_mask, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
         slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias,
         slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
         ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
         decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
         lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb, type_emb,
-        role_id, role_emb, _decoding_strategy, _beam_size, _topk, _topp,
-        _n_head, _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-        _diversity_rate, _unk_id, _mask_id, _temperature, _len_penalty,
-        _normalize_before, _pos_bias, _hidden_act, _rel_len, _early_stopping,
-        _min_length):
+        role_id, decoding_role_id, role_emb, _decoding_strategy, _beam_size,
+        _topk, _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
+        _max_out_len, _diversity_rate, _unk_id, _mask_id, _temperature,
+        _len_penalty, _normalize_before, _pos_bias, _hidden_act, _rel_len,
+        _early_stopping, _min_length):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
         "InputIds": input_ids,
         "AttnMask": attn_mask,
         "MemSeqLen": memory_seq_lens,
-        "InputTypeId": input_type_id,
         "TypeId": type_id,
+        "DecTypeId": decoding_type_id,
         "LogitsMask": logits_mask,
         "WordEmbedding": word_emb,
         "SelfLayernormWeight@VECTOR": slf_ln_weight,
@@ -308,6 +308,7 @@ def infer_unified_decoding(
         "PositionEncEmb": pos_emb,
         "TypeEmb": type_emb,
         "RoleId": role_id,
+        "DecRoleId": decoding_role_id,
         "RoleEmbedding": role_emb
     }
 
@@ -1372,9 +1373,10 @@ class InferUnifiedDecoding(nn.Layer):
                 input_ids,
                 attn_mask,
                 memory_seq_lens,
-                input_type_id,
+                type_id,
                 decoding_type_id,
                 role_id=None,
+                decoding_role_id=None,
                 beam_size=4,
                 topk=4,
                 topp=0.0,
@@ -1392,7 +1394,8 @@ class InferUnifiedDecoding(nn.Layer):
                 early_stopping=False,
                 min_length=0):
         if role_id is None:
-            role_id = paddle.zeros(shape=[0], dtype="int64")
+            role_id = paddle.zeros(shape=[0], dtype="int32")
+            decoding_role_id = paddle.zeros(shape=[0], dtype="int32")
             self.role_embedding_table = [
                 paddle.zeros(
                     shape=[0], dtype="float32")
@@ -1420,8 +1423,8 @@ class InferUnifiedDecoding(nn.Layer):
             input_ids=[input_ids],
             attn_mask=[attn_mask],
             memory_seq_lens=[memory_seq_lens],
-            input_type_id=[input_type_id],
-            type_id=[decoding_type_id],
+            type_id=[type_id],
+            decoding_type_id=[decoding_type_id],
             logits_mask=[self._logits_mask],
             word_emb=self.sub_modules["word_emb"],
             slf_ln_weight=self.sub_modules["slf_ln_weight"],
@@ -1451,6 +1454,7 @@ class InferUnifiedDecoding(nn.Layer):
             pos_emb=self.sub_modules["pos_emb"],
             type_emb=self.sub_modules["type_emb"],
             role_id=[role_id],
+            decoding_role_id=[decoding_role_id],
             role_emb=self.role_embedding_table,
             _decoding_strategy=decoding_strategy,
             _beam_size=beam_size,

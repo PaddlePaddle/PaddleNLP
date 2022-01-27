@@ -40,8 +40,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& input_ids,
     const paddle::Tensor& attn_mask,
     const paddle::Tensor& memory_sequence_length,
-    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
+    const paddle::Tensor& decoding_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_emb,
     const std::vector<paddle::Tensor>& self_layernorm_weight,
@@ -71,6 +71,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& position_encoding_table,
     const paddle::Tensor& type_embedding_weight,
     const paddle::Tensor& role_id,
+    const paddle::Tensor& decoding_role_id,
     const paddle::Tensor& role_embedding_table,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
@@ -147,8 +148,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.d_start_lengths = memory_sequence_length.data<int>();
 
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
-  decoding_params.input_type_id = input_type_id.data<int>();
   decoding_params.type_id = type_id.data<int>();
+  decoding_params.decoding_type_id = decoding_type_id.data<int>();
 
   if (decoding_strategy == "beam_search" ||
       decoding_strategy == "beam_search_v2" ||
@@ -273,6 +274,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   auto role_id_shape = role_id.shape();
   if (role_id_shape.size() > 0 && numel(role_id_shape) > 0) {
     decoding_params.role_id = role_id.data<int>();
+    decoding_params.decoding_role_id = decoding_role_id.data<int>();
     decoding_params.role_embedding_table =
         reinterpret_cast<const DataType_*>(role_embedding_table.data<data_t_>());
   }
@@ -402,8 +404,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& input_ids,
     const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
-    const paddle::Tensor& input_type_id,
     const paddle::Tensor& type_id,
+    const paddle::Tensor& decoding_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
@@ -433,6 +435,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& type_embedding_weight,
     const paddle::Tensor& role_id,
+    const paddle::Tensor& decoding_role_id,
     const paddle::Tensor& role_embedding_table,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
@@ -472,8 +475,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           input_ids,
           attn_mask,
           mem_seq_len,
-          input_type_id,
           type_id,
+          decoding_type_id,
           logits_mask,
           word_embedding,
           self_ln_weight,
@@ -503,6 +506,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           positional_embedding_weight,
           type_embedding_weight,
           role_id,
+          decoding_role_id,
           role_embedding_table,
           output_ids,
           parent_ids,
@@ -537,8 +541,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           input_ids,
           attn_mask,
           mem_seq_len,
-          input_type_id,
           type_id,
+          decoding_type_id,
           logits_mask,
           word_embedding,
           self_ln_weight,
@@ -568,6 +572,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           positional_embedding_weight,
           type_embedding_weight,
           role_id,
+          decoding_role_id,
           role_embedding_table,
           output_ids,
           parent_ids,

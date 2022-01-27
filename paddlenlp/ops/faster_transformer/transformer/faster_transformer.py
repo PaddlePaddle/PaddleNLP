@@ -867,8 +867,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 token_type_ids,
                 position_ids,
                 attention_mask,
+                decoding_type_id=None,
                 seq_len=None,
                 role_id=None,
+                decoding_role_id=None,
                 max_length=128,
                 min_length=0,
                 top_k=4,
@@ -920,19 +922,26 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
+        model_inputs = {}
+        if decoding_type_id is None:
+            model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                              **model_kwargs)
 
-        seq_len = model_inputs.pop('seq_len')
-        decoding_type_id = model_inputs.pop('decoding_type_id')
+            seq_len = model_inputs.pop('seq_len')
+            decoding_type_id = model_inputs.pop('decoding_type_id')
+        else:
+            model_inputs["input_ids"] = input_ids
+            model_inputs["attention_mask"] = attention_mask
+            model_inputs["token_type_ids"] = token_type_ids
 
         return self.decoding(
             input_ids=model_inputs["input_ids"],
             attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
-            input_type_id=model_inputs["token_type_ids"],
+            type_id=model_inputs["token_type_ids"],
             decoding_type_id=decoding_type_id,
             role_id=role_id,
+            decoding_role_id=None,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
@@ -1095,7 +1104,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             input_ids=model_inputs["input_ids"],
             attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
-            input_type_id=model_inputs["token_type_ids"],
+            type_id=model_inputs["token_type_ids"],
             decoding_type_id=decoding_type_id,
             beam_size=num_beams,
             diversity_rate=diversity_rate,

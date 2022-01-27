@@ -91,7 +91,9 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int batch_size,
                                 const int hidden_units,
                                 const bool pos_bias,
-                                cudaStream_t stream);
+                                cudaStream_t stream,
+                                const int* decoding_role_id = nullptr,
+                                const T* role_embedding_table = nullptr);
 
 template <typename T>
 void start_ids_embeddings_kernel_launcher(T* from_tensor,

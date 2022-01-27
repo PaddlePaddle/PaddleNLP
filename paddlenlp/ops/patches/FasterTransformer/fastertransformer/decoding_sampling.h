@@ -385,7 +385,7 @@ public:
                                             decoding_params.embedding_table,
                                             decoding_params.position_encoding_table,
                                             decoding_params.type_table,
-                                            decoding_params.input_type_id,
+                                            decoding_params.type_id,
                                             decoding_params.d_start_ids,
                                             decoding_params.memory_sequence_length,
                                             1,
@@ -401,7 +401,7 @@ public:
                                             decoding_params.embedding_table,
                                             decoding_params.position_encoding_table,
                                             decoding_params.type_table,
-                                            decoding_params.input_type_id,
+                                            decoding_params.type_id,
                                             decoding_params.d_start_ids,
                                             decoding_params.memory_sequence_length,
                                             1,
@@ -577,13 +577,15 @@ public:
                                      decoding_params.position_encoding_table,
                                      decoding_params.type_table,
                                      decoding_params.memory_sequence_length,
-                                     decoding_params.type_id,
+                                     decoding_params.decoding_type_id,
                                      word_ids_buf_,
                                      step,
                                      args_.batch_size_,
                                      args_.hidden_units_,
                                      args_.pos_bias_,
-                                     decoding_params.stream);
+                                     decoding_params.stream,
+                                     decoding_params.decoding_role_id,
+                                     decoding_params.role_embedding_table);
         } else {
           if (args_.is_mbart_) {
             embedding_lookup_sine_position_encoding_kernel_launcher(
@@ -623,13 +625,15 @@ public:
                                      decoding_params.position_encoding_table,
                                      decoding_params.type_table,
                                      decoding_params.memory_sequence_length,
-                                     decoding_params.type_id,
+                                     decoding_params.decoding_type_id,
                                      word_ids_buf_,
                                      step,
                                      args_.batch_size_,
                                      args_.hidden_units_,
                                      args_.pos_bias_,
-                                     decoding_params.stream);
+                                     decoding_params.stream,
+                                     decoding_params.decoding_role_id,
+                                     decoding_params.role_embedding_table);
         } else {
           // TODO(gongenlei): Only support Bart temporarily.
           embedding_position_lookups_bart_kernel_launcher(
