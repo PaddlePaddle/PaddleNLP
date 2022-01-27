@@ -388,11 +388,12 @@ def create_masked_lm_predictions(tokens,
             output_tokens[index] = masked_token
             masked_lms.append(
                 MaskedLmInstance(
-                    index=index, label=tokens[index]))
+                    index=index, label=backup_output_tokens[index]))
 
         masked_spans.append(
             MaskedLmInstance(
-                index=index_set, label=[tokens[index] for index in index_set]))
+                index=index_set,
+                label=[backup_output_tokens[index] for index in index_set]))
 
     assert len(masked_lms) <= num_to_predict
     np_rng.shuffle(ngram_indexes)
