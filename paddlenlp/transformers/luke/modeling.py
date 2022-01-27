@@ -95,9 +95,9 @@ class LukePretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "luke-base":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/luke-base/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-base/model_state.pdparams",
             "luke-large":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/luke-large/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-large/model_state.pdparams",
         }
     }
     base_model_prefix = "luke"
