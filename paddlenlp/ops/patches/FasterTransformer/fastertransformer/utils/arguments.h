@@ -61,6 +61,9 @@ public:
   const int* role_id = nullptr;
   const int* decoder_role_id = nullptr;
   const T* role_embedding_table = nullptr;
+  // Custom position.
+  const int* position_ids = nullptr;
+  const int* decoder_position_ids = nullptr;
 
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;

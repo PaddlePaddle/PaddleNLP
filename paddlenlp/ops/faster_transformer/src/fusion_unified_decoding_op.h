@@ -65,6 +65,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& role_id,
     const paddle::Tensor& decoder_role_id,
     const paddle::Tensor& role_embedding_table,
+    const paddle::Tensor& position_ids,
+    const paddle::Tensor& decoder_position_ids,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,

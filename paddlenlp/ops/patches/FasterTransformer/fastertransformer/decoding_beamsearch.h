@@ -450,7 +450,8 @@ public:
                                             h_1,
                                             decoding_params.stream,
                                             decoding_params.role_id,
-                                            decoding_params.role_embedding_table);
+                                            decoding_params.role_embedding_table,
+                                            decoding_params.position_ids);
       } else {
         // Memory reuse. from_tensor[1].
         start_ids_embeddings_kernel_launcher(from_tensor[1],
@@ -464,7 +465,10 @@ public:
                                             input_len,
                                             request_batch_size,
                                             h_1,
-                                            decoding_params.stream);
+                                            decoding_params.stream,
+                                            decoding_params.role_id,
+                                            decoding_params.role_embedding_table,
+                                            decoding_params.position_ids);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -655,7 +659,9 @@ public:
                                      args_.hidden_units_,
                                      args_.pos_bias_,
                                      decoding_params.stream,
-                                     decoding_params.decoder_role_id);
+                                     decoding_params.decoder_role_id,
+                                     decoding_params.role_embedding_table,
+                                     decoding_params.decoder_position_ids);
         } else {
           if (args_.is_mbart_) {
             embedding_lookup_sine_position_encoding_kernel_launcher(
@@ -702,7 +708,9 @@ public:
                                      args_.hidden_units_,
                                      args_.pos_bias_,
                                      decoding_params.stream,
-                                     decoding_params.decoder_role_id);
+                                     decoding_params.decoder_role_id,
+                                     decoding_params.role_embedding_table,
+                                     decoding_params.decoder_position_ids);
         } else {
           // TODO(gongenlei): Only support Bart temporarily.
           embedding_position_lookups_bart_kernel_launcher(

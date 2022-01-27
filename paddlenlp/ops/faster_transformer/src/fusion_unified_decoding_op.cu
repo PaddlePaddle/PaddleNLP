@@ -73,6 +73,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& role_id,
     const paddle::Tensor& decoder_role_id,
     const paddle::Tensor& role_embedding_table,
+    const paddle::Tensor& position_ids,
+    const paddle::Tensor& decoder_position_ids,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -281,6 +283,12 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         reinterpret_cast<const DataType_*>(role_embedding_table.data<data_t_>());
   }
 
+  auto position_id_shape = position_ids.shape();
+  if (position_id_shape.size() > 0 && numel(position_id_shape) > 0) {
+      decoding_params.position_ids = position_ids.data<int>();
+      decoding_params.decoder_position_ids = decoder_position_ids.data<int>();
+  }
+
   ActivationType activate =
       (hidden_act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
 
@@ -439,6 +447,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& role_id,
     const paddle::Tensor& decoder_role_id,
     const paddle::Tensor& role_embedding_table,
+    const paddle::Tensor& position_ids,
+    const paddle::Tensor& decoder_position_ids,
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
@@ -511,6 +521,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           role_id,
           decoder_role_id,
           role_embedding_table,
+          position_ids,
+          decoder_position_ids,
           output_ids,
           parent_ids,
           sequence_length,
@@ -578,6 +590,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           role_id,
           decoder_role_id,
           role_embedding_table,
+          position_ids,
+          decoder_position_ids,
           output_ids,
           parent_ids,
           sequence_length,
