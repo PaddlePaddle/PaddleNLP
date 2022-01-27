@@ -497,10 +497,6 @@ class GenerationMixin(object):
 
     def _build_faster(self, kwargs):
         self._faster_entry = False
-        # if kwargs['min_length'] != 0:
-        #     # not support for min_length yet in the faster version
-        #     raise AttributeError(
-        #         "'min_length != 0' is not supported yet in the faster version")
         if kwargs['num_beam_groups'] != 1:
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
