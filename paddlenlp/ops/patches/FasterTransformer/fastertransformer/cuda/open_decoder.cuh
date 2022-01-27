@@ -30,21 +30,4 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 const int local_head_num,
                                                 cudaStream_t stream);
 
-template <typename T>
-void self_attention_dispatch(const int* memory_sequence_length,
-                             T* key_buf,
-                             T* value_buf,
-                             T* query_buf,
-                             const T* self_Q_bias,
-                             T* key_cache,
-                             const T* self_K_bias,
-                             T* value_cache,
-                             const T* self_V_bias,
-                             T* context_buf,
-                             int batch_size,
-                             int head_num,
-                             int size_per_head,
-                             const int step,
-                             const int memory_max_seq_len,
-                             cudaStream_t stream);
 }

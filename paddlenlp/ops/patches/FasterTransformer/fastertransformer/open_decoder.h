@@ -675,7 +675,7 @@ public:
               m,
               4 * t_parallel_param_.local_hidden_units_,
               hidden_units_,
-              ActivationType::RELU);
+              act_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());

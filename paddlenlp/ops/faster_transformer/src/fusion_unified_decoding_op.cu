@@ -28,11 +28,11 @@ limitations under the License. */
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape) {
     int size = tensor_shape.size();
-    int64_t numel_ = 1;
+    int64_t n = 1;
     for (int i = 0; i < size; ++i) {
-        numel_ *= tensor_shape[i];
+        n *= tensor_shape[i];
     }
-    return numel_;
+    return n;
 }
 
 template <paddle::DataType D>
