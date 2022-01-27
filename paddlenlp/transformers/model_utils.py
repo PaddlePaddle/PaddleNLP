@@ -106,7 +106,10 @@ def convert_config_from_hf(config_path, derived_parameters_dict, class_name):
             if k in derived_config:
                 derived_config[k] = v
         if "id2label" in init_kwargs:
-            derived_config["num_classes"] = len(init_kwargs["id2label"])
+            if "num_classes" in derived_config:
+                derived_config["num_classes"] = len(init_kwargs["id2label"])
+            elif "num_choices" in derived_config:
+                derived_config["num_choices"] = len(init_kwargs["id2label"])
     return derived_config
 
 
