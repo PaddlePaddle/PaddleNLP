@@ -339,11 +339,13 @@ def infer_unified_decoding(
     output_ids = helper.create_variable(dtype="int32")
     parent_ids = helper.create_variable(dtype="int32")
     sequence_length = helper.create_variable(dtype="int32")
+    output_scores = helper.create_variable(dtype="float32")
 
     outputs = {
         'OutputIds': output_ids,
         'ParentIds': parent_ids,
-        'SequenceLength': sequence_length
+        'SequenceLength': sequence_length,
+        "OutputScores": output_scores
     }
 
     helper.append_op(
@@ -352,7 +354,7 @@ def infer_unified_decoding(
         outputs=outputs,
         attrs=attrs)
 
-    return output_ids, parent_ids, sequence_length
+    return output_ids, parent_ids, sequence_length, output_scores
 
 
 def infer_bart_decoding(
@@ -1419,7 +1421,7 @@ class InferUnifiedDecoding(nn.Layer):
                     "Topk sampling and topp sampling cannot be both applied in the faster version.")
         elif decoding_strategy.startswith("beam_search"):
             decoding_strategy = "beam_search_v3"
-        output_ids, parent_ids, sequence_length = infer_unified_decoding(
+        output_ids, parent_ids, sequence_length, output_scores = infer_unified_decoding(
             input_ids=[input_ids],
             attn_mask=[attn_mask],
             memory_seq_lens=[memory_seq_lens],
@@ -1484,7 +1486,7 @@ class InferUnifiedDecoding(nn.Layer):
             sequence_length,
             forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
-        return ids
+        return ids, output_scores
 
 
 class InferBartDecoding(nn.Layer):

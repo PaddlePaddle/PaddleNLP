@@ -71,8 +71,7 @@ public:
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
-
-  T* output_scores = nullptr;
+  float* output_scores = nullptr;
 
   cublasHandle_t cublas_handle;
   cublasLtHandle_t cublaslt_handle;

@@ -76,6 +76,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
+    paddle::Tensor& output_scores,
     const std::string& decoding_strategy,
     const int beam_size,
     const int topk,
@@ -137,6 +138,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input_ids.place());
   decoding_params.sequence_length =
       sequence_length.mutable_data<int>(input_ids.place());
+  decoding_params.output_scores = output_scores.mutable_data<float>(input_ids.place());
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
@@ -397,7 +399,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   }
   delete[] params;
 
-  return {output_ids, parent_ids, sequence_length};
+  return {output_ids, parent_ids, sequence_length, output_scores};
 }
 
 std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
@@ -440,6 +442,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
+    paddle::Tensor& output_scores,
     const std::string& decoding_strategy,
     const int beam_size,
     const int topk,
@@ -511,6 +514,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           output_ids,
           parent_ids,
           sequence_length,
+          output_scores,
           decoding_strategy,
           beam_size,
           topk,
@@ -577,6 +581,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           output_ids,
           parent_ids,
           sequence_length,
+          output_scores,
           decoding_strategy,
           beam_size,
           topk,

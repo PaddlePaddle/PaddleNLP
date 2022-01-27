@@ -946,31 +946,55 @@ public:
 
         if (args_.candidate_num_ != 0) {
           // top k sampling
-          update_logits_without_softmax(logits_buf_,
-                                        embedding_bias_ptr,
-                                        args_.end_id_,
-                                        finished_buf_,
-                                        m,
-                                        n,
-                                        decoding_params.stream);
+          if (decoding_params.output_scores) {
+            softmax_kernelLauncher(logits_buf_,
+                                  embedding_bias_ptr,
+                                  args_.end_id_,
+                                  finished_buf_,
+                                  m,
+                                  n,
+                                  n,
+                                  decoding_params.stream);
+
+            // Return Score.
+            topK_sampling_kernel_kernelLauncher_v3(
+                topk_workspace_,
+                topk_workspace_size_,
+                logits_buf_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                decoding_params.output_scores,
+                finished_buf_,
+                curandstate_buf_,  // used as random number
+                args_,
+                decoding_params.stream,
+                args_.batch_size_);
+          } else {
+            update_logits_without_softmax(logits_buf_,
+                                          embedding_bias_ptr,
+                                          args_.end_id_,
+                                          finished_buf_,
+                                          m,
+                                          n,
+                                          decoding_params.stream);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
 #endif
 
-          topK_sampling_kernel_kernelLauncher_v2(
-              topk_workspace_,
-              topk_workspace_size_,
-              logits_buf_,
-              decoding_params.output_ids + (step - 1) * args_.batch_size_,
-              decoding_params.sequence_length,
-              finished_buf_,
-              curandstate_buf_,  // used as random number
-              args_,
-              decoding_params.stream,
-              args_.batch_size_);
-
+            topK_sampling_kernel_kernelLauncher_v2(
+                topk_workspace_,
+                topk_workspace_size_,
+                logits_buf_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                finished_buf_,
+                curandstate_buf_,  // used as random number
+                args_,
+                decoding_params.stream,
+                args_.batch_size_);
+          }
         } else if (args_.probability_threshold_ != 0.0) {
           // top p sampling
           softmax_kernelLauncher(logits_buf_,
@@ -987,21 +1011,40 @@ public:
           check_cuda_error(cudaGetLastError());
 #endif
 
-          topP_sampling_kernel_kernelLauncher_v2(
-              topp_workspace_,
-              topp_workspace_size_,
-              logits_buf_,
-              topp_id_vals_buf_,
-              topp_offset_buf_,
-              begin_topp_offset_buf_,
-              finished_buf_,
-              curandstate_buf_,
-              args_,
-              decoding_params.output_ids + (step - 1) * args_.batch_size_,
-              decoding_params.sequence_length,
-              n,
-              decoding_params.stream,
-              args_.batch_size_);
+          if (decoding_params.output_scores) {
+            topP_sampling_kernel_kernelLauncher_v3(
+                topp_workspace_,
+                topp_workspace_size_,
+                logits_buf_,
+                topp_id_vals_buf_,
+                topp_offset_buf_,
+                begin_topp_offset_buf_,
+                finished_buf_,
+                curandstate_buf_,
+                args_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                decoding_params.output_scores,
+                n,
+                decoding_params.stream,
+                args_.batch_size_);
+          } else {
+            topP_sampling_kernel_kernelLauncher_v2(
+                topp_workspace_,
+                topp_workspace_size_,
+                logits_buf_,
+                topp_id_vals_buf_,
+                topp_offset_buf_,
+                begin_topp_offset_buf_,
+                finished_buf_,
+                curandstate_buf_,
+                args_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                n,
+                decoding_params.stream,
+                args_.batch_size_);
+          }
         }
       }
 

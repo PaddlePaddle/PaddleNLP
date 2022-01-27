@@ -1236,6 +1236,11 @@ public:
         if (sum == finish_size) break;
       }
     }  // end for decoding step for llop
+
+    if (decoding_params.output_scores) {
+      cudaMemcpyAsync(decoding_params.output_scores, cum_log_buf_, 
+                      sizeof(float) * args_.batch_size_ * args_.beam_width_, cudaMemcpyDeviceToDevice, decoding_params.stream);
+    }
   }    // end of forward
 
   virtual ~DecodingBeamsearch() {

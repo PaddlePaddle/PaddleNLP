@@ -68,6 +68,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     paddle::Tensor& output_ids,
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
+    paddle::Tensor& output_scores,
     const std::string& decoding_strategy,
     const int beam_size,
     const int topk,
