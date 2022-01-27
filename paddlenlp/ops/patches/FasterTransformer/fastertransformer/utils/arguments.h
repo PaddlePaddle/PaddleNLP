@@ -43,7 +43,7 @@ public:
   const T *memory_tensor = nullptr;
 
   const int *type_id = nullptr;
-  const int *decoding_type_id = nullptr;
+  const int *decoder_type_id = nullptr;
   const int *memory_sequence_length = nullptr;
 
   // Used for force decoding.
@@ -59,7 +59,7 @@ public:
   const int* latent_id = nullptr;
   const T* latent_embedding_table = nullptr;
   const int* role_id = nullptr;
-  const int* decoding_role_id = nullptr;
+  const int* decoder_role_id = nullptr;
   const T* role_embedding_table = nullptr;
 
   LayerNormWeight<T> layernorm;

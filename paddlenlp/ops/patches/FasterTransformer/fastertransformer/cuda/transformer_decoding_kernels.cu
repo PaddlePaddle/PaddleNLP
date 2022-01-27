@@ -28,7 +28,7 @@ __global__ void embeddings_kernels(T* from_tensor,
                                    const int batch_size,
                                    const int hidden_units,
                                    const bool pos_bias,
-                                   const int* decoding_role_id,
+                                   const int* decoder_role_id,
                                    const T* role_embedding_table) {
   // 1. lookup from embedding table
   // 2. add the position encoding
@@ -45,8 +45,8 @@ __global__ void embeddings_kernels(T* from_tensor,
         position_encoding[pos * hidden_units + col_index] +
         type_table[type_id[row_index] * hidden_units + col_index];
 
-    if (decoding_role_id) {
-      from_tensor[index] += role_embedding_table[decoding_role_id[row_index] * hidden_units + col_index];
+    if (decoder_role_id) {
+      from_tensor[index] += role_embedding_table[decoder_role_id[row_index] * hidden_units + col_index];
     }
   }
 }
@@ -64,7 +64,7 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int hidden_units,
                                 const bool pos_bias,
                                 cudaStream_t stream,
-                                const int* decoding_role_id,
+                                const int* decoder_role_id,
                                 const T* role_embedding_table) {
   dim3 grid(min(batch_size, 65536));
   dim3 block(min(hidden_units, 1024));
@@ -80,7 +80,7 @@ void embeddings_kernel_launcher(T* from_tensor,
                                                     batch_size,
                                                     hidden_units,
                                                     pos_bias,
-                                                    decoding_role_id,
+                                                    decoder_role_id,
                                                     role_embedding_table);
 }
 
@@ -386,7 +386,7 @@ template void embeddings_kernel_launcher(float* from_tensor,
                                          const int hidden_units,
                                          const bool pos_bias,
                                          cudaStream_t stream,
-                                         const int* decoding_role_id,
+                                         const int* decoder_role_id,
                                          const float* role_embedding_table);
 
 template void embeddings_kernel_launcher(half* from_tensor,
@@ -401,7 +401,7 @@ template void embeddings_kernel_launcher(half* from_tensor,
                                          const int hidden_units,
                                          const bool pos_bias,
                                          cudaStream_t stream,
-                                         const int* decoding_role_id,
+                                         const int* decoder_role_id,
                                          const half* role_embedding_table);
 
 template void start_ids_embeddings_kernel_launcher(float* from_tensor,

@@ -92,7 +92,7 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int hidden_units,
                                 const bool pos_bias,
                                 cudaStream_t stream,
-                                const int* decoding_role_id = nullptr,
+                                const int* decoder_role_id = nullptr,
                                 const T* role_embedding_table = nullptr);
 
 template <typename T>

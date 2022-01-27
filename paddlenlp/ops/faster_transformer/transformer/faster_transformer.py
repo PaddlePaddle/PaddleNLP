@@ -824,7 +824,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         input_ids = paddle.cast(input_ids, dtype="int32")
 
         token_type_ids = paddle.cast(token_type_ids, dtype="int32")
-        decoding_type_id = token_type_ids[:, -1].unsqueeze([1])
+        decoder_type_id = token_type_ids[:, -1].unsqueeze([1])
         token_type_ids = token_type_ids[:, :-1]
 
         attention_mask = attention_mask[:, :, :-1, :-1]
@@ -840,7 +840,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "attention_mask": attention_mask,
             "use_cache": True,
             "seq_len": seq_len,
-            "decoding_type_id": decoding_type_id
+            "decoder_type_id": decoder_type_id
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -867,10 +867,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 token_type_ids,
                 position_ids,
                 attention_mask,
-                decoding_type_id=None,
+                decoder_type_id=None,
                 seq_len=None,
                 role_id=None,
-                decoding_role_id=None,
+                decoder_role_id=None,
                 max_length=128,
                 min_length=0,
                 top_k=4,
@@ -923,12 +923,12 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 "Only greedy search, beam search and sampling are supported. ")
 
         model_inputs = {}
-        if decoding_type_id is None:
+        if decoder_type_id is None:
             model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                               **model_kwargs)
 
             seq_len = model_inputs.pop('seq_len')
-            decoding_type_id = model_inputs.pop('decoding_type_id')
+            decoder_type_id = model_inputs.pop('decoder_type_id')
         else:
             model_inputs["input_ids"] = input_ids
             model_inputs["attention_mask"] = attention_mask
@@ -939,9 +939,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
             type_id=model_inputs["token_type_ids"],
-            decoding_type_id=decoding_type_id,
+            decoder_type_id=decoder_type_id,
             role_id=role_id,
-            decoding_role_id=None,
+            decoder_role_id=None,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
@@ -1000,7 +1000,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         input_ids = paddle.cast(input_ids, dtype="int32")
 
         token_type_ids = paddle.cast(token_type_ids, dtype="int32")
-        decoding_type_id = token_type_ids[:, -1].unsqueeze([1])
+        decoder_type_id = token_type_ids[:, -1].unsqueeze([1])
         token_type_ids = token_type_ids[:, :-1]
 
         attention_mask = attention_mask[:, :, :-1, :-1]
@@ -1016,7 +1016,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             "attention_mask": attention_mask,
             "use_cache": True,
             "seq_len": seq_len,
-            "decoding_type_id": decoding_type_id
+            "decoder_type_id": decoder_type_id
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -1098,14 +1098,14 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
         seq_len = model_inputs.pop('seq_len')
-        decoding_type_id = model_inputs.pop('decoding_type_id')
+        decoder_type_id = model_inputs.pop('decoder_type_id')
 
         return self.decoding(
             input_ids=model_inputs["input_ids"],
             attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
             type_id=model_inputs["token_type_ids"],
-            decoding_type_id=decoding_type_id,
+            decoder_type_id=decoder_type_id,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
