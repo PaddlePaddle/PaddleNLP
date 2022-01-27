@@ -234,7 +234,7 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
 
-    if args.sharding_stage == 1:
+    if args.sharding_stage == 1 and args.sharding_degree > 1:
         optimizer = DygraphShardingOptimizer(
             hcg=fleet.get_hybrid_communicate_group(),
             user_defined_strategy=strategy,
