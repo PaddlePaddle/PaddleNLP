@@ -64,7 +64,6 @@ class LukePretrainedModel(PretrainedModel):
     pretrained_init_configuration = {
         "luke-base": {
             "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 768,
             "initializer_range": 0.02,
@@ -73,12 +72,10 @@ class LukePretrainedModel(PretrainedModel):
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "type_vocab_size": 1,
-            "vocab_size": 50265,
-            "pad_token_id": 1
+            "vocab_size": 50265
         },
         "luke-large": {
             "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
             "initializer_range": 0.02,
@@ -87,8 +84,7 @@ class LukePretrainedModel(PretrainedModel):
             "num_attention_heads": 16,
             "num_hidden_layers": 24,
             "type_vocab_size": 1,
-            "vocab_size": 50265,
-            "pad_token_id": 1
+            "vocab_size": 50265
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
