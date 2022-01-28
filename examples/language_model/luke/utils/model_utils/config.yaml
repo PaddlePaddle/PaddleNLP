@@ -1,0 +1,76 @@
+# Builtin Configurations(DO NOT CHANGE THESE CONFIGURATIONS unless you know exactly what you are doing)
+modelArts: False
+
+# Url for modelarts
+data_url: ""
+train_url: ""
+checkpoint_url: ""
+
+# Path for local
+local_data_url: "/cache/data_url"
+local_train_url: "/cache/train_url"
+local_checkpoint_url: "/cache/ckpt_url"
+
+# ==============================================================================
+# options
+model_file: "./pre_luke/luke_large"
+data: "./squad_data"
+
+# create squad squad_data
+wikipedia: "./enwiki_dataset"
+doc_stride: 128
+max_answer_length: 30
+max_entity_length: 128
+max_query_length: 64
+max_seq_length: 512
+min_mention_link_prob: 0.01
+n_best_size: 20
+no_entity: False
+null_score_diff_threshold: 0.0
+with_negative: False
+
+# train
+output_dir: "./output"
+num_train_epochs: 2
+train_batch_size: 2
+learning_rate: 0.000012 # 12e-6
+weight_decay: 0.01
+adam_b1: 0.9
+adam_b2: 0.98
+adam_eps: 0.000001 # 1e-6
+warmup_proportion: 0.09
+seed: 14
+duoka: False
+dataset_sink_mode: False
+
+# eval
+checkpoint_file: "./output/luke.ckpt"
+eval_batch_size: 8
+
+# export option
+export_batch_size: 8
+file_name: "luke_squad"
+
+# preprocess
+result_path: "./preprocess_result/"
+
+# postprocess
+label_dir=: ./preprocess_result/07_data
+result_dir: ./result_files
+---
+
+# Help description for each configuration
+modelArts: "use modelArt"
+
+# Url for modelarts
+data_url: "obs squad_data url"
+train_url: "modelArt train out url path"
+checkpoint_url: "pretrain model path url"
+
+# ==============================================================================
+# options
+model_file: "pretrain model path"
+data: "squad squad_data path"
+
+# create squad squad_data
+wikipedia: "wikipedia path"
