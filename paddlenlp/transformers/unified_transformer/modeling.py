@@ -126,6 +126,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
@@ -137,6 +139,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
+                    # TODO(guosheng): `normal` does not support float16, and
+                    # need to handle this when using fp16 as default dtype for
+                    # big models.
                     paddle.tensor.normal(
                         mean=0.0,
                         std=self.initializer_range

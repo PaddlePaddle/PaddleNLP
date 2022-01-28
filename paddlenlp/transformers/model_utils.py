@@ -293,6 +293,9 @@ class PretrainedModel(Layer, GenerationMixin):
 
             base_args = base_arg.pop("init_args", ())
             base_kwargs = base_arg
+        # To init faster on CPU big model, maybe empty is better.
+        # paddle.nn.initializer.set_global_initializer(
+        #     paddle.nn.initializer.Constant(), paddle.nn.initializer.Constant())
         if cls == cls.base_model_class:
             # Update with newly provided args and kwargs for base model
             base_args = base_args if not args else args
@@ -355,11 +358,13 @@ class PretrainedModel(Layer, GenerationMixin):
         if len(unexpected_keys) > 0:
             logger.info("Weights from pretrained model not used in {}: {}".
                         format(model.__class__.__name__, unexpected_keys))
+        dtype_prefix_len = len("paddle.")  # paddle.float16
         for k, v in model_to_load.state_dict().items():
             if not isinstance(v, np.ndarray):
-                dtype = str(v.dtype)[7:]  # paddle.float16
+                dtype = str(v.dtype)[dtype_prefix_len:]
             # TODO(guosheng): add warnings for unmatched dtypes
-            state_to_load[k] = state_to_load[k].astype(dtype)
+            if k in state_to_load:
+                state_to_load[k] = state_to_load[k].astype(dtype)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model
