@@ -60,12 +60,10 @@ parser.add_argument("--adam_b2",
                     default=0.99)
 parser.add_argument("--model_type",
                     type=str,
-                    default='luke-base'
-                    )
+                    default='luke-base')
 
 args = parser.parse_args()
 args.tokenizer = LukeTokenizer.from_pretrained(args.model_type)
-
 
 class LukeForReadingComprehension(LukePretrainedModel):
     def __init__(self, luke):
