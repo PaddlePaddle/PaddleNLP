@@ -15,6 +15,7 @@
 """Tokenization classes for LUKE."""
 
 from typing import Optional, Union, List, Dict
+
 try:
     import regex as re
 except:
@@ -36,6 +37,7 @@ except ImportError:
         return lambda func: func
 
 __all__ = ['LukeTokenizer']
+
 
 def get_pairs(word):
     """Return set of symbol pairs in a word.
@@ -198,6 +200,7 @@ class LukeTokenizer(RobertaTokenizer):
                                             pad_token=pad_token,
                                             cls_token=cls_token,
                                             mask_token=mask_token)
+
     def get_entity_vocab(self):
         """Get the entity vocab"""
         return self.entity_vocab
@@ -280,7 +283,7 @@ class LukeTokenizer(RobertaTokenizer):
                 `entity_spans_pair` without specifying this argument, the entity sequence or the batch of entity
                 sequences is automatically constructed by filling it with the [MASK] entity.
              max_mention_length (`int`):
-                    The entity_position_ids's length.
+                The entity_position_ids's length.
         """
 
         encode_output = super(LukeTokenizer, self).__call__(text,
@@ -315,9 +318,10 @@ class LukeTokenizer(RobertaTokenizer):
     def tokenize(self, text, add_prefix_space=False):
         """ Tokenize a string.
             Args:
-            - add_prefix_space (boolean, default False):
-            Begin the sentence with at least one space to get invariance to word order in GPT-2 (and Luke) tokenizers.
+              add_prefix_space (boolean, default False):
+                Begin the sentence with at least one space to get invariance to word order in GPT-2 (and Luke) tokenizers.
         """
+
         def split_on_token(tok, text):
             result = []
             split_text = text.split(tok)
