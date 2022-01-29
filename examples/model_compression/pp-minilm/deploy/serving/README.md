@@ -1,4 +1,4 @@
-# PP-MiniLM 使用 Paddle Serving API 进行推理
+# PP-MiniLM 使用 Paddle Serving API 进行服务化部署
 
 Paddle Serving 可以实现在服务器端部署推理模型，客户端远程通过 RPC/HTTP 方式发送数据进行推理，实现模型推理的服务化，下面以RPC方式为例进行说明。
 
@@ -9,19 +9,19 @@ Paddle Serving 可以实现在服务器端部署推理模型，客户端远程�
 | ppminilm.pdiparams      | 模型权重文件，供推理时加载使用            |
 | ppminilm.pdmodel        | 模型结构文件，供推理时加载使用            |
 
-假设这 2 个文件已生成，其中模型是集成了 FasterTokenizer 算子的模型，并放在在目录 `$MODEL_DIR` 下
+假设这 2 个文件已生成，并放在在目录 `$MODEL_DIR` 下。
 
 ## 环境要求
 
 使用 Paddle Serving 需要在服务器端安装相关模块，需要 v0.8.0 之后的版本：
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server paddlepaddle
+pip install paddle-serving-app paddle-serving-client paddle-serving-server
 ```
 
 如果服务器端可以使用GPU进行推理，则安装 server 的 gpu 版本，安装时要注意参考服务器当前 CUDA、TensorRT 的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.8.0)
 
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu paddlepaddle-gpu
+pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu
 ```
 
 还需要在客户端安装相关模块，也需要 v0.8.0 之后的版本：
@@ -60,12 +60,12 @@ python export_to_serving.py \
 在启动预测之前，需要按照自己的情况修改 config 文件中的配置，主要需要修改的配置释义如下：
 
 - `rpc_port` : rpc端口。
-- `device_type` : 0 代表 cpu, 1 代表 gpu, 2 代表 tensorRT, 3 代表 arm cpu, 4 代表 kunlun xpu。
+- `device_type` : 0 代表 CPU, 1 代表 GPU, 2 代表 TensorRT, 3 代表 Arm CPU, 4 代表 Kunlun XPU。
 - `devices` : 计算硬件 ID，当 devices 为 "" 或不写时，为 CPU 预测；当 devices 为"0"、 "0,1,2" 时为 GPU 预测。
 - `fetch_list` : fetch 结果列表，以 client_config 中 fetch_var 的 alias_name 为准, 如果没有设置则全部返回。
 - `model_config` : 模型路径。
 
-## 启动server
+## 启动 server
 
 在服务器端容器中，使用上一步得到的 serving_server 目录启动 server：
 
@@ -74,9 +74,9 @@ python web_service.py
 
 ```
 
-## 启动 client 进行推理
+## 启动 client 发起推理请求
 在客户端容器中，使用前面得到的 serving_client 目录启动 client 发起 RPC 推理请求。从命令行读取输入数据发起推理请求：
 
 ```shell
-python client.py
+python rpc_client.py
 ```
