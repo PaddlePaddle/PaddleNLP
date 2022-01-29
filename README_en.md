@@ -215,8 +215,11 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Join our WeChat Technical Group for technical exchange right now! ⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/148376503-3446b288-c88a-41d8-9dbd-dd095d8442ec.png" width="200" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/151304268-ae8f218c-ad32-4e9d-ae72-e8e101484272.jpg" width="200" height="200" />
 </div>
+
+
+
 
 ## ChangeLog
 
