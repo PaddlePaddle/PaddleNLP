@@ -1,4 +1,4 @@
-# PP-MiniLM 使用 Paddle Serving API 进行服务化部署
+# PP-MiniLM 使用 Paddle Serving 进行服务化部署
 
 Paddle Serving 可以实现在服务器端部署推理模型，客户端远程通过 RPC/HTTP 方式发送数据进行推理，实现模型推理的服务化，下面以RPC方式为例进行说明。
 
