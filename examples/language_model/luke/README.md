@@ -62,12 +62,12 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --num_train_epochs 3 \
     --train_batch_size 2
 ```
-训练结束后模型会对模型进行评估，其评估在验证集上完成, 训练完成后你将看到如下结果:
+训练结束后模型会对模型进行评估，其评估在测试集上完成, 训练完成后你将看到如下结果:
 ```text
 Results: {
-  "test_f1": 0.7750939345142244,
-  "test_precision": 0.7925356750823271,
-  "test_recall": 0.7584033613445378
+  "test_f1": 0.7815726767275616,
+  "test_precision": 0.7880405766150561,
+  "test_recall": 0.7752100840336135
 }
 ```
 
