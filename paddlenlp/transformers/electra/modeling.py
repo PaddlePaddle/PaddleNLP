@@ -225,6 +225,21 @@ class ElectraPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
         },
+        "chinese-ehealth": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 22608,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -239,6 +254,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
+            "chinese-ehealth":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-ehealth.pdparams"
         }
     }
 
