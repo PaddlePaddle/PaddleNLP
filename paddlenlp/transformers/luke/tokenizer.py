@@ -38,6 +38,7 @@ except ImportError:
 
 
 __all__ = ['LukeTokenizer']
+_add_prefix_space = False
 
 
 def get_pairs(word):
@@ -251,6 +252,7 @@ class LukeTokenizer(RobertaTokenizer):
                  max_mention_length=30,
                  max_seq_len: Optional[int]=None,
                  stride=0,
+                 add_prefix_space=False,
                  is_split_into_words=False,
                  pad_to_max_seq_len=False,
                  truncation_strategy="longest_first",
@@ -298,6 +300,9 @@ class LukeTokenizer(RobertaTokenizer):
              max_mention_length (`int`):
                 The entity_position_ids's length.
         """
+        global _add_prefix_space
+        if add_prefix_space:
+            _add_prefix_space = True
 
         encode_output = super(LukeTokenizer, self).__call__(
             text,
@@ -320,14 +325,34 @@ class LukeTokenizer(RobertaTokenizer):
             (is_split_into_words and isinstance(text, (list, tuple)) and
              text and isinstance(text[0], (list, tuple))))
         if is_batched:
+            if entities is None:
+                entities = [None] * len(entity_spans)
             for i, ent in enumerate(zip(entities, entity_spans)):
                 entity_encode = self.entity_encode(ent[0], max_mention_length,
                                                    ent[1])
                 encode_output[i].update(entity_encode)
+            if entity_spans_pair:
+                if entities_pair is None:
+                    entities_pair = [None] * len(entity_spans_pair)
+                for i, ent in enumerate(zip(entities_pair, entity_spans_pair)):
+                    entity_encode = self.entity_encode(
+                        ent[0], max_mention_length, ent[1], 1,
+                        encode_output[i]['input_ids'].index(self.sep_token_id) +
+                        1)
+                    for k in entity_encode.keys():
+                        encode_output[i][k] = encode_output[i][
+                            k] + entity_encode[k]
+
         else:
             entity_encode = self.entity_encode(entities, max_mention_length,
                                                entity_spans)
             encode_output.update(entity_encode)
+            if entity_spans_pair:
+                entity_encode = self.entity_encode(
+                    entities_pair, max_mention_length, entity_spans_pair, 1,
+                    encode_output['input_ids'].index(self.sep_token_id) + 2)
+            for k in entity_encode.keys():
+                encode_output[k] = encode_output[k] + entity_encode[k]
 
         return encode_output
 
@@ -337,6 +362,8 @@ class LukeTokenizer(RobertaTokenizer):
               add_prefix_space (boolean, default False):
                 Begin the sentence with at least one space to get invariance to word order in GPT-2 (and Luke) tokenizers.
         """
+        if _add_prefix_space:
+            add_prefix_space = True
 
         def split_on_token(tok, text):
             result = []
@@ -476,7 +503,12 @@ class LukeTokenizer(RobertaTokenizer):
         else:
             return self.entity_vocab[entity]
 
-    def entity_encode(self, entities, max_mention_length, entity_spans):
+    def entity_encode(self,
+                      entities,
+                      max_mention_length,
+                      entity_spans,
+                      ent_sep=0,
+                      offset_a=1):
         """Convert the string entity to digital entity"""
         mentions = []
         if entities:
@@ -493,12 +525,10 @@ class LukeTokenizer(RobertaTokenizer):
                 mentions.append((entity[0], entity[1][0], entity[1][1]))
 
         entity_ids = [0] * len(mentions)
-        entity_segment_ids = [0] * len(mentions)
+        entity_segment_ids = [ent_sep] * len(mentions)
         entity_attention_mask = [1] * len(mentions)
         entity_position_ids = [[-1 for y in range(max_mention_length)]
                                for x in range(len(mentions))]
-
-        offset_a = 1
 
         for i, (offset, (entity_id, start,
                          end)) in enumerate(zip(repeat(offset_a), mentions)):
