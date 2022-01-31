@@ -338,7 +338,7 @@ class LukeTokenizer(RobertaTokenizer):
                     entity_encode = self.entity_encode(
                         ent[0], max_mention_length, ent[1], 1,
                         encode_output[i]['input_ids'].index(self.sep_token_id) +
-                        1)
+                        2)
                     for k in entity_encode.keys():
                         encode_output[i][k] = encode_output[i][
                             k] + entity_encode[k]
