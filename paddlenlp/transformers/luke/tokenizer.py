@@ -274,13 +274,13 @@ class LukeTokenizer(RobertaTokenizer):
                     tokenizer does not support tokenization based on pretokenized strings.
              entity_spans (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
                 The sequence or batch of sequences of entity spans to be encoded. Each sequence consists of tuples each
-                with two integers denoting character-based start and end positions of entities. If you specify
-                `"entity_classification"` or `"entity_pair_classification"` as the `task` argument in the constructor,
-                the length of each sequence must be 1 or 2, respectively. If you specify `entities`, the length of each
-                sequence must be equal to the length of each sequence of `entities`.
+                with two integers denoting word-based(different from transformers LUKE) start and end positions
+                of entities. If you specify `"entity_classification"` or `"entity_pair_classification"` as the `task`
+                argument in the constructor, the length of each sequence must be 1 or 2, respectively. If you specify
+                `entities`, the length of each sequence must be equal to the length of each sequence of `entities`.
             entity_spans_pair (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
                 The sequence or batch of sequences of entity spans to be encoded. Each sequence consists of tuples each
-                with two integers denoting character-based start and end positions of entities. If you specify the
+                with two integers denoting word-based start and end positions of entities. If you specify the
                 `task` argument in the constructor, this argument is ignored. If you specify `entities_pair`, the
                 length of each sequence must be equal to the length of each sequence of `entities_pair`.
             entities (`List[str]`, `List[List[str]]`, *optional*):
@@ -534,7 +534,7 @@ class LukeTokenizer(RobertaTokenizer):
                          end)) in enumerate(zip(repeat(offset_a), mentions)):
             entity_ids[i] = entity_id
             entity_position_ids[i][:end - start] = range(start + offset,
-                                                         end + offset)
+                                                         end + offset + 1)
 
         return dict(
             entity_ids=entity_ids,
