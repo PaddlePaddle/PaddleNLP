@@ -125,8 +125,7 @@ class LukeTokenizer(RobertaTokenizer):
             tokenizer = LukeTokenizer.from_pretrained('luke-large)
 
             tokens = tokenizer('Beyoncé lives in Los Angeles', entity_spans=[(0, 7), (17, 28)])
-            #{'input_ids': [0, 40401, 261, 12695, 1074, 11, 1287, 1422, 2],
-            #'entity_ids': [1657, 32]
+            #{'input_ids': [0, 40401, 261, 12695, 1074, 11, 1287, 1422, 2], 'entity_ids': [1657, 32]}
 
     """
 
@@ -274,13 +273,13 @@ class LukeTokenizer(RobertaTokenizer):
                     tokenizer does not support tokenization based on pretokenized strings.
              entity_spans (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
                 The sequence or batch of sequences of entity spans to be encoded. Each sequence consists of tuples each
-                with two integers denoting word-based(different from transformers LUKE) start and end positions
+                with two integers denoting character-based(different from transformers LUKE) start and end positions
                 of entities. If you specify `"entity_classification"` or `"entity_pair_classification"` as the `task`
                 argument in the constructor, the length of each sequence must be 1 or 2, respectively. If you specify
                 `entities`, the length of each sequence must be equal to the length of each sequence of `entities`.
             entity_spans_pair (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
                 The sequence or batch of sequences of entity spans to be encoded. Each sequence consists of tuples each
-                with two integers denoting word-based start and end positions of entities. If you specify the
+                with two integers denoting character-based start and end positions of entities. If you specify the
                 `task` argument in the constructor, this argument is ignored. If you specify `entities_pair`, the
                 length of each sequence must be equal to the length of each sequence of `entities_pair`.
             entities (`List[str]`, `List[List[str]]`, *optional*):
@@ -327,16 +326,17 @@ class LukeTokenizer(RobertaTokenizer):
         if is_batched:
             if entities is None:
                 entities = [None] * len(entity_spans)
-            for i, ent in enumerate(zip(entities, entity_spans)):
-                entity_encode = self.entity_encode(ent[0], max_mention_length,
-                                                   ent[1])
+            for i, ent in enumerate(zip(entities, entity_spans, text)):
+                entity_encode = self.entity_encode(ent[2], ent[0],
+                                                   max_mention_length, ent[1])
                 encode_output[i].update(entity_encode)
             if entity_spans_pair:
                 if entities_pair is None:
                     entities_pair = [None] * len(entity_spans_pair)
-                for i, ent in enumerate(zip(entities_pair, entity_spans_pair)):
+                for i, ent in enumerate(
+                        zip(entities_pair, entity_spans_pair, text_pair)):
                     entity_encode = self.entity_encode(
-                        ent[0], max_mention_length, ent[1], 1,
+                        ent[2], ent[0], max_mention_length, ent[1], 1,
                         encode_output[i]['input_ids'].index(self.sep_token_id) +
                         2)
                     for k in entity_encode.keys():
@@ -344,15 +344,17 @@ class LukeTokenizer(RobertaTokenizer):
                             k] + entity_encode[k]
 
         else:
-            entity_encode = self.entity_encode(entities, max_mention_length,
-                                               entity_spans)
+            entity_encode = self.entity_encode(text, entities,
+                                               max_mention_length, entity_spans)
+
             encode_output.update(entity_encode)
             if entity_spans_pair:
                 entity_encode = self.entity_encode(
-                    entities_pair, max_mention_length, entity_spans_pair, 1,
+                    text_pair, entities_pair, max_mention_length,
+                    entity_spans_pair, 1,
                     encode_output['input_ids'].index(self.sep_token_id) + 2)
-            for k in entity_encode.keys():
-                encode_output[k] = encode_output[k] + entity_encode[k]
+                for k in entity_encode.keys():
+                    encode_output[k] = encode_output[k] + entity_encode[k]
 
         return encode_output
 
@@ -504,15 +506,29 @@ class LukeTokenizer(RobertaTokenizer):
             return self.entity_vocab[entity]
 
     def entity_encode(self,
+                      text,
                       entities,
                       max_mention_length,
                       entity_spans,
                       ent_sep=0,
                       offset_a=1):
         """Convert the string entity to digital entity"""
+
+        def convert_tuple_to_list(x):
+            """This function aim to convert tuple to list"""
+            if isinstance(x, tuple):
+                x = list(x)
+            for i, each_x in enumerate(x):
+                if isinstance(each_x, tuple):
+                    x[i] = list(each_x)
+            return x
+
         mentions = []
         if entities:
             for i, entity in enumerate(zip(entities, entity_spans)):
+                entity = convert_tuple_to_list(entity)
+                entity[1][0], entity[1][1] = self._convert_entity_pos(text,
+                                                                      entity[1])
                 if not self.entity_vocab[entity[0]]:
                     warnings.warn(f"{entity[0]} not found in entity thesaurus")
                     mentions.append((1, entity[1][0], entity[1][1]))
@@ -522,6 +538,9 @@ class LukeTokenizer(RobertaTokenizer):
         else:
             entities = [2] * len(entity_spans)
             for i, entity in enumerate(zip(entities, entity_spans)):
+                entity = convert_tuple_to_list(entity)
+                entity[1][0], entity[1][1] = self._convert_entity_pos(text,
+                                                                      entity[1])
                 mentions.append((entity[0], entity[1][0], entity[1][1]))
 
         entity_ids = [0] * len(mentions)
@@ -534,10 +553,15 @@ class LukeTokenizer(RobertaTokenizer):
                          end)) in enumerate(zip(repeat(offset_a), mentions)):
             entity_ids[i] = entity_id
             entity_position_ids[i][:end - start] = range(start + offset,
-                                                         end + offset + 1)
-
+                                                         end + offset)
         return dict(
             entity_ids=entity_ids,
             entity_segment_ids=entity_segment_ids,
             entity_attention_mask=entity_attention_mask,
             entity_position_ids=entity_position_ids)
+
+    def _convert_entity_pos(self, text, entity_span):
+        _text_token = self.tokenize(text[0:entity_span[0]].strip())
+        _entity_token = self.tokenize(text[entity_span[0]:entity_span[1]].strip(
+        ))
+        return len(_text_token), len(_text_token) + len(_entity_token)
