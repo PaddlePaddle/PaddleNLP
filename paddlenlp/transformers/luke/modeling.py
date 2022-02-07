@@ -561,19 +561,19 @@ class LukeModel(LukePretrainedModel):
     def forward(
             self,
             input_ids,
-            word_segment_ids,
-            word_attention_mask,
+            token_type_ids,
+            attention_mask,
             entity_ids,
             entity_position_ids,
             entity_segment_ids,
             entity_attention_mask, ):
-        word_embeddings = self.embeddings(input_ids, word_segment_ids)
+        word_embeddings = self.embeddings(input_ids, token_type_ids)
         entity_embeddings = self.entity_embeddings(
             entity_ids, entity_position_ids, entity_segment_ids)
-        attention_mask = self._compute_extended_attention_mask(
-            word_attention_mask, entity_attention_mask)
+        _attention_mask = self._compute_extended_attention_mask(
+            attention_mask, entity_attention_mask)
         word_hidden_state, entity_hidden_state, attention_probs = self.encoder(
-            word_embeddings, entity_embeddings, attention_mask)
+            word_embeddings, entity_embeddings, _attention_mask)
         pool_output = self.pooler(word_hidden_state)
         return word_hidden_state, entity_hidden_state, pool_output, attention_probs
 
@@ -661,8 +661,8 @@ class LukeForMaskedLM(LukePretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                word_attention_mask=None,
-                word_segment_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
                 entity_ids=None,
                 entity_position_ids=None,
                 entity_segment_ids=None,
@@ -682,8 +682,8 @@ class LukeForMaskedLM(LukePretrainedModel):
 
         outputs = self.luke(
             input_ids=input_ids,
-            word_segment_ids=word_segment_ids,
-            word_attention_mask=word_attention_mask,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
             entity_segment_ids=entity_segment_ids,
@@ -735,8 +735,8 @@ class LukeForEntityClassification(LukePretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                word_attention_mask=None,
-                word_segment_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
                 entity_ids=None,
                 entity_position_ids=None,
                 entity_segment_ids=None,
@@ -753,8 +753,8 @@ class LukeForEntityClassification(LukePretrainedModel):
 
         outputs = self.luke(
             input_ids=input_ids,
-            word_segment_ids=word_segment_ids,
-            word_attention_mask=word_attention_mask,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
             entity_segment_ids=entity_segment_ids,
@@ -793,8 +793,8 @@ class LukeForEntityPairClassification(LukePretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                word_attention_mask=None,
-                word_segment_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
                 entity_ids=None,
                 entity_position_ids=None,
                 entity_segment_ids=None,
@@ -810,8 +810,8 @@ class LukeForEntityPairClassification(LukePretrainedModel):
         """
         outputs = self.luke(
             input_ids=input_ids,
-            word_segment_ids=word_segment_ids,
-            word_attention_mask=word_attention_mask,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
             entity_segment_ids=entity_segment_ids,
@@ -851,7 +851,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                word_attention_mask=None,
+                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
                 entity_ids=None,
@@ -878,7 +878,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
         outputs = self.luke(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
-            word_attention_mask=word_attention_mask,
+            attention_mask=attention_mask,
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,
             entity_segment_ids=entity_segment_ids,
