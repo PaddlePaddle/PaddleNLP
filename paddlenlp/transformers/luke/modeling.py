@@ -560,14 +560,14 @@ class LukeModel(LukePretrainedModel):
 
     def forward(
             self,
-            word_ids,
+            input_ids,
             word_segment_ids,
             word_attention_mask,
             entity_ids,
             entity_position_ids,
             entity_segment_ids,
             entity_attention_mask, ):
-        word_embeddings = self.embeddings(word_ids, word_segment_ids)
+        word_embeddings = self.embeddings(input_ids, word_segment_ids)
         entity_embeddings = self.entity_embeddings(
             entity_ids, entity_position_ids, entity_segment_ids)
         attention_mask = self._compute_extended_attention_mask(
@@ -660,7 +660,7 @@ class LukeForMaskedLM(LukePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                word_ids=None,
+                input_ids=None,
                 word_attention_mask=None,
                 word_segment_ids=None,
                 entity_ids=None,
@@ -681,7 +681,7 @@ class LukeForMaskedLM(LukePretrainedModel):
         """
 
         outputs = self.luke(
-            word_ids=word_ids,
+            input_ids=input_ids,
             word_segment_ids=word_segment_ids,
             word_attention_mask=word_attention_mask,
             entity_ids=entity_ids,
@@ -734,7 +734,7 @@ class LukeForEntityClassification(LukePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                word_ids=None,
+                input_ids=None,
                 word_attention_mask=None,
                 word_segment_ids=None,
                 entity_ids=None,
@@ -752,7 +752,7 @@ class LukeForEntityClassification(LukePretrainedModel):
         """
 
         outputs = self.luke(
-            word_ids=word_ids,
+            input_ids=input_ids,
             word_segment_ids=word_segment_ids,
             word_attention_mask=word_attention_mask,
             entity_ids=entity_ids,
@@ -792,7 +792,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                word_ids=None,
+                input_ids=None,
                 word_attention_mask=None,
                 word_segment_ids=None,
                 entity_ids=None,
@@ -809,7 +809,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
         and 1 indicate false and true, respectively.
         """
         outputs = self.luke(
-            word_ids=word_ids,
+            input_ids=input_ids,
             word_segment_ids=word_segment_ids,
             word_attention_mask=word_attention_mask,
             entity_ids=entity_ids,
@@ -850,9 +850,9 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                word_ids=None,
+                input_ids=None,
                 word_attention_mask=None,
-                word_segment_ids=None,
+                token_type_ids=None,
                 position_ids=None,
                 entity_ids=None,
                 entity_position_ids=None,
@@ -876,8 +876,8 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
         """
 
         outputs = self.luke(
-            word_ids=word_ids,
-            word_segment_ids=word_segment_ids,
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
             word_attention_mask=word_attention_mask,
             entity_ids=entity_ids,
             entity_position_ids=entity_position_ids,

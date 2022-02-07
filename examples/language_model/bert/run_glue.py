@@ -101,7 +101,7 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument(
         "--learning_rate",
-        default=1e-4,
+        default=1e-5,
         type=float,
         help="The initial learning rate for Adam.")
     parser.add_argument(
@@ -330,7 +330,7 @@ def do_train(args):
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
         p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
+        if not any(nd in n for nd in ["bias", "Norm", "ln"])
     ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,

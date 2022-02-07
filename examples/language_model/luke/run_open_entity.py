@@ -1,3 +1,18 @@
+#encoding=utf8
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import argparse
 from paddle.io import Dataset, DataLoader
@@ -8,8 +23,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from utils.processor import *
 import paddle
+import json
 from tqdm import tqdm
 from utils.trainer import Trainer
+import os
 
 parser = argparse.ArgumentParser(description="LUKE FOR OPEN ENTITY")
 
@@ -43,7 +60,7 @@ class DataGenerator(Dataset):
         super(DataGenerator, self).__init__()
         self.args = args
         self.all_word_ids = [f.word_ids for f in features]
-        self.all_word_segment_ids = [f.word_segment_ids for f in features]
+        self.all_word_segment_ids = [f.token_type_ids for f in features]
         self.all_word_attention_mask = [f.word_attention_mask for f in features]
         self.all_entity_ids = [f.entity_ids for f in features]
         self.all_entity_position_ids = [f.entity_position_ids for f in features]
