@@ -21,11 +21,11 @@ from paddlenlp.transformers import LukeTokenizer
 from paddlenlp.transformers import LukePretrainedModel
 import paddle.nn as nn
 import paddle.nn.functional as F
-from utils.processor import *
+from .utils.processor import *
 import paddle
 import json
 from tqdm import tqdm
-from utils.trainer import Trainer
+from .utils.trainer import Trainer
 import os
 
 parser = argparse.ArgumentParser(description="LUKE FOR OPEN ENTITY")
