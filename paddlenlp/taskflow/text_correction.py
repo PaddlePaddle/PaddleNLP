@@ -72,7 +72,7 @@ class CSCTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "pinyin_vocab": "pinyin_vocab.txt"    
+        "pinyin_vocab": "pinyin_vocab.txt"
     }
     resource_files_urls = {
         "csc-ernie-1.0": {
@@ -81,7 +81,7 @@ class CSCTask(Task):
                 "cdc53e7e3985ffc78fedcdf8e6dca6d2"
             ],
             "pinyin_vocab": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",
                 "5599a8116b6016af573d08f8e686b4b2"
             ],
         }
@@ -101,7 +101,6 @@ class CSCTask(Task):
                 "Please install the dependencies first, pip install pypinyin --upgrade"
             )
         self._pypinyin = pypinyin
-        self._max_seq_length = 128
         self._batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # input
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # segment
@@ -114,6 +113,8 @@ class CSCTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         self._lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
+        self._max_seq_len = self.kwargs[
+            'max_seq_len'] if 'max_seq_len' in self.kwargs else 128
 
     def _construct_input_spec(self):
         """
@@ -154,10 +155,13 @@ class CSCTask(Task):
         self._tokenizer = ErnieTokenizer.from_pretrained(TASK_MODEL_MAP[model])
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
-        inputs = self._check_input_text(inputs)
+        input_texts = self._check_input_text(inputs)
         examples = []
         texts = []
-        for text in inputs:
+        max_predict_len = self._max_seq_len - 2
+        short_input_texts, self.input_mapping = self._auto_splitter(
+            input_texts, max_predict_len)
+        for text in short_input_texts:
             if not (isinstance(text, str) and len(text) > 0):
                 continue
             example = {"source": text.strip()}
@@ -171,7 +175,7 @@ class CSCTask(Task):
             for idx in range(0, len(examples), self._batch_size)
         ]
         batch_texts = [
-            texts[idx:idx + self._batch_size]
+            short_input_texts[idx:idx + self._batch_size]
             for idx in range(0, len(examples), self._batch_size)
         ]
         outputs = {}
@@ -201,6 +205,29 @@ class CSCTask(Task):
                 results.append(batch_result)
         inputs['batch_results'] = results
         return inputs
+
+    def auto_joiner(self, results, input_mapping):
+        concat_results = []
+        single_results = {}
+        for k, vs in input_mapping.items():
+            pos_id = 0
+            for v in vs:
+                if len(single_results) == 0:
+                    single_results = results[v]
+                    pos_id = len(results[v]["source"]) - 1
+                else:
+                    single_results["source"] += results[v]["source"]
+                    single_results["target"] += results[v]["target"]
+                    tmp_errors = []
+                    for e in results[v]["errors"]:
+                        e['position'] += (length + 1)
+                        tmp_errors.append(e)
+                    single_results["errors"].extend(tmp_errors)
+                    pos_id += len(results[v]["source"])
+            concat_results.append(single_results)
+            single_results = {}
+            length = 0
+        return concat_results
 
     def _postprocess(self, inputs):
         """
@@ -236,8 +263,6 @@ class CSCTask(Task):
     def _convert_example(self, example):
         source = example["source"]
         words = list(source)
-        if len(words) > self._max_seq_length - 2:
-            words = words[:self._max_seq_length - 2]
         length = len(words)
         words = ['[CLS]'] + words + ['[SEP]']
         input_ids = self._tokenizer.convert_tokens_to_ids(words)
@@ -277,7 +302,7 @@ class CSCTask(Task):
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
         rest_words = []
-        max_seq_length = self._max_seq_length - 2
+        max_seq_length = self._max_seq_len - 2
         if len(words) > max_seq_length:
             rest_words = words[max_seq_length:]
             words = words[:max_seq_length]

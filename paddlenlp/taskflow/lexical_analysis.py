@@ -93,7 +93,7 @@ class LacTask(Task):
     resource_files_urls = {
         "lac": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/model_state.pdparams", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/model_state.pdparams",
                 "3d4008c6c9d29424465829c9acf909bd"
             ],
             "tags": [
@@ -111,17 +111,14 @@ class LacTask(Task):
         }
     }
 
-    def __init__(self, 
-                 task, 
-                 model,
-                 user_dict=None,
-                 **kwargs):
+    def __init__(self, task, model, user_dict=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
         self._user_dict = user_dict
         self._check_task_files()
         self._construct_vocabs()
         self._get_inference_model()
+        self._max_seq_len = 512
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -157,8 +154,7 @@ class LacTask(Task):
         """
         model_instance = BiGruCrf(self.kwargs['emb_dim'],
                                   self.kwargs['hidden_size'],
-                                  len(self._word_vocab), 
-                                  len(self._tag_vocab))
+                                  len(self._word_vocab), len(self._tag_vocab))
         # Load the model parameter for the predict
         state_dict = paddle.load(
             os.path.join(self._task_path, "model_state.pdparams"))
@@ -188,13 +184,16 @@ class LacTask(Task):
         oov_token_id = self._word_vocab.get("OOV")
 
         filter_inputs = []
+        for input in inputs:
+            if not (isinstance(input, str) and len(input.strip()) > 0):
+                continue
+            filter_inputs.append(input)
+
+        short_input_texts, self.input_mapping = self._auto_splitter(
+            filter_inputs, self._max_seq_len)
 
         def read(inputs):
             for input_tokens in inputs:
-                if not (isinstance(input_tokens, str) and
-                        len(input_tokens.strip()) > 0):
-                    continue
-                filter_inputs.append(input_tokens)
                 ids = []
                 for token in input_tokens:
                     token = self._q2b_vocab.get(token, token)
@@ -203,7 +202,7 @@ class LacTask(Task):
                 lens = len(ids)
                 yield ids, lens
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=False)
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=False)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=0, dtype="int64"),  # input_ids
             Stack(dtype='int64'),  # seq_len
@@ -216,7 +215,7 @@ class LacTask(Task):
             shuffle=False,
             return_list=True)
         outputs = {}
-        outputs['text'] = filter_inputs
+        outputs['text'] = short_input_texts
         outputs['data_loader'] = infer_data_loader
         return outputs
 
@@ -237,6 +236,21 @@ class LacTask(Task):
         inputs['result'] = results
         inputs['lens'] = lens
         return inputs
+
+    def _auto_joiner(self, results, input_mapping):
+        concat_results = []
+        single_results = {}
+        for k, vs in input_mapping.items():
+            for v in vs:
+                if len(single_results) == 0:
+                    single_results = results[v]
+                else:
+                    single_results["text"] += results[v]["text"]
+                    single_results["segs"].extend(results[v]["segs"])
+                    single_results["tags"].extend(results[v]["tags"])
+            concat_results.append(single_results)
+            single_results = {}
+        return concat_results
 
     def _postprocess(self, inputs):
         """
@@ -278,4 +292,5 @@ class LacTask(Task):
             single_result['segs'] = sent_out
             single_result['tags'] = tags_out
             final_results.append(single_result)
+        final_results = self._auto_joiner(final_results, self.input_mapping)
         return final_results

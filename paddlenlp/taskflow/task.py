@@ -15,6 +15,7 @@
 
 import os
 import abc
+import math
 from abc import abstractmethod
 import paddle
 from ..utils.env import PPNLP_HOME
@@ -50,15 +51,15 @@ class Task(metaclass=abc.ABCMeta):
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
         else:
-            self._task_path = os.path.join(self._home_path, "taskflow", 
-                self.task, self.model)
+            self._task_path = os.path.join(self._home_path, "taskflow",
+                                           self.task, self.model)
         download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
         """
-       Construct the inference model for the predictor.
-       """
+        Construct the inference model for the predictor.
+        """
 
     @abstractmethod
     def _construct_tokenizer(self, model):
@@ -112,8 +113,7 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
             # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
-            self._config.delete_pass(
-                "embedding_eltwise_layernorm_fuse_pass")
+            self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
@@ -175,6 +175,34 @@ class Task(metaclass=abc.ABCMeta):
                 "Invalid inputs, input text should be str or list of str, but type of {} found!".
                 format(type(inputs)))
         return inputs
+
+    def _auto_splitter(self, input_texts, max_text_len):
+        """
+        Split the input texts into several chunks automatically, ensure that the length of model input meets the requirements.
+        """
+        input_mapping = {}
+        short_input_texts = []
+        cnt_org = 0
+        cnt_short = 0
+        for text in input_texts:
+            if len(text) <= max_text_len:
+                short_input_texts.append(text)
+                input_mapping[cnt_org] = [cnt_short]
+                cnt_short += 1
+            else:
+                lens = len(text)
+                temp_text_list = [
+                    text[i:i + max_text_len]
+                    for i in range(0, len(text), max_text_len)
+                ]
+                short_input_texts.extend(temp_text_list)
+                short_idx = cnt_short
+                cnt_short += math.ceil(len(text) / max_text_len)
+                input_mapping[cnt_org] = [
+                    short_idx + i for i in range(cnt_short - short_idx)
+                ]
+            cnt_org += 1
+        return short_input_texts, input_mapping
 
     def help(self):
         """

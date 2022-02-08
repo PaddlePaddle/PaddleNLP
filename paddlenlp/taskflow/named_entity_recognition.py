@@ -89,9 +89,8 @@ class NERTask(WordTagTask):
         for sent_index in range(len(batch_texts)):
             sent = batch_texts[sent_index]
             tags = [
-                self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:len(
-                    sent) + self.summary_num]
+                self._index_to_tags[index] for index in batch_pred_tags[
+                    sent_index][self.summary_num:len(sent) + self.summary_num]
             ]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
@@ -122,32 +121,21 @@ class NERTask(WordTagTask):
             batch_results.append(result)
         return batch_results
 
-    def _concat_short_text_reuslts(self, input_texts, results):
+    def _auto_joiner(self, results, input_mapping):
         """
         Concat the model output of short texts to the total result of long text.
         """
-        long_text_lens = [len(text) for text in input_texts]
         concat_results = []
         single_results = {}
-        count = 0
-        for text in input_texts:
-            text_len = len(text)
-            while True:
-                if len(single_results) == 0 or len(single_results[
-                        "text"]) < text_len:
-                    if len(single_results) == 0:
-                        single_results = copy.deepcopy(results[count])
-                    else:
-                        single_results["text"] += results[count]["text"]
-                        single_results["items"].extend(results[count]["items"])
-                    count += 1
-                elif len(single_results["text"]) == text_len:
-                    concat_results.append(single_results)
-                    single_results = {}
-                    break
+        for k, vs in input_mapping.items():
+            for v in vs:
+                if len(single_results) == 0:
+                    single_results = results[v]
                 else:
-                    raise Exception(
-                        "The length of input text and raw text is not equal.")
+                    single_results["text"] += results[v]["text"]
+                    single_results["items"].extend(results[v]["items"])
+            concat_results.append(single_results)
+            single_results = {}
         simple_results = []
         for result in concat_results:
             simple_result = []
@@ -165,5 +153,5 @@ class NERTask(WordTagTask):
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        results = self._concat_short_text_reuslts(inputs['inputs'], results)
+        results = self._auto_joiner(results, self.input_mapping)
         return results
