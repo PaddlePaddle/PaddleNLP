@@ -42,7 +42,7 @@ __global__ void embeddings_kernels(T* from_tensor,
 
     int position_index;
     if (decoder_position_id) {
-      position_index = decoder_position_id[row_index] * hidden_units + col_index;
+      position_index = (decoder_position_id[row_index] + step - 1) * hidden_units + col_index;
     } else {
       int pos = (pos_bias) ? (step - 1 + memory_sequence_length[row_index])
                            : (step - 1);

@@ -1249,6 +1249,15 @@ class InferUnifiedDecoding(nn.Layer):
                     self._model.embeddings.token_type_embeddings.weight,
                     restore_data=True)
             ]
+
+            if getattr(self._model.embeddings, "role_embeddings",
+                       None) is not None:
+                self.sub_modules["role_embedding_table"] = [
+                    transfer_param(
+                        self._model.embeddings.role_embeddings.weight,
+                        restore_data=True)
+                ]
+
             if self._normalize_before:
                 self.sub_modules["decoder_ln_weight"] = [
                     transfer_param(
@@ -1346,6 +1355,13 @@ class InferUnifiedDecoding(nn.Layer):
             self.sub_modules["type_emb"] = [
                 self._model.embeddings.token_type_embeddings.weight
             ]
+
+            if getattr(self._model.embeddings, "role_embeddings",
+                       None) is not None:
+                self.sub_modules["role_embedding_table"] = [
+                    self._model.embeddings.role_embeddings.weight
+                ]
+
             if self._normalize_before:
                 self.sub_modules[
                     "decoder_ln_weight"] = [self._model.encoder.norm.weight]
@@ -1402,9 +1418,10 @@ class InferUnifiedDecoding(nn.Layer):
         if role_id is None:
             role_id = paddle.zeros(shape=[0], dtype="int32")
             decoder_role_id = paddle.zeros(shape=[0], dtype="int32")
-            self.role_embedding_table = [
+            self.sub_modules["role_embedding_table"] = [
                 paddle.zeros(
-                    shape=[0], dtype="float32")
+                    shape=[0],
+                    dtype="float16" if self._use_fp16_decoding else "float32")
             ]
         if position_id is None:
             position_id = paddle.zeros(shape=[0], dtype="int32")
@@ -1464,7 +1481,7 @@ class InferUnifiedDecoding(nn.Layer):
             type_emb=self.sub_modules["type_emb"],
             role_id=[role_id],
             decoder_role_id=[decoder_role_id],
-            role_emb=self.role_embedding_table,
+            role_emb=self.sub_modules["role_embedding_table"],
             position_id=[position_id],
             decoder_position_id=[decoder_position_id],
             _decoding_strategy=decoding_strategy,

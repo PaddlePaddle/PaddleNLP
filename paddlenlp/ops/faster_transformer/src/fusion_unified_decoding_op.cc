@@ -374,6 +374,7 @@ PD_BUILD_OP(fusion_unified_decoding)
              "PositionEncEmb",
              "TypeEmb",
              "RoleIds",
+             "DecRoleIds",
              "RoleEmbedding",
              "PositionIds",
              "DecPositionIds"})

@@ -507,7 +507,9 @@ public:
       finished: false
       word_ids: start_id_
     */
-
+    if (decoding_params.output_scores) {
+   	  cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
+    }
     if (args_.candidate_num_ != 0) {
       sampling_init_kernelLauncher(finished_buf_,
                                    decoding_params.sequence_length,

@@ -600,10 +600,10 @@ __global__ void topk_stage_2_opt3_sampling_v2(
   extern __shared__ char array[];
   __shared__ float rand_num;
   __shared__ float s_sum;
-  __shared__ float s_max;
+  // __shared__ float s_max;
   T* s_val = topk_tmp_val_buf + batch_id * size;
   int* s_id = (int*)(array);
-  s_max = (float)0.0f;
+  // s_max = (float)0.0f;
   s_sum = (float)0.0f;
   TopK_2<float> partial;
 
@@ -624,7 +624,7 @@ __global__ void topk_stage_2_opt3_sampling_v2(
     TopK_2<float> total =
         BlockReduce(temp_storage).Reduce(partial, reduce_topk_op_2<float>);
 
-    if (ite == 0) s_max = total.u;
+    // if (ite == 0) s_max = total.u;
 
     if (tid == 0) {
       s_id[ite] = total.p;
