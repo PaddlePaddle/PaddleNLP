@@ -352,8 +352,9 @@ class WordTagTask(Task):
         for sent_index in range(len(batch_texts)):
             sent = batch_texts[sent_index]
             tags = [
-                self._index_to_tags[index] for index in batch_pred_tags[
-                    sent_index][self.summary_num:len(sent) + self.summary_num]
+                self._index_to_tags[index]
+                for index in batch_pred_tags[sent_index][self.summary_num:len(
+                    sent) + self.summary_num]
             ]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
@@ -735,7 +736,6 @@ class NPTagTask(Task):
         all_scores_can = []
         all_preds_can = []
         pred_ids = []
-
         for batch in inputs['data_loader']:
             input_ids, token_type_ids, label_indices = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
