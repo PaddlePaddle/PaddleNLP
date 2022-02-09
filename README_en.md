@@ -1,7 +1,7 @@
 English | [简体中文](./README.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="718" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -212,10 +212,10 @@ Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for con
 To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
 
 ### WeChat
-Join our WeChat Technical Group for technical exchange right now! ⬇️
+Join our WeChat Group for technical exchange right now! ⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/148376503-3446b288-c88a-41d8-9dbd-dd095d8442ec.png" width="200" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/152269366-7655809f-09ec-4547-90eb-92e178425280.jpg" width="210" height="200" />
 </div>
 
 ## ChangeLog

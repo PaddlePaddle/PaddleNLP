@@ -169,6 +169,7 @@ class RobertaTokenizer(PretrainedTokenizer):
                 vocab_file=vocab_file, do_lower_case=True, **kwargs)
             self.basic_tokenizer = self.tokenizer.basic_tokenizer
             self.wordpiece_tokenizer = self.tokenizer.wordpiece_tokenizer
+            self.vocab = self.tokenizer.vocab
         else:
             raise ValueError(
                 "You should specify both of 'vocal_file'"

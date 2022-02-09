@@ -369,20 +369,23 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = paddle.gather(attention_mask,
                                                            index)
 
-        if "token_type_ids" in model_kwargs:
+        if "token_type_ids" in model_kwargs and model_kwargs[
+                "token_type_ids"] is not None:
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
                                                            index)
 
-        if "position_ids" in model_kwargs:
+        if "position_ids" in model_kwargs and model_kwargs[
+                "position_ids"] is not None:
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.gather(position_ids, index)
 
-        if "seq_len" in model_kwargs:
+        if "seq_len" in model_kwargs and model_kwargs["seq_len"] is not None:
             seq_len = model_kwargs["seq_len"]
             model_kwargs["seq_len"] = paddle.gather(seq_len, index)
 
-        if "encoder_output" in model_kwargs:
+        if "encoder_output" in model_kwargs and model_kwargs[
+                "encoder_output"] is not None:
             encoder_output = model_kwargs["encoder_output"]
             model_kwargs["encoder_output"] = paddle.gather(encoder_output,
                                                            index)
@@ -422,17 +425,27 @@ class GenerationMixin(object):
             # nn.Pad2D don't support the data type `bool`
             if convert_dtype(attention_mask.dtype) == 'bool':
                 attention_mask = paddle.cast(attention_mask, 'int64')
-            attention_mask = nn.Pad2D(
-                [0, 0, 0, 1], mode='replicate')(attention_mask)
-            attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e9)(attention_mask)
-            dtype = convert_dtype(attention_mask.dtype)
-            if 'int' in dtype:
-                attention_mask[:, :, -1, -1] = 1
-            elif 'float' in dtype:
-                attention_mask[:, :, -1, -1] = 0.0
+            if len(attention_mask.shape) == 4:
+                attention_mask = nn.Pad2D(
+                    [0, 0, 0, 1], mode='replicate')(attention_mask)
+                attention_mask = nn.Pad2D(
+                    [0, 1, 0, 0], value=-1e4)(attention_mask)
+                dtype = convert_dtype(attention_mask.dtype)
+                if 'int' in dtype:
+                    attention_mask[:, :, -1, -1] = 1
+                elif 'float' in dtype:
+                    attention_mask[:, :, -1, -1] = 0.0
+                else:
+                    raise ValueError(
+                        'The data type of input `attention_mask` must '
+                        'be bool, int or float')
             else:
-                raise ValueError('The data type of input `attention_mask` must '
-                                 'be bool, int or float')
+                attention_mask = paddle.concat(
+                    [
+                        attention_mask, paddle.ones(
+                            [attention_mask.shape[0], 1], dtype="int64")
+                    ],
+                    axis=-1)
             model_kwargs["attention_mask"] = attention_mask
 
         return model_kwargs
