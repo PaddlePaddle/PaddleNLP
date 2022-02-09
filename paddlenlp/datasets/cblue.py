@@ -13,16 +13,16 @@ from . import DatasetBuilder
 class CBLUE(DatasetBuilder):
     '''
     The Chinese Biomedical Language Understanding Evaluation (CBLUE) benchmark
-    is a collection of natural language understanding tasks including named 
+    is a collection of natural language understanding tasks including named
     entity recognition, information extraction, clinical diagnosis normalization
     and single-sentence/sentence-pair classification.
     From https://github.com/CBLUEbenchmark/CBLUE
 
     CMeEE:
         The Chinese Medical Named Entity Recognition is first released in CHIP20204.
-        Given a pre-defined schema, the task is to identify and extract entities 
-        from the given sentence and classify them into nine categories: disease, 
-        clinical manifestations, drugs, medical equipment, medical procedures, 
+        Given a pre-defined schema, the task is to identify and extract entities
+        from the given sentence and classify them into nine categories: disease,
+        clinical manifestations, drugs, medical equipment, medical procedures,
         body, medical examinations, microorganisms, and department.
 
     CMeIE:
@@ -34,6 +34,12 @@ class CBLUE(DatasetBuilder):
     CHIP-CDN:
         The CHIP Clinical Diagnosis Normalization dataset aims to standardize
         the terms from the final diagnoses of Chinese electronic medical records.
+
+    CHIP-CDN-2C:
+        The CHIP Clinical Diagnosis Normalization dataset is reformalized as a task of
+        pairwise classification to judge if a normalized term matches the original term
+        or not. For each original term from the whole ICD-10 vocabulary, 100 candidates
+        normalized terms are retrieved using Elasticsearch.
 
     CHIP-CTC:
         The CHIP Clinical Trial Classification dataset aimed at classifying
@@ -51,11 +57,11 @@ class CBLUE(DatasetBuilder):
         effects, treatment fees, and others.
 
     KUAKE-QTR:
-        The KUAKE Query Title Relevance dataset is used to estimate the 
+        The KUAKE Query Title Relevance dataset is used to estimate the
         relevance of the title of a query document.
 
     KUAKE-QQR:
-        The KUAKE Query-Query Relevance dataset is used to evaluate the 
+        The KUAKE Query-Query Relevance dataset is used to evaluate the
         relevance of the content expressed in two queries.
     '''
 
@@ -77,7 +83,13 @@ class CBLUE(DatasetBuilder):
                     'c45b3b3d79ca29776e3d9f009b7d6ee5', ['test']
                 ]
             },
-            'labels': ['dis', 'sym', 'pro', 'equ', 'dru', 'ite', 'bod', 'dep', 'mic']
+            'labels': [[
+                'B-dis', 'I-dis', 'E-dis', 'S-dis', 'B-pro', 'I-pro', 'E-pro',
+                'S-pro', 'B-equ', 'I-equ', 'E-equ', 'S-equ', 'B-dru', 'I-dru',
+                'E-dru', 'S-dru', 'B-ite', 'I-ite', 'E-ite', 'S-ite', 'B-bod',
+                'I-bod', 'E-bod', 'S-bod', 'B-dep', 'I-dep', 'E-dep', 'S-dep',
+                'B-mic', 'I-mic', 'E-mic', 'S-mic', 'O'
+            ], ['B-sym', 'I-sym', 'E-sym', 'S-sym', 'O']]
         },
         'CMeIE': {
             'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CMeIE.zip',
@@ -99,7 +111,8 @@ class CBLUE(DatasetBuilder):
             'labels': '53_schema.json'
         },
         'CHIP-CDN': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-CDN.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-CDN.zip',
             'md5': 'e378d6bfe6740aadfb197ca352db3427',
             'splits': {
                 'train': [
@@ -117,8 +130,29 @@ class CBLUE(DatasetBuilder):
             },
             'labels': '国际疾病分类 ICD-10北京临床版v601.xlsx'
         },
+        'CHIP-CDN-2C': {
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-CDN-2C.zip',
+            'md5': '6dce903ff95713947d349b4a4e61a486',
+            'splits': {
+                'train': [
+                    os.path.join('CHIP-CDN-2C', 'train.tsv'),
+                    '28e38f631b77b33bff0fd018d84c670f', ['text_a', 'text_b']
+                ],
+                'dev': [
+                    os.path.join('CHIP-CDN-2C', 'dev.tsv'),
+                    '801a0e12101a7ed2261b5984350cd238', ['text_a', 'text_b']
+                ],
+                'test': [
+                    os.path.join('CHIP-CDN-2C', 'test.tsv'),
+                    '0ff464a3c34b095f4d4c22753a119164', ['text_a', 'text_b']
+                ]
+            },
+            'labels': ['0', '1']
+        },
         'CHIP-CTC': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-CTC.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-CTC.zip',
             'md5': '43d804211d46f9374c18ab13d6984f29',
             'splits': {
                 'train': [
@@ -137,29 +171,28 @@ class CBLUE(DatasetBuilder):
             'labels': 'category.xlsx'
         },
         'CHIP-STS': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-STS.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CHIP-STS.zip',
             'md5': '4d4db5ef14336e3179e4e1f3c1cc2621',
             'splits': {
                 'train': [
                     os.path.join('CHIP-STS', 'CHIP-STS_train.json'),
-                    'c6150e2628f107cf2657feb4ed2ba65b', 
-                    ['text1', 'text2']
+                    'c6150e2628f107cf2657feb4ed2ba65b', ['text1', 'text2']
                 ],
                 'dev': [
                     os.path.join('CHIP-STS', 'CHIP-STS_dev.json'),
-                    '2813ecc0222ef8e4612296776e54639d',
-                    ['text1', 'text2']
+                    '2813ecc0222ef8e4612296776e54639d', ['text1', 'text2']
                 ],
                 'test': [
                     os.path.join('CHIP-STS', 'CHIP-STS_test.json'),
-                    '44394681097024aa922e4e33fa651360',
-                    ['text1', 'text2']
+                    '44394681097024aa922e4e33fa651360', ['text1', 'text2']
                 ]
             },
             'labels': ['0', '1']
         },
         'KUAKE-QIC': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QIC.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QIC.zip',
             'md5': '7661e3a6b5daf4ee025ba407669788d8',
             'splits': {
                 'train': [
@@ -175,12 +208,14 @@ class CBLUE(DatasetBuilder):
                     '337dc7f3cdc77b1a21b534ecb3142a6b', ['query']
                 ]
             },
-            'labels': ['病情诊断', '治疗方案', '病因分析', '指标解读',
-                       '就医建议', '疾病表述', '后果表述',
-                       '注意事项', '功效作用', '医疗费用', '其他']
+            'labels': [
+                '病情诊断', '治疗方案', '病因分析', '指标解读', '就医建议', '疾病表述', '后果表述', '注意事项',
+                '功效作用', '医疗费用', '其他'
+            ]
         },
         'KUAKE-QTR': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QTR.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QTR.zip',
             'md5': 'a59686c2b489ac64ff6f0f029c1df068',
             'splits': {
                 'train': [
@@ -199,29 +234,26 @@ class CBLUE(DatasetBuilder):
             'labels': ['0', '1', '2', '3']
         },
         'KUAKE-QQR': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QQR.zip',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QQR.zip',
             'md5': 'b7fdeed0ae56e450d7cf3aa7c0b19e20',
             'splits': {
                 'train': [
                     os.path.join('KUAKE-QQR', 'KUAKE-QQR_train.json'),
-                    'f667e31610acf3f107369310b78d56a9',
-                    ('query1', 'query2')
+                    'f667e31610acf3f107369310b78d56a9', ('query1', 'query2')
                 ],
                 'dev': [
                     os.path.join('KUAKE-QQR', 'KUAKE-QQR_dev.json'),
-                    '597354382a806b8168a705584f4f6887',
-                    ('query1', 'query2')
+                    '597354382a806b8168a705584f4f6887', ('query1', 'query2')
                 ],
                 'test': [
                     os.path.join('KUAKE-QQR', 'KUAKE-QQR_test.json'),
-                    '2d257135c6e1651d24a84496dd50c658',
-                    ('query1', 'query2')
+                    '2d257135c6e1651d24a84496dd50c658', ('query1', 'query2')
                 ]
             },
             'labels': ['0', '1', '2']
         }
     }
-
 
     def _get_data(self, mode, **kwargs):
         builder_config = self.BUILDER_CONFIGS[self.name]
@@ -234,19 +266,46 @@ class CBLUE(DatasetBuilder):
                               builder_config['md5'])
         return fullname
 
-
     def _read(self, filename, split):
-        if self.name == 'CMeIE':
-            pass
-        elif self.name == 'CMeEE':
-            pass
-        else:
-            _, _, input_keys = self.BUILDER_CONFIGS[self.name]['splits'][split]
-            with open(filename, 'r', encoding='utf-8') as f:
-                data_list = json.load(f)
+        _, _, input_keys = self.BUILDER_CONFIGS[self.name]['splits'][split]
+        with open(filename, 'r', encoding='utf-8') as f:
+            if self.name == 'CMeIE':
+                data_list = json.load(f, encoding='utf-8')
+                pass
+            elif self.name == 'CMeEE':
+                data_list = json.load(f, encoding='utf-8')
+                for data in data_list:
+                    text_len = len(data[input_keys[0]])
+                    if data.get('entities', None):
+                        labels = [['O' * text_len], ['O' * text_len]]
+                        for entity in data['entities']:
+                            start_idx = entity['start_idx']
+                            end_idx = entity['end_idx']
+                            etype = entity['type']
+                            ltype = int(etype == 'sym')
+                            if start_idx == end_idx:
+                                labels[ltype][end_idx] = 'S-' + etype
+                            else:
+                                labels[ltype][start_idx] = 'B-' + etype
+                                labels[ltype][end_idx] = 'E-' + etype
+                                for x in range(start_idx + 1, end_idx):
+                                    labels[ltype][x] = 'I-' + etype
+                        data.pop('entities')
+                    yield data
+            elif self.name == 'CHIP-CDN-2C':
+                data_keys = f.readline().strip().split('\t')
+                for data in f:
+                    data = data.strip().split('\t')
+                    data = dict([(k, v) for k, v in zip(data_keys, data)])
+                    yield data
+            else:
+                data_list = json.load(f, encoding='utf-8')
                 for data in data_list:
                     if data.get('normalized_result', None):
-                        data['labels'] = [x.strip('"') for x in data['normalized_result'].split('##')]
+                        data['labels'] = [
+                            x.strip('"')
+                            for x in data['normalized_result'].split('##')
+                        ]
                         data.pop('normalized_result')
                     data['text_a'] = data[input_keys[0]]
                     data.pop(input_keys[0])
@@ -254,7 +313,6 @@ class CBLUE(DatasetBuilder):
                         data['text_b'] = data[input_keys[1]]
                         data.pop(input_keys[1])
                     yield data
-
 
     def get_labels(self):
         """
@@ -267,15 +325,15 @@ class CBLUE(DatasetBuilder):
         if self.name == 'CHIP-CDN':
             name = [x for x in os.listdir(label_dir) if x.endswith('.xlsx')][0]
             labels = pd.read_excel(os.path.join(label_dir, name), header=None)
-            return labels[1].values
+            return sorted(labels[1].values)
         elif self.name == 'CHIP-CTC':
             labels = pd.read_excel(os.path.join(label_dir, labels))
-            return labels['Label Name'].values
+            return sorted(labels['Label Name'].values)
         elif self.name == 'CMeIE':
             labels = []
             with open(os.path.join(label_dir, labels), 'r') as f:
                 for line in f.readlines():
                     labels.append(json.loads(line))
-            return labels
+            return sorted(labels)
         else:
             return self.BUILDER_CONFIGS[self.name]['labels']
