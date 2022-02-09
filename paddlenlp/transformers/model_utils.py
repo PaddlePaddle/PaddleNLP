@@ -111,6 +111,7 @@ class PretrainedModel(Layer, GenerationMixin):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
+    pretrained_model_name = "_default"
 
     def _wrap_init(self, original_init, *args, **kwargs):
         """
@@ -194,6 +195,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
+            cls.pretrained_model_name = pretrained_model_name_or_path
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]

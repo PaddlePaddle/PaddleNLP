@@ -62,8 +62,13 @@ ACT2FN = {
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self, vocab_size, embedding_size, hidden_dropout_prob,
-                 max_position_embeddings, type_vocab_size):
+    def __init__(self,
+                 vocab_size,
+                 embedding_size,
+                 hidden_dropout_prob,
+                 max_position_embeddings,
+                 type_vocab_size,
+                 layer_norm_eps=1e-12):
         super(ElectraEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
@@ -71,7 +76,7 @@ class ElectraEmbeddings(nn.Layer):
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
                                                   embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
@@ -208,7 +213,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 21128,
+            "vocab_size": 21128
         },
         "chinese-electra-base": {
             "attention_probs_dropout_prob": 0.1,
@@ -223,7 +228,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 21128,
+            "vocab_size": 21128
         },
         "chinese-ehealth": {
             "attention_probs_dropout_prob": 0.1,
@@ -238,7 +243,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 22608,
+            "vocab_size": 22608
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -258,6 +263,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-ehealth.pdparams"
         }
     }
+    layer_norm_eps = {"chinese-ehealth": 1e-5, "_default": 1e-12}
+    finetune_act = {"chinese-ehealth": "tanh", "_default": "gelu"}
 
     def init_weights(self):
         """
@@ -292,7 +299,8 @@ class ElectraPretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = 1e-12
+            layer._epsilon = self.layer_norm_eps.get(self.pretrained_model_name,
+                                                     1e-12)
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
@@ -383,7 +391,8 @@ class ElectraModel(ElectraPretrainedModel):
         self.initializer_range = initializer_range
         self.embeddings = ElectraEmbeddings(
             vocab_size, embedding_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+            max_position_embeddings, type_vocab_size,
+            self.layer_norm_eps.get(self.pretrained_model_name, 1e-12))
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -647,12 +656,13 @@ class ElectraClassificationHead(nn.Layer):
 
     """
 
-    def __init__(self, hidden_size, hidden_dropout_prob, num_classes):
+    def __init__(self, hidden_size, hidden_dropout_prob, num_classes,
+                 activation):
         super(ElectraClassificationHead, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.out_proj = nn.Linear(hidden_size, num_classes)
-        self.act = get_activation("gelu")
+        self.act = get_activation(activation)
 
     def forward(self, features, **kwargs):
         r"""
@@ -670,7 +680,7 @@ class ElectraClassificationHead(nn.Layer):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
-        x = self.act(x)  # Electra paper used gelu here
+        x = self.act(x)
         x = self.dropout(x)
         x = self.out_proj(x)
         return x
@@ -700,7 +710,9 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             hidden_size=self.electra.config["hidden_size"],
             hidden_dropout_prob=dropout if dropout is not None else
             self.electra.config["hidden_dropout_prob"],
-            num_classes=self.num_classes, )
+            num_classes=self.num_classes,
+            activation=self.finetune_act.get(self.pretrained_model_name,
+                                             "gelu"))
         self.init_weights()
 
     def forward(self,
