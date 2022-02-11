@@ -156,34 +156,12 @@ class Predictor(object):
                     use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
-
-            # Set min/max/opt tensor shape of each trt subgraph input.
-            if args.int8:
-                min_batch_size, max_batch_size, opt_batch_size = 16, 32, 32
-                min_seq_len, max_seq_len, opt_seq_len = 31, 128, 32
-
-                min_input_shape = {
-                    "faster_tokenizer_2.tmp_0": [min_batch_size, min_seq_len],
-                    "faster_tokenizer_2.tmp_1": [min_batch_size, min_seq_len],
-                    "tmp_4": [min_batch_size, min_seq_len],
-                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len],
-                }
-                max_input_shape = {
-                    "faster_tokenizer_2.tmp_0": [max_batch_size, max_seq_len],
-                    "faster_tokenizer_2.tmp_1": [max_batch_size, max_seq_len],
-                    "tmp_4": [max_batch_size, max_seq_len],
-                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len],
-                }
-                opt_input_shape = {
-                    "faster_tokenizer_2.tmp_0": [opt_batch_size, opt_seq_len],
-                    "faster_tokenizer_2.tmp_1": [opt_batch_size, opt_seq_len],
-                    "tmp_4": [opt_batch_size, opt_seq_len],
-                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
-                }
-            else:
-                min_batch_size, max_batch_size, opt_batch_size = 16, 32, 32
-                min_seq_len, max_seq_len, opt_seq_len = 31, 128, 32
-
+            # Set min/max/opt tensor shape of each trt subgraph input according
+            # to dataset.
+            # For example, the config of TNEWS data should be 16, 32, 32, 31, 128, 32.
+            min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
+            min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32
+            if args.use_faster_tokenizer:
                 min_input_shape = {
                     "faster_tokenizer_1.tmp_0": [min_batch_size, min_seq_len],
                     "faster_tokenizer_1.tmp_1": [min_batch_size, min_seq_len],
@@ -201,6 +179,25 @@ class Predictor(object):
                     "faster_tokenizer_1.tmp_1": [opt_batch_size, opt_seq_len],
                     "tmp_4": [opt_batch_size, opt_seq_len],
                     "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
+                }
+            else:
+                min_input_shape = {
+                    "input_ids": [min_batch_size, min_seq_len],
+                    "token_type_ids": [min_batch_size, min_seq_len],
+                    "tmp_4": [min_batch_size, min_seq_len],
+                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
+                }
+                max_input_shape = {
+                    "input_ids": [max_batch_size, max_seq_len],
+                    "token_type_ids": [max_batch_size, max_seq_len],
+                    "tmp_4": [max_batch_size, max_seq_len],
+                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
+                }
+                opt_input_shape = {
+                    "input_ids": [opt_batch_size, opt_seq_len],
+                    "token_type_ids": [opt_batch_size, opt_seq_len],
+                    "tmp_4": [opt_batch_size, opt_seq_len],
+                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
                 }
             config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape,
                                               opt_input_shape)

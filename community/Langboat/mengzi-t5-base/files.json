@@ -1,0 +1,6 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/Langboat/mengzi-t5-base/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/Langboat/mengzi-t5-base/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/Langboat/mengzi-t5-base/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/Langboat/mengzi-t5-base/spiece.model"
+}
