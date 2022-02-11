@@ -5,6 +5,11 @@ import psutil
 
 from util.benchmark_utils import PaddleInferBenchmark
 
+import paddle
+if paddle.is_compiled_with_cuda():
+    import pynvml
+    import GPUtil
+
 
 class Recorder(object):
     def __init__(self, config, batch_size, model_name, mem_info=None):
@@ -17,12 +22,7 @@ class Recorder(object):
         self.use_xpu = False
         self.use_cpu = False
 
-        print(config.use_gpu())
-        # import pdb; pdb.set_trace()
-
         if config.use_gpu():
-            import pynvml
-            import GPUtil
             self.place = "gpu"
             self.use_gpu = True
         elif config.use_xpu():

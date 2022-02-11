@@ -46,10 +46,7 @@ class PaddleInferBenchmark(object):
                  'shape': '3,224,224'
                  'data_num': 1000}
             perf_info(dict): performance result
-                {'preprocess_time_s': 1.0
-                'inference_time_s': 2.0
-                'postprocess_time_s': 1.0
-                'total_time_s': 4.0}
+                {'inference_time_s': 2.0}
             resource_info(dict): 
                 cpu and gpu resources
                 {'cpu_rss': 100
@@ -89,10 +86,6 @@ class PaddleInferBenchmark(object):
             raise ValueError(
                 "Set argument wrong, please check input argument and its type")
 
-        self.preprocess_time_s = perf_info.get('preprocess_time_s', 0)
-        self.postprocess_time_s = perf_info.get('postprocess_time_s', 0)
-        self.total_time_s = perf_info.get('total_time_s', 0)
-
         self.inference_time_s_90 = perf_info.get("inference_time_s_90", "")
         self.inference_time_s_99 = perf_info.get("inference_time_s_99", "")
         self.succ_rate = perf_info.get("succ_rate", "")
@@ -111,7 +104,6 @@ class PaddleInferBenchmark(object):
 
             self.gpu_rss_mb = int(resource_info.get('gpu_rss_mb', 0))
             self.gpu_util = round(resource_info.get('gpu_util', 0), 2)
-            self.gpu_mem_util = round(resource_info.get('gpu_mem_util', 0), 2)
         else:
             self.cpu_rss_mb = 0
             self.cpu_vms_mb = 0
@@ -121,7 +113,6 @@ class PaddleInferBenchmark(object):
 
             self.gpu_rss_mb = 0
             self.gpu_util = 0
-            self.gpu_mem_util = 0
 
         # init benchmark logger
         self.benchmark_logger()
@@ -236,12 +227,10 @@ class PaddleInferBenchmark(object):
             f"{identifier} cpu_rss(MB): {self.cpu_rss_mb}, cpu_vms: {self.cpu_vms_mb}, cpu_shared_mb: {self.cpu_shared_mb}, cpu_dirty_mb: {self.cpu_dirty_mb}, cpu_util: {self.cpu_util}%"
         )
         self.logger.info(
-            f"{identifier} gpu_rss(MB): {self.gpu_rss_mb}, gpu_util: {self.gpu_util}%, gpu_mem_util: {self.gpu_mem_util}%"
+            f"{identifier} gpu_rss(MB): {self.gpu_rss_mb}, gpu_util: {self.gpu_util}%"
         )
         self.logger.info(
-            f"{identifier} total time spent(s): {self.total_time_s}")
-        self.logger.info(
-            f"{identifier} preprocess_time(ms): {round(self.preprocess_time_s*1000, 1)}, inference_time(ms): {round(self.inference_time_s*1000, 1)}, postprocess_time(ms): {round(self.postprocess_time_s*1000, 1)}"
+            f"{identifier} inference_time(ms): {round(self.inference_time_s*1000, 1)}"
         )
         if self.inference_time_s_90:
             self.logger.info(
@@ -262,10 +251,7 @@ class PaddleInferBenchmark(object):
             data_info = {'batch_size': 1
                          'shape': '3,224,224'
                          'data_num': 1000}
-            perf_info = {'preprocess_time_s': 1.0
-                         'inference_time_s': 2.0
-                         'postprocess_time_s': 1.0
-                         'total_time_s': 4.0}
+            perf_info = {'inference_time_s': 2.0}
             resource_info = {'cpu_rss_mb': 100
                              'gpu_rss_mb': 100
                              'gpu_util': 60}

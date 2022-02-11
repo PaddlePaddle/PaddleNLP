@@ -135,12 +135,12 @@ class Predictor(object):
             config.switch_use_feed_fetch_ops(False)
 
         if profile:
-            pid = os.getpid()
             if args.mod is recorder:
-                autolog = recorder.Recorder(config, args.infer_batch_size,
+                autolog = args.mod.Recorder(config, args.infer_batch_size,
                                             args.model_name)
             else:
-                autolog = auto_log.AutoLogger(
+                pid = os.getpid()
+                autolog = args.mod.AutoLogger(
                     model_name=args.model_name,
                     model_precision="fp32",
                     batch_size=args.infer_batch_size,
@@ -189,13 +189,15 @@ class Predictor(object):
                 cpu_rss_mb, gpu_rss_mb = 0, 0
                 gpu_id = 0 if self.autolog.use_gpu else None
                 gpu_util = 0
-                self.autolog.tic()
 
         for data in test_loader:
-            samples += len(data[0])
+            samples = len(data[0])
 
-            if self.autolog is not None and self.use_auto_log:
-                self.autolog.times.stamp()
+            if self.autolog is not None:
+                if self.use_auto_log:
+                    self.autolog.times.stamp()
+                else:
+                    self.autolog.tic()
 
             output = self.predict_batch(data)
 
@@ -203,10 +205,11 @@ class Predictor(object):
                 if self.use_auto_log:
                     self.autolog.times.stamp()
                 else:
+                    self.autolog.toc(samples)
+                    gpu_util += recorder.Recorder.get_current_gputil(gpu_id)
                     cm, gm = recorder.Recorder.get_current_memory_mb(gpu_id)
                     cpu_rss_mb += cm
                     gpu_rss_mb += gm
-                    gpu_util += recorder.Recorder.get_current_gputil(gpu_id)
 
             finished_sequence = output[0].transpose([0, 2, 1])
             for ins in finished_sequence:
@@ -224,7 +227,6 @@ class Predictor(object):
             if self.use_auto_log:
                 self.autolog.times.end(stamp=True)
             else:
-                self.autolog.toc(samples)
                 self.autolog.get_device_info(
                     cpu_rss_mb=cpu_rss_mb / len(test_loader),
                     gpu_rss_mb=gpu_rss_mb / len(test_loader)
