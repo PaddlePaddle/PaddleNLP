@@ -40,7 +40,7 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 **整体效果**
 
 
-| Model                         | #Params   | #FLOPs    | Speedup          | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | Avg       |
+| Model                         | #Params   | #FLOPs    | Speedup (w/o FasterTokenizer)   | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | Avg       |
 | ----------------------------- | --------- | --------- | ---------------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------- |
 | BERT-base, Chinese            | 102.3M    | 10.87B    | 1.00x            | 74.14     | 56.81     | 61.10     | 81.19     | 74.85     | 79.93       | 81.47     | 72.78     |
 | TinyBERT<sub>6,</sub> Chinese | 59.7M     | 5.44B     | 1.90x            | 72.59     | 55.70     | 57.64     | 79.57     | 73.97     | 76.32       | 80.00     | 70.83     |
