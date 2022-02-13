@@ -10,7 +10,6 @@ for batch_size in "1" "2" "4"; do
         --device cpu \
         --model_dir=${model_dir} \
         --batch_size=${batch_size} \
-        --test_file test.en test.de \
         --profile > ${log_path}/transformer_${model}_cpu_nomkl_bs${batch_size}_inference.log 2>&1
 
     for threads in "1" "6"; do
@@ -21,7 +20,6 @@ for batch_size in "1" "2" "4"; do
             --use_mkl True \
             --threads=${threads} \
             --batch_size=${batch_size} \
-            --test_file test.en test.de \
             --profile > ${log_path}/transformer_${model}_cpu_mkl_threads${threads}_bs${batch_size}_inference.log 2>&1 
     done
 
@@ -30,6 +28,5 @@ for batch_size in "1" "2" "4"; do
         --model_dir=${model_dir} \
         --device gpu \
         --batch_size=${batch_size} \
-        --test_file test.en test.de \
         --profile > tee ${log_path}/transformer_${model}_gpu_bs${batch_size}_inference.log 2>&1 
 done
