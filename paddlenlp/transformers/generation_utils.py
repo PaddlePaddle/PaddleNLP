@@ -425,17 +425,27 @@ class GenerationMixin(object):
             # nn.Pad2D don't support the data type `bool`
             if convert_dtype(attention_mask.dtype) == 'bool':
                 attention_mask = paddle.cast(attention_mask, 'int64')
-            attention_mask = nn.Pad2D(
-                [0, 0, 0, 1], mode='replicate')(attention_mask)
-            attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e9)(attention_mask)
-            dtype = convert_dtype(attention_mask.dtype)
-            if 'int' in dtype:
-                attention_mask[:, :, -1, -1] = 1
-            elif 'float' in dtype:
-                attention_mask[:, :, -1, -1] = 0.0
+            if len(attention_mask.shape) == 4:
+                attention_mask = nn.Pad2D(
+                    [0, 0, 0, 1], mode='replicate')(attention_mask)
+                attention_mask = nn.Pad2D(
+                    [0, 1, 0, 0], value=-1e4)(attention_mask)
+                dtype = convert_dtype(attention_mask.dtype)
+                if 'int' in dtype:
+                    attention_mask[:, :, -1, -1] = 1
+                elif 'float' in dtype:
+                    attention_mask[:, :, -1, -1] = 0.0
+                else:
+                    raise ValueError(
+                        'The data type of input `attention_mask` must '
+                        'be bool, int or float')
             else:
-                raise ValueError('The data type of input `attention_mask` must '
-                                 'be bool, int or float')
+                attention_mask = paddle.concat(
+                    [
+                        attention_mask, paddle.ones(
+                            [attention_mask.shape[0], 1], dtype="int64")
+                    ],
+                    axis=-1)
             model_kwargs["attention_mask"] = attention_mask
 
         return model_kwargs
