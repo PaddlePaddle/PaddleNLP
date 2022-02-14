@@ -21,11 +21,17 @@ LUKE和现有CWRs之间的一个重要区别在于，它不仅将单词视为独
 #### 1、SQuAD1.1
 以SQuAD1.1数据集为例
 
+下载SQuAD1.1数据集，主流机器阅读理解数据集
+[下载地址](https://data.deepai.org/squad1.1.zip)
+
+同时需要下载由LUKE官方提供的维基百科(实体)数据集
+[下载地址](https://drive.google.com/file/d/129tDJ3ev6IdbJiKOmO6GTgNANunhO_vt/view)
+
 ```shell
 python create_squad_data.py \
-    --wiki_data=data/
-    --data_dir=data/
-    --output_data_dir=data/
+    --wiki_data data/
+    --data_dir data/
+    --output_data_dir data/
 
 python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type luke-base \
@@ -52,8 +58,12 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 #### 2、Open Entity
 
+下载Open Entity数据集
+[下载地址](https://cloud.tsinghua.edu.cn/f/6ec98dbd931b4da9a7f0/)
+把下载好的文件解压,并把解压后的Open Entity目录下的`train.json`、`test.json`和`dev.json`分别为训练集、验证集和测试集
+
 ```shell
-!python -m paddle.distributed.launch --gpus "0" run_open_entity.py \
+python -m paddle.distributed.launch --gpus "0" run_open_entity.py \
     --model_type luke-base \
     --data_dir data/ \
     --output_dir output/ \
