@@ -204,6 +204,25 @@ class Task(metaclass=abc.ABCMeta):
             cnt_org += 1
         return short_input_texts, input_mapping
 
+    def _auto_joiner(self, results, input_mapping, elem_type=[]):
+        concat_results = []
+        single_results = elem_type
+        for k, vs in input_mapping.items():
+            for v in vs:
+                if len(single_results) == 0:
+                    single_results = results[v]
+                elif isinstance(single_results, list):
+                    single_results.extend(results[v])
+                else:
+                    for sk in single_results.keys():
+                        if isinstance(single_results[sk], str):
+                            single_results[sk] += results[v][sk]
+                        else:
+                            single_results[sk].extend(results[v][sk])
+            concat_results.append(single_results)
+            single_results = elem_type
+        return concat_results
+
     def help(self):
         """
         Return the usage message of the current task.

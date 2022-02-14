@@ -237,21 +237,6 @@ class LacTask(Task):
         inputs['lens'] = lens
         return inputs
 
-    def _auto_joiner(self, results, input_mapping):
-        concat_results = []
-        single_results = {}
-        for k, vs in input_mapping.items():
-            for v in vs:
-                if len(single_results) == 0:
-                    single_results = results[v]
-                else:
-                    single_results["text"] += results[v]["text"]
-                    single_results["segs"].extend(results[v]["segs"])
-                    single_results["tags"].extend(results[v]["tags"])
-            concat_results.append(single_results)
-            single_results = {}
-        return concat_results
-
     def _postprocess(self, inputs):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
@@ -292,5 +277,6 @@ class LacTask(Task):
             single_result['segs'] = sent_out
             single_result['tags'] = tags_out
             final_results.append(single_result)
-        final_results = self._auto_joiner(final_results, self.input_mapping)
+        final_results = self._auto_joiner(
+            final_results, self.input_mapping, elem_type={})
         return final_results

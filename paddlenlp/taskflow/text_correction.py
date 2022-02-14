@@ -206,59 +206,37 @@ class CSCTask(Task):
         inputs['batch_results'] = results
         return inputs
 
-    def auto_joiner(self, results, input_mapping):
-        concat_results = []
-        single_results = {}
-        for k, vs in input_mapping.items():
-            pos_id = 0
-            for v in vs:
-                if len(single_results) == 0:
-                    single_results = results[v]
-                    pos_id = len(results[v]["source"]) - 1
-                else:
-                    single_results["source"] += results[v]["source"]
-                    single_results["target"] += results[v]["target"]
-                    tmp_errors = []
-                    for e in results[v]["errors"]:
-                        e['position'] += (length + 1)
-                        tmp_errors.append(e)
-                    single_results["errors"].extend(tmp_errors)
-                    pos_id += len(results[v]["source"])
-            concat_results.append(single_results)
-            single_results = {}
-            length = 0
-        return concat_results
-
     def _postprocess(self, inputs):
         """
         The model output is the logits and probs, this function will convert the model output to raw text.
         """
-        final_results = []
+        results = []
 
-        for examples, texts, results in zip(inputs['batch_examples'],
-                                            inputs['batch_texts'],
-                                            inputs['batch_results']):
+        for examples, texts, temp_results in zip(inputs['batch_examples'],
+                                                 inputs['batch_texts'],
+                                                 inputs['batch_results']):
             for i in range(len(examples)):
                 result = {}
-                det_pred, char_preds, length = results[i]
+                det_pred, char_preds, length = temp_results[i]
                 pred_result = self._parse_decode(texts[i], char_preds, det_pred,
                                                  length)
                 result['source'] = texts[i]
                 result['target'] = ''.join(pred_result)
-                errors_result = []
-                for i, (
-                        source_token, target_token
-                ) in enumerate(zip(result['source'], result['target'])):
-                    if source_token != target_token:
-                        errors_result.append({
-                            'position': i,
-                            'correction': {
-                                source_token: target_token
-                            }
-                        })
-                result['errors'] = errors_result
-                final_results.append(result)
-        return final_results
+                results.append(result)
+        results = self._auto_joiner(results, self.input_mapping, elem_type={})
+        for result in results:
+            errors_result = []
+            for i, (source_token, target_token
+                    ) in enumerate(zip(result['source'], result['target'])):
+                if source_token != target_token:
+                    errors_result.append({
+                        'position': i,
+                        'correction': {
+                            source_token: target_token
+                        }
+                    })
+            result['errors'] = errors_result
+        return results
 
     def _convert_example(self, example):
         source = example["source"]

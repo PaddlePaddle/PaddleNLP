@@ -122,24 +122,9 @@ class NERTask(WordTagTask):
             batch_results.append(result)
         return batch_results
 
-    def _auto_joiner(self, results, input_mapping):
-        """
-        Concat the model output of short texts to the total result of long text.
-        """
-        concat_results = []
-        single_results = {}
-        for k, vs in input_mapping.items():
-            for v in vs:
-                if len(single_results) == 0:
-                    single_results = results[v]
-                else:
-                    single_results["text"] += results[v]["text"]
-                    single_results["items"].extend(results[v]["items"])
-            concat_results.append(single_results)
-            single_results = {}
-
+    def _simplify_result(self, results):
         simple_results = []
-        for result in concat_results:
+        for result in results:
             simple_result = []
             if 'items' in result:
                 for item in result['items']:
@@ -155,5 +140,6 @@ class NERTask(WordTagTask):
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        results = self._auto_joiner(results, self.input_mapping)
+        results = self._auto_joiner(results, self.input_mapping, elem_type={})
+        results = self._simplify_result(results)
         return results

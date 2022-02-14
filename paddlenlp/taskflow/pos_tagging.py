@@ -52,21 +52,6 @@ class POSTaggingTask(LacTask):
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
-    def _auto_joiner(self, results, input_mapping):
-        concat_results = []
-        single_results = []
-        for k, vs in input_mapping.items():
-            for v in vs:
-                if len(single_results) == 0:
-                    single_results = results[v]
-                else:
-                    single_results.extend(results[v])
-            concat_results.append(single_results)
-            single_results = []
-        concat_results = concat_results if len(
-            concat_results) > 1 else concat_results[0]
-        return concat_results
-
     def _postprocess(self, inputs):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
@@ -106,4 +91,6 @@ class POSTaggingTask(LacTask):
             result = list(zip(sent_out, tags_out))
             final_results.append(result)
         final_results = self._auto_joiner(final_results, self.input_mapping)
+        final_results = final_results if len(
+            final_results) > 1 else final_results[0]
         return final_results

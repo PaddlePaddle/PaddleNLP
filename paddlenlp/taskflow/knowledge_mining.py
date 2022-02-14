@@ -271,24 +271,6 @@ class WordTagTask(Task):
             self._termtree = TermTree.from_dir(
                 self._term_schema_path, self._term_data_path, self._linking)
 
-    def _auto_joiner(self, results, input_mapping):
-        concat_results = []
-        single_results = {}
-        for k, vs in input_mapping.items():
-            for v in vs:
-                if len(single_results) == 0:
-                    single_results = results[v]
-                else:
-                    single_results["text"] += results[v]["text"]
-                    single_results["items"].extend(results[v]["items"])
-            concat_results.append(single_results)
-            single_results = {}
-        for result in concat_results:
-            pred_words = result['items']
-            pred_words = self._reset_offset(pred_words)
-            result['items'] = pred_words
-        return concat_results
-
     def _preprocess_text(self, input_texts):
         """
         Create the dataset and dataloader for the predict.
@@ -493,7 +475,11 @@ class WordTagTask(Task):
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        results = self._auto_joiner(results, self.input_mapping)
+        results = self._auto_joiner(results, self.input_mapping, elem_type={})
+        for result in results:
+            pred_words = result['items']
+            pred_words = self._reset_offset(pred_words)
+            result['items'] = pred_words
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
