@@ -793,6 +793,9 @@ class GPTForPretraining(GPTPretrainedModel):
         super(GPTForPretraining, self).__init__()
         self.gpt = gpt
         self.apply(self.init_weights)
+        # extra_parameters using for sharding stage3 to register extra_parameters
+        # TODO(Baibaifan): add additional extra parameters mode of semi-automatic registration later
+        self.extra_parameters = [self.gpt.embeddings.word_embeddings.weight]
 
     def forward(self,
                 input_ids,
