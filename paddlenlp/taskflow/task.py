@@ -205,6 +205,9 @@ class Task(metaclass=abc.ABCMeta):
         return short_input_texts, input_mapping
 
     def _auto_joiner(self, results, input_mapping, elem_type=[]):
+        """
+        Join the model output automatically.
+        """
         concat_results = []
         single_results = elem_type
         for k, vs in input_mapping.items():
