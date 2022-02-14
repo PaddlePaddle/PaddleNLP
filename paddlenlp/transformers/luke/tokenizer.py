@@ -103,20 +103,20 @@ class LukeTokenizer(RobertaTokenizer):
         unk_token (str):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to "[UNK]".
+            Defaults to "<unk>".
         sep_token (str):
             A special token separating two different sentences in the same input.
-            Defaults to "[SEP]".
+            Defaults to "</s>".
         pad_token (str):
             A special token used to make arrays of tokens the same size for batching purposes.
-            Defaults to "[PAD]".
+            Defaults to "<pad>".
         cls_token (str):
             A special token used for sequence classification. It is the last token
-            of the sequence when built with special tokens. Defaults to "[CLS]".
+            of the sequence when built with special tokens. Defaults to "<s>".
         mask_token (str):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
-            Defaults to "[MASK]".
+            Defaults to "<mask>".
 
     Examples:
         .. code-block::
@@ -297,7 +297,7 @@ class LukeTokenizer(RobertaTokenizer):
                 `entity_spans_pair` without specifying this argument, the entity sequence or the batch of entity
                 sequences is automatically constructed by filling it with the [MASK] entity.
              max_mention_length (`int`):
-                The entity_position_ids's length.
+                The entity_position_ids's length for each entity.
         """
         global _add_prefix_space
         if add_prefix_space:
