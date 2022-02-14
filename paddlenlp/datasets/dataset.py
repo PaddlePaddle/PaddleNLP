@@ -23,6 +23,7 @@ import inspect
 from collections import namedtuple
 from multiprocess import Pool, RLock
 import time
+import json
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -32,6 +33,7 @@ from paddlenlp.utils.env import DATA_HOME
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
 from functools import partial
+from datasets.fingerprint import fingerprint_transform, Hasher
 
 __all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
 
@@ -57,6 +59,14 @@ class DatasetTuple:
 
     def __len__(self):
         return len(self.tuple)
+
+
+def save_json(filename, examples):
+    cache_dir = os.path.dirname(filename)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(examples, f)
 
 
 def import_main_class(module_path):
@@ -228,6 +238,9 @@ class MapDataset(Dataset):
         self.info = kwargs
         self.label_list = self.info.pop('label_list', None)
         self.vocab_info = self.info.pop('vocab_info', None)
+        self.cache_dir = self.info.pop('cache_dir', None)
+
+        self.fingerprint = self.info.pop('fingerprint', None)
 
     def _transform(self, data):
         for fn in self._transform_pipline:
@@ -383,6 +396,14 @@ class MapDataset(Dataset):
         else:
             return self._map(fn, lazy=lazy, batched=batched)
 
+    @classmethod
+    def load_from_json(cls, filename, cache_dir=None, **kwargs):
+        with open(filename, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if cache_dir is None:
+            cache_dir = os.path.dirname(filename)
+        return cls(data, cache_dir=cache_dir, **kwargs)
+
     def _map(self, fn, lazy=True, batched=False):
         if batched:
             self.new_data = fn(self.new_data)
@@ -531,6 +552,7 @@ class DatasetBuilder:
             self.lazy = lazy
         self.name = name
         self.config = config
+        self.cache_dir = os.path.join(DATA_HOME, self.__class__.__name__)
 
     def read_datasets(self, splits=None, data_files=None):
         def remove_if_exit(filepath):
@@ -561,6 +583,23 @@ class DatasetBuilder:
             if isinstance(splits, str):
                 splits = [splits]
             datasets = DatasetTuple(splits)
+
+            # load cache here
+            if os.path.exists(self.cache_dir):
+                no_cache_splits = []
+                while splits:
+                    split = splits.pop()
+                    # TODO: also init IterDataset
+                    cache_split_path = os.path.join(self.cache_dir, '-'.join(
+                        ['cache', self.__class__.__name__, split]) + '.json')
+                    if os.path.exists(cache_split_path):
+                        print('Reusing split', split, 'from', cache_split_path)
+                        datasets[split] = MapDataset.load_from_json(
+                            cache_split_path, cache_dir=self.cache_dir)
+                    else:
+                        no_cache_splits.append(split)
+                splits = no_cache_splits
+
             parallel_env = dist.ParallelEnv()
             unique_endpoints = _get_unique_endpoints(
                 parallel_env.trainer_endpoints[:])
@@ -593,6 +632,12 @@ class DatasetBuilder:
                     while not os.path.exists(lock_file):
                         time.sleep(1)
                 datasets[split] = self.read(filename=filename, split=split)
+
+                # save cache here
+                cache_split_path = os.path.join(self.cache_dir, '-'.join(
+                    ['cache', self.__class__.__name__, split]) + '.json')
+                print('Saving split', split, 'to', cache_split_path)
+                save_json(cache_split_path, datasets[split].data)
         else:
             assert isinstance(data_files, str) or isinstance(
                 data_files, tuple) or isinstance(
@@ -600,27 +645,62 @@ class DatasetBuilder:
                 ), "`data_files` should be a string or tuple or list of strings."
             if isinstance(data_files, str):
                 data_files = [data_files]
+
             default_split = 'train'
+
             if splits:
                 if isinstance(splits, str):
                     splits = [splits]
-                datasets = DatasetTuple(splits)
-                assert len(splits) == len(
-                    data_files
-                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
-                for i in range(len(data_files)):
-                    datasets[splits[i]] = self.read(
-                        filename=data_files[i], split=splits[i])
+                unique_splits = splits
             else:
-                datasets = DatasetTuple(
-                    ["split" + str(i) for i in range(len(data_files))])
-                for i in range(len(data_files)):
-                    datasets["split" + str(i)] = self.read(
-                        filename=data_files[i], split=default_split)
+                splits = ['train' for _ in range(len(data_files))]
+                unique_splits = [
+                    "split" + str(i) for i in range(len(data_files))
+                ]
+
+            datasets = DatasetTuple(unique_splits)
+            assert len(splits) == len(
+                data_files
+            ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
+            # load cache here
+            if not os.path.exists(self.cache_dir):
+                os.makedirs(self.cache_dir)
+
+            for i in range(len(data_files)):
+                data_file = data_files[i]
+                split = splits[i]
+                unique_split = unique_splits[i]
+
+                # compute fingerprint
+                hasher = Hasher()
+                hasher.update(split)
+                hasher.update(data_file)
+                if os.path.exists(data_file) and os.path.isfile(data_file):
+                    hasher.update(md5file(data_file))
+                fingerprint = hasher.hexdigest()
+
+                # TODO: also init IterDataset
+                cache_file_path = os.path.join(self.cache_dir,
+                                               'cache-' + fingerprint + '.json')
+                if os.path.exists(cache_file_path):
+                    print('Reusing dataset from', cache_file_path)
+                    datasets[unique_split] = MapDataset.load_from_json(
+                        cache_file_path,
+                        cache_dir=self.cache_dir,
+                        fingerprint=fingerprint)
+                else:
+                    datasets[unique_split] = self.read(
+                        filename=data_files[i],
+                        split=split,
+                        fingerprint=fingerprint)
+
+                    # save cache here
+                    print('Saving dataset to', cache_file_path)
+                    save_json(cache_file_path, datasets[unique_split].data)
 
         return datasets if len(datasets) > 1 else datasets[0]
 
-    def read(self, filename, split='train'):
+    def read(self, filename, fingerprint=None, split='train'):
         """
         Returns a dataset containing all the examples that can be read from the file path.
 
@@ -644,7 +724,6 @@ class DatasetBuilder:
 
         label_list = self.get_labels()
         vocab_info = self.get_vocab()
-
         if self.lazy:
 
             def generate_examples():
@@ -682,7 +761,8 @@ class DatasetBuilder:
             return IterDataset(
                 generate_examples(),
                 label_list=label_list,
-                vocab_info=vocab_info)
+                vocab_info=vocab_info,
+                fingerprint=fingerprint)
         else:
             examples = self._read(
                 filename,
@@ -723,7 +803,11 @@ class DatasetBuilder:
                             label_col]]
 
             return MapDataset(
-                examples, label_list=label_list, vocab_info=vocab_info)
+                examples,
+                label_list=label_list,
+                vocab_info=vocab_info,
+                cache_dir=self.cache_dir,
+                fingerprint=fingerprint)
 
     def _read(self, filename: str, *args):
         """
@@ -762,6 +846,20 @@ class SimpleBuilder(DatasetBuilder):
         self.lazy = lazy
 
     def read(self, **kwargs):
+        hasher = Hasher()
+        for key in sorted(kwargs):
+            hasher.update(key)
+            hasher.update(kwargs[key])
+            if os.path.exists(kwargs[key]) and os.path.isfile(kwargs[key]):
+                hasher.update(md5file(kwargs[key]))
+        fingerprint = hasher.hexdigest()
+        cache_dir = os.path.join(DATA_HOME, 'costum_datasets', fingerprint)
+        cache_filename = os.path.join(cache_dir,
+                                      'cache-' + fingerprint + '.json')
+        if os.path.exists(cache_filename):
+            print("Reusing dataset from", cache_filename)
+            return MapDataset.load_from_json(
+                cache_filename, cache_dir=cache_dir, fingerprint=fingerprint)
         if self.lazy:
 
             def generate_examples():
@@ -772,8 +870,10 @@ class SimpleBuilder(DatasetBuilder):
             return IterDataset(generate_examples)
         else:
             examples = self._read(**kwargs)
-            if hasattr(examples, '__len__') and hasattr(examples,
-                                                        '__getitem__'):
-                return MapDataset(examples)
-            else:
-                return MapDataset(list(examples))
+            if not (hasattr(examples, '__len__') and hasattr(examples,
+                                                             '__getitem__')):
+                examples = list(examples)
+            print("Saving dataset to", cache_filename)
+            save_json(cache_filename, examples)
+            return MapDataset(
+                examples, cache_dir=cache_dir, fingerprint=fingerprint)
