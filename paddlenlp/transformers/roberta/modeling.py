@@ -166,13 +166,13 @@ class RobertaPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "roberta-wwm-ext":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
             "roberta-wwm-ext-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
             "rbt3":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+                "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
         }
     }
     base_model_prefix = "roberta"
@@ -359,7 +359,7 @@ class RobertaModel(RobertaPretrainedModel):
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
-        
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -600,7 +600,6 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None):
-
         num_choices = input_ids.shape[1]
 
         flat_input_ids = input_ids.reshape(
@@ -827,5 +826,5 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         for layer_past in past:
             reordered_past += (tuple(
                 past_state.index_select(0, beam_idx)
-                for past_state in layer_past), )
+                for past_state in layer_past),)
         return reordered_past
