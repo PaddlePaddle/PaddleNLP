@@ -166,13 +166,13 @@ class RobertaPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "roberta-wwm-ext":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
             "roberta-wwm-ext-large":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
             "rbt3":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
         }
     }
     base_model_prefix = "roberta"
@@ -600,6 +600,7 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None):
+
         num_choices = input_ids.shape[1]
 
         flat_input_ids = input_ids.reshape(
@@ -684,7 +685,7 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
 
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForMaskedLM.from_pretrained('roberta-wwm-ext')
-                
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
@@ -782,7 +783,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForCausalLM.from_pretrained('roberta-wwm-ext')
-                
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
@@ -826,5 +827,5 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         for layer_past in past:
             reordered_past += (tuple(
                 past_state.index_select(0, beam_idx)
-                for past_state in layer_past),)
+                for past_state in layer_past), )
         return reordered_past
