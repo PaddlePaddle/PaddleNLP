@@ -59,6 +59,6 @@ GENERAL_MODEL_DIR=PaddleNLP/examples/model_compression/PP-MiniLM/general_distill
 
 在 CLUE 数据集上经过超参寻优后，得到 CLUE 上各个任务上的最高准确率如下表：
 
-| AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | WSC   | CSL   | CLUE 平均值 |
-| ----- | ----- | ------- | ----- | ----- | ----- | ----- | ----------- |
-| 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18 | 77.47 | 73.45       |
+| AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | Avg   |
+| ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----- |
+| 74.14 | 57.43 | 61.75   | 81.01 | 76.17 | 86.18       | 79.17 | 73.69 |
