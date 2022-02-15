@@ -77,10 +77,12 @@ class MegatronBertPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "megatronbert-cased": "https://bj.bcebos.com/paddlenlp/models/"
-            "transformers/megatronbert/megatronbert-cased/model_state.pdparams",
-            "megatronbert-uncased": "https://bj.bcebos.com/paddlenlp/models/"
-            "transformers/megatronbert/megatronbert-uncased/model_state.pdparams",
+            "megatronbert-cased":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/"
+            "megatron-bert/megatronbert-cased/model_state.pdparams",
+            "megatronbert-uncased":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/"
+            "megatron-bert/megatronbert-cased/model_state.pdparams",
         }
     }
     base_model_prefix = "megatronbert"
