@@ -72,7 +72,7 @@ python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
 #### 2、Open Entity
 
 ```shell
-!python -m paddle.distributed.launch examples/language_model/luke/run_open_entity.py \
+python -m paddle.distributed.launch examples/language_model/luke/run_open_entity.py \
     --model_type luke-base \
     --data_dir data/ \
     --output_dir output/ \
