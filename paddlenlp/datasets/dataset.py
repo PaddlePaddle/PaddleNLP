@@ -61,6 +61,18 @@ class DatasetTuple:
         return len(self.tuple)
 
 
+def generate_new_fingerprint(fingerprint, transform, **kwargs):
+    hasher = Hasher()
+    if fingerprint is not None:
+        hasher.update(fingerprint)
+    hasher.update(transform)
+    for k, v in kwargs.items():
+        if v is not None:
+            hasher.update(k)
+            hasher.update(v)
+    return hasher.hexdigest()
+
+
 def save_json(filename, examples):
     cache_dir = os.path.dirname(filename)
     if not os.path.exists(cache_dir):
@@ -236,11 +248,11 @@ class MapDataset(Dataset):
         self._transform_pipline = []
         self.new_data = self.data
         self.info = kwargs
-        self.label_list = self.info.pop('label_list', None)
-        self.vocab_info = self.info.pop('vocab_info', None)
-        self.cache_dir = self.info.pop('cache_dir', None)
+        self.label_list = self.info.get('label_list', None)
+        self.vocab_info = self.info.get('vocab_info', None)
+        self.cache_dir = self.info.get('cache_dir', None)
 
-        self.fingerprint = self.info.pop('fingerprint', None)
+        self.fingerprint = self.info.get('fingerprint', None)
 
     def _transform(self, data):
         for fn in self._transform_pipline:
@@ -261,7 +273,7 @@ class MapDataset(Dataset):
         """
         return len(self.new_data)
 
-    def filter(self, fn, num_workers=0):
+    def _filter(self, fn, num_workers=0):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
@@ -272,41 +284,22 @@ class MapDataset(Dataset):
             num_workers(int, optional): Number of processes for multiprocessing. If 
                 set to 0, it doesn't use multiprocessing. Defaults to `0`.
         """
-        assert num_workers >= 0, "num_workers should be a non-negative value"
-        if num_workers > 1:
-            shards = [
-                self._shard(
-                    num_shards=num_workers, index=index, contiguous=True)
-                for index in range(num_workers)
-            ]
-            kwds_per_shard = [
-                dict(
-                    self=shards[rank], fn=fn) for rank in range(num_workers)
-            ]
-            pool = Pool(num_workers, initargs=(RLock(), ))
 
-            results = [
-                pool.apply_async(
-                    self.__class__._filter, kwds=kwds)
-                for kwds in kwds_per_shard
+        def _filter_to_map(examples, fn):
+            examples = [
+                examples[idx] for idx in range(len(examples))
+                if fn(examples[idx])
             ]
-            transformed_shards = [r.get() for r in results]
+            return examples
 
-            pool.close()
-            pool.join()
-            self.new_data = []
-            for i in range(num_workers):
-                self.new_data += transformed_shards[i].new_data
-            return self
-        else:
-            return self._filter(fn)
+        return self.map(partial(
+            _filter_to_map, fn=fn),
+                        num_workers=num_workers,
+                        lazy=False,
+                        batched=True)
 
-    def _filter(self, fn):
-        self.new_data = [
-            self.new_data[idx] for idx in range(len(self.new_data))
-            if fn(self.new_data[idx])
-        ]
-        return self
+    def filter(self, fn, num_workers=0):
+        return self._filter(fn=fn, num_workers=num_workers)
 
     def shard(self, num_shards=None, index=None, contiguous=False):
         self.new_data = self._shard(
@@ -350,7 +343,12 @@ class MapDataset(Dataset):
 
         return MapDataset(new_data)
 
-    def map(self, fn, lazy=True, batched=False, num_workers=0):
+    def map(self,
+            fn,
+            lazy=True,
+            batched=False,
+            num_workers=0,
+            load_from_cache=True):
         """
         Performs specific function on the dataset to transform and update every sample.
 
@@ -378,7 +376,11 @@ class MapDataset(Dataset):
             ]
             kwds_per_shard = [
                 dict(
-                    self=shards[rank], fn=fn, lazy=False, batched=batched)
+                    self=shards[rank],
+                    fn=fn,
+                    lazy=False,
+                    batched=batched,
+                    load_from_cache=load_from_cache)
                 for rank in range(num_workers)
             ]
             pool = Pool(num_workers, initargs=(RLock(), ))
@@ -394,7 +396,8 @@ class MapDataset(Dataset):
                 self.new_data += transformed_shards[i].new_data
             return self
         else:
-            return self._map(fn, lazy=lazy, batched=batched)
+            return self._map(
+                fn, lazy=lazy, batched=batched, load_from_cache=load_from_cache)
 
     @classmethod
     def load_from_json(cls, filename, cache_dir=None, **kwargs):
@@ -404,15 +407,49 @@ class MapDataset(Dataset):
             cache_dir = os.path.dirname(filename)
         return cls(data, cache_dir=cache_dir, **kwargs)
 
-    def _map(self, fn, lazy=True, batched=False):
+    def _get_cache_file_path(self, transform, new_fingerprint):
+        cache_file_path = os.path.join(
+            self.cache_dir, transform + '-' + new_fingerprint + '.json')
+        return cache_file_path
+
+    def _map(self,
+             fn,
+             lazy=True,
+             batched=False,
+             load_from_cache=True,
+             cache_file_name=None,
+             new_fingerprint=None):
+        transform = sys._getframe().f_code.co_name
+        if new_fingerprint is None:
+            new_fingerprint = generate_new_fingerprint(
+                self.fingerprint, transform, fn=fn, lazy=lazy, batched=batched)
+        self.fingerprint = new_fingerprint
+
+        # load cache here
+        if self.cache_dir:
+            if cache_file_name is None:
+                cache_file_name = self._get_cache_file_path(transform,
+                                                            new_fingerprint)
+            if os.path.exists(cache_file_name) and load_from_cache:
+                print(f"Loading cached processed dataset at {cache_file_name}")
+                info = self.info.copy()
+                # TODO: also init IterDataset
+                self.new_data = MapDataset.load_from_json(
+                    cache_file_name).new_data
+                return self
+
         if batched:
             self.new_data = fn(self.new_data)
         elif lazy:
             self._transform_pipline.append(fn)
         else:
+
             self.new_data = [
                 fn(self.new_data[idx]) for idx in range(len(self.new_data))
             ]
+        # save cache here
+        print(f"Saving cached processed dataset at {cache_file_name}")
+        save_json(cache_file_name, self.new_data)
         return self
 
 
@@ -436,8 +473,8 @@ class IterDataset(IterableDataset):
         self._transform_pipline = []
         self._filter_pipline = []
 
-        self.label_list = kwargs.pop('label_list', None)
-        self.vocab_info = kwargs.pop('vocab_info', None)
+        self.label_list = kwargs.get('label_list', None)
+        self.vocab_info = kwargs.get('vocab_info', None)
 
     def _transform(self, data):
         for fn in self._transform_pipline:
