@@ -20,14 +20,22 @@ LUKE和现有CWRs之间的一个重要区别在于，它不仅将单词视为独
 
 #### 1、SQuAD1.1
 以SQuAD1.1数据集为例
+LUKE做阅读理解较为特殊，需要提供能够自动感知实体的数据集文件并需要安装以下环境：
 
 ```shell
-python create_squad_data.py \
+pip install wikipedia2vec==1.0.5
+pip install regex
+```
+
+运行以下两个命令即可训练并评估LUKE在SQuAD1.1数据集的精度
+
+```shell
+python examples/language_model/luke/create_squad_data.py \
     --wiki_data=data/
     --data_dir=data/
     --output_data_dir=data/
 
-python -m paddle.distributed.launch --gpus "0" run_squad.py \
+python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
     --model_type luke-base \
     --data_dir data/
     --output_dir output/ \
@@ -53,7 +61,7 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 #### 2、Open Entity
 
 ```shell
-!python -m paddle.distributed.launch --gpus "0" run_open_entity.py \
+!python -m paddle.distributed.launch examples/language_model/luke/run_open_entity.py \
     --model_type luke-base \
     --data_dir data/ \
     --output_dir output/ \

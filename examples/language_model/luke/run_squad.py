@@ -18,13 +18,13 @@ import argparse
 import pickle
 from paddle.io import Dataset, DataLoader
 import numpy as np
-from .utils.reading_comprehension.squad_get_predictions import *
-from .utils.reading_comprehension.squad_postprocess import *
+from utils.reading_comprehension.squad_get_predictions import *
+from utils.reading_comprehension.squad_postprocess import *
 from paddlenlp.transformers import LukeTokenizer
 from paddlenlp.transformers import LukePretrainedModel
 import paddle.nn as nn
 from paddle.nn import CrossEntropyLoss
-from .utils.trainer import *
+from utils.trainer import *
 import paddle
 
 parser = argparse.ArgumentParser(description="LUKE FOR MRC")
