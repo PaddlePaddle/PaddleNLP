@@ -212,11 +212,12 @@ Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for con
 To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
 
 ### WeChat
-Join our WeChat Group for technical exchange right now! ⬇️
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/152269366-7655809f-09ec-4547-90eb-92e178425280.jpg" width="210" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/153517320-2e1f35b5-ae5a-42db-971c-ae96c6480778.jpg" width="210" height="200" />
 </div>
+
 
 ## ChangeLog
 
