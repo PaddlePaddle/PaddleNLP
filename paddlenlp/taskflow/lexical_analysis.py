@@ -278,5 +278,5 @@ class LacTask(Task):
             single_result['tags'] = tags_out
             final_results.append(single_result)
         final_results = self._auto_joiner(
-            final_results, self.input_mapping, elem_type={})
+            final_results, self.input_mapping, is_dict=True)
         return final_results

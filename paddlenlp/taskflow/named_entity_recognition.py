@@ -89,9 +89,8 @@ class NERTask(WordTagTask):
         for sent_index in range(len(batch_texts)):
             sent = batch_texts[sent_index]
             tags = [
-                self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:len(
-                    sent) + self.summary_num]
+                self._index_to_tags[index] for index in batch_pred_tags[
+                    sent_index][self.summary_num:len(sent) + self.summary_num]
             ]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
@@ -140,6 +139,6 @@ class NERTask(WordTagTask):
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        results = self._auto_joiner(results, self.input_mapping, elem_type={})
+        results = self._auto_joiner(results, self.input_mapping, is_dict=True)
         results = self._simplify_result(results)
         return results

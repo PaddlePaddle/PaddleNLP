@@ -223,7 +223,7 @@ class CSCTask(Task):
                 result['source'] = texts[i]
                 result['target'] = ''.join(pred_result)
                 results.append(result)
-        results = self._auto_joiner(results, self.input_mapping, elem_type={})
+        results = self._auto_joiner(results, self.input_mapping, is_dict=True)
         for result in results:
             errors_result = []
             for i, (source_token, target_token

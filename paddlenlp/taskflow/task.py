@@ -20,7 +20,7 @@ from abc import abstractmethod
 import paddle
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file
+from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
 
 
 class Task(metaclass=abc.ABCMeta):
@@ -176,54 +176,71 @@ class Task(metaclass=abc.ABCMeta):
                 format(type(inputs)))
         return inputs
 
-    def _auto_splitter(self, input_texts, max_text_len):
+    def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
         """
-        Split the input texts into several chunks automatically, ensure that the length of model input meets the requirements.
+        Split the input texts into several short input texts automatically, ensure that the length of model input meets the requirements.
         """
         input_mapping = {}
         short_input_texts = []
         cnt_org = 0
         cnt_short = 0
         for text in input_texts:
-            if len(text) <= max_text_len:
-                short_input_texts.append(text)
-                input_mapping[cnt_org] = [cnt_short]
-                cnt_short += 1
+            if not split_sentence:
+                sens = [text]
             else:
-                lens = len(text)
-                temp_text_list = [
-                    text[i:i + max_text_len]
-                    for i in range(0, len(text), max_text_len)
-                ]
-                short_input_texts.extend(temp_text_list)
-                short_idx = cnt_short
-                cnt_short += math.ceil(len(text) / max_text_len)
-                input_mapping[cnt_org] = [
-                    short_idx + i for i in range(cnt_short - short_idx)
-                ]
+                sens = cut_chinese_sent(text)
+            for sen in sens:
+                lens = len(sen)
+                if lens <= max_text_len:
+                    short_input_texts.append(sen)
+                    if cnt_org not in input_mapping.keys():
+                        input_mapping[cnt_org] = [cnt_short]
+                    else:
+                        input_mapping[cnt_org].append(cnt_short)
+                    cnt_short += 1
+                else:
+                    temp_text_list = [
+                        sen[i:i + max_text_len]
+                        for i in range(0, lens, max_text_len)
+                    ]
+                    short_input_texts.extend(temp_text_list)
+                    short_idx = cnt_short
+                    cnt_short += math.ceil(lens / max_text_len)
+                    temp_text_id = [
+                        short_idx + i for i in range(cnt_short - short_idx)
+                    ]
+                    if cnt_org not in input_mapping.keys():
+                        input_mapping[cnt_org] = temp_text_id
+                    else:
+                        input_mapping[cnt_org].extend(temp_text_id)
             cnt_org += 1
         return short_input_texts, input_mapping
 
-    def _auto_joiner(self, results, input_mapping, elem_type=[]):
+    def _auto_joiner(self, short_results, input_mapping, is_dict=False):
         """
         Join the model output automatically.
         """
         concat_results = []
-        single_results = elem_type
+        elem_type = {} if is_dict else []
         for k, vs in input_mapping.items():
+            single_results = elem_type
             for v in vs:
                 if len(single_results) == 0:
-                    single_results = results[v]
-                elif isinstance(single_results, list):
-                    single_results.extend(results[v])
-                else:
+                    single_results = short_results[v]
+                elif isinstance(elem_type, list):
+                    single_results.extend(short_results[v])
+                elif isinstance(elem_type, dict):
                     for sk in single_results.keys():
                         if isinstance(single_results[sk], str):
-                            single_results[sk] += results[v][sk]
+                            single_results[sk] += short_results[v][sk]
                         else:
-                            single_results[sk].extend(results[v][sk])
+                            single_results[sk].extend(short_results[v][sk])
+                else:
+                    raise ValueError(
+                        "Invalid element type, the type of results "
+                        "for each element should be list of dict, "
+                        "but {} received.".format(type(single_results)))
             concat_results.append(single_results)
-            single_results = elem_type
         return concat_results
 
     def help(self):
