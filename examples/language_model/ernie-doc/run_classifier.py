@@ -156,11 +156,16 @@ def do_train(args):
 
     # Get dataset
     if args.dataset == "iflytek":
-        train_ds, eval_ds, test_ds = load_dataset(
-            "clue", name=args.dataset, splits=["train", eval_name, test_name])
+        train_ds, eval_ds, = load_dataset(
+            "clue", name=args.dataset, splits=["train", eval_name])
+        test_ds = eval_ds
     else:
-        train_ds, eval_ds, test_ds = load_dataset(
-            args.dataset, splits=["train", eval_name, test_name])
+        train_ds, eval_ds = load_dataset(
+            args.dataset, splits=["train", eval_name])
+        if eval_name == test_name:
+            test_ds = eval_ds
+        else:
+            test_ds = load_dataset(args.dataset, splits=["train", test_name])
 
     num_classes = len(train_ds.label_list)
 
@@ -262,6 +267,7 @@ def do_train(args):
     # Copy the memory
     memories = create_memory()
     tic_train = time.time()
+    stop_training = False
     for epoch in range(args.epochs):
         train_ds_iter.shuffle_sample()
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
@@ -318,7 +324,10 @@ def do_train(args):
                         tokenizer.save_pretrained(best_model_dir)
 
             if args.max_steps > 0 and global_steps >= args.max_steps:
-                return
+                stop_training = True
+                break
+        if stop_training:
+            break
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
 
