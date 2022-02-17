@@ -811,7 +811,8 @@ class GPTModel(GPTPretrainedModel):
             diagonal=1)
 
         if attention_mask is not None:
-            attention_mask = attention_mask[:, None, None, :]
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
