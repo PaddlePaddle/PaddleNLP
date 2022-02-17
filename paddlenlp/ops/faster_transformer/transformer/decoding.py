@@ -1076,10 +1076,10 @@ class InferGptDecoding(nn.Layer):
             (self.model.gpt.embeddings.word_embeddings, "weight"))
         params["pos_emb"].append(
             (self.model.gpt.embeddings.position_embeddings, "weight"))
+        params["linear_weight"].append(
+            (self.model.gpt.embeddings.word_embeddings, "weight"))
         for k, v in params.items():
             setattr(self, k, v)
-
-        self.linear_weight = [self.model.gpt.embeddings.word_embeddings.weight]
 
     def forward(self,
                 input_ids,
