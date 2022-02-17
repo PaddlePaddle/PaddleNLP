@@ -13,9 +13,6 @@
 # limitations under the License.
 
 export task=TNEWS
-python infer.py  --task_name ${task} --model_path  ../finetuning/ppminilm-6l-768h/models/${task}/1e-4_64/inference  --use_trt  --collect_shape --perf
-python infer.py --task_name ${task} --model_path ../pruning/pruned_models/${task}/0.75/sub_static/float  --use_trt --collect_shape --perf
-python  infer.py  --task_name ${task} --model_path  ../quantization/${task}_quant_models/mse4/int8  --int8 --use_trt  --collect_shape --perf
 
 echo Inference of orgin FP32 model
 for ((i=0;i<=4;i++));

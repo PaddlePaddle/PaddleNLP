@@ -1252,6 +1252,7 @@ class FasterMBART(MBartPretrainedModel):
                 temperature=1.0,
                 num_return_sequences=1,
                 early_stopping=False,
+                forced_eos_token_id=None,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(

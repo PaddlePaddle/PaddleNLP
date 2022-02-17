@@ -34,7 +34,7 @@ def parse_args():
         help="The name of the task to train selected in the list: " +
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
-        "--output_dir",
+        "--model_path",
         default="best_clue_model",
         type=str,
         help="The output directory where the model predictions and checkpoints will be written.",
@@ -50,9 +50,10 @@ def parse_args():
 
 
 def do_export(args):
-    save_path = os.path.join(args.output_dir, "inference")
-    model = PPMiniLMForSequenceClassification.from_pretrained(args.output_dir)
+    save_path = os.path.join(os.path.dirname(args.model_path), "inference")
+    model = PPMiniLMForSequenceClassification.from_pretrained(args.model_path)
     is_text_pair = True
+    args.task_name = args.task_name.lower()
     if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
         is_text_pair = False
     model.to_static(

@@ -811,10 +811,11 @@ class GPTModel(GPTPretrainedModel):
             diagonal=1)
 
         if attention_mask is not None:
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
-
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1151,13 +1152,16 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
+        if attention_mask is not None:
+            if len(attention_mask.shape) == 4:
+                attention_mask = attention_mask[:, -1, -1, :]
+            if "int" in paddle.fluid.data_feeder.convert_dtype(
+                    attention_mask.dtype):
+                attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
-
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,

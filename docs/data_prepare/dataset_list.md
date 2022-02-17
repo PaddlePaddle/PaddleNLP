@@ -50,7 +50,7 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [CLUEWSCF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的 WSC Winograd 模式挑战中文版，代词消歧任务，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'cluewsc')`|
 | [THUCNews](https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86) |  THUCNews中文新闻类别分类 | `paddlenlp.datasets.load_dataset('thucnews')` |
 | [HYP](https://pan.webis.de/semeval19/semeval19-web/) | 英文政治新闻情感分类语料  | `paddlenlp.datasets.load_dataset('hyp')` |
-|  [XNLI](https://github.com/facebookresearch/XNLI) | 15种语言自然语言推理数据集，三分类任务. | `paddlenlp.datasets.load_dataset('xnli')`|
+|  [XNLI](https://github.com/facebookresearch/XNLI) | 15种语言自然语言推理数据集，三分类任务. | `paddlenlp.datasets.load_dataset('xnli', 'ar')`|
 |  [XNLI_CN](https://github.com/facebookresearch/XNLI) | 中文自然语言推理数据集（XNLI的子集），三分类任务. | `paddlenlp.datasets.load_dataset('xnli_cn')`|
 
 ## 文本匹配
@@ -65,6 +65,7 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  ----  | --------- | ------ |
 |  [MSRA_NER](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra) | MSRA 命名实体识别数据集| `paddlenlp.datasets.load_dataset('msra_ner')`|
 |  [People's Daily](https://github.com/OYE93/Chinese-NLP-Corpus/tree/master/NER/People's%20Daily) | 人民日报命名实体识别数据集| `paddlenlp.datasets.load_dataset('peoples_daily_ner')`|
+|  [CoNLL-2002](https://www.aclweb.org/anthology/W02-2024/) | 西班牙语和荷兰语实体识别数据集| `paddlenlp.datasets.load_dataset('conll2002', 'es')`|
 
 
 ## 机器翻译
