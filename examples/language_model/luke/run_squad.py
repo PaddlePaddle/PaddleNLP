@@ -148,9 +148,9 @@ def evaluate(args, model):
     for batch in tqdm(dataloader, desc="eval"):
         model.eval()
         outputs = model(
-            word_ids=batch[0],
-            word_segment_ids=batch[1],
-            word_attention_mask=batch[2],
+            input_ids=batch[0],
+            token_type_ids=batch[1],
+            attention_mask=batch[2],
             entity_ids=batch[3],
             entity_position_ids=batch[4],
             entity_segment_ids=batch[5],

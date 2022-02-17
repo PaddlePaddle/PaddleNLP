@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,14 +101,13 @@ def evaluate(args, model, fold="dev", output_file=None):
 
     for batch in tqdm(dataloader, desc=fold):
         logits = model(
-            word_ids=batch[0],
-            word_segment_ids=batch[1],
-            word_attention_mask=batch[2],
+            input_ids=batch[0],
+            token_type_ids=batch[1],
+            attention_mask=batch[2],
             entity_ids=batch[3],
             entity_position_ids=batch[4],
             entity_segment_ids=batch[5],
-            entity_attention_mask=batch[6],
-            labels=None)
+            entity_attention_mask=batch[6])
 
         logits = logits.tolist()
         labels = batch[7].tolist()
