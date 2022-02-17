@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,11 +21,13 @@ import numpy as np
 from utils.reading_comprehension.squad_get_predictions import *
 from utils.reading_comprehension.squad_postprocess import *
 from paddlenlp.transformers import LukeTokenizer
-from paddlenlp.transformers import LukePretrainedModel
-import paddle.nn as nn
-from paddle.nn import CrossEntropyLoss
+from paddlenlp.transformers import LukeForQuestionAnswering
+import os
+import json
 from utils.trainer import *
 import paddle
+import collections
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description="LUKE FOR MRC")
 
@@ -48,57 +50,6 @@ parser.add_argument("--model_type", type=str, default='luke-base')
 
 args = parser.parse_args()
 args.tokenizer = LukeTokenizer.from_pretrained(args.model_type)
-
-
-class LukeForReadingComprehension(LukePretrainedModel):
-    def __init__(self, luke):
-        super(LukeForReadingComprehension, self).__init__()
-        self.luke = luke  # luke模型用于特征抽取
-        self.qa_outputs = nn.Linear(self.luke.config['hidden_size'], 2)  # 预测器
-        self.apply(self.init_weights)
-
-    def forward(
-            self,
-            word_ids,
-            word_segment_ids,
-            word_attention_mask,
-            entity_ids,
-            entity_position_ids,
-            entity_segment_ids,
-            entity_attention_mask,
-            start_positions=None,
-            end_positions=None, ):
-        encoder_outputs = self.luke(
-            word_ids, word_segment_ids, word_attention_mask, entity_ids,
-            entity_position_ids, entity_segment_ids, entity_attention_mask)
-
-        word_hidden_states = encoder_outputs[0][:, :word_ids.shape[1], :]
-        logits = self.qa_outputs(word_hidden_states)
-        start_logits, end_logits = paddle.split(logits, 2, -1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
-
-        if start_positions is not None and end_positions is not None:
-            if len(start_positions.shape) > 1:
-                start_positions = start_positions.squeeze(-1)
-            if len(end_positions.shape) > 1:
-                end_positions = end_positions.squeeze(-1)
-
-            ignored_index = start_logits.shape[1]
-            start_positions = start_positions.clip(0, ignored_index)
-            end_positions = end_positions.clip(0, ignored_index)
-
-            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
-            total_loss = (start_loss + end_loss) / 2
-            outputs = (total_loss, )
-        else:
-            outputs = tuple()
-
-        return outputs + (
-            start_logits,
-            end_logits, )
 
 
 def to_numpy(value):
@@ -147,15 +98,9 @@ class DataGenerator(Dataset):
             dtype=np.int64) if not self.args.evaluate else 0
         example_index = self.all_example_index[
             item] if self.args.evaluate else 0
-        return word_ids, \
-               word_segment_ids, \
-               word_attention_mask, \
-               entity_ids, \
-               entity_position_ids, \
-               entity_segment_ids, \
-               entity_attention_mask, \
-               start_positions, \
-               end_positions, \
+        return word_ids, word_segment_ids, word_attention_mask, \
+               entity_ids, entity_position_ids, entity_segment_ids, \
+               entity_attention_mask, start_positions, end_positions, \
                example_index
 
     def __len__(self):
@@ -167,10 +112,10 @@ def load_examples(args, evaluate=False):
     features = []
     if not evaluate:
         logging.info('Loading the preprocess data......')
-        data_file = args.data_dir + 'train.json'
+        data_file = os.path.join(args.data_dir, 'train.json')
     else:
         logging.info('Loading the preprocess data......')
-        data_file = args.data_dir + 'eval_data.json'
+        data_file = os.path.join(args.data_dir, 'eval_data.json')
     with open(data_file, 'r', encoding='utf-8') as f:
         line = f.readline()
         while line:
@@ -180,7 +125,7 @@ def load_examples(args, evaluate=False):
     if evaluate:
         data_generator = DataGenerator(features, args)
         dataloader = DataLoader(data_generator, batch_size=args.eval_batch_size)
-        with open(args.data_dir + 'eval_obj.pickle', 'rb') as f:
+        with open(os.path.join(args.data_dir, 'eval_obj.pickle'), 'rb') as f:
             eval_obj = pickle.load(f)
         examples, features, processor = eval_obj.examples, eval_obj.features, eval_obj.processor
     else:
@@ -227,7 +172,7 @@ def evaluate(args, model):
 
 
 if __name__ == '__main__':
-    model = LukeForReadingComprehension.from_pretrained(args.model_type)
+    model = LukeForQuestionAnswering.from_pretrained(args.model_type)
     train_dataloader, _, _, _ = load_examples(args, evaluate=False)
     num_train_steps = len(
         train_dataloader

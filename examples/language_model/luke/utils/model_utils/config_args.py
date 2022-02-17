@@ -140,6 +140,8 @@ def get_config():
     parser.add_argument("--wiki_data", type=str, required=False)
     parser.add_argument("--data_dir", type=str, required=False)
     parser.add_argument("--output_data_dir", type=str, required=False)
+    parser.add_argument("--bert_model_name", type=str, default='roberta-large')
+    parser.add_argument("--max_mention_length", type=int, default=30)
     path_args, _ = parser.parse_known_args()
     default, helper, choices = parse_yaml(path_args.config_path)
     args = parse_cli_to_yaml(

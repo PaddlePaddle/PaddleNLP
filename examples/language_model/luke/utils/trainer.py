@@ -17,6 +17,24 @@ import paddle
 from tqdm import tqdm
 from paddle.optimizer import AdamW
 from paddle.optimizer.lr import LRScheduler
+import paddle.nn.functional as F
+
+
+class CrossEntropyLossForSQuAD(paddle.nn.Layer):
+    def __init__(self):
+        super(CrossEntropyLossForSQuAD, self).__init__()
+
+    def forward(self, y, label):
+        start_logits, end_logits = y
+        start_position, end_position = label
+        start_position = paddle.unsqueeze(start_position, axis=-1)
+        end_position = paddle.unsqueeze(end_position, axis=-1)
+        start_loss = paddle.nn.functional.cross_entropy(
+            input=start_logits, label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(
+            input=end_logits, label=end_position)
+        loss = (start_loss + end_loss) / 2
+        return loss
 
 
 class LinearScheduleWithWarmup(LRScheduler):
@@ -79,29 +97,23 @@ class Trainer(object):
             while True:
                 for step, batch in enumerate(self.dataloader):
                     with paddle.amp.auto_cast():
+                        outputs = model(
+                            input_ids=batch[0],
+                            token_type_ids=batch[1],
+                            attention_mask=batch[2],
+                            entity_ids=batch[3],
+                            entity_position_ids=batch[4],
+                            entity_segment_ids=batch[5],
+                            entity_attention_mask=batch[6])
                         if not is_op:
-                            outputs = model(
-                                word_ids=batch[0],
-                                word_segment_ids=batch[1],
-                                word_attention_mask=batch[2],
-                                entity_ids=batch[3],
-                                entity_position_ids=batch[4],
-                                entity_segment_ids=batch[5],
-                                entity_attention_mask=batch[6],
-                                start_positions=batch[7],
-                                end_positions=batch[8])
-                        else:
-                            outputs = model(
-                                word_ids=batch[0],
-                                word_segment_ids=batch[1],
-                                word_attention_mask=batch[2],
-                                entity_ids=batch[3],
-                                entity_position_ids=batch[4],
-                                entity_segment_ids=batch[5],
-                                entity_attention_mask=batch[6],
-                                labels=batch[7])
+                            loss_fn = CrossEntropyLossForSQuAD()
+                            loss = loss_fn(outputs, (batch[7], batch[8]))
 
-                    loss = outputs[0]
+                        else:
+                            logits = outputs
+                            loss = F.binary_cross_entropy_with_logits(
+                                logits.reshape([-1]),
+                                batch[7].reshape([-1]).astype('float32'))
 
                     if self.args.gradient_accumulation_steps > 1:
                         loss = loss / self.args.gradient_accumulation_steps

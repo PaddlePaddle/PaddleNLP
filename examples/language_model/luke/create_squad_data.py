@@ -17,13 +17,14 @@
 from utils.model_utils.config_args import args_config as args
 from utils.reading_comprehension.dataProcessing import build_data_change
 from paddlenlp.transformers import LukeTokenizer
+import os
 
-args.wiki_link_db_file = args.wiki_data + "enwiki_20160305.pkl"
-args.model_redirects_file = args.wiki_data + "enwiki_20181220_redirects.pkl"
-args.link_redirects_file = args.wiki_data + "enwiki_20160305_redirects.pkl"
+args.wiki_link_db_file = os.path.join(args.wiki_data, "enwiki_20160305.pkl")
+args.model_redirects_file = os.path.join(args.wiki_data,
+                                         "enwiki_20181220_redirects.pkl")
+args.link_redirects_file = os.path.join(args.wiki_data,
+                                        "enwiki_20160305_redirects.pkl")
 
-args.bert_model_name = 'roberta-large'
-args.max_mention_length = 30
 args.tokenizer = LukeTokenizer.from_pretrained('luke-base')
 args.entity_vocab = args.tokenizer.get_entity_vocab()
 build_data_change(args)

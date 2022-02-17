@@ -22,7 +22,7 @@ import math
 __all__ = [
     'LukeModel', 'LukePretrainedModel', 'LukeForEntitySpanClassification',
     'LukeForEntityPairClassification', 'LukeForEntityClassification',
-    'LukeForMaskedLM'
+    'LukeForMaskedLM', 'LukeForQuestionAnswering'
 ]
 
 
@@ -47,6 +47,47 @@ def paddle_gather(x, dim, index):
     return paddle_out
 
 
+def get_activation(activation_string):
+    if activation_string in ACT2FN:
+        return ACT2FN[activation_string]
+    else:
+        raise KeyError("function {} not found in ACT2FN mapping {}".format(
+            activation_string, list(ACT2FN.keys())))
+
+
+def mish(x):
+    return x * F.tanh(F.softplus(x))
+
+
+def linear_act(x):
+    return x
+
+
+def swish(x):
+    return x * F.sigmoid(x)
+
+
+def gelu_new(x):
+    """
+    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
+    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    """
+    return 0.5 * x * (1.0 + paddle.tanh(
+        math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
+
+
+ACT2FN = {
+    "relu": F.relu,
+    "gelu": F.gelu,
+    "gelu_new": gelu_new,
+    "tanh": F.tanh,
+    "sigmoid": F.sigmoid,
+    "mish": mish,
+    "linear": linear_act,
+    "swish": swish,
+}
+
+
 class LukePretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained Luke models. It provides Luke related
@@ -61,6 +102,10 @@ class LukePretrainedModel(PretrainedModel):
     pretrained_init_configuration = {
         "luke-base": {
             "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "pad_token_id": 1,
+            "entity_pad_token_id": -1,
+            "layer_norm_eps": 1e-6,
             "hidden_dropout_prob": 0.1,
             "hidden_size": 768,
             "initializer_range": 0.02,
@@ -69,10 +114,14 @@ class LukePretrainedModel(PretrainedModel):
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "type_vocab_size": 1,
-            "vocab_size": 50265
+            "vocab_size": 50267
         },
         "luke-large": {
             "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "pad_token_id": 1,
+            "entity_pad_token_id": -1,
+            "layer_norm_eps": 1e-6,
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
             "initializer_range": 0.02,
@@ -81,7 +130,7 @@ class LukePretrainedModel(PretrainedModel):
             "num_attention_heads": 16,
             "num_hidden_layers": 24,
             "type_vocab_size": 1,
-            "vocab_size": 50265
+            "vocab_size": 50267
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -115,10 +164,7 @@ class LukePretrainedModel(PretrainedModel):
 class LukeSelfOutput(nn.Layer):
     """Luke self output"""
 
-    def __init__(self,
-                 hidden_size,
-                 layer_norm_eps=1e-6,
-                 hidden_dropout_prob=0.1):
+    def __init__(self, hidden_size, layer_norm_eps, hidden_dropout_prob):
         super(LukeSelfOutput, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -134,10 +180,10 @@ class LukeSelfOutput(nn.Layer):
 class LukeIntermediate(nn.Layer):
     """Luke intermediate"""
 
-    def __init__(self, hidden_size, intermediate_size):
+    def __init__(self, hidden_size, intermediate_size, hidden_act):
         super(LukeIntermediate, self).__init__()
         self.dense = nn.Linear(hidden_size, intermediate_size)
-        self.intermediate_act_fn = nn.GELU()
+        self.intermediate_act_fn = get_activation(hidden_act)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -160,70 +206,28 @@ class LukeOutput(nn.Layer):
         return hidden_states
 
 
-class BaseEmbeddings(nn.Layer):
-    """Construct the embeddings from word, position and token_type embeddings.
-    """
-
-    def __init__(self, vocab_size, hidden_size, max_position_embeddings,
-                 type_vocab_size, layer_norm_eps, hidden_dropout_prob):
-        super(BaseEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=0)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-
-        self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
-
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                inputs_embeds=None):
-        if input_ids is not None:
-            input_shape = input_ids.shape
-        else:
-            input_shape = inputs_embeds.shape[:-1]
-
-        seq_length = input_shape[1]
-        if position_ids is None:
-            position_ids = paddle.arange(start=0, end=seq_length, dtype='int64')
-            position_ids = position_ids.unsqueeze(0).expand(input_shape)
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype='int64')
-
-        if inputs_embeds is None:
-            inputs_embeds = self.word_embeddings(input_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
-
-        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
-        embeddings = self.LayerNorm(embeddings)
-        embeddings = self.dropout(embeddings)
-        return embeddings
-
-
-class LukeEmbeddings(BaseEmbeddings):
+class LukeEmbeddings(nn.Layer):
     """
     Same as BertEmbeddings with a tiny tweak for positional embeddings indexing.
     """
 
     def __init__(self,
-                 vocab_size=50265,
+                 vocab_size=50267,
                  hidden_size=768,
                  max_position_embeddings=514,
                  type_vocab_size=1,
+                 pad_token_id=0,
                  layer_norm_eps=1e-6,
                  hidden_dropout_prob=0.1):
-        super(LukeEmbeddings, self).__init__(
-            vocab_size, hidden_size, max_position_embeddings, type_vocab_size,
-            layer_norm_eps, hidden_dropout_prob)
-        self.padding_idx = 1
+        super(LukeEmbeddings, self).__init__()
+        self.padding_idx = pad_token_id
         self.word_embeddings = nn.Embedding(
             vocab_size, hidden_size, padding_idx=self.padding_idx)
         self.position_embeddings = nn.Embedding(
             max_position_embeddings, hidden_size, padding_idx=self.padding_idx)
+        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self,
                 input_ids=None,
@@ -245,11 +249,39 @@ class LukeEmbeddings(BaseEmbeddings):
                 seq_length + self.padding_idx + 1,
                 dtype='int64')
             position_ids = position_ids.unsqueeze(0).expand(input_shape)
-        return super(LukeEmbeddings, self).forward(
+        return self.fuse_embedding(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             inputs_embeds=inputs_embeds)
+
+    def fuse_embedding(
+            self,
+            input_ids,
+            token_type_ids,
+            position_ids,
+            inputs_embeds, ):
+        if input_ids is not None:
+            input_shape = input_ids.shape
+        else:
+            input_shape = inputs_embeds.shape[:-1]
+
+        seq_length = input_shape[1]
+        if position_ids is None:
+            position_ids = paddle.arange(start=0, end=seq_length, dtype='int64')
+            position_ids = position_ids.unsqueeze(0).expand(input_shape)
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros(input_shape, dtype='int64')
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+        position_embeddings = self.position_embeddings(position_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
 
 
 class LukePooler(nn.Layer):
@@ -274,13 +306,16 @@ class EntityEmbeddings(nn.Layer):
                  hidden_size=768,
                  max_position_embeddings=514,
                  type_vocab_size=1,
+                 pad_token_id=0,
+                 entity_pad_token_id=-1,
                  layer_norm_eps=1e-6,
                  hidden_dropout_prob=0.1):
         super(EntityEmbeddings, self).__init__()
         self.entity_emb_size = entity_emb_size
         self.hidden_size = hidden_size
+        self.entity_pad_token_id = entity_pad_token_id
         self.entity_embeddings = nn.Embedding(
-            entity_vocab_size, entity_emb_size, padding_idx=0)
+            entity_vocab_size, entity_emb_size, padding_idx=pad_token_id)
         if entity_emb_size != hidden_size:
             self.entity_embedding_dense = nn.Linear(
                 entity_emb_size, hidden_size, bias_attr=False)
@@ -303,8 +338,8 @@ class EntityEmbeddings(nn.Layer):
         position_embeddings = self.position_embeddings(
             paddle.clip(
                 position_ids, min=0))
-        position_embedding_mask = (
-            position_ids != -1).astype('float32').unsqueeze(-1)
+        position_embedding_mask = (position_ids != self.entity_pad_token_id
+                                   ).astype('float32').unsqueeze(-1)
         position_embeddings = position_embeddings * position_embedding_mask
         position_embeddings = paddle.sum(position_embeddings, axis=-2)
         position_embeddings = position_embeddings / paddle.clip(
@@ -445,6 +480,7 @@ class EntityAwareAttention(nn.Layer):
 class EntityAwareLayer(nn.Layer):
     def __init__(self,
                  hidden_size=768,
+                 hidden_act="gelu",
                  intermediate_size=3072,
                  layer_norm_eps=1e-6,
                  hidden_dropout_prob=0.1,
@@ -459,7 +495,9 @@ class EntityAwareLayer(nn.Layer):
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob)
         self.intermediate = LukeIntermediate(
-            hidden_size=hidden_size, intermediate_size=intermediate_size)
+            hidden_size=hidden_size,
+            intermediate_size=intermediate_size,
+            hidden_act=hidden_act)
         self.output = LukeOutput(
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
@@ -481,6 +519,7 @@ class EntityAwareLayer(nn.Layer):
 
 class EntityAwareEncoder(nn.Layer):
     def __init__(self,
+                 hidden_act,
                  num_hidden_layers=12,
                  hidden_size=768,
                  intermediate_size=3072,
@@ -491,6 +530,7 @@ class EntityAwareEncoder(nn.Layer):
         super(EntityAwareEncoder, self).__init__()
         self.layer = nn.LayerList([
             EntityAwareLayer(
+                hidden_act=hidden_act,
                 hidden_size=hidden_size,
                 intermediate_size=intermediate_size,
                 layer_norm_eps=layer_norm_eps,
@@ -516,12 +556,15 @@ class LukeModel(LukePretrainedModel):
     def __init__(
             self,
             vocab_size=50265,
+            pad_token_id=1,
+            entity_pad_token_id=-1,
             initializer_range=0.02,
             max_position_embeddings=514,
             type_vocab_size=1,
             hidden_size=768,
             entity_vocab_size=500000,
             entity_emb_size=256,
+            hidden_act="gelu",
             num_hidden_layers=12,
             intermediate_size=3072,
             layer_norm_eps=1e-6,
@@ -532,6 +575,7 @@ class LukeModel(LukePretrainedModel):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.encoder = EntityAwareEncoder(
+            hidden_act=hidden_act,
             num_hidden_layers=num_hidden_layers,
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
@@ -540,6 +584,7 @@ class LukeModel(LukePretrainedModel):
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob)
         self.embeddings = LukeEmbeddings(
+            pad_token_id=pad_token_id,
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             max_position_embeddings=max_position_embeddings,
@@ -548,6 +593,8 @@ class LukeModel(LukePretrainedModel):
             hidden_dropout_prob=hidden_dropout_prob)
         self.embeddings.token_type_embeddings.stop_gradient = True
         self.entity_embeddings = EntityEmbeddings(
+            entity_pad_token_id=entity_pad_token_id,
+            pad_token_id=pad_token_id,
             entity_vocab_size=entity_vocab_size,
             entity_emb_size=entity_emb_size,
             hidden_size=hidden_size,
@@ -596,24 +643,22 @@ class LukeLMHead(nn.Layer):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-
         self.decoder = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
         x = F.gelu(x)
         x = self.layer_norm(x)
-        # project back to size of vocabulary with bias
         x = self.decoder(x)
-
         return x
 
 
 class EntityPredictionHeadTransform(nn.Layer):
-    def __init__(self, hidden_size, entity_emb_size, layer_norm_eps):
+    def __init__(self, hidden_act, hidden_size, entity_emb_size,
+                 layer_norm_eps):
         super().__init__()
         self.dense = nn.Linear(hidden_size, entity_emb_size)
-        self.transform_act_fn = nn.GELU()
+        self.transform_act_fn = get_activation(hidden_act)
         self.LayerNorm = nn.LayerNorm(entity_emb_size, epsilon=layer_norm_eps)
 
     def forward(self, hidden_states):
@@ -625,10 +670,11 @@ class EntityPredictionHeadTransform(nn.Layer):
 
 class EntityPredictionHead(nn.Layer):
     def __init__(self, hidden_size, entity_vocab_size, entity_emb_size,
-                 layer_norm_eps):
+                 hidden_act, layer_norm_eps):
         super().__init__()
         self.transform = EntityPredictionHeadTransform(
             hidden_size=hidden_size,
+            hidden_act=hidden_act,
             entity_emb_size=entity_emb_size,
             layer_norm_eps=layer_norm_eps)
         self.decoder = nn.Linear(entity_emb_size, entity_vocab_size)
@@ -652,11 +698,11 @@ class LukeForMaskedLM(LukePretrainedModel):
             layer_norm_eps=self.luke.config['layer_norm_eps'])
         self.entity_predictions = EntityPredictionHead(
             hidden_size=self.luke.config['hidden_size'],
+            hidden_act=self.luke.config['hidden_act'],
             entity_vocab_size=self.luke.config['entity_vocab_size'],
             entity_emb_size=self.luke.config['entity_emb_size'],
             layer_norm_eps=self.luke.config['layer_norm_eps'])
 
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -666,20 +712,7 @@ class LukeForMaskedLM(LukePretrainedModel):
                 entity_ids=None,
                 entity_position_ids=None,
                 entity_segment_ids=None,
-                entity_attention_mask=None,
-                labels=None,
-                entity_labels=None):
-        r"""
-        labels (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
-            config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
-            loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`
-        entity_labels (`paddle.Tensor` of shape `(batch_size, entity_length)`, *optional*):
-            Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
-            vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
-            loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
-        """
-
+                entity_attention_mask=None):
         outputs = self.luke(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
@@ -689,37 +722,10 @@ class LukeForMaskedLM(LukePretrainedModel):
             entity_segment_ids=entity_segment_ids,
             entity_attention_mask=entity_attention_mask)
 
-        loss = None
-
-        mlm_loss = None
         logits = self.lm_head(outputs[0])
-        if labels is not None:
-            mlm_loss = self.loss_fn(
-                logits.reshape((-1, self.vocab_size)), labels.reshape([-1]))
-            if loss is None:
-                loss = mlm_loss
-
-        mep_loss = None
         entity_logits = self.entity_predictions(outputs[1])
-        if entity_labels is not None:
-            mep_loss = self.loss_fn(
-                entity_logits.reshape((-1, self.entity_vocab_size)),
-                entity_labels.reshape([-1]))
-            if loss is None:
-                loss = mep_loss
-            else:
-                loss = loss + mep_loss
 
-        output = (logits, entity_logits, outputs[0], outputs[1], outputs[2],
-                  outputs[3])
-        if mlm_loss is not None and mep_loss is not None:
-            return (loss, mlm_loss, mep_loss) + output
-        elif mlm_loss is not None:
-            return (loss, mlm_loss) + output
-        elif mep_loss is not None:
-            return (loss, mep_loss) + output
-        else:
-            return output
+        return logits, entity_logits
 
 
 class LukeForEntityClassification(LukePretrainedModel):
@@ -740,17 +746,7 @@ class LukeForEntityClassification(LukePretrainedModel):
                 entity_ids=None,
                 entity_position_ids=None,
                 entity_segment_ids=None,
-                entity_attention_mask=None,
-                labels=None):
-        """
-        labels (`paddle.Tensor` of shape `(batch_size,)` or `(batch_size, num_labels)`, *optional*):
-            Labels for computing the classification loss. If the shape is `(batch_size,)`, the cross entropy loss is
-            used for the single-label classification. In this case, labels should contain the indices that should be in
-            `[0, ..., config.num_labels - 1]`. If the shape is `(batch_size, num_labels)`, the binary cross entropy
-            loss is used for the multi-label classification. In this case, labels should only contain `[0, 1]`, where 0
-            and 1 indicate false and true, respectively.
-        """
-
+                entity_attention_mask=None):
         outputs = self.luke(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
@@ -764,19 +760,7 @@ class LukeForEntityClassification(LukePretrainedModel):
         feature_vector = self.dropout(feature_vector)
         logits = self.classifier(feature_vector)
 
-        loss = None
-        if labels is not None:
-            # When the number of dimension of `labels` is 1, cross entropy is used as the loss function. The binary
-            # cross entropy is used otherwise.
-            if len(labels.shape) == 1:
-                loss = nn.functional.cross_entropy(logits, labels)
-            else:
-                loss = nn.functional.binary_cross_entropy_with_logits(
-                    logits.reshape([-1]),
-                    labels.reshape([-1]).astype('float32'))
-
-        output = (logits, outputs[0], outputs[1], outputs[2], outputs[3])
-        return ((loss, ) + output) if loss is not None else output
+        return logits
 
 
 class LukeForEntityPairClassification(LukePretrainedModel):
@@ -791,23 +775,15 @@ class LukeForEntityPairClassification(LukePretrainedModel):
             self.luke.config['hidden_size'] * 2, num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                attention_mask=None,
-                token_type_ids=None,
-                entity_ids=None,
-                entity_position_ids=None,
-                entity_segment_ids=None,
-                entity_attention_mask=None,
-                labels=None):
-        """
-        labels (`paddle.Tensor` of shape `(batch_size,)` or `(batch_size, num_labels)`, *optional*):
-        Labels for computing the classification loss. If the shape is `(batch_size,)`, the cross entropy loss is
-        used for the single-label classification. In this case, labels should contain the indices that should be in
-        `[0, ..., config.num_labels - 1]`. If the shape is `(batch_size, num_labels)`, the binary cross entropy
-        loss is used for the multi-label classification. In this case, labels should only contain `[0, 1]`, where 0
-        and 1 indicate false and true, respectively.
-        """
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            entity_ids=None,
+            entity_position_ids=None,
+            entity_segment_ids=None,
+            entity_attention_mask=None, ):
         outputs = self.luke(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
@@ -822,19 +798,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
         feature_vector = self.dropout(feature_vector)
         logits = self.classifier(feature_vector)
 
-        loss = None
-        if labels is not None:
-            # When the number of dimension of `labels` is 1, cross entropy is used as the loss function. The binary
-            # cross entropy is used otherwise.
-            if len(labels.shape) == 1:
-                loss = nn.functional.cross_entropy(logits, labels)
-            else:
-                loss = nn.functional.binary_cross_entropy_with_logits(
-                    logits.reshape([-1]),
-                    labels.reshape([-1]).astype('float32'))
-
-        output = (logits, outputs[0], outputs[1], outputs[2], outputs[3])
-        return ((loss, ) + output) if loss is not None else output
+        return logits
 
 
 class LukeForEntitySpanClassification(LukePretrainedModel):
@@ -859,22 +823,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
                 entity_segment_ids=None,
                 entity_attention_mask=None,
                 entity_start_positions=None,
-                entity_end_positions=None,
-                labels=None):
-        """
-        entity_start_positions (`paddle.Tensor`):
-            The start positions of entities in the word token sequence.
-        entity_end_positions (`paddle.Tensor`):
-            The end positions of entities in the word token sequence.
-        labels (`paddle.Tensor` of shape `(batch_size, entity_length)` or `(batch_size, entity_length, num_labels)`,
-            *optional*):Labels for computing the classification loss. If the shape is `(batch_size, entity_length)`, the cross
-            entropy loss is used for the single-label classification. In this case, labels should contain the indices
-            that should be in `[0, ..., config.num_labels - 1]`. If the shape is `(batch_size, entity_length,
-            num_labels)`, the binary cross entropy loss is used for the multi-label classification. In this case,
-            labels should only contain `[0, 1]`, where 0 and 1 indicate false and true, respectively.
-
-        """
-
+                entity_end_positions=None):
         outputs = self.luke(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
@@ -899,17 +848,38 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
         feature_vector = self.dropout(feature_vector)
         logits = self.classifier(feature_vector)
 
-        loss = None
-        if labels is not None:
-            # When the number of dimension of `labels` is 2, cross entropy is used as the loss function. The binary
-            # cross entropy is used otherwise.
-            if len(labels.shape) == 2:
-                loss = nn.functional.cross_entropy(
-                    logits.reshape((-1, self.num_labels)), labels.reshape([-1]))
-            else:
-                loss = nn.functional.binary_cross_entropy_with_logits(
-                    logits.reshape([-1]),
-                    labels.reshape([-1]).astype('float32'))
+        return logits
 
-        output = (logits, outputs[0], outputs[1], outputs[2], outputs[3])
-        return ((loss, ) + output) if loss is not None else output
+
+class LukeForQuestionAnswering(LukePretrainedModel):
+    def __init__(self, luke):
+        super(LukeForQuestionAnswering, self).__init__()
+        self.luke = luke
+        self.qa_outputs = nn.Linear(self.luke.config['hidden_size'], 2)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                entity_ids=None,
+                entity_position_ids=None,
+                entity_segment_ids=None,
+                entity_attention_mask=None):
+        encoder_outputs = self.luke(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            entity_ids=entity_ids,
+            entity_position_ids=entity_position_ids,
+            entity_segment_ids=entity_segment_ids,
+            entity_attention_mask=entity_attention_mask)
+
+        word_hidden_states = encoder_outputs[0][:, :input_ids.shape[1], :]
+        logits = self.qa_outputs(word_hidden_states)
+        start_logits, end_logits = paddle.split(logits, 2, -1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        return start_logits, end_logits

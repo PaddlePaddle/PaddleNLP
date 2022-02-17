@@ -18,9 +18,7 @@ import argparse
 from paddle.io import Dataset, DataLoader
 import numpy as np
 from paddlenlp.transformers import LukeTokenizer
-from paddlenlp.transformers import LukePretrainedModel
-import paddle.nn as nn
-import paddle.nn.functional as F
+from paddlenlp.transformers import LukeForEntityClassification
 from utils.processor import *
 import paddle
 import json
@@ -159,44 +157,6 @@ def evaluate(args, model, fold="dev", output_file=None):
     return dict(precision=precision, recall=recall, f1=f1)
 
 
-class LukeForEntityTyping(LukePretrainedModel):
-    def __init__(self, luke, num_labels):
-        super(LukeForEntityTyping, self).__init__()
-        self.luke = luke
-        self.num_labels = num_labels
-        self.dropout = nn.Dropout(self.luke.config[
-            'attention_probs_dropout_prob'])
-        self.typing = nn.Linear(self.luke.config['hidden_size'], num_labels)
-
-    def forward(
-            self,
-            word_ids,
-            word_segment_ids,
-            word_attention_mask,
-            entity_ids,
-            entity_position_ids,
-            entity_segment_ids,
-            entity_attention_mask,
-            labels=None, ):
-        encoder_outputs = self.luke(
-            word_ids,
-            word_segment_ids,
-            word_attention_mask,
-            entity_ids,
-            entity_position_ids,
-            entity_segment_ids,
-            entity_attention_mask, )
-
-        feature_vector = encoder_outputs[1][:, 0, :]
-        feature_vector = self.dropout(feature_vector)
-        logits = self.typing(feature_vector)
-        if labels is None:
-            return logits
-
-        return (F.binary_cross_entropy_with_logits(
-            logits.reshape([-1]), labels.reshape([-1]).astype('float32')), )
-
-
 def load_examples(args, fold="train"):
     processor = DatasetProcessor()
     if fold == "train":
@@ -259,15 +219,8 @@ if __name__ == '__main__':
     num_train_steps_per_epoch = len(
         train_dataloader) // args.gradient_accumulation_steps
     num_train_steps = int(num_train_steps_per_epoch * args.num_train_epochs)
-    model = LukeForEntityTyping.from_pretrained(
+    model = LukeForEntityClassification.from_pretrained(
         args.model_type, num_labels=num_labels)
-    word_emb = model.luke.embeddings.word_embeddings.weight
-    marker_emb = word_emb[args.tokenizer.convert_tokens_to_ids(["@"])[
-        0]].unsqueeze(0)
-    model.luke.embeddings.word_embeddings = nn.Embedding(
-        model.luke.config['vocab_size'] + 1, model.luke.config['hidden_size'])
-    model.luke.embeddings.word_embeddings.weight.set_value(
-        paddle.concat([word_emb, marker_emb]))
     trainer = Trainer(
         args,
         model=model,
