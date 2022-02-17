@@ -187,7 +187,7 @@ def evaluate(model, loss_fct, metric, data_loader):
     for batch in data_loader:
         input_ids, segment_ids, labels = batch
         attention_mask = input_ids != 0
-        logits = model(input_ids, attention_mask, segment_ids)[0]
+        logits = model(input_ids, attention_mask, segment_ids)
         loss = loss_fct(logits, labels)
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -356,7 +356,7 @@ def do_train(args):
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits = model(input_ids, attention_mask, segment_ids)[0]
+                logits = model(input_ids, attention_mask, segment_ids)
                 loss = loss_fct(logits, labels)
             if args.use_amp:
                 scaler.scale(loss).backward()
