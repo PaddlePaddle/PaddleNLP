@@ -39,6 +39,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
 # add sharding stage2/3
+import paddle.distributed as dist
 from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.sharding_optimizer_stage2 import ShardingOptimizerStage2
 from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage2 import ShardingStage2
@@ -153,7 +154,10 @@ def do_train(args):
     sharding_rank = hcg.get_sharding_parallel_rank()
 
     # sharding stage2/3 not support hybrid parallel
-    if args.sharding_stage in [2, 3]:
+    if args.sharding_stage == 2 and args.dp_degree > 0:
+        logger.info("using sharding stage2 degree {} and dp degree {}".format(
+            args.sharding_degree, args.dp_degree))
+    elif args.sharding_stage in [2, 3]:
         assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support hybrid parallel later"
 
     sharding_size = hcg.get_sharding_parallel_world_size()
@@ -356,6 +360,10 @@ def do_train(args):
                             loss_mbs.backward()
                         loss = loss + loss_mbs
 
+                    # support sharding stage2 + dp hybrid parallel
+                    if args.sharding_stage == 2 and args.dp_degree > 0:
+                        reduce_grad(model)
+
                     if args.use_pure_fp16:
                         if args.sharding_stage in [2, 3]:
                             scaler.step(optimizer)
@@ -367,7 +375,6 @@ def do_train(args):
 
                     if lr_scheduler is not None:
                         lr_scheduler.step()
-
                     optimizer.clear_grad()
 
                 else:
@@ -475,8 +482,19 @@ def do_train(args):
             del train_data_loader
 
 
+def sync_dp_params(model):
+    dp_group = fleet.get_hybrid_communicate_group().get_data_parallel_group()
+
+    for p in model.parameters():
+        dist.broadcast(
+            p, src=dp_group.ranks[0], group=dp_group, use_calc_stream=True)
+
+    dist.wait(tensor=p, group=dp_group, use_calc_stream=True)
+
+
 def wrap_sharding_2_3(model, optimizer, sharding_offload, use_recompute):
     group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
+    sync_dp_params(model)
 
     if args.sharding_stage == 2:
         optimizer = ShardingOptimizerStage2(
@@ -494,6 +512,35 @@ def wrap_sharding_2_3(model, optimizer, sharding_offload, use_recompute):
             sync_comm=use_recompute,
             offload=sharding_offload)
     return model, optimizer
+
+
+def reduce_grad(model):
+    dp_group = fleet.get_hybrid_communicate_group().get_data_parallel_group()
+    dp_size_scaling = 1.0 / dp_group.nranks
+    dist.wait(
+        tensor=paddle.zeros(shape=[1]), group=dp_group, use_calc_stream=True)
+    assert not model._offload, "stage2_dp not support now"
+
+    # Scale and sum grad storages
+    for dtype in model._grad_storages.keys():
+        if model._rank in model._grad_storages[dtype].keys():
+            model._grad_storages[dtype][model._rank].buffer.scale_(
+                scale=dp_size_scaling)
+            dist.all_reduce(
+                tensor=model._grad_storages[dtype][model._rank].buffer,
+                group=dp_group,
+                use_calc_stream=True)
+
+    # Scale and sum grads of params
+    for param in model._trainable_params:
+        if param.name in model._param_grads and param.grad is not None:
+            param.grad.scale_(scale=dp_size_scaling)
+            param._reset_grad_inplace_version(True)
+            dist.all_reduce(
+                tensor=param.grad, group=dp_group, use_calc_stream=True)
+
+    dist.wait(
+        tensor=paddle.zeros(shape=[1]), group=dp_group, use_calc_stream=True)
 
 
 if __name__ == "__main__":
