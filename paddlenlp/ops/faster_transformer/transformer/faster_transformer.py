@@ -961,7 +961,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             seq_len = model_inputs.pop('seq_len')
             decoder_type_ids = model_inputs.pop('decoder_type_ids')
             role_ids = None
-            decoder_type_ids = None
             position_ids = None
             decoder_position_ids = None
         else:

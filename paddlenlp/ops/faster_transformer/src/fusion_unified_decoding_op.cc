@@ -232,7 +232,7 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const std::vector<int64_t>& positional_embedding_weight_shape,
     const std::vector<int64_t>& type_embedding_weight_shape,
     const std::vector<int64_t>& role_id_shape,
-    const std::vector<int64_t>& decoding_role_id_shape,
+    const std::vector<int64_t>& decoder_role_id_shape,
     const std::vector<int64_t>& role_embedding_table_shape,
     const std::vector<int64_t>& position_ids_shape,
     const std::vector<int64_t>& decoder_position_ids_shape,
