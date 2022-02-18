@@ -18,10 +18,11 @@
             * [原理简介](#原理简介)
             * [运行方式](#运行方式)
             * [量化后模型精度](#量化后模型精度)
-        * [预测](#预测)
+        * [使用 Paddle Inference 进行推理部署](#使用PaddleInference推理部署)
             * [环境要求](#环境要求)
             * [运行方式](#运行方式)
             * [性能测试](#性能测试)
+        * [使用 Paddle Serving 进行服务化部署](#使用PaddleServing服务化部署)
     * [参考文献](#参考文献)
 
 <a name="PP-MiniLM中文小模型"></a>
@@ -101,10 +102,17 @@ PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-a
 ├── quantization                 # 离线量化目录
 │ └── quant_post.py              # 离线量化脚本
 │ └── quant.sh                   # 离线量化启动脚本
-├── inference                    # 预测目录
-│ └── infer.py                   # 预测脚本
-│ └── infer_all.sh               # 批量预测量化模型启动脚本
-│ └── infer_perf.sh              # 量化模型性能测试启动脚本
+├── deploy                       # 部署目录
+│ └── python                     # Paddle Inference 预测目录
+│   └── infer.py                 # Paddle Inference 预测脚本
+│   └── infer_all.sh             # 批量预测量化模型启动脚本
+│   └── infer_perf.sh            # 量化模型性能测试启动脚本
+│ └── serving                    # Paddle Serving 预测目录
+│   └── export_to_serving.py     # 导出 Paddle Serving 预测模型脚本
+│   └── web_service.py           # Paddle Serving 服务端启动脚本
+│   └── rpc_client.py            # Paddle Serving 客户端启动脚本
+│   └── config_nlp.yml           # Paddle Serving 预测配置文件
+│   └── README.md                # Paddle Serving 预测文档
 ├── data.py                      # 数据处理脚本
 ├── pp-minilm.png                # PP-MiniLM 方案流程图
 └── README.md                    # 文档，本文件
@@ -331,9 +339,9 @@ cd ..
 
 最后，值得注意的是，PP-MiniLM 是基于 `roberta-wwm-ext-large` 做教师模型蒸馏得到的学生模型，如果你有更好的 24 层中文预训练模型，可以基于[任务无关蒸馏文档](general_distill/README.md)中介绍的蒸馏过程，训练出一个比 PP-MiniLM 精度更高，在下游任务上表现更好的 6 层小模型。
 
-<a name="预测"></a>
+<a name="使用PaddleInference进行推理部署"></a>
 
-### 预测
+### 使用 Paddle Inference 进行推理部署
 
 预测部署借助 PaddlePaddle 安装包中自带的 [Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/05_inference_deployment/inference/inference_cn.html) 进行预测。
 
@@ -357,7 +365,8 @@ INT8 预测运行脚本：
 
 ```shell
 
-cd inference
+cd deploy/python
+
 export task=tnews
 export algo=mse
 export bs=4
@@ -401,6 +410,12 @@ cd ..
 | PP-MiniLM + 量化        | 7.34x     | 4.63x                         |
 | PP-MiniLM + 裁剪 + 量化 | **8.88x** | **5.36x**                     |
 
+
+<a name="使用PaddleServing进行服务化部署"></a>
+
+### 使用 Paddle Serving 进行服务化部署
+
+上面介绍的 Paddle Inference 为使用本地模型推理，Paddle Serving 可以实现在服务器端部署推理模型，客户端远程通过 RPC/HTTP 方式发送数据进行推理，实现模型推理的服务化。准备好静态图（推理模型）后，可参考 [Paddle Serving](deploy/serving/README.md) 部署步骤。
 
 <a name="参考文献"></a>
 
