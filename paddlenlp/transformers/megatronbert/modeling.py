@@ -17,7 +17,7 @@ import math
 
 import paddle
 from paddle import nn
-from paddlenlp.transformers import PretrainedModel, register_base_model
+from .. import PretrainedModel, register_base_model
 import paddle.nn.functional as F
 from ...ops import einsum
 
@@ -234,7 +234,7 @@ class MegatronBertSelfAttention(nn.Layer):
         x = x.reshape(new_x_shape)
         return x.transpose((0, 2, 1, 3))
 
-    def forward(self, hidden_states, attention_mask=None, head_mask=None):
+    def forward(self, hidden_states, attention_mask=None):
         mixed_query_layer = self.query(hidden_states)
 
         key_layer = self.transpose_for_scores(self.key(hidden_states))
@@ -278,10 +278,6 @@ class MegatronBertSelfAttention(nn.Layer):
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
-
-        # Mask heads if we want to
-        if head_mask is not None:
-            attention_probs = attention_probs * head_mask
 
         context_layer = paddle.matmul(attention_probs, value_layer)
 
@@ -329,9 +325,9 @@ class MegatronBertAttention(nn.Layer):
             hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob)
         self.pruned_heads = set()
 
-    def forward(self, hidden_states, attention_mask=None, head_mask=None):
+    def forward(self, hidden_states, attention_mask=None):
         ln_outputs = self.ln(hidden_states)
-        self_outputs = self.self(ln_outputs, attention_mask, head_mask)
+        self_outputs = self.self(ln_outputs, attention_mask)
         attention_output = self.output(self_outputs[0], hidden_states)
         outputs = (attention_output,
                    ) + self_outputs[1:]  # add attentions if we output them
@@ -398,9 +394,8 @@ class MegatronBertLayer(nn.Layer):
             hidden_dropout_prob=hidden_dropout_prob,
             hidden_size=hidden_size)
 
-    def forward(self, hidden_states, attention_mask=None, head_mask=None):
-        self_attention_outputs = self.attention(hidden_states, attention_mask,
-                                                head_mask)
+    def forward(self, hidden_states, attention_mask=None):
+        self_attention_outputs = self.attention(hidden_states, attention_mask)
         attention_output = self_attention_outputs[0]
 
         outputs = self_attention_outputs[1:]
@@ -448,12 +443,10 @@ class MegatronBertEncoder(nn.Layer):
         # is simply the final LN (Transformer's BERT has it attached to each hidden layer).
         self.ln = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
 
-    def forward(self, hidden_states, attention_mask=None, head_mask=None):
+    def forward(self, hidden_states, attention_mask=None):
         for i, layer_module in enumerate(self.layer):
-            layer_head_mask = head_mask[i] if head_mask is not None else None
 
-            layer_outputs = layer_module(hidden_states, attention_mask,
-                                         layer_head_mask)
+            layer_outputs = layer_module(hidden_states, attention_mask)
 
             hidden_states = layer_outputs[0]
 
@@ -480,6 +473,66 @@ class MegatronBertPooler(nn.Layer):
 
 @register_base_model
 class MegatronBertModel(MegatronBertPretrainedModel):
+    """
+        The bare MegatronBert Model transformer outputting raw hidden-states.
+
+        This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+        Refer to the superclass documentation for the generic methods.
+
+        This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+        /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+        and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+        Args:
+            vocab_size (int):
+                Vocabulary size of `inputs_ids` in `ConvBertModel`. Also is the vocab size of token embedding matrix.
+                Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `MegatronBert`.
+            hidden_size (int, optional):
+                Dimensionality of the encoder layer and pooler layer. Defaults to `1024`.
+            pad_token_id (int, optional):
+                The index of padding token in the token vocabulary.
+                Defaults to `0`.
+            layer_norm_eps (float, optional):
+                The parameter to prevent division by zero. Defaults to 1e-12.
+            type_vocab_size (int, optional):
+                The vocabulary size of `token_type_ids`.
+                Defaults to `2`.
+            hidden_act (str, optional):
+                The non-linear activation function in the feed-forward layer.
+                ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+                are supported. Defaults to `"gelu"`.
+            attention_probs_dropout_prob (float, optional):
+                The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+                Defaults to `0.1`.
+            num_attention_heads (int, optional):
+                Number of attention heads for each attention layer in the Transformer encoder.
+                Defaults to `16`.
+            num_hidden_layers (int, optional):
+                Number of hidden layers in the Transformer encoder. Defaults to `24`.
+            max_position_embeddings (int, optional):
+                The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+                sequence. Defaults to `512`.
+            hidden_dropout_prob (float, optional):
+                The dropout probability for all fully connected layers in the embeddings and encoder.
+                Defaults to `0.1`.
+            intermediate_size (int, optional):
+                Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+                to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+                and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+                Defaults to `4096`.
+            position_embedding_type (str, optional):
+                Type of position embedding. Defaults to "absolute"
+            initializer_range (float, optional):
+                The standard deviation of the normal initializer.
+                Defaults to 0.02.
+
+                .. note::
+                    A normal_initializer initializes weight matrices as normal distributions.
+                    See :meth:`ConvBertPretrainedModel.init_weights()` for how weights are initialized in `MegatronBertModel`.
+
+
+        """
+
     def __init__(self,
                  vocab_size=29056,
                  hidden_size=1024,
@@ -489,12 +542,12 @@ class MegatronBertModel(MegatronBertPretrainedModel):
                  hidden_act="gelu",
                  attention_probs_dropout_prob=0.1,
                  num_attention_heads=16,
+                 num_hidden_layers=24,
                  max_position_embeddings=512,
                  hidden_dropout_prob=0.1,
                  intermediate_size=4096,
-                 num_hidden_layers=24,
-                 initializer_range=0.02,
-                 position_embedding_type="absolute"):
+                 position_embedding_type="absolute",
+                 initializer_range=0.02):
         super().__init__()
 
         self.num_hidden_layers = num_hidden_layers
@@ -533,10 +586,71 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                head_mask=None):
+                attention_mask=None):
+        r"""
+        The MegatronBertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            tuple: Returns tuple (`sequence_output`, `pooled_output`).
+
+            With the fields:
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `pooled_output` (Tensor):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MegatronBertModel, MegatronBertTokenizer
+
+                tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+                model = MegatronBertModel.from_pretrained('megatronbert-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        """
 
         input_shape = input_ids.shape
 
@@ -550,21 +664,12 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         extended_attention_mask = self.get_extended_attention_mask(
             attention_mask, input_shape)
 
-        # Prepare head mask if needed
-        # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x n_heads x N x N
-        # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
-        # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
-        head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
-
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
         encoder_outputs = self.encoder(
-            embedding_output,
-            attention_mask=extended_attention_mask,
-            head_mask=head_mask)
+            embedding_output, attention_mask=extended_attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
 
@@ -587,10 +692,10 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         Invert an attention mask (e.g., switches 0. and 1.).
 
         Args:
-            encoder_attention_mask (:obj:`paddle.Tensor`): An attention mask.
+            encoder_attention_mask (:obj:`Tensor`): An attention mask.
 
         Returns:
-            :obj:`paddle.Tensor`: The inverted attention mask.
+            :obj:`Tensor`: The inverted attention mask.
         """
         if encoder_attention_mask.ndim == 3:
             encoder_extended_attention_mask = encoder_attention_mask[:,
@@ -608,34 +713,17 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
         return encoder_extended_attention_mask
 
-    def get_head_mask(self,
-                      head_mask,
-                      num_hidden_layers,
-                      is_attention_chunked=False):
-        if head_mask is not None:
-            head_mask = self._convert_head_mask_to_5d(head_mask,
-                                                      num_hidden_layers)
-            if is_attention_chunked is True:
-                head_mask = head_mask.unsqueeze(-1)
-        else:
-            head_mask = [None] * num_hidden_layers
-
-        return head_mask
-
-    def _convert_head_mask_to_5d(self, head_mask, num_hidden_layers):
-        """-> [num_hidden_layers x batch x num_heads x seq_length x seq_length]"""
-        if head_mask.ndim == 1:
-            head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(
-                -1).unsqueeze(-1)
-            head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
-        elif head_mask.ndim == 2:
-            head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(
-                -1)  # We can specify head_mask for each layer
-        assert head_mask.ndim == 5, f"head_mask.dim != 5, instead {len(head_mask.shape)}"
-        return head_mask
-
 
 class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with question answering tasks.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
         self.megatronbert = megatronbert
@@ -644,18 +732,59 @@ class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                attention_mask=None,
-                token_type_ids=None,
-                position_ids=None,
-                head_mask=None):
+    def forward(
+            self,
+            input_ids=None,
+            token_type_ids=None,
+            position_ids=None,
+            attention_mask=None, ):
+        r"""
+        The MegatronBertForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MegatronBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`MegatronBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`MegatronBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`MegatronBertModel`.
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MegatronBertForQuestionAnswering, MegatronBertTokenizer
+
+                tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+                model = MegatronBertForQuestionAnswering.from_pretrained('megatronbert-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  = outputs[1]
+        """
+
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         sequence_output = outputs[0]
 
@@ -669,6 +798,16 @@ class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
 
 
 class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with sequence classification tasks.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+        num_labels (int):
+            The number of labels.
+    """
+
     def __init__(self, megatronbert, num_labels):
         super().__init__()
         self.num_labels = num_labels
@@ -681,18 +820,46 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                attention_mask=None,
-                token_type_ids=None,
-                position_ids=None,
-                head_mask=None):
+    def forward(
+            self,
+            input_ids=None,
+            token_type_ids=None,
+            position_ids=None,
+            attention_mask=None, ):
+        r"""
+        The MegatronBertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MegatronBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`MegatronBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`MegatronBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`MegatronBertModel`.
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the sequence classification logits.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MegatronBertForSequenceClassification, MegatronBertTokenizer
+
+                tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+                model = MegatronBertForSequenceClassification.from_pretrained('megatronbert-uncased', num_labels=2)
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -773,6 +940,15 @@ class MegatronBertPreTrainingHeads(nn.Layer):
 
 
 class MegatronBertForPreTraining(MegatronBertPretrainedModel):
+    """
+    Megatronbert Model with pretraining tasks on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
 
@@ -780,23 +956,61 @@ class MegatronBertForPreTraining(MegatronBertPretrainedModel):
         self.cls = MegatronBertPreTrainingHeads(
             hidden_size=self.megatronbert.config['hidden_size'],
             layer_norm_eps=self.megatronbert.config['layer_norm_eps'],
-            vocab_size=self.megatronbert.config['vocab_size'])
+            vocab_size=self.megatronbert.config['vocab_size'],
+            hidden_act=self.megatronbert.config['hidden_act'])
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                head_mask=None):
+                attention_mask=None):
+        r"""
+        The MegatronBertForPreTraining forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MegatronBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`MegatronBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`MegatronBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`MegatronBertModel`.
+        Returns:
+            tuple: Returns tuple (`prediction_scores`, `seq_relationship_score`).
+
+            With the fields:
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and its shape is [batch_size, 2].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MegatronBertForPreTraining, MegatronBertTokenizer
+
+                tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+                model = MegatronBertForPreTraining.from_pretrained('megatronbert-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_scores, seq_relationship_score = model(**inputs)
+        """
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         sequence_output, pooled_output = outputs[:2]
         prediction_scores, seq_relationship_score = self.cls(sequence_output,
@@ -807,6 +1021,15 @@ class MegatronBertForPreTraining(MegatronBertPretrainedModel):
 
 
 class MegatronBertForCausalLM(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with a `causal masked language modeling` head on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
 
@@ -822,16 +1045,45 @@ class MegatronBertForCausalLM(MegatronBertPretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                head_mask=None):
+                attention_mask=None):
+        r"""
+       The MegatronBertForCausalLM forward method, overrides the __call__() special method.
+
+       Args:
+           input_ids (Tensor):
+               See :class:`MegatronBertModel`.
+           token_type_ids (Tensor, optional):
+               See :class:`MegatronBertModel`.
+           position_ids(Tensor, optional):
+               See :class:`MegatronBertModel`.
+           attention_mask (Tensor, optional):
+               See :class:`MegatronBertModel`.
+       Returns:
+           Tensor: Returns Tensor `prediction_scores`. The scores of masked token prediction.
+                   Its data type should be float32. If `masked_positions` is None, its shape is
+                   [batch_size, sequence_length, vocab_size]. Otherwise, its shape is
+                   [batch_size, mask_token_num, vocab_size].
+
+       Example:
+           .. code-block::
+
+               import paddle
+               from paddlenlp.transformers import MegatronBertForCausalLM, MegatronBertTokenizer
+
+               tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+               model = MegatronBertForCausalLM.from_pretrained('megatronbert-uncased')
+
+               inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+               inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+               prediction_scores = model(**inputs)
+       """
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
@@ -839,6 +1091,15 @@ class MegatronBertForCausalLM(MegatronBertPretrainedModel):
 
 
 class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with a `masked language modeling` head on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
 
@@ -857,15 +1118,44 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
             input_ids=None,
             attention_mask=None,
             token_type_ids=None,
-            position_ids=None,
-            head_mask=None, ):
+            position_ids=None, ):
+        r"""
+        The MegatronBertForMaskedLM forward method, overrides the __call__() special method.
+
+        Args:
+           input_ids (Tensor):
+               See :class:`MegatronBertModel`.
+           token_type_ids (Tensor, optional):
+               See :class:`MegatronBertModel`.
+           position_ids(Tensor, optional):
+               See :class:`MegatronBertModel`.
+           attention_mask (Tensor, optional):
+               See :class:`MegatronBertModel`.
+        Returns:
+           Tensor: Returns Tensor `prediction_scores`. The scores of masked token prediction.
+                   Its data type should be float32. If `masked_positions` is None, its shape is
+                   [batch_size, sequence_length, vocab_size]. Otherwise, its shape is
+                   [batch_size, mask_token_num, vocab_size].
+
+        Example:
+           .. code-block::
+
+               import paddle
+               from paddlenlp.transformers import MegatronBertForMaskedLM, MegatronBertTokenizer
+
+               tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+               model = MegatronBertForMaskedLM.from_pretrained('megatronbert-uncased')
+
+               inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+               inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+               prediction_scores = model(**inputs)
+        """
 
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
@@ -874,6 +1164,14 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
 
 
 class MegatronBertForNextSentencePrediction(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with a `next sentence prediction (classification)` head on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
 
@@ -886,17 +1184,44 @@ class MegatronBertForNextSentencePrediction(MegatronBertPretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                head_mask=None):
+                attention_mask=None):
+        r"""
+        The MegatronBertForNextSentencePrediction forward method, overrides the __call__() special method.
+
+        Args:
+           input_ids (Tensor):
+               See :class:`MegatronBertModel`.
+           token_type_ids (Tensor, optional):
+               See :class:`MegatronBertModel`.
+           position_ids(Tensor, optional):
+               See :class:`MegatronBertModel`.
+           attention_mask (Tensor, optional):
+               See :class:`MegatronBertModel`.
+        Returns:
+           Tensor: Returns Tensor `seq_relationship_scores`. The scores of next sentence prediction.
+                   Its data type should be float32 and its shape is [batch_size, 2].
+
+        Example:
+           .. code-block::
+
+               import paddle
+               from paddlenlp.transformers import MegatronBertForNextSentencePrediction, MegatronBertTokenizer
+
+               tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+               model = MegatronBertForNextSentencePrediction.from_pretrained('megatronbert-uncased')
+
+               inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+               inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+               seq_relationship_scores = model(**inputs)
+        """
 
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -906,6 +1231,14 @@ class MegatronBertForNextSentencePrediction(MegatronBertPretrainedModel):
 
 
 class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with a multiple choice classification head on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+    """
+
     def __init__(self, megatronbert):
         super().__init__()
 
@@ -919,10 +1252,38 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                head_mask=None):
+                attention_mask=None):
+        r"""
+        The MegatronBertForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+           input_ids (Tensor):
+               See :class:`MegatronBertModel`.
+           token_type_ids (Tensor, optional):
+               See :class:`MegatronBertModel`.
+           position_ids(Tensor, optional):
+               See :class:`MegatronBertModel`.
+           attention_mask (Tensor, optional):
+               See :class:`MegatronBertModel`.
+        Returns:
+           Tensor: Returns Tensor `reshaped_logits`. A tensor of the multiple choice classification logits.
+                   Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+           .. code-block::
+
+               import paddle
+               from paddlenlp.transformers import MegatronBertForMultipleChoice, MegatronBertTokenizer
+
+               tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+               model = MegatronBertForNextSentencePrediction.from_pretrained('megatronbert-uncased')
+
+               inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+               inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+               reshaped_logits = model(**inputs)
+        """
         num_choices = input_ids.shape[1]
 
         input_ids = input_ids.reshape(
@@ -940,8 +1301,7 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -953,6 +1313,17 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
 
 
 class MegatronBertForTokenClassification(MegatronBertPretrainedModel):
+    """
+    MegatronBert Model with a token classification head on top.
+
+    Args:
+        megatronbert (:class:`MegatronBertModel`):
+            An instance of :class:`MegatronBertModel`.
+
+        num_labels (int):
+            The number of labels.
+    """
+
     def __init__(self, megatronbert, num_labels):
         super().__init__()
         self.num_labels = num_labels
@@ -967,15 +1338,42 @@ class MegatronBertForTokenClassification(MegatronBertPretrainedModel):
                 input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
-                position_ids=None,
-                head_mask=None):
+                position_ids=None):
+        r"""
+        The MegatronBertForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+           input_ids (Tensor):
+               See :class:`MegatronBertModel`.
+           token_type_ids (Tensor, optional):
+               See :class:`MegatronBertModel`.
+           position_ids(Tensor, optional):
+               See :class:`MegatronBertModel`.
+           attention_mask (Tensor, optional):
+               See :class:`MegatronBertModel`.
+        Returns:
+           Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+                   Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+           .. code-block::
+
+               import paddle
+               from paddlenlp.transformers import MegatronBertForTokenClassification, MegatronBertTokenizer
+
+               tokenizer = MegatronBertTokenizer.from_pretrained('megatronbert-uncased')
+               model = MegatronBertForTokenClassification.from_pretrained('megatronbert-uncased', num_labels=2)
+
+               inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+               inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+               reshaped_logits = model(**inputs)
+        """
 
         outputs = self.megatronbert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask)
+            position_ids=position_ids)
 
         sequence_output = outputs[0]
 
