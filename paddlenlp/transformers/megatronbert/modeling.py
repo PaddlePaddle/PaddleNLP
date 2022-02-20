@@ -70,6 +70,8 @@ ACT2FN = {
     "swish": swish,
 }
 
+layer_norm_eps = 1e-12
+
 
 class MegatronBertPretrainedModel(PretrainedModel):
     r"""
@@ -86,7 +88,6 @@ class MegatronBertPretrainedModel(PretrainedModel):
         "megatronbert-cased": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
-            "layer_norm_eps": 1e-12,
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
             "initializer_range": 0.02,
@@ -101,7 +102,6 @@ class MegatronBertPretrainedModel(PretrainedModel):
         "megatronbert-uncased": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
-            "layer_norm_eps": 1e-12,
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
             "initializer_range": 0.02,
@@ -140,9 +140,7 @@ class MegatronBertPretrainedModel(PretrainedModel):
                     self.megatronbert.config["initializer_range"],
                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = self.layer_norm_eps if hasattr(
-                self, "layer_norm_eps") else self.megatronbert.config[
-                    "layer_norm_eps"]
+            layer._epsilon = layer_norm_eps
 
 
 class MegatronBertEmbeddings(nn.Layer):
@@ -308,14 +306,13 @@ class MegatronBertSelfOutput(nn.Layer):
 class MegatronBertAttention(nn.Layer):
     def __init__(self,
                  hidden_size=1024,
-                 layer_norm_eps=1e-12,
                  num_attention_heads=16,
                  hidden_dropout_prob=0.1,
                  attention_probs_dropout_prob=0.1,
                  max_position_embeddings=512,
                  position_embedding_type=None):
         super().__init__()
-        self.ln = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.self = MegatronBertSelfAttention(
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob,
@@ -326,7 +323,7 @@ class MegatronBertAttention(nn.Layer):
         self.pruned_heads = set()
 
     def forward(self, hidden_states, attention_mask=None):
-        ln_outputs = self.ln(hidden_states)
+        ln_outputs = self.layer_norm(hidden_states)
         self_outputs = self.self(ln_outputs, attention_mask)
         attention_output = self.output(self_outputs[0], hidden_states)
         outputs = (attention_output,
@@ -366,7 +363,6 @@ class MegatronBertLayer(nn.Layer):
     def __init__(self,
                  hidden_size=1024,
                  hidden_act="gelu",
-                 layer_norm_eps=1e-12,
                  num_attention_heads=16,
                  hidden_dropout_prob=0.1,
                  attention_probs_dropout_prob=0.1,
@@ -377,14 +373,13 @@ class MegatronBertLayer(nn.Layer):
         self.seq_len_dim = 1
         self.attention = MegatronBertAttention(
             hidden_size=hidden_size,
-            layer_norm_eps=layer_norm_eps,
             num_attention_heads=num_attention_heads,
             hidden_dropout_prob=hidden_dropout_prob,
             attention_probs_dropout_prob=attention_probs_dropout_prob,
             max_position_embeddings=max_position_embeddings,
             position_embedding_type=position_embedding_type)
 
-        self.ln = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.intermediate = MegatronBertIntermediate(
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
@@ -406,7 +401,7 @@ class MegatronBertLayer(nn.Layer):
         return outputs
 
     def feed_forward_chunk(self, attention_output):
-        ln_output = self.ln(attention_output)
+        ln_output = self.layer_norm(attention_output)
         intermediate_output = self.intermediate(ln_output)
         layer_output = self.output(intermediate_output, attention_output)
         return layer_output
@@ -416,7 +411,6 @@ class MegatronBertEncoder(nn.Layer):
     def __init__(self,
                  hidden_size=1024,
                  hidden_act="gelu",
-                 layer_norm_eps=1e-12,
                  num_attention_heads=16,
                  hidden_dropout_prob=0.1,
                  attention_probs_dropout_prob=0.1,
@@ -429,7 +423,6 @@ class MegatronBertEncoder(nn.Layer):
             MegatronBertLayer(
                 hidden_size=hidden_size,
                 hidden_act=hidden_act,
-                layer_norm_eps=layer_norm_eps,
                 num_attention_heads=num_attention_heads,
                 hidden_dropout_prob=hidden_dropout_prob,
                 attention_probs_dropout_prob=attention_probs_dropout_prob,
@@ -441,17 +434,16 @@ class MegatronBertEncoder(nn.Layer):
 
         # The final layer norm. We removed the 1st LN, moved LN to each hidden layer and this one
         # is simply the final LN (Transformer's BERT has it attached to each hidden layer).
-        self.ln = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
 
     def forward(self, hidden_states, attention_mask=None):
         for i, layer_module in enumerate(self.layer):
-
             layer_outputs = layer_module(hidden_states, attention_mask)
 
             hidden_states = layer_outputs[0]
 
         # Finalize the hidden states.
-        hidden_states = self.ln(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
 
         return hidden_states
 
@@ -492,8 +484,6 @@ class MegatronBertModel(MegatronBertPretrainedModel):
             pad_token_id (int, optional):
                 The index of padding token in the token vocabulary.
                 Defaults to `0`.
-            layer_norm_eps (float, optional):
-                The parameter to prevent division by zero. Defaults to 1e-12.
             type_vocab_size (int, optional):
                 The vocabulary size of `token_type_ids`.
                 Defaults to `2`.
@@ -537,7 +527,6 @@ class MegatronBertModel(MegatronBertPretrainedModel):
                  vocab_size=29056,
                  hidden_size=1024,
                  pad_token_id=0,
-                 layer_norm_eps=1e-12,
                  type_vocab_size=2,
                  hidden_act="gelu",
                  attention_probs_dropout_prob=0.1,
@@ -551,8 +540,8 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         super().__init__()
 
         self.num_hidden_layers = num_hidden_layers
+        self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.layer_norm_eps = layer_norm_eps
         self.embeddings = MegatronBertEmbeddings(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
@@ -564,7 +553,6 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         self.encoder = MegatronBertEncoder(
             hidden_size=hidden_size,
             hidden_act=hidden_act,
-            layer_norm_eps=layer_norm_eps,
             num_attention_heads=num_attention_heads,
             hidden_dropout_prob=hidden_dropout_prob,
             attention_probs_dropout_prob=attention_probs_dropout_prob,
@@ -654,64 +642,28 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
         input_shape = input_ids.shape
 
-        batch_size, seq_length = input_shape
-
         if attention_mask is None:
-            attention_mask = paddle.ones(((batch_size, seq_length)))
+            attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2])
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')
-
-        extended_attention_mask = self.get_extended_attention_mask(
-            attention_mask, input_shape)
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
         encoder_outputs = self.encoder(
-            embedding_output, attention_mask=extended_attention_mask)
+            embedding_output, attention_mask=attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
 
         return sequence_output, pooled_output
-
-    def get_extended_attention_mask(self, attention_mask, input_shape):
-        if attention_mask.ndim == 3:
-            extended_attention_mask = attention_mask[:, None, :, :]
-        elif attention_mask.ndim == 2:
-            extended_attention_mask = attention_mask[:, None, None, :]
-        else:
-            raise ValueError(
-                f"Wrong shape for input_ids (shape {input_shape}) or "
-                f"attention_mask (shape {attention_mask.shape})")
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        return extended_attention_mask
-
-    def invert_attention_mask(self, encoder_attention_mask):
-        """
-        Invert an attention mask (e.g., switches 0. and 1.).
-
-        Args:
-            encoder_attention_mask (:obj:`Tensor`): An attention mask.
-
-        Returns:
-            :obj:`Tensor`: The inverted attention mask.
-        """
-        if encoder_attention_mask.ndim == 3:
-            encoder_extended_attention_mask = encoder_attention_mask[:,
-                                                                     None, :, :]
-        if encoder_attention_mask.ndim == 2:
-            encoder_extended_attention_mask = encoder_attention_mask[:, None,
-                                                                     None, :]
-
-        if encoder_extended_attention_mask.dtype == paddle.float16:
-            encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e4
-        elif encoder_extended_attention_mask.dtype == paddle.float32:
-            encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e9
-
-        return encoder_extended_attention_mask
 
 
 class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
@@ -870,24 +822,24 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
 
 
 class MegatronBertPredictionHeadTransform(nn.Layer):
-    def __init__(self, hidden_size, layer_norm_eps, hidden_act):
+    def __init__(self, hidden_size, hidden_act):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.transform_act_fn = get_activation(hidden_act)
-        self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.transform_act_fn(hidden_states)
-        hidden_states = self.LayerNorm(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
         return hidden_states
 
 
 class MegatronBertLMPredictionHead(nn.Layer):
-    def __init__(self, hidden_size, layer_norm_eps, vocab_size, hidden_act):
+    def __init__(self, hidden_size, vocab_size, hidden_act):
         super().__init__()
-        self.transform = MegatronBertPredictionHeadTransform(
-            hidden_size, layer_norm_eps, hidden_act)
+        self.transform = MegatronBertPredictionHeadTransform(hidden_size,
+                                                             hidden_act)
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
@@ -900,11 +852,10 @@ class MegatronBertLMPredictionHead(nn.Layer):
 
 
 class MegatronBertOnlyMLMHead(nn.Layer):
-    def __init__(self, hidden_size, layer_norm_eps, vocab_size, hidden_act):
+    def __init__(self, hidden_size, vocab_size, hidden_act):
         super().__init__()
         self.predictions = MegatronBertLMPredictionHead(
             hidden_size=hidden_size,
-            layer_norm_eps=layer_norm_eps,
             vocab_size=vocab_size,
             hidden_act=hidden_act)
 
@@ -924,11 +875,10 @@ class MegatronBertOnlyNSPHead(nn.Layer):
 
 
 class MegatronBertPreTrainingHeads(nn.Layer):
-    def __init__(self, hidden_size, layer_norm_eps, vocab_size, hidden_act):
+    def __init__(self, hidden_size, vocab_size, hidden_act):
         super().__init__()
         self.predictions = MegatronBertLMPredictionHead(
             hidden_size=hidden_size,
-            layer_norm_eps=layer_norm_eps,
             vocab_size=vocab_size,
             hidden_act=hidden_act)
         self.seq_relationship = nn.Linear(hidden_size, 2)
@@ -955,7 +905,6 @@ class MegatronBertForPreTraining(MegatronBertPretrainedModel):
         self.megatronbert = megatronbert
         self.cls = MegatronBertPreTrainingHeads(
             hidden_size=self.megatronbert.config['hidden_size'],
-            layer_norm_eps=self.megatronbert.config['layer_norm_eps'],
             vocab_size=self.megatronbert.config['vocab_size'],
             hidden_act=self.megatronbert.config['hidden_act'])
 
@@ -1036,7 +985,6 @@ class MegatronBertForCausalLM(MegatronBertPretrainedModel):
         self.megatronbert = megatronbert
         self.cls = MegatronBertOnlyMLMHead(
             hidden_size=self.megatronbert.config['hidden_size'],
-            layer_norm_eps=self.megatronbert.config['layer_norm_eps'],
             vocab_size=self.megatronbert.config['vocab_size'],
             hidden_act=self.megatronbert.config['hidden_act'])
 
@@ -1106,7 +1054,6 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
         self.megatronbert = megatronbert
         self.cls = MegatronBertOnlyMLMHead(
             hidden_size=self.megatronbert.config['hidden_size'],
-            layer_norm_eps=self.megatronbert.config['layer_norm_eps'],
             vocab_size=self.megatronbert.config['vocab_size'],
             hidden_act=self.megatronbert.config['hidden_act'])
 

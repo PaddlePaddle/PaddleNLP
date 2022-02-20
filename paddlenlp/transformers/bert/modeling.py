@@ -420,8 +420,7 @@ class BertModel(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None,
-                output_hidden_states=False):
+                attention_mask=None):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -505,22 +504,11 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        if output_hidden_states:
-            output = embedding_output
-            encoder_outputs = []
-            for mod in self.encoder.layers:
-                output = mod(output, src_mask=attention_mask)
-                encoder_outputs.append(output)
-            if self.encoder.norm is not None:
-                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-            pooled_output = self.pooler(encoder_outputs[-1])
-        else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
-            pooled_output = self.pooler(sequence_output)
-        if output_hidden_states:
-            return encoder_outputs, pooled_output
-        else:
-            return sequence_output, pooled_output
+
+        sequence_output = self.encoder(embedding_output, attention_mask)
+        pooled_output = self.pooler(sequence_output)
+
+        return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):

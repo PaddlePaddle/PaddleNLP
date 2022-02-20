@@ -277,7 +277,7 @@ def run(args):
         # All bias and LayerNorm parameters are excluded.
         decay_params = [
             p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "Norm", "ln"])
+            if not any(nd in n for nd in ["bias", "norm"])
         ]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
