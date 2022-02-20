@@ -325,11 +325,14 @@ class BertPretrainedModel(PretrainedModel):
 class BertModel(BertPretrainedModel):
     """
     The bare BERT Model transformer outputting raw hidden-states.
+
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
+
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+
     Args:
         vocab_size (int):
             Vocabulary size of `inputs_ids` in `BertModel`. Also is the vocab size of token embedding matrix.
@@ -362,18 +365,23 @@ class BertModel(BertPretrainedModel):
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids`.
             Defaults to `16`.
+
         initializer_range (float, optional):
             The standard deviation of the normal initializer.
             Defaults to 0.02.
+
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
+
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
+
         pooled_act (str, optional):
             The non-linear activation function in the pooling layer.
             Defaults to `"tanh"`.
+
     """
 
     def __init__(self,
@@ -416,6 +424,7 @@ class BertModel(BertPretrainedModel):
                 output_hidden_states=False):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
+
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
@@ -426,8 +435,10 @@ class BertModel(BertPretrainedModel):
                 Selected in the range ``[0, type_vocab_size - 1]``.
                 If `type_vocab_size` is 2, which means the inputs have two portions.
                 Indices can either be 0 or 1:
+
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
+
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             position_ids(Tensor, optional):
@@ -446,26 +457,35 @@ class BertModel(BertPretrainedModel):
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
                 Defaults to `False`.
+
         Returns:
             tuple: Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_outputs`, `pooled_output`).
+
             With the fields:
+
             - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
             - `pooled_output` (Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and its shape is [batch_size, hidden_size].
+
             - `encoder_outputs` (List(Tensor)):
                 A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
                 The length of the list is `num_hidden_layers`.
                 Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import BertModel, BertTokenizer
+
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
+
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
@@ -507,6 +527,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the hidden-states output to compute `span_start_logits`
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
+
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
@@ -531,30 +552,40 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 attention_mask=None):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
             token_type_ids (Tensor, optional):
                 See :class:`BertModel`.
+
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
+
             With the fields:
+
             - `start_logits` (Tensor):
                 A tensor of the input token classification logits, indicates the start position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
+
             - `end_logits` (Tensor):
                 A tensor of the input token classification logits, indicates the end position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers.bert.modeling import BertForQuestionAnswering
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
+
                 start_logits = outputs[0]
                 end_logits = outputs[1]
         """
@@ -576,6 +607,7 @@ class BertForSequenceClassification(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
+
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
@@ -604,6 +636,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 attention_mask=None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
@@ -613,21 +646,28 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (list, optional):
                 See :class:`BertModel`.
+
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_classes]` and dtype as float32.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers.bert.modeling import BertForSequenceClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_classes=2)
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 2]
+
         """
 
         _, pooled_output = self.bert(
@@ -645,6 +685,7 @@ class BertForTokenClassification(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
+
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
@@ -673,6 +714,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 attention_mask=None):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
@@ -682,22 +724,28 @@ class BertForTokenClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (list, optional):
                 See :class:`BertModel`.
+
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
             Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers.bert.modeling import BertForTokenClassification
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForTokenClassification.from_pretrained('bert-base-cased', num_classes=2)
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-
+                
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 13, 2]
+
         """
         sequence_output, _ = self.bert(
             input_ids,
@@ -750,6 +798,7 @@ class BertLMPredictionHead(Layer):
 class BertPretrainingHeads(Layer):
     """
     Perform language modeling task and next sentence classification task.
+
     Args:
         hidden_size (int):
             See :class:`BertModel`.
@@ -761,6 +810,7 @@ class BertPretrainingHeads(Layer):
             Decoding weights used to map hidden_states to logits of the masked token prediction.
             Its data type should be float32 and its shape is [vocab_size, hidden_size].
             Defaults to `None`, which means use the same weights of the embedding layer.
+
     """
 
     def __init__(self,
@@ -788,16 +838,21 @@ class BertPretrainingHeads(Layer):
                 Its data type should be int64 and its shape is [batch_size, mask_token_num].
                 `mask_token_num` is the number of masked tokens. It should be no bigger than `sequence_length`.
                 Defaults to `None`, which means we output hidden-states of all tokens in masked token prediction.
+
         Returns:
             tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
+
             With the fields:
+
             - `prediction_scores` (Tensor):
                 The scores of masked token prediction. Its data type should be float32.
                 If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
                 Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
             - `seq_relationship_score` (Tensor):
                 The scores of next sentence prediction.
                 Its data type should be float32 and its shape is [batch_size, 2].
+
         """
         prediction_scores = self.predictions(sequence_output, masked_positions)
         seq_relationship_score = self.seq_relationship(pooled_output)
@@ -807,9 +862,11 @@ class BertPretrainingHeads(Layer):
 class BertForPretraining(BertPretrainedModel):
     """
     Bert Model with pretraining tasks on top.
+
     Args:
         bert (:class:`BertModel`):
             An instance of :class:`BertModel`.
+
     """
 
     def __init__(self, bert):
@@ -830,6 +887,7 @@ class BertForPretraining(BertPretrainedModel):
                 attention_mask=None,
                 masked_positions=None):
         r"""
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
@@ -841,16 +899,21 @@ class BertForPretraining(BertPretrainedModel):
                 See :class:`BertModel`.
             masked_positions(Tensor, optional):
                 See :class:`BertPretrainingHeads`.
+
         Returns:
             tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
+
             With the fields:
+
             - `prediction_scores` (Tensor):
                 The scores of masked token prediction. Its data type should be float32.
                 If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
                 Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
             - `seq_relationship_score` (Tensor):
                 The scores of next sentence prediction.
                 Its data type should be float32 and its shape is [batch_size, 2].
+
         """
         with paddle.static.amp.fp16_guard():
             outputs = self.bert(
@@ -866,10 +929,12 @@ class BertForPretraining(BertPretrainedModel):
 
 class BertPretrainingCriterion(paddle.nn.Layer):
     """
+
     Args:
         vocab_size(int):
             Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `BertModel`.
+
     """
 
     def __init__(self, vocab_size):
@@ -900,9 +965,12 @@ class BertPretrainingCriterion(paddle.nn.Layer):
             masked_lm_scale(Tensor or int):
                 The scale of masked tokens. Used for the normalization of masked language modeling loss.
                 If it is a `Tensor`, its data type should be int64 and its shape is equal to `prediction_scores`.
+
         Returns:
             Tensor: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
             Its data type should be float32 and its shape is [1].
+
+
         """
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
@@ -920,7 +988,7 @@ class BertForMultipleChoice(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
-
+    
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
@@ -948,6 +1016,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                 attention_mask=None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
@@ -957,16 +1026,21 @@ class BertForMultipleChoice(BertPretrainedModel):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
             Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import BertForMultipleChoice, BertTokenizer
                 from paddlenlp.data import Pad, Dict
+
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 model = BertForMultipleChoice.from_pretrained('bert-base-uncased', num_choices=2)
+
                 data = [
                     {
                         "question": "how do you turn on an ipad screen?",
@@ -981,6 +1055,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                         "label": 0,
                     },
                 ]
+
                 text = []
                 text_pair = []
                 for d in data:
@@ -988,6 +1063,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                     text_pair.append(d["answer1"])
                     text.append(d["question"])
                     text_pair.append(d["answer2"])
+
                 inputs = tokenizer(text, text_pair)
                 batchify_fn = lambda samples, fn=Dict(
                     {
@@ -998,12 +1074,14 @@ class BertForMultipleChoice(BertPretrainedModel):
                     }
                 ): fn(samples)
                 inputs = batchify_fn(inputs)
+
                 reshaped_logits = model(
                     input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
                     token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
                 )
                 print(reshaped_logits.shape)
                 # [2, 2]
+
         """
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape(shape=(
@@ -1051,9 +1129,11 @@ class BertOnlyMLMHead(nn.Layer):
 class BertForMaskedLM(BertPretrainedModel):
     """
     Bert Model with a `masked language modeling` head on top.
+
     Args:
         bert (:class:`BertModel`):
             An instance of :class:`BertModel`.
+
     """
 
     def __init__(self, bert):
@@ -1073,6 +1153,7 @@ class BertForMaskedLM(BertPretrainedModel):
                 position_ids=None,
                 attention_mask=None):
         r"""
+
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
@@ -1082,21 +1163,27 @@ class BertForMaskedLM(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (Tensor, optional):
                 See :class:`BertModel`.
+
         Returns:
             Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
             Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import BertForMaskedLM, BertTokenizer
+
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 model = BertForMaskedLM.from_pretrained('bert-base-uncased')
-
+                
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 13, 30522]
+
         """
 
         outputs = self.bert(
