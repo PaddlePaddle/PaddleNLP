@@ -255,23 +255,30 @@ class LukeTokenizer(RobertaTokenizer):
                  is_split_into_words=False,
                  pad_to_max_seq_len=False,
                  truncation_strategy="longest_first",
-                 return_position_ids=False,
+                 return_position_ids=True,
                  return_token_type_ids=True,
                  return_attention_mask=True,
                  return_length=False,
                  return_overflowing_tokens=False,
                  return_special_tokens_mask=False):
         """
-        Main method to tokenize and prepare for the model one or several sequence(s) or one or several pair(s) of
-        sequences, depending on the task you want to prepare them for.
+        Performs tokenization and uses the tokenized tokens to prepare model
+        inputs. It supports sequence or sequence pair as input, and batch input
+        is allowed. `self.encode()` or `self.batch_encode()` would be called
+        separately for single or batch input depending on input format and
+        `is_split_into_words` argument.
+
         Args:
-             text (`str`, `List[str]`, `List[List[str]]`):
-                    The sequence or batch of sequences to be encoded. Each sequence must be a string. Note that this
-                    tokenizer does not support tokenization based on pretokenized strings.
-             text_pair (`str`, `List[str]`, `List[List[str]]`):
-                    The sequence or batch of sequences to be encoded. Each sequence must be a string. Note that this
-                    tokenizer does not support tokenization based on pretokenized strings.
-             entity_spans (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
+            text (str, List[str] or List[List[str]]):
+                The sequence or batch of sequences to be processed. One sequence
+                is a string or a list of strings depending on whether it has been
+                pretokenized. If each sequence is provided as a list of strings
+                (pretokenized), you must set `is_split_into_words` as `True` to
+                disambiguate with a batch of sequences.
+            text_pair (str, List[str] or List[List[str]], optional):
+                Same as `text` argument, while it represents for the latter
+                sequence of the sequence pair.
+            entity_spans (`List[Tuple[int, int]]`, `List[List[Tuple[int, int]]]`, *optional*):
                 The sequence or batch of sequences of entity spans to be encoded. Each sequence consists of tuples each
                 with two integers denoting character-based(different from transformers LUKE) start and end positions
                 of entities. If you specify `"entity_classification"` or `"entity_pair_classification"` as the `task`
@@ -296,9 +303,101 @@ class LukeTokenizer(RobertaTokenizer):
                 each sequence must be equal to the length of each sequence of `entity_spans_pair`. If you specify
                 `entity_spans_pair` without specifying this argument, the entity sequence or the batch of entity
                 sequences is automatically constructed by filling it with the [MASK] entity.
-             max_mention_length (`int`):
+            max_mention_length (`int`):
                 The entity_position_ids's length.
-        """
+            max_seq_len (int, optional):
+                If set to a number, will limit the total sequence returned so
+                that it has a maximum length. If there are overflowing tokens,
+                those overflowing tokens will be added to the returned dictionary
+                when `return_overflowing_tokens` is `True`. Defaults to `None`.
+            stride (int, optional):
+                Only available for batch input of sequence pair and mainly for
+                question answering usage. When for QA, `text` represents questions
+                and `text_pair` represents contexts. If `stride` is set to a
+                positive number, the context will be split into multiple spans
+                where `stride` defines the number of (tokenized) tokens to skip
+                from the start of one span to get the next span, thus will produce
+                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
+                and 'offset_mapping' preserving the original example and position
+                information will be added to the returned dictionary. Defaults to 0.
+            add_prefix_space (bool, optional):
+                The tokenizer will add a space at the beginning of the sentence when it set to `True`.
+                Defaults to `False`.
+            pad_to_max_seq_len (bool, optional):
+                If set to `True`, the returned sequences would be padded up to
+                `max_seq_len` specified length according to padding side
+                (`self.padding_side`) and padding token id. Defaults to `False`.
+            truncation_strategy (str, optional):
+                String selected in the following options:
+
+                - 'longest_first' (default) Iteratively reduce the inputs sequence
+                until the input is under `max_seq_len` starting from the longest
+                one at each token (when there is a pair of input sequences).
+                - 'only_first': Only truncate the first sequence.
+                - 'only_second': Only truncate the second sequence.
+                - 'do_not_truncate': Do not truncate (raise an error if the input
+                sequence is longer than `max_seq_len`).
+
+                Defaults to 'longest_first'.
+            return_position_ids (bool, optional):
+                Whether to include tokens position ids in the returned dictionary.
+                Defaults to `False`.
+            return_token_type_ids (bool, optional):
+                Whether to include token type ids in the returned dictionary.
+                Defaults to `True`.
+            return_attention_mask (bool, optional):
+                Whether to include the attention mask in the returned dictionary.
+                Defaults to `False`.
+            return_length (bool, optional):
+                Whether to include the length of each encoded inputs in the
+                returned dictionary. Defaults to `False`.
+            return_overflowing_tokens (bool, optional):
+                Whether to include overflowing token information in the returned
+                dictionary. Defaults to `False`.
+            return_special_tokens_mask (bool, optional):
+                Whether to include special tokens mask information in the returned
+                dictionary. Defaults to `False`.
+
+        Returns:
+            dict or list[dict] (for batch input):
+                The dict has the following optional items:
+
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
+                  fed to a model. Included when `return_position_ids` is `True`
+                - **token_type_ids** (list[int], optional): List of token type ids to be
+                  fed to a model. Included when `return_token_type_ids` is `True`.
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
+                  where 0 specifies paddings and should not be attended to by the
+                  model. Included when `return_attention_mask` is `True`.
+                - **entity_ids** (list[int]): List of token ids to be fed to a model. Included when
+                  `entity_spans` is not `None`.
+                - **entity_position_ids** (list[int], optional): List of token position ids to be
+                  fed to a model. Included when `entity_spans` is not `None`.
+                - **entity_segment_ids** (list[int], optional): List of token type ids to be
+                  fed to a model. Included when `entity_spans` is not `None`.
+                - **entity_attention_mask** (list[int], optional): List of integers valued 0 or 1,
+                  where 0 specifies paddings and should not be attended to by the
+                  model. Included when `entity_spans` is not `None`.
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
+                  is `True`.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
+                  with 0 specifying special added tokens and 1 specifying sequence tokens.
+                  Included when `return_special_tokens_mask` is `True`.
+                - **offset_mapping** (list[int], optional): list of pair preserving the
+                  index of start and end char in original input for each token.
+                  For a special token, the index pair is `(0, 0)`. Included when
+                  `stride` works.
+                - **overflow_to_sample** (int, optional): Index of example from which this
+                  feature is generated. Included when `stride` works.
+                """
+
         global _add_prefix_space
         if add_prefix_space:
             _add_prefix_space = True
@@ -359,10 +458,14 @@ class LukeTokenizer(RobertaTokenizer):
         return encode_output
 
     def tokenize(self, text, add_prefix_space=False):
-        """ Tokenize a string.
+        """
+        Tokenize a string.
             Args:
+              text (str):
+                The sentence to be tokenized.
               add_prefix_space (boolean, default False):
-                Begin the sentence with at least one space to get invariance to word order in GPT-2 (and Luke) tokenizers.
+                Begin the sentence with at least one space to get invariance
+                to word order in GPT-2 (and Luke) tokenizers.
         """
         if _add_prefix_space:
             add_prefix_space = True
