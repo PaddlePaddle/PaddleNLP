@@ -664,6 +664,7 @@ class LukeModel(LukePretrainedModel):
         super(LukeModel, self).__init__()
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
+        self.entity_pad_token_id = entity_pad_token_id
         self.encoder = EntityAwareEncoder(
             hidden_act=hidden_act,
             num_hidden_layers=num_hidden_layers,
@@ -800,7 +801,7 @@ class LukeModel(LukePretrainedModel):
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
         if entity_ids is not None and entity_attention_mask is None:
             entity_attention_mask = paddle.unsqueeze(
-                (entity_ids == self.pad_token_id
+                (entity_ids == self.entity_pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         if entity_attention_mask is not None:
