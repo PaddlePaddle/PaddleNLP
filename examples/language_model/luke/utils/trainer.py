@@ -81,7 +81,7 @@ class Trainer(object):
         self.scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
         self.wd_params = [
             p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "LayerNorm"])
+            if not any(nd in n for nd in ["bias", "norm"])
         ]
 
     def train(self, is_op=False):

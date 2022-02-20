@@ -24,7 +24,6 @@ import sys
 import json
 import itertools
 from .. import RobertaTokenizer
-from .entity_vocab import EntityVocab
 from itertools import repeat
 import warnings
 
@@ -133,7 +132,7 @@ class LukeTokenizer(RobertaTokenizer):
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt",
-        "entity_file": "entity_vocab.tsv"
+        "entity_file": "entity_vocab.json"
     }
     pretrained_resource_files_map = {
         "vocab_file": {
@@ -150,9 +149,9 @@ class LukeTokenizer(RobertaTokenizer):
         },
         "entity_file": {
             "luke-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-base/entity_vocab.tsv",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-base/entity_vocab.json",
             "luke-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-large/entity_vocab.tsv"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/luke/luke-large/entity_vocab.json"
         },
     }
     pretrained_init_configuration = {
@@ -177,7 +176,8 @@ class LukeTokenizer(RobertaTokenizer):
 
         with open(vocab_file, encoding="utf-8") as vocab_handle:
             self.encoder = json.load(vocab_handle)
-        self.entity_vocab = EntityVocab(entity_file)
+        with open(entity_file, encoding='utf-8') as entity_vocab_handle:
+            self.entity_vocab = json.load(entity_vocab_handle)
         self.sep_token, self.sep_token_id = sep_token, self.encoder[sep_token]
         self.cls_token, self.cls_token_id = cls_token, self.encoder[cls_token]
         self.pad_token, self.pad_token_id = pad_token, self.encoder[pad_token]
@@ -602,7 +602,7 @@ class LukeTokenizer(RobertaTokenizer):
 
     def convert_entity_to_id(self, entity: str):
         """Convert the entity to id"""
-        if not self.entity_vocab[entity]:
+        if not self.entity_vocab.get(entity, None):
             warnings.warn(f"{entity} not found in entity thesaurus")
             return None
         else:
@@ -632,7 +632,7 @@ class LukeTokenizer(RobertaTokenizer):
                 entity = convert_tuple_to_list(entity)
                 entity[1][0], entity[1][1] = self._convert_entity_pos(text,
                                                                       entity[1])
-                if not self.entity_vocab[entity[0]]:
+                if not self.entity_vocab.get(entity[0], None):
                     warnings.warn(f"{entity[0]} not found in entity thesaurus")
                     mentions.append((1, entity[1][0], entity[1][1]))
                 else:
