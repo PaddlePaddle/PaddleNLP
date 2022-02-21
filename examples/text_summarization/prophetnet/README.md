@@ -1,8 +1,10 @@
-# Prophetnet_paddle
+# Prophetnet
 
-## 简介
+## 模型简介
 
-本项目是Prophetnet在PaddlePaddle 2.2上开源实现的文本摘要的例子
+ProphetNet（先知网络）是一种新型的seq2seq预训练模型。在训练时，Prophetnet每一时刻将会学习同时预测未来的N个字符，这种自监督学习目标可以使得模型考虑未来更远的字符，防止模型对强局部相关（strong local correlation）过拟合。
+
+本项目是Prophetnet在PaddlePaddle 2.2上开源实现的文本摘要的例子，包含了在CNN/DailyMail数据集，Gigaword数据集上微调和生成的代码。
 
 ## 快速开始
 
