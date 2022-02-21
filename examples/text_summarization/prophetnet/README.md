@@ -107,6 +107,11 @@ python train_prophetnet.py \
 
 - `output_idr` 指定微调结果权重存放路径
 
+已经finetune好的模型权重：
+
+- cnndm : [链接](https://pan.baidu.com/s/1cemrUDxkqEW9raoasJ_VKw), 提取码：1egi
+- gigaword : [链接](https://pan.baidu.com/s/1qRH2FStT3vNQtDjZLkYJBQ), 提取码：on5v
+
 ### 模型评估
 使用prophetNet源码的[评估脚本](https://pan.baidu.com/s/1FOnd01rNvDJoONYegacq1Q), 此脚本依赖于pyrouge，需要提前安装rouge。
 ```
