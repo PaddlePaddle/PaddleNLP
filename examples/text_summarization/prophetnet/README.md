@@ -151,7 +151,7 @@ python generate.py \
     --early_stopping=True \
     --logging_steps=100 \
     --device=gpu
-   
+
 python eval.py --dataset cnndm --generated ./generate/cnndm/generate.txt
 ```
 
@@ -172,7 +172,7 @@ python generate.py \
     --early_stopping=True \
     --logging_steps=100 \
     --device=gpu
-    
+
 python eval.py --dataset gigaword --generated ./generate/gigaword/generate.txt
 ```
 
