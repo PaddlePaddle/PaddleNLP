@@ -824,7 +824,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         input_ids = paddle.cast(input_ids, dtype="int32")
 
         token_type_ids = paddle.cast(token_type_ids, dtype="int32")
-        decoder_type_ids = token_type_ids[:, -1].unsqueeze([1])
+        decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
 
         attention_mask = attention_mask[:, :, :-1, :-1]
@@ -833,6 +833,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             dtype="float16" if self._use_fp16_decoding else "float32")
 
         seq_len = kwargs.get("seq_len") - 1
+
+        position_ids = paddle.cast(kwargs.get("position_ids"), dtype="int32")
+        decoder_position_ids = position_ids[:, -1:]
+        position_ids = position_ids[:, :-1]
 
         return {
             "input_ids": input_ids,
@@ -1042,7 +1046,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         input_ids = paddle.cast(input_ids, dtype="int32")
 
         token_type_ids = paddle.cast(token_type_ids, dtype="int32")
-        decoder_type_ids = token_type_ids[:, -1].unsqueeze([1])
+        decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
 
         attention_mask = attention_mask[:, :, :-1, :-1]
