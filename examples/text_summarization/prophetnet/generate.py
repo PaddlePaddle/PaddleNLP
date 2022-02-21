@@ -21,17 +21,15 @@ summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
-    parser.add_argument(
-        "--dataset",
-        default="gigaword",
-        choices=["cnndm", "gigaword"],
-        type=str,
-        help="Path to tokenizer vocab file. ")
-    parser.add_argument(
-        "--vocab_file",
-        default="./prophetnet.tokenizer",
-        type=str,
-        help="Path to tokenizer vocab file. ")
+    parser.add_argument("--dataset",
+                        default="gigaword",
+                        choices=["cnndm", "gigaword"],
+                        type=str,
+                        help="Path to tokenizer vocab file. ")
+    parser.add_argument("--vocab_file",
+                        default="./prophetnet.tokenizer",
+                        type=str,
+                        help="Path to tokenizer vocab file. ")
     parser.add_argument(
         '--output_path',
         type=str,
@@ -42,42 +40,41 @@ def parse_args():
         default=1024,
         type=int,
         help="The maximum total input sequence length after "
-             "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
+        "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
         "--min_target_length",
         default=45,
         type=int,
-        help="The minimum total sequence length for target text when generating. "
-    )
+        help=
+        "The minimum total sequence length for target text when generating. ")
     parser.add_argument(
         "--max_target_length",
         default=110,
         type=int,
         help="The maximum total sequence length for target text after "
-             "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
-             "during ``evaluate`` and ``predict``.", )
-    parser.add_argument(
-        '--decode_strategy',
-        default='beam_search',
-        type=str,
-        help='The decode strategy in generation.')
+        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+        "during ``evaluate`` and ``predict``.",
+    )
+    parser.add_argument('--decode_strategy',
+                        default='beam_search',
+                        type=str,
+                        help='The decode strategy in generation.')
     parser.add_argument(
         '--top_k',
         default=2,
         type=int,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
-    parser.add_argument(
-        '--top_p',
-        default=1.0,
-        type=float,
-        help='The cumulative probability for top-p sampling.')
-    parser.add_argument(
-        '--num_beams',
-        default=5,
-        type=int,
-        help='The number of beams for beam search.')
+    parser.add_argument('--top_p',
+                        default=1.0,
+                        type=float,
+                        help='The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams',
+                        default=5,
+                        type=int,
+                        help='The number of beams for beam search.')
     parser.add_argument(
         '--length_penalty',
         default=1.2,
@@ -87,30 +84,36 @@ def parse_args():
         '--early_stopping',
         default=False,
         type=eval,
-        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
+        help=
+        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
     )
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity of beam search. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity of beam search. ")
     parser.add_argument(
         "--num_beam_groups",
         default=1,
         type=int,
-        help="Number of groups to divide `num_beams` into in order to use DIVERSE BEAM SEARCH.")
+        help=
+        "Number of groups to divide `num_beams` into in order to use DIVERSE BEAM SEARCH."
+    )
     parser.add_argument(
         "--repetition_penalty",
         default=1.0,
         type=float,
-        help="Number of groups to divide `num_beams` into in order to use DIVERSE BEAM SEARCH.")
+        help=
+        "Number of groups to divide `num_beams` into in order to use DIVERSE BEAM SEARCH."
+    )
     parser.add_argument(
         "--batch_size",
         default=4,
         type=int,
         help="Batch size per GPU/CPU for testing or evaluation.")
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -122,12 +125,12 @@ def parse_args():
         default=True,
         type=bool,
         help="Whether to ignore the tokens corresponding to "
-             "padded labels in the loss computation or not.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
+        "padded labels in the loss computation or not.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
     args = parser.parse_args()
     return args
 
@@ -142,7 +145,12 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True, compute_rouge_=True):
+def compute_metrics(preds,
+                    labels,
+                    tokenizer,
+                    ignore_pad_token_for_loss=True,
+                    compute_rouge_=True):
+
     def compute_rouge(predictions,
                       references,
                       rouge_types=None,
@@ -150,8 +158,8 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True, co
         if rouge_types is None:
             rouge_types = ["rouge1", "rouge2", "rougeLsum"]
 
-        scorer = rouge_scorer.RougeScorer(
-            rouge_types=rouge_types, use_stemmer=use_stemmer)
+        scorer = rouge_scorer.RougeScorer(rouge_types=rouge_types,
+                                          use_stemmer=use_stemmer)
         aggregator = scoring.BootstrapAggregator()
 
         for ref, pred in zip(references, predictions):
@@ -212,23 +220,29 @@ def read(data_path):
     assert src_lines_length == tgt_lines_length
     with open(data_path_src, 'r', encoding='utf-8') as f_d_s:
         with open(data_path_tgt, 'r', encoding='utf-8') as f_d_t:
-            for row_d_s, row_d_t in tqdm(zip(f_d_s, f_d_t), total=src_lines_length):
+            for row_d_s, row_d_t in tqdm(zip(f_d_s, f_d_t),
+                                         total=src_lines_length):
                 yield {'article': row_d_s, 'highlights': row_d_t}
 
 
 def convert_example(is_test=False):
+
     def warpper(example):
         """convert an example into necessary features"""
         tokens = example['article']
         labels = example['highlights']
         src_ids, src_attention_mask_ids = tokens.split("$1$")
         src_ids = [int(i) for i in src_ids.split(" ")]
-        src_attention_mask_ids = [int(i) for i in src_attention_mask_ids.split(" ")]
+        src_attention_mask_ids = [
+            int(i) for i in src_attention_mask_ids.split(" ")
+        ]
 
         if not is_test:
             labels, decoder_input_attention_mask_ids = labels.split("$1$")
             labels = [int(i) for i in labels.split(" ")]
-            decoder_input_attention_mask_ids = [int(i) for i in decoder_input_attention_mask_ids.split(" ")]
+            decoder_input_attention_mask_ids = [
+                int(i) for i in decoder_input_attention_mask_ids.split(" ")
+            ]
             decoder_input_ids = [labels[-1]] + labels[:-1]
 
             return src_ids, src_attention_mask_ids, decoder_input_ids, decoder_input_attention_mask_ids, labels
@@ -255,17 +269,22 @@ def generate(args):
     test_data_src = 'data/' + args.dataset + '_data/uncased_tok_data/test.src'
     test_data_tgt = 'data/' + args.dataset + '_data/uncased_tok_data/test.tgt'
 
-    test_dataset = load_dataset(read, data_path=[test_data_src, test_data_tgt], lazy=False)
+    test_dataset = load_dataset(read,
+                                data_path=[test_data_src, test_data_tgt],
+                                lazy=False)
 
     trunc = convert_example(is_test=True)
 
     test_dataset = test_dataset.map(trunc)
-    batchify_fn = lambda samples, fn=Tuple(Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-                                           Pad(axis=0, pad_val=0),  # attn mask
-                                           Pad(axis=0, pad_val=tokenizer.pad_token_id)  # labels
-                                           ): fn(samples)
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
+        Pad(axis=0, pad_val=0),  # attn mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id)  # labels
+    ): fn(samples)
 
-    batch_sampler = BatchSampler(test_dataset, batch_size=args.batch_size, shuffle=False)
+    batch_sampler = BatchSampler(test_dataset,
+                                 batch_size=args.batch_size,
+                                 shuffle=False)
     test_data_loader = DataLoader(dataset=test_dataset,
                                   batch_sampler=batch_sampler,
                                   num_workers=0,
@@ -277,7 +296,8 @@ def generate(args):
     start_time = time.time()
     all_preds = []
     all_labels = []
-    for step, batch in tqdm(enumerate(test_data_loader), total=len(test_data_loader)):
+    for step, batch in tqdm(enumerate(test_data_loader),
+                            total=len(test_data_loader)):
         input_ids, attention_mask, labels = batch
         preds, _ = model.generate(input_ids=input_ids,
                                   attention_mask=attention_mask,
@@ -300,10 +320,17 @@ def generate(args):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
         start_time = time.time()
-    decoded_preds, _ = compute_metrics(
-        all_preds, all_labels, tokenizer, args.ignore_pad_token_for_loss, compute_rouge_=False)
-    if not os.path.exists(os.path.abspath(os.path.dirname(args.output_path) + os.path.sep + ".")):
-        os.makedirs(os.path.abspath(os.path.dirname(args.output_path) + os.path.sep + "."))
+    decoded_preds, _ = compute_metrics(all_preds,
+                                       all_labels,
+                                       tokenizer,
+                                       args.ignore_pad_token_for_loss,
+                                       compute_rouge_=False)
+    if not os.path.exists(
+            os.path.abspath(
+                os.path.dirname(args.output_path) + os.path.sep + ".")):
+        os.makedirs(
+            os.path.abspath(
+                os.path.dirname(args.output_path) + os.path.sep + "."))
     with open(args.output_path, 'w', encoding='utf-8') as fout:
         for decoded_pred in decoded_preds:
             fout.write(decoded_pred + '\n')

@@ -6,7 +6,10 @@ from os import listdir
 from os.path import isfile, join
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", type=str, help="choose from all, or 1 of 8 dataset like cnndm, gigaword etc.")
+parser.add_argument(
+    "--dataset",
+    type=str,
+    help="choose from all, or 1 of 8 dataset like cnndm, gigaword etc.")
 parser.add_argument("--generated", type=str, help="generated output file.")
 
 args = parser.parse_args()
@@ -28,17 +31,22 @@ def eval_one_dataset():
     golden_file = f"{data_root_path}/{args.dataset}_data/test.tgt"
 
     eval_template = {
-        'cnndm': f"python ./evaluate/cnndm/postprocess_cnn_dm.py --generated {generated_file} --golden {golden_file}",
-        'gigaword': f"python ./evaluate/gigaword/eval.py --perl --pred {generated_file} --gold {golden_file}",
+        'cnndm':
+        f"python ./evaluate/cnndm/postprocess_cnn_dm.py --generated {generated_file} --golden {golden_file}",
+        'gigaword':
+        f"python ./evaluate/gigaword/eval.py --perl --pred {generated_file} --gold {golden_file}",
     }
 
     cmd = eval_template[args.dataset]
     try:
         output = os.popen(cmd).read()
         if args.dataset in ['cnndm', 'gigaword']:
-            d = re.search(files2rouge_template, output.replace("\n", " ")).groupdict()
+            d = re.search(files2rouge_template,
+                          output.replace("\n", " ")).groupdict()
             d = scale_up(d)
-            print(f"{args.dataset}\trouge1/rouge2/rougeL\t{d['rouge1_f']:.2f}/{d['rouge2_f']:.2f}/{d['rougeL_f']:.2f}")
+            print(
+                f"{args.dataset}\trouge1/rouge2/rougeL\t{d['rouge1_f']:.2f}/{d['rouge2_f']:.2f}/{d['rougeL_f']:.2f}"
+            )
     except:
         print("Unexpected error:", sys.exc_info()[0])
         print(f"{args.dataset} evaluate failed!")
@@ -49,7 +57,10 @@ if args.dataset != 'all':
     eval_one_dataset()
 else:
     output_root_path = args.generated
-    onlyfolders = [f for f in listdir(output_root_path) if not isfile(join(args.generated, f))]
+    onlyfolders = [
+        f for f in listdir(output_root_path)
+        if not isfile(join(args.generated, f))
+    ]
     for dataset in support_dataset:
         for folder in onlyfolders:
             if folder.startswith(dataset):

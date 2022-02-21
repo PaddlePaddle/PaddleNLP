@@ -61,11 +61,7 @@ python uncase_tokenize_data.py --dataset <DATASET>
 
 ### 模型训练
 
-```
-bash run_train.sh <DATASET>
-```
-
-或直接运行finetune程序 cnndm:
+运行finetune程序 cnndm:
 
 ```
 python train_prophetnet.py \
@@ -133,11 +129,7 @@ python train_prophetnet.py \
 pip install git+https://github.com/pltrdy/pyrouge
 ```
 
-```
-bash run_eval.sh <DATASET>
-```
-
-或直接运行模型生成程序 cnndm:
+运行模型生成程序 cnndm:
 
 ```
 python generate.py \
