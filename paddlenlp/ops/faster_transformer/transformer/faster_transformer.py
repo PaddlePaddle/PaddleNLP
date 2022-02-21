@@ -844,7 +844,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "attention_mask": attention_mask,
             "use_cache": True,
             "seq_len": seq_len,
-            "decoder_type_ids": decoder_type_ids
+            "decoder_type_ids": decoder_type_ids,
+            "position_ids": position_ids,
+            "decoder_position_ids": decoder_position_ids
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -965,8 +967,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             seq_len = model_inputs.pop('seq_len')
             decoder_type_ids = model_inputs.pop('decoder_type_ids')
             role_ids = None
-            position_ids = None
-            decoder_position_ids = None
+            position_ids = model_inputs.pop('position_ids')
+            decoder_position_ids = model_inputs.pop('decoder_position_ids')
         else:
             model_inputs["input_ids"] = input_ids
             model_inputs["attention_mask"] = model_kwargs["attention_mask"]
