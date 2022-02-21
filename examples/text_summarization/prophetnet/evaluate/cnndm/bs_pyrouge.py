@@ -18,7 +18,6 @@ import logging
 from pyrouge.utils import log
 from pyrouge.utils.file_utils import verify_dir
 
-
 REMAP = {"-lrb-": "(", "-rrb-": ")", "-lcb-": "{", "-rcb-": "}",
          "-lsb-": "[", "-rsb-": "]", "``": '"', "''": '"'}
 
@@ -220,6 +219,7 @@ class Rouge155(object):
         ss = PunktSentenceSplitter()
 
         def sent_split_to_string(s): return "\n".join(ss.split(s))
+
         process_func = partial(
             DirectoryProcessor.process, function=sent_split_to_string)
         self.__process_summaries(process_func)
@@ -319,7 +319,6 @@ class Rouge155(object):
             f.write('<ROUGE-EVAL version="1.55">')
             for task_id, (system_filename, model_filenames) in enumerate(
                     system_models_tuples, start=1):
-
                 eval_string = Rouge155.__get_eval_string(
                     task_id, system_id,
                     system_dir, system_filename,

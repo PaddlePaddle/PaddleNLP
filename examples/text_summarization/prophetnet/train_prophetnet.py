@@ -1,14 +1,14 @@
-import os
-import time
 import argparse
-from tqdm import tqdm
+import os
+
 import paddle
+from paddle.io import DataLoader
+from tqdm import tqdm
+
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddle.io import DataLoader
-
-from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration, ProphetNetModel
+from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
 parser = argparse.ArgumentParser()
 # Required parameters

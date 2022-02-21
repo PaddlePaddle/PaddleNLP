@@ -1,9 +1,9 @@
 import argparse
 import os
+import re
+import sys
 from os import listdir
 from os.path import isfile, join
-import sys
-import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", type=str, help="choose from all, or 1 of 8 dataset like cnndm, gigaword etc.")

@@ -1,17 +1,19 @@
-import os
 import argparse
+import os
 import random
 import time
 from pprint import pprint
-from tqdm import tqdm
+
 import numpy as np
 import paddle
 from paddle.io import BatchSampler, DataLoader
-from paddlenlp.datasets import load_dataset
+from rouge_score import rouge_scorer, scoring
+from tqdm import tqdm
+
 from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration, ProphetNetModel
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
-from rouge_score import rouge_scorer, scoring
 
 summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 

@@ -1,8 +1,8 @@
 import argparse
 import os
 
-from nltk.tokenize.treebank import TreebankWordDetokenizer
 import tqdm
+from nltk.tokenize.treebank import TreebankWordDetokenizer
 
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 

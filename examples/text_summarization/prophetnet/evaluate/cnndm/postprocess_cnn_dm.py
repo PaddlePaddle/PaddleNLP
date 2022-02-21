@@ -25,11 +25,13 @@ _tok_dict = {"(": "-LRB-", ")": "-RRB-",
              "[": "-LSB-", "]": "-RSB-",
              "{": "-LCB-", "}": "-RCB-"}
 
+
 def _is_digit(w):
     for ch in w:
-        if not(ch.isdigit() or ch == ','):
+        if not (ch.isdigit() or ch == ','):
             return False
     return True
+
 
 def fix_tokenization(text):
     input_tokens = text.split()
@@ -52,12 +54,13 @@ def fix_tokenization(text):
                 output_tokens.append("``")
             has_left_quote = not has_left_quote
             i += 1
-        elif tok == "'" and len(output_tokens) > 0 and output_tokens[-1].endswith("n") and i < len(input_tokens) - 1 and input_tokens[i + 1] == "t":
+        elif tok == "'" and len(output_tokens) > 0 and output_tokens[-1].endswith("n") and i < len(input_tokens) - 1 and \
+                input_tokens[i + 1] == "t":
             output_tokens[-1] = output_tokens[-1][:-1]
             output_tokens.append("n't")
             i += 2
         elif tok == "'" and i < len(input_tokens) - 1 and input_tokens[i + 1] in ("s", "d", "ll"):
-            output_tokens.append("'"+input_tokens[i + 1])
+            output_tokens.append("'" + input_tokens[i + 1])
             i += 2
         elif tok == "'":
             if has_left_single_quote:
@@ -69,18 +72,22 @@ def fix_tokenization(text):
         elif tok == "." and i < len(input_tokens) - 2 and input_tokens[i + 1] == "." and input_tokens[i + 2] == ".":
             output_tokens.append("...")
             i += 3
-        elif tok == "," and len(output_tokens) > 0 and _is_digit(output_tokens[-1]) and i < len(input_tokens) - 1 and _is_digit(input_tokens[i + 1]):
+        elif tok == "," and len(output_tokens) > 0 and _is_digit(output_tokens[-1]) and i < len(
+                input_tokens) - 1 and _is_digit(input_tokens[i + 1]):
             # $ 3 , 000 -> $ 3,000
-            output_tokens[-1] += ','+input_tokens[i + 1]
+            output_tokens[-1] += ',' + input_tokens[i + 1]
             i += 2
-        elif tok == "." and len(output_tokens) > 0 and output_tokens[-1].isdigit() and i < len(input_tokens) - 1 and input_tokens[i + 1].isdigit():
+        elif tok == "." and len(output_tokens) > 0 and output_tokens[-1].isdigit() and i < len(input_tokens) - 1 and \
+                input_tokens[i + 1].isdigit():
             # 3 . 03 -> $ 3.03
-            output_tokens[-1] += '.'+input_tokens[i + 1]
+            output_tokens[-1] += '.' + input_tokens[i + 1]
             i += 2
-        elif tok == "." and len(output_tokens) > 0 and len(output_tokens[-1]) == 1 and output_tokens[-1].isupper() and i < len(input_tokens) - 2 and len(input_tokens[i + 1]) == 1 and input_tokens[i + 1].isupper() and input_tokens[i + 2] == '.':
+        elif tok == "." and len(output_tokens) > 0 and len(output_tokens[-1]) == 1 and output_tokens[
+            -1].isupper() and i < len(input_tokens) - 2 and len(input_tokens[i + 1]) == 1 and input_tokens[
+            i + 1].isupper() and input_tokens[i + 2] == '.':
             # U . N . -> U.N.
-            k = i+3
-            while k+2 < len(input_tokens):
+            k = i + 3
+            while k + 2 < len(input_tokens):
                 if len(input_tokens[k + 1]) == 1 and input_tokens[k + 1].isupper() and input_tokens[k + 2] == '.':
                     k += 2
                 else:
@@ -110,16 +117,18 @@ def fix_tokenization(text):
         prev_dash = flag_prev_dash
     return " ".join(output_tokens)
 
+
 def remove_duplicate(l_list, duplicate_rate):
     tk_list = [l.lower().split() for l in l_list]
     r_list = []
     history_set = set()
     for i, w_list in enumerate(tk_list):
         w_set = set(w_list)
-        if len(w_set & history_set)/len(w_set) <= duplicate_rate:
+        if len(w_set & history_set) / len(w_set) <= duplicate_rate:
             r_list.append(l_list[i])
         history_set |= w_set
     return r_list
+
 
 def test_rouge(cand, ref):
     temp_dir = tempfile.mkdtemp()
@@ -157,6 +166,7 @@ def test_rouge(cand, ref):
             shutil.rmtree(tmp_dir)
     return results_dict
 
+
 def rouge_results_to_str(results_dict):
     return ">> ROUGE-F(1/2/l): {:.2f}/{:.2f}/{:.2f}\nROUGE-R(1/2/3/l): {:.2f}/{:.2f}/{:.2f}\n".format(
         results_dict["rouge_1_f_score"] * 100,
@@ -167,6 +177,7 @@ def rouge_results_to_str(results_dict):
         results_dict["rouge_l_recall"] * 100
     )
 
+
 def count_tokens(tokens):
     counter = {}
     for t in tokens:
@@ -175,6 +186,7 @@ def count_tokens(tokens):
         else:
             counter[t] = 1
     return counter
+
 
 def get_f1(text_a, text_b):
     tokens_a = text_a.lower().split()
@@ -190,6 +202,7 @@ def get_f1(text_a, text_b):
     p = match / len(tokens_a)
     r = match / len(tokens_b)
     return 2.0 * p * r / (p + r + 1e-5)
+
 
 generated_list = []
 for line in fin:
