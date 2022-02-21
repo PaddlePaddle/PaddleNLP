@@ -2,18 +2,20 @@
 
 ## 模型简介
 
-ProphetNet（先知网络）是一种新型的seq2seq预训练模型。在训练时，Prophetnet每一时刻将会学习同时预测未来的N个字符，这种自监督学习目标可以使得模型考虑未来更远的字符，防止模型对强局部相关（strong local correlation）过拟合。
+ProphetNet（先知网络）是一种新型的 seq2seq 预训练模型。在训练时，Prophetnet 每一时刻将会学习同时预测未来的 N 个字符，这种自监督学习目标可以使得模型考虑未来更远的字符，防止模型对强局部相关（strong local correlation）过拟合。
 
-本项目是Prophetnet在PaddlePaddle 2.2上开源实现的文本摘要的例子，包含了在CNN/DailyMail数据集，Gigaword数据集上微调和生成的代码。
+本项目是 Prophetnet 在 PaddlePaddle 2.2 上开源实现的文本摘要的例子，包含了在 CNN/DailyMail 数据集，Gigaword 数据集上微调和生成的代码。
 
 ## 快速开始
 
 ### 项目依赖
+
 ```
 pip install -r requirements.txt
 python -m pip install paddlepaddle-gpu==2.2.2.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
 pip install paddlenlp==2.2.3
 ```
+
 ### 代码结构说明
 
 以下是本项目主要代码结构及说明：
@@ -31,9 +33,9 @@ pip install paddlenlp==2.2.3
 ```
 
 ### 数据准备
-GLGE 数据集下载: [链接](https://drive.google.com/file/d/1F4zppa9Gqrh6iNyVsZJkxfbm5waalqEA/view)
+GLGE 数据集下载：[链接](https://drive.google.com/file/d/1F4zppa9Gqrh6iNyVsZJkxfbm5waalqEA/view)
 
-GLGE 测试集下载: [链接](https://drive.google.com/file/d/11lDXIG87dChIfukq3x2Wx4r5_duCRm_J/view)
+GLGE 测试集下载：[链接](https://drive.google.com/file/d/11lDXIG87dChIfukq3x2Wx4r5_duCRm_J/view)
 
 将glge_public.tar与glge_hidden_v1.1.tar.gz放入到项目根目录下。
 
@@ -45,6 +47,7 @@ bash uncompress_data.sh
 模型权重和词表[下载链接](https://pan.baidu.com/s/1FOnd01rNvDJoONYegacq1Q), 提取码：o28q，下载后放入项目根目录。
 
 ### 数据预处理
+
 ```
 python uncase_tokenize_data.py --dataset <DATASET>
 ```
@@ -54,11 +57,14 @@ python uncase_tokenize_data.py --dataset <DATASET>
 - `<DATASET>`可选`cnndm`, `gigaword`.
 
 ### 模型训练
+
 ```
 bash run_train.sh <DATASET>
 ```
+
 或直接运行finetune程序
 cnndm:
+
 ```
 python train_prophetnet.py \
     --dataset=cnndm \
@@ -72,7 +78,9 @@ python train_prophetnet.py \
     --num_workers=4 \
     --output_dir=./ckpt/cnndm
 ```
+
 gigaword:
+
 ```
 python train_prophetnet.py \
     --dataset=gigaword \
@@ -112,18 +120,22 @@ python train_prophetnet.py \
 已经finetune好的模型权重：
 
 - cnndm : [链接](https://pan.baidu.com/s/1cemrUDxkqEW9raoasJ_VKw), 提取码：1egi
+
 - gigaword : [链接](https://pan.baidu.com/s/1qRH2FStT3vNQtDjZLkYJBQ), 提取码：on5v
 
 ### 模型评估
 使用prophetNet源码的[评估脚本](https://pan.baidu.com/s/1FOnd01rNvDJoONYegacq1Q), 此脚本依赖于pyrouge，需要提前安装rouge。
+
 ```
 pip install git+https://github.com/pltrdy/pyrouge
 ```
 ```
 bash run_eval.sh <DATASET>
 ```
+
 或直接运行模型生成程序
 cnndm:
+
 ```
 python generate.py \
     --dataset=cnndm \
@@ -142,7 +154,9 @@ python generate.py \
    
 python eval.py --dataset cnndm --generated ./generate/cnndm/generate.txt
 ```
+
 gigaword:
+
 ```
 python generate.py \
     --dataset=gigaword \
@@ -202,7 +216,6 @@ python eval.py --dataset gigaword --generated ./generate/gigaword/generate.txt
 |网络 |opt|batch_size|数据集|ROUGE_1|ROUGE_2|ROUGE_L|
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 |prophetnet-large-uncased|Adam|16|gigaword|38.92|19.81|36.06|
-
 
 ### 实验环境
 - GPU RTX3090 * 1, CPU Intel i7-11700k
