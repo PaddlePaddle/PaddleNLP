@@ -180,6 +180,8 @@ class LacTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
+        self._split_sentence = self.kwargs[
+            'split_sentence'] if 'split_sentence' in self.kwargs else False
         infer_data = []
         oov_token_id = self._word_vocab.get("OOV")
 
@@ -190,7 +192,9 @@ class LacTask(Task):
             filter_inputs.append(input)
 
         short_input_texts, self.input_mapping = self._auto_splitter(
-            filter_inputs, self._max_seq_len)
+            filter_inputs,
+            self._max_seq_len,
+            split_sentence=self._split_sentence)
 
         def read(inputs):
             for input_tokens in inputs:

@@ -115,6 +115,8 @@ class CSCTask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 128
+        self._split_sentence = self.kwargs[
+            'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     def _construct_input_spec(self):
         """
@@ -160,7 +162,7 @@ class CSCTask(Task):
         texts = []
         max_predict_len = self._max_seq_len - 2
         short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len)
+            input_texts, max_predict_len, split_sentence=self._split_sentence)
         for text in short_input_texts:
             if not (isinstance(text, str) and len(text) > 0):
                 continue

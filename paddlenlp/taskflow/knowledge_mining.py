@@ -225,6 +225,8 @@ class WordTagTask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
+        self._split_sentence = self.kwargs[
+            'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     @property
     def summary_num(self):
@@ -285,7 +287,7 @@ class WordTagTask(Task):
         input_texts = filter_input_texts
 
         short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len)
+            input_texts, max_predict_len, split_sentence=self._split_sentence)
 
         def read(inputs):
             for text in inputs:
