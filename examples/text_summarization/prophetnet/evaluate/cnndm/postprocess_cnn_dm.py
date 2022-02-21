@@ -1,10 +1,10 @@
-import sys
-import string
 import argparse
-import tempfile
 import os
-import time
 import shutil
+import string
+import tempfile
+import time
+
 from bs_pyrouge import Rouge155
 
 parser = argparse.ArgumentParser()

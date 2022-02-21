@@ -1,13 +1,12 @@
 from __future__ import print_function, unicode_literals, division
 
-import os
-import re
 import codecs
+import os
 import platform
-
+import re
+from functools import partial
 from subprocess import check_output
 from tempfile import mkdtemp
-from functools import partial
 
 try:
     from configparser import ConfigParser

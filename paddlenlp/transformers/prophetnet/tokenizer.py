@@ -1,8 +1,9 @@
-import os
-from typing import List
 import collections
 import logging
+import os
 from collections import OrderedDict
+from typing import List
+
 from .. import PretrainedTokenizer, BasicTokenizer, WordpieceTokenizer
 
 

@@ -18,8 +18,8 @@ from typing import Optional, Tuple
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import Layer
 from paddle import Tensor
+from paddle.nn import Layer
 
 import paddlenlp
 from .. import PretrainedModel

@@ -4,22 +4,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import logging
+import argparse
 import glob
 import json
-import argparse
-import math
+import logging
+import os
+import shutil
 import string
+import tempfile
+import time
 from multiprocessing import Pool, cpu_count
-from tqdm import tqdm, trange
 from pathlib import Path
-import numpy as np
+
 # pip install py-rouge
 import rouge
-import time
-import tempfile
-import shutil
 
 # from pytorch_pretrained_bert.tokenization import BertTokenizer
 # pip install pyrouge
