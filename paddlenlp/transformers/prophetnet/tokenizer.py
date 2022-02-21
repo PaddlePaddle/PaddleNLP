@@ -26,7 +26,6 @@ class Trie:
     Trie in Python. Creates a Trie out of a list of words. The trie is used to split on `added_tokens` in one pass
     Loose reference https://en.wikipedia.org/wiki/Trie
     """
-
     def __init__(self):
         self.data = {}
 
@@ -143,7 +142,9 @@ class Trie:
                             # It wasn't updated yet so indices are current ones
                             lookahead_index = current
                             end = current
-                        next_char = text[lookahead_index] if lookahead_index < len(text) else None
+                        next_char = text[
+                            lookahead_index] if lookahead_index < len(
+                                text) else None
                         while next_char in looktrie_pointer:
                             looktrie_pointer = looktrie_pointer[next_char]
                             lookahead_index += 1
@@ -297,15 +298,20 @@ class ProphetNetTokenizer(PretrainedTokenizer):
                  x_sep_token="[X_SEP]",
                  pad_token="[PAD]",
                  mask_token="[MASK]"):
-        self.unique_no_split_tokens = [x_sep_token, unk_token, sep_token, bos_token, eos_token, cls_token, pad_token,
-                                       mask_token]
+        self.unique_no_split_tokens = [
+            x_sep_token, unk_token, sep_token, bos_token, eos_token, cls_token,
+            pad_token, mask_token
+        ]
         self.tokens_trie = create_trie(self.unique_no_split_tokens)
         self.vocab = load_vocab(vocab_file)
-        self.ids_to_tokens = collections.OrderedDict([(ids, tok) for tok, ids in self.vocab.items()])
+        self.ids_to_tokens = collections.OrderedDict([
+            (ids, tok) for tok, ids in self.vocab.items()
+        ])
         self.do_basic_tokenize = do_basic_tokenize
         if do_basic_tokenize:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -417,7 +423,10 @@ class ProphetNetTokenizer(PretrainedTokenizer):
     def convert_ids_to_string(self, ids):
         return self.convert_tokens_to_string(self.convert_ids_to_tokens(ids))
 
-    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
         """
         Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer `prepare_for_model` method.
@@ -435,14 +444,17 @@ class ProphetNetTokenizer(PretrainedTokenizer):
         """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
-            )
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=True)
 
         if token_ids_1 is None:
             return ([0] * len(token_ids_0)) + [1]
         return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
 
-    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. A ProphetNet
         sequence pair mask has the following format:
@@ -469,7 +481,9 @@ class ProphetNetTokenizer(PretrainedTokenizer):
             return len(token_ids_0 + sep) * [0]
         return len(token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1]
 
-    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None) -> List[int]:
+    def build_inputs_with_special_tokens(self,
+                                         token_ids_0,
+                                         token_ids_1=None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. A BERT sequence has the following format:
@@ -493,12 +507,15 @@ class ProphetNetTokenizer(PretrainedTokenizer):
 
     def save_vocabulary(self, save_directory):
         index = 0
-        vocab_file = os.path.join(save_directory, self.resource_files_names["vocab_file"])
+        vocab_file = os.path.join(save_directory,
+                                  self.resource_files_names["vocab_file"])
         with open(vocab_file, "w", encoding="utf-8") as writer:
-            for token, token_index in sorted(self.vocab.items(), key=lambda kv: kv[1]):
+            for token, token_index in sorted(self.vocab.items(),
+                                             key=lambda kv: kv[1]):
                 if index != token_index:
-                    logging.warning(f"Saving vocabulary to {vocab_file}: vocabulary indices are not consecutive."
-                                    " Please check that the vocabulary is not corrupted!")
+                    logging.warning(
+                        f"Saving vocabulary to {vocab_file}: vocabulary indices are not consecutive."
+                        " Please check that the vocabulary is not corrupted!")
                     index = token_index
                 writer.write(token + "\n")
                 index += 1
