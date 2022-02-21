@@ -27,7 +27,7 @@ def parse_args():
         help="Path to pre-trained model or shortcut name of model.")
     parser.add_argument(
         "--output_dir",
-        default="/root/paddlejob/workspace/output",
+        default=None,
         type=str,
         help="The output directory where the model predictions and checkpoints will be written. "
         "Default as `outputs`")

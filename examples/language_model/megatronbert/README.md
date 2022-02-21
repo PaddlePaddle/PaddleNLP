@@ -82,7 +82,7 @@ python -m paddle.distributed.launch run_squad.py \
 }
 ```
 
-#### 2、
+#### 2、mnli数据集
 
 ```shell
 python -m paddle.distributed.launch run_glue.py \
@@ -100,4 +100,4 @@ eval loss: 0.186327, acc: 0.8992358634742741, eval loss: 0.332409, acc: 0.896867
 
 # Reference
 
-* Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism
+* [Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism](https://arxiv.org/pdf/1909.08053.pdf)
