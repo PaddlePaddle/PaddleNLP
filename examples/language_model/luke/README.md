@@ -41,19 +41,16 @@ pip install regex
 运行以下两个命令即可训练并评估LUKE在SQuAD1.1数据集的精度
 
 ```shell
-python examples/language_model/luke/create_squad_data.py \
-    --wiki_data=data/
-    --data_dir=data/
-    --output_data_dir=data/
-
 python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
     --model_type luke-base \
     --data_dir data/
     --output_dir output/ \
     --device gpu
     --learning_rate 12e-6 \
-    --num_train_epochs 2\
-    --train_batch_size 8
+    --num_train_epochs 2 \
+    --train_batch_size 8 \
+    --do_train \
+    --do_eval
 ```
 其中参数释义如下：
 - `model_type` 指示了模型类型，当前支持`luke-base`和`luke-large`模型。
@@ -63,6 +60,8 @@ python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
 - `output_dir` 表示模型保存路径。
 - `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 - `num_train_epochs` 表示需要训练的epoch数量
+- `do_train` 表示是否开启训练
+- `do_eval` 表示是否开启评估
 
 训练结束后模型会对模型进行评估，其评估在验证集上完成, 训练完成后你将看到如下结果:
 ```text

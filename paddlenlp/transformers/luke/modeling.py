@@ -829,7 +829,7 @@ class LukeLMHead(nn.Layer):
                  hidden_size,
                  hidden_act,
                  embedding_weights=None):
-        super().__init__()
+        super(LukeLMHead, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.activation = get_activation(hidden_act)
@@ -852,7 +852,7 @@ class LukeLMHead(nn.Layer):
 
 class EntityPredictionHeadTransform(nn.Layer):
     def __init__(self, hidden_act, hidden_size, entity_emb_size):
-        super().__init__()
+        super(EntityPredictionHeadTransform, self).__init__()
         self.dense = nn.Linear(hidden_size, entity_emb_size)
         self.transform_act_fn = get_activation(hidden_act)
         self.layer_norm = nn.LayerNorm(entity_emb_size, epsilon=layer_norm_eps)
@@ -867,7 +867,7 @@ class EntityPredictionHeadTransform(nn.Layer):
 class EntityPredictionHead(nn.Layer):
     def __init__(self, hidden_size, entity_vocab_size, entity_emb_size,
                  hidden_act):
-        super().__init__()
+        super(EntityPredictionHead, self).__init__()
         self.transform = EntityPredictionHeadTransform(
             hidden_size=hidden_size,
             hidden_act=hidden_act,
@@ -891,7 +891,7 @@ class LukeForMaskedLM(LukePretrainedModel):
     """
 
     def __init__(self, luke):
-        super().__init__()
+        super(LukeForMaskedLM, self).__init__()
         self.luke = luke
         self.vocab_size = self.luke.config['vocab_size']
         self.entity_vocab_size = self.luke.config['entity_vocab_size']
@@ -997,7 +997,7 @@ class LukeForEntityClassification(LukePretrainedModel):
     """
 
     def __init__(self, luke, num_classes):
-        super().__init__()
+        super(LukeForEntityClassification, self).__init__()
 
         self.luke = luke
 
@@ -1088,7 +1088,7 @@ class LukeForEntityPairClassification(LukePretrainedModel):
     """
 
     def __init__(self, luke, num_classes):
-        super().__init__()
+        super(LukeForEntityPairClassification, self).__init__()
 
         self.luke = luke
 
@@ -1181,7 +1181,7 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
     """
 
     def __init__(self, luke, num_classes):
-        super().__init__()
+        super(LukeForEntitySpanClassification, self).__init__()
 
         self.luke = luke
 

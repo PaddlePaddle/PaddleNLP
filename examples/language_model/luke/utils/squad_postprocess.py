@@ -1,4 +1,3 @@
-#encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -95,15 +94,10 @@ def evaluate(dataset, predictions):
 
 
 def SQuad_postprocess(dataset_file,
-                      all_predictions,
-                      output_metrics="output.json"):
+                      all_predictions):
     """squad postprocess fun"""
     with open(dataset_file) as ds:
         dataset_json = json.load(ds)
         dataset = dataset_json['data']
     re_json = evaluate(dataset, all_predictions)
     print(json.dumps(re_json))
-    #with open(output_metrics, 'w') as wr:
-
-
-#wr.write(json.dumps(re_json))

@@ -1,4 +1,3 @@
-#encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 
-import os
 import paddle
 from tqdm import tqdm
 from paddle.optimizer import AdamW
-from paddle.optimizer.lr import LRScheduler
+from paddlenlp.transformers import LinearDecayWithWarmup
 import paddle.nn.functional as F
 
 
@@ -27,37 +25,12 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
     def forward(self, y, label):
         start_logits, end_logits = y
         start_position, end_position = label
-        start_position = paddle.unsqueeze(start_position, axis=-1)
-        end_position = paddle.unsqueeze(end_position, axis=-1)
         start_loss = paddle.nn.functional.cross_entropy(
             input=start_logits, label=start_position)
         end_loss = paddle.nn.functional.cross_entropy(
             input=end_logits, label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
-
-
-class LinearScheduleWithWarmup(LRScheduler):
-    def __init__(self,
-                 learning_rate,
-                 warmup_steps,
-                 max_train_steps,
-                 last_epoch=-1,
-                 verbose=False):
-
-        self.warmup_steps = warmup_steps
-        self.learning_rate = learning_rate
-        self.max_train_steps = max_train_steps
-        super(LinearScheduleWithWarmup, self).__init__(learning_rate,
-                                                       last_epoch, verbose)
-
-    def get_lr(self):
-        if self.last_epoch < self.warmup_steps:
-            warmup_percent = self.last_epoch / self.warmup_steps
-        else:
-            warmup_percent = 1 - self.last_epoch / self.max_train_steps
-
-        return self.learning_rate * warmup_percent
 
 
 def _create_model_arguments(batch):
@@ -146,12 +119,12 @@ class Trainer(object):
             parameters=model.parameters(),
             grad_clip=clip,
             learning_rate=scheduler,
-            beta1=self.args.adam_b1,
+            beta1=0.9,
             apply_decay_param_fun=lambda x: x in self.wd_params,
             weight_decay=self.args.weight_decay,
-            beta2=self.args.adam_b2), scheduler
+            beta2=0.99), scheduler
 
     def _create_scheduler(self):
-        warmup_steps = int(self.num_train_steps * self.args.warmup_proportion)
-        return LinearScheduleWithWarmup(self.args.learning_rate, warmup_steps,
-                                        self.num_train_steps)
+        return LinearDecayWithWarmup(learning_rate=self.args.learning_rate,
+                                     total_steps=self.num_train_steps,
+                                     warmup=self.args.warmup_proportion)

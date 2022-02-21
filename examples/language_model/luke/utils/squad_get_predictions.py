@@ -1,4 +1,3 @@
-#encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,6 @@
 
 import math
 import collections
-
 
 def get_prelim_predictions(features, unique_id_to_result, n_best_size,
                            max_answer_length):
@@ -69,7 +67,7 @@ def get_prelim_predictions(features, unique_id_to_result, n_best_size,
 
 
 def get_nbest(args, prelim_predictions, features, example, n_best_size,
-              do_lower_case):
+              do_lower_case, tokenizer):
     """get nbest predictions"""
     _NbestPrediction = collections.namedtuple(
         "NbestPrediction", ["text", "start_logit", "end_logit"])
@@ -82,7 +80,7 @@ def get_nbest(args, prelim_predictions, features, example, n_best_size,
         feature = features[pred.feature_index]
         if pred.start_index > 0:  # this is a non-null prediction
             tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
-            final_text = args.tokenizer.convert_tokens_to_string(
+            final_text = tokenizer.convert_tokens_to_string(
                 tok_tokens).strip()
 
             if final_text in seen_predictions:
@@ -111,7 +109,7 @@ def get_nbest(args, prelim_predictions, features, example, n_best_size,
 
 
 def get_predictions(args, all_examples, all_features, all_results, n_best_size,
-                    max_answer_length, do_lower_case):
+                    max_answer_length, do_lower_case, tokenizer):
     """Get final predictions"""
     print("start to get predictions")
     example_index_to_features = collections.defaultdict(list)
@@ -128,7 +126,7 @@ def get_predictions(args, all_examples, all_features, all_results, n_best_size,
         prelim_predictions = get_prelim_predictions(
             features, unique_id_to_result, n_best_size, max_answer_length)
         nbest = get_nbest(args, prelim_predictions, features, example,
-                          n_best_size, do_lower_case)
+                          n_best_size, do_lower_case, tokenizer)
 
         total_scores = []
         best_non_null_entry = None
@@ -156,12 +154,12 @@ def get_predictions(args, all_examples, all_features, all_results, n_best_size,
 
 
 def write_predictions(args, all_examples, all_features, all_results,
-                      n_best_size, max_answer_length, do_lower_case):
+                      n_best_size, max_answer_length, do_lower_case, tokenizer):
     """Write final predictions to the json file and log-odds of null if needed."""
 
     all_predictions = get_predictions(args, all_examples, all_features,
                                       all_results, n_best_size,
-                                      max_answer_length, do_lower_case)
+                                      max_answer_length, do_lower_case, tokenizer)
     return all_predictions
 
 

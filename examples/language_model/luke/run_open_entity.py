@@ -1,4 +1,3 @@
-# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,76 +18,99 @@ from paddle.io import Dataset, DataLoader
 import numpy as np
 from paddlenlp.transformers import LukeTokenizer
 from paddlenlp.transformers import LukeForEntityClassification
-from utils.processor import *
+from utils.open_entity_processor import convert_examples_to_features, DatasetProcessor
 import paddle
 import json
 from tqdm import tqdm
 from utils.trainer import Trainer
 import os
 
+ENTITY_TOKEN = "[ENTITY]"
+
 parser = argparse.ArgumentParser(description="LUKE FOR OPEN ENTITY")
 
-parser.add_argument("--output_dir", type=str, required=True)
-parser.add_argument("--data_dir", type=str, required=True)
-parser.add_argument("--do_eval", type=bool, default=True)
-parser.add_argument("--do_train", type=bool, default=True)
-parser.add_argument("--eval_batch_size", type=int, default=32)
-parser.add_argument("--num_train_epochs", type=int, default=2)
-parser.add_argument("--seed", type=int, default=42)
-parser.add_argument("--train_batch_size", type=int, default=2)
-parser.add_argument("--device", type=str, default='gpu')
-parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
-parser.add_argument("--weight_decay", type=float, default=0.01)
-parser.add_argument("--warmup_proportion", type=float, default=0.06)
-parser.add_argument("--learning_rate", type=float, default=1e-5)
-parser.add_argument("--adam_b1", type=float, default=0.9)
-parser.add_argument("--adam_b2", type=float, default=0.98)
-parser.add_argument("--model_type", type=str, default='luke-base')
-parser.add_argument("--max_mention_length", type=str, default=30)
+parser.add_argument("--output_dir",
+                    type=str,
+                    required=True,
+                    help="Use to store all outputs during training and evaluation.")
+parser.add_argument("--data_dir",
+                    type=str,
+                    required=True,
+                    help="Dataset folder")
+parser.add_argument("--eval_batch_size",
+                    type=int,
+                    default=32,
+                    help="Batch size per GPU/CPU for evaluating.")
+parser.add_argument("--num_train_epochs",
+                    type=int,
+                    default=2,
+                    help="Number of training cycles")
+parser.add_argument("--seed",
+                    type=int,
+                    default=42,
+                    help="random seed for initialization")
+parser.add_argument("--train_batch_size",
+                    type=int,
+                    default=8,
+                    help="Batch size per GPU/CPU for training.")
+parser.add_argument("--device",
+                    type=str,
+                    default='gpu',
+                    help="Batch size per GPU/CPU for training.")
+parser.add_argument("--gradient_accumulation_steps",
+                    type=int,
+                    default=3,
+                    help="Gradient accumulated before each parameter update.")
+parser.add_argument("--weight_decay",
+                    type=float,
+                    default=0.01,
+                    help="Weight decay if we apply some")
+parser.add_argument("--warmup_proportion",
+                    type=float,
+                    default=0.06,
+                    help="Proportion of training steps to perform linear learning rate warmup for.")
+parser.add_argument("--learning_rate",
+                    type=float,
+                    default=1e-5,
+                    help="The initial learning rate for Adam.")
+parser.add_argument("--model_type",
+                    type=str,
+                    default='luke-base',
+                    help="Type of pre-trained model.")
+parser.add_argument("--max_mention_length",
+                    type=int,
+                    default=30,
+                    help="Max entity position's length")
 
 args = parser.parse_args()
-args.tokenizer = LukeTokenizer.from_pretrained(args.model_type)
-args.entity_vocab = args.tokenizer.get_entity_vocab()
-args.tokenizer.add_special_tokens(
-    dict(additional_special_tokens=[ENTITY_TOKEN]))
 
 
 class DataGenerator(Dataset):
-    def __init__(self, features, args):
+    def __init__(self, features):
         super(DataGenerator, self).__init__()
-        self.args = args
-        self.all_word_ids = [f.word_ids for f in features]
-        self.all_word_segment_ids = [f.word_segment_ids for f in features]
-        self.all_word_attention_mask = [f.word_attention_mask for f in features]
-        self.all_entity_ids = [f.entity_ids for f in features]
-        self.all_entity_position_ids = [f.entity_position_ids for f in features]
-        self.all_entity_segment_ids = [f.entity_segment_ids for f in features]
-        self.all_entity_attention_mask = [
-            f.entity_attention_mask for f in features
-        ]
-        self.all_labels = [f.labels for f in features]
+        self.features = features
 
     def __getitem__(self, item):
-        word_ids = self.all_word_ids[item]
-        word_segment_ids = self.all_word_segment_ids[item]
-        word_attention_mask = self.all_word_attention_mask[item]
-        entity_ids = self.all_entity_ids[item]
-        entity_position_ids = self.all_entity_position_ids[item]
-        entity_segment_ids = self.all_entity_segment_ids[item]
-        entity_attention_mask = self.all_entity_attention_mask[item]
-        label = self.all_labels[item]
+        word_ids = self.features[item].word_segment_ids
+        word_segment_ids = self.features[item].word_segment_ids
+        word_attention_mask = self.features[item].word_attention_mask
+        entity_ids = self.features[item].entity_ids
+        entity_position_ids = self.features[item].entity_position_ids
+        entity_segment_ids = self.features[item].entity_segment_ids
+        entity_attention_mask = self.features[item].entity_attention_mask
+        labels = self.features[item].labels
 
-        return word_ids, \
-               word_segment_ids, \
-               word_attention_mask, \
-               entity_ids, \
-               entity_position_ids, \
-               entity_segment_ids, \
-               entity_attention_mask, \
-               label
+        return (word_ids,
+                word_segment_ids,
+                word_attention_mask,
+                entity_ids,
+                entity_position_ids,
+                entity_segment_ids,
+                entity_attention_mask,
+                labels)
 
     def __len__(self):
-        return len(self.all_word_ids)
+        return len(self.features)
 
 
 @paddle.no_grad()
@@ -157,6 +179,9 @@ def evaluate(args, model, fold="dev", output_file=None):
 
 
 def load_examples(args, fold="train"):
+    tokenizer = LukeTokenizer.from_pretrained(args.model_type)
+    tokenizer.add_special_tokens(
+        dict(additional_special_tokens=[ENTITY_TOKEN]))
     processor = DatasetProcessor()
     if fold == "train":
         examples = processor.get_train_examples(args.data_dir)
@@ -169,12 +194,13 @@ def load_examples(args, fold="train"):
 
     logging.info("Creating features from the dataset...")
     features = convert_examples_to_features(
-        examples, label_list, args.tokenizer, args.max_mention_length)
+        examples, label_list, tokenizer, args.max_mention_length)
 
-    data_generator = DataGenerator(features, args)
+    dataset = DataGenerator(features)
 
     def collate_fn(batch):
         def create_padded_sequence(k, padding_value):
+            """Pad sequence to maximum length"""
             new_data = []
             max_len = 0
             for each_batch in batch:
@@ -182,28 +208,28 @@ def load_examples(args, fold="train"):
                     max_len = len(each_batch[k])
             for each_batch in batch:
                 new_data.append(each_batch[k] + [padding_value] * (
-                    max_len - len(each_batch[k])))
+                        max_len - len(each_batch[k])))
             return np.array(new_data, dtype='int64')
 
-        return (
-            create_padded_sequence(0, 1),
-            create_padded_sequence(1, 0),
-            create_padded_sequence(2, 0),
-            create_padded_sequence(3, 0),
-            create_padded_sequence(4, 0),
-            create_padded_sequence(5, 0),
-            create_padded_sequence(6, 0),
-            create_padded_sequence(7, 0), )
+        return (create_padded_sequence(0, 1),  # pad word_ids
+                create_padded_sequence(1, 0),  # pad word_segment_ids
+                create_padded_sequence(2, 0),  # pad word_attention_mask
+                create_padded_sequence(3, 0),  # pad entity_ids
+                create_padded_sequence(4, 0),  # pad entity_position_ids
+                create_padded_sequence(5, 0),  # pad entity_segment_ids
+                create_padded_sequence(6, 0),  # pad entity_attention_mask
+                create_padded_sequence(7, 0),) # convert to numpy array
+
 
     if fold in ("dev", "test"):
         dataloader = DataLoader(
-            data_generator,
+            dataset,
             batch_size=args.eval_batch_size,
             shuffle=False,
             collate_fn=collate_fn)
     else:
         dataloader = DataLoader(
-            data_generator,
+            dataset,
             shuffle=True,
             batch_size=args.train_batch_size,
             collate_fn=collate_fn)
@@ -219,7 +245,7 @@ if __name__ == '__main__':
         train_dataloader) // args.gradient_accumulation_steps
     num_train_steps = int(num_train_steps_per_epoch * args.num_train_epochs)
     model = LukeForEntityClassification.from_pretrained(
-        args.model_type, num_labels=num_labels)
+        args.model_type, num_classes=num_labels)
     trainer = Trainer(
         args,
         model=model,
