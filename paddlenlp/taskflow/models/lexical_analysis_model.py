@@ -23,7 +23,8 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
     # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
     from paddle.text import ViterbiDecoder
 else:
-    from paddlenlp.layers.crf import ViterbiDecoder
+    raise RuntimeError('Taskflow requires paddle version >=2.2.0, but got %s' %
+                       paddle.version.full_version)
 
 
 class BiGruCrf(nn.Layer):
