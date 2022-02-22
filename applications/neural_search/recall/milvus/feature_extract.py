@@ -15,7 +15,7 @@
 import argparse
 import os
 import sys
-from tqdm import tqdm 
+from tqdm import tqdm
 import numpy as np
 from scipy.special import softmax
 
@@ -26,11 +26,9 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-
-
 sys.path.append('.')
 
-from base_model import SemanticIndexBase,SemanticIndexBaseStatic
+from base_model import SemanticIndexBase, SemanticIndexBaseStatic
 
 from data import convert_example
 
@@ -123,7 +121,6 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-
     def predict(self, data, tokenizer):
         """
         Predicts the data labels.
@@ -144,11 +141,14 @@ class Predictor(object):
 
         all_embeddings = []
         examples = []
-        for idx,text in enumerate(tqdm(data)):
+        for idx, text in enumerate(tqdm(data)):
             input_ids, segment_ids = convert_example(
-                text, tokenizer,max_seq_length=self.max_seq_length,pad_to_max_seq_len=True)
+                text,
+                tokenizer,
+                max_seq_length=self.max_seq_length,
+                pad_to_max_seq_len=True)
             examples.append((input_ids, segment_ids))
-            if(len(examples)>100):
+            if (len(examples) > 100):
                 input_ids, segment_ids = batchify_fn(examples)
                 self.input_handles[0].copy_from_cpu(input_ids)
                 self.input_handles[1].copy_from_cpu(segment_ids)
@@ -156,17 +156,17 @@ class Predictor(object):
                 logits = self.output_handle.copy_to_cpu()
                 # print(logits.shape)
                 all_embeddings.append(logits)
-                examples=[]
+                examples = []
 
         all_embeddings = np.concatenate(all_embeddings, axis=0)
-        np.save('corpus_embedding',all_embeddings) 
+        np.save('corpus_embedding', all_embeddings)
 
 
 def read_text(file_path):
-    file=open(file_path)
-    id2corpus={}
-    for idx,data in enumerate(file.readlines()):
-        id2corpus[idx]=data.strip()
+    file = open(file_path)
+    id2corpus = {}
+    for idx, data in enumerate(file.readlines()):
+        id2corpus[idx] = data.strip()
     return id2corpus
 
 
@@ -177,10 +177,9 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    output_emb_size=256
+    output_emb_size = 256
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    id2corpus=read_text(args.corpus_file)
+    id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     predictor.predict(corpus_list, tokenizer)
-    

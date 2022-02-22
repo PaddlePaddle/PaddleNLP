@@ -16,7 +16,6 @@ import numpy as np
 
 from paddle_serving_server.pipeline import PipelineClient
 
-
 client = PipelineClient()
 client.connect(['127.0.0.1:8080'])
 
