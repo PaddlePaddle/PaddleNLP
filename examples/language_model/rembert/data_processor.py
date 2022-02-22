@@ -58,7 +58,7 @@ class MrpcProcessor(object):
             guid = "%s-%s" % (set_type, i)
             text_a = tokenization(line[1])['input_ids']
             text_b = tokenization(line[2])['input_ids']
-            label = line[3]
+            label = int(line[3])
             examples.append(
                 InputExample(
                     guid=guid, text_a=text_a, text_b=text_b, label=label))
@@ -145,10 +145,14 @@ class DataGenerator(Dataset):
         text_b = self.features[item].text_b
         text_a_token_type_ids = [0] * len(text_a)
         text_b_token_type_ids = [1] * len(text_b)
-        label = self.features[item].label
+        label = [self.features[item].label]
 
-        return (text_a, text_b, text_a_token_type_ids, text_b_token_type_ids,
-                label)
+        return dict(
+            text_a=text_a,
+            text_b=text_b,
+            text_a_token_type_ids=text_a_token_type_ids,
+            text_b_token_type_ids=text_b_token_type_ids,
+            label=label)
 
     def __len__(self):
         return len(self.features)

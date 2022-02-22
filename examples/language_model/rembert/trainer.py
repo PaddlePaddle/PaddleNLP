@@ -57,7 +57,7 @@ class Trainer(object):
             optimizers=self.optimizer,
             level='O2',
             master_weight=None,
-            save_dtype=paddle.float32)
+            save_dtype='float32')
 
         with tqdm(total=self.num_train_steps) as pbar:
             while True:
@@ -67,13 +67,11 @@ class Trainer(object):
                             custom_white_list=None,
                             custom_black_list=None,
                             level='O2'):
-                        outputs = model(
-                            input_ids=batch[0],
-                            attention_mask=batch[1],
-                            token_type_ids=batch[2],
-                            labels=batch[3])
+                        logits = model(
+                            input_ids=batch[0], token_type_ids=batch[1])
 
-                    loss, logits = outputs[0], outputs[1]
+                    loss = paddle.nn.CrossEntropyLoss()(
+                        logits, batch[2].reshape((-1, )))
 
                     if self.args.gradient_accumulation_steps > 1:
                         loss = loss / self.args.gradient_accumulation_steps
@@ -83,8 +81,8 @@ class Trainer(object):
                         self.scaler.minimize(self.optimizer, scaled)
                         self.scheduler.step()
                         self.optimizer.clear_grad()
-                        pbar.set_description("epoch: %d loss: %.7f acc: %.7f" %
-                                             (epoch, loss, acc))
+                        pbar.set_description("epoch: {} loss: {} acc: {}".
+                                             format(epoch, loss.numpy(), acc))
                         pbar.update()
                         global_step += 1
 

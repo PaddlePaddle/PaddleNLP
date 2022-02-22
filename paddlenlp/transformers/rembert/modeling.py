@@ -74,7 +74,7 @@ class RembertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {
         "rembert": {
             "attention_probs_dropout_prob": 0,
-            "embedding_size": 256,
+            "input_embedding_size": 256,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0,
             "hidden_size": 1152,
@@ -269,10 +269,8 @@ class RemBertAttention(nn.Layer):
             hidden_states,
             attention_mask=None, ):
         self_outputs = self.self(hidden_states, attention_mask)
-        attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
-        return outputs
+        attention_output = self.output(self_outputs, hidden_states)
+        return attention_output
 
 
 class RemBertIntermediate(nn.Layer):
@@ -325,14 +323,10 @@ class RemBertLayer(nn.Layer):
         self_attention_outputs = self.attention(
             hidden_states,
             attention_mask, )
-        attention_output = self_attention_outputs[0]
 
-        outputs = self_attention_outputs[1:]
+        layer_output = self.feed_forward_chunk(self_attention_outputs)
 
-        layer_output = self.feed_forward_chunk(attention_output)
-        outputs = (layer_output, ) + outputs
-
-        return outputs
+        return layer_output
 
     def feed_forward_chunk(self, attention_output):
         intermediate_output = self.intermediate(attention_output)
@@ -450,7 +444,7 @@ class RemBertModel(RembertPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0):
         super(RemBertModel, self).__init__()
-        self.layer_norm_eps = layer_norm_eps
+        self.pad_token_id = pad_token_id
         self.num_hidden_layers = num_hidden_layers
         self.initializer_range = initializer_range
         self.embeddings = RemBertEmbeddings(

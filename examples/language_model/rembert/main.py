@@ -21,7 +21,7 @@ from tqdm import tqdm
 from trainer import Trainer
 import numpy as np
 from paddlenlp.transformers import RemBertForSequenceClassification
-from .data_processor import MrpcProcessor, tokenization, XNLIProcessor, DataGenerator
+from data_processor import MrpcProcessor, tokenization, XNLIProcessor, DataGenerator
 import paddle.distributed as dist
 import random
 from paddle.metric import Accuracy
@@ -42,10 +42,19 @@ parser.add_argument(
     help="Total number of training epochs to perform.")
 parser.add_argument(
     "--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--train_batch_size", type=int, default=16)
+parser.add_argument(
+    "--train_batch_size",
+    type=int,
+    default=16,
+    help="per gpu batch size during thr training.")
+parser.add_argument(
+    "--eval_batch_size",
+    type=int,
+    default=16,
+    help="per gpu batch size during thr evaluating.")
 parser.add_argument(
     "--output_dir",
-    default="outputs",
+    default='outputs',
     type=str,
     help="The output directory where the model predictions and checkpoints will be written. "
     "Default as `outputs`")
@@ -120,42 +129,34 @@ def load_example(args, fold='train'):
     datagenerator = DataGenerator(examples)
 
     def collate_fn(batch):
-        def create_padded_sequence(k, padding_value):
+        def create_padded_sequence(key, padding_value):
             """Pad sequence to max length"""
-            new_data = []
+            pad_sequence = []
             max_len = 0
-            for each_batch in batch:
-                if len(each_batch[k]) > max_len:
-                    max_len = len(each_batch[k])
-            for each_batch in batch:
-                new_data.append(each_batch[k] + [padding_value] * (
-                    max_len - len(each_batch[k])))
-            return np.array(new_data, dtype='int64')
+            for example in batch:
+                if len(example[key]) > max_len:
+                    max_len = len(example[key])
+            for example in batch:
+                pad_sequence.append(example[key] + [padding_value] * (
+                    max_len - len(example[key])))
+            return np.array(pad_sequence, dtype='int64')
 
-        text_a = create_padded_sequence(
-            0, tokenization.pad_token_id)  # pad text_a input_ids
-        text_b = create_padded_sequence(
-            1, tokenization.pad_token_id)  # pad text_b input_ids
-        text_a_attention_mask = create_padded_sequence(
-            2, 0)  # pad text_a attention_mask
-        text_b_attention_mask = create_padded_sequence(
-            3, 0)  # pad text_b attention_mask
+        text_a = create_padded_sequence('text_a', 0)  # pad text_a input_ids
+        text_b = create_padded_sequence('text_b', 0)  # pad text_b input_ids
         text_a_token_type_ids = create_padded_sequence(
-            4, 0)  # pad text_a token_type_ids
+            'text_a_token_type_ids', 0)  # pad text_a_token_type_ids
         text_b_token_type_ids = create_padded_sequence(
-            5, 1)  # pad text_b token_type_ids
-        label = create_padded_sequence(6, 0)  # convert to numpy array
+            'text_b_token_type_ids', 1)  # pad text_b_token_type_ids
+        label = create_padded_sequence(
+            'label', 0)  # label will not pad, just convert to numpy array
 
         input_ids = np.concatenate(
             [text_a, text_b], axis=-1)[:, :args.max_seq_length]
-        attention_mask = np.concatenate(
-            [text_a_attention_mask, text_b_attention_mask],
-            axis=-1)[:, :args.max_seq_length]
         token_type_ids = np.concatenate(
             [text_a_token_type_ids, text_b_token_type_ids],
             axis=-1)[:, :args.max_seq_length]
 
-        return input_ids, attention_mask, token_type_ids, label
+        return input_ids, token_type_ids, label
 
     if fold in ("dev", "test"):
         dataloader = DataLoader(
@@ -169,7 +170,8 @@ def load_example(args, fold='train'):
             batch_size=args.train_batch_size,
             shuffle=True,
             drop_last=False)
-        dataloader = DataLoader(datagenerator, batch_sampler=sampler)
+        dataloader = DataLoader(
+            datagenerator, batch_sampler=sampler, collate_fn=collate_fn)
 
     return dataloader, processor
 
@@ -207,13 +209,10 @@ def evaluate(model, args, fold='test'):
     metric = Accuracy()
     eval_dataloader, processor = load_example(args, fold)
     for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
-        logits = model(
-            input_ids=batch[0],
-            attention_mask=batch[1],
-            token_type_ids=batch[2])
-        labels = batch[3].reshape((
-            1,
-            -1, ))
+        logits = model(input_ids=batch[0], token_type_ids=batch[1])
+        labels = batch[2].reshape((
+            -1,
+            1, ))
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
