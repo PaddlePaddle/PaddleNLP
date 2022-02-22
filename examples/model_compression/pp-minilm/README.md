@@ -370,7 +370,7 @@ cd deploy/python
 export task=tnews
 export algo=mse
 export bs=4
-python infer.py --task_name ${task}  --model_path  ../quantization/${task}_quant_models/${algo}${bs}/int8  --int8 --use_trt
+python infer.py --task_name ${task}  --model_path  ../../quantization/${task}_quant_models/${algo}${bs}/int8  --int8 --use_trt
 ```
 如果想要批量对量化模型进行预测并输出不同量化策略产出模型的精度，可以使用如下的脚本批量预测：
 
@@ -395,7 +395,7 @@ python infer.py --task_name ${task}  --model_path  $MODEL_PATH --use_trt
 ```shell
 
 bash infer_perf.sh
-cd ..
+cd ../../
 ```
 
 下表后三行分别是微调后的模型、裁剪后的模型、量化后模型的总耗时情况。
