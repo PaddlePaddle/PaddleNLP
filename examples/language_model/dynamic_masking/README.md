@@ -6,7 +6,7 @@ collator.py: 数据采样class
 modeling.py: MLM模型class
 ru_pretrain.py: 预训练代码
 运行如下：
-‘’‘
+```shell
 python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 --model_name_or_path ernie-2.0-en \
 --batch_size 32 \
@@ -22,7 +22,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 --device gpu:0 \
 --max_seq_length 128 \
 --amp True
-’‘’
+```
 
 其中参数释义如下：
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
@@ -41,7 +41,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 - `amp` 指示是否启用自动混合精度训练。
 ### 数据准备
 原始数据默认每一行为一条训练样本，数据读取函数为 read_data(fileName):
-'''
+```shell
 def read_data(fileName):
     # Read the raw txt file, each line represents one sample.
     # customize the read function if necessary
@@ -49,5 +49,5 @@ def read_data(fileName):
         for line in f:
             yield line
         f.close()
-'''
+```
 可以根据需求更改。
