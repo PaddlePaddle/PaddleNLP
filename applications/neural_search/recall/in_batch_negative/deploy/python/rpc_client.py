@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
+import numpy as np
 
 from paddle_serving_server.pipeline import PipelineClient
-import numpy as np
+
 
 client = PipelineClient()
 client.connect(['127.0.0.1:8080'])
@@ -27,8 +29,11 @@ for i, item in enumerate(list_data):
     feed[str(i)] = item
 
 print(feed)
+b_start = time.time()
 ret = client.predict(feed_dict=feed)
-# print(ret)
+b_end = time.time()
+print("time to cost :{} seconds".format(b_end - b_start))
+
 result = np.array(eval(ret.value[0]))
 print(ret.key)
 print(result.shape)
