@@ -25,7 +25,7 @@ from paddle import inference
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
-sys.path.append("../")
+sys.path.append("../../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
