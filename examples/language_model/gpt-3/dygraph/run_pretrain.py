@@ -277,9 +277,8 @@ def do_train(args):
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
-        model, optimizer = wrap_sharding_2_3(accumulate_steps, model, optimizer,
-                                             args.sharding_offload,
-                                             args.use_recompute)
+        model, optimizer = wrap_sharding_2_3(
+            model, optimizer, args.sharding_offload, args.use_recompute)
 
     elif paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -453,8 +452,11 @@ def do_train(args):
                         if mp_rank == 0 and sharding_rank == 0:
                             tokenizer.save_pretrained(output_dir)
                         model_to_save.save_pretrained(output_dir)
+                        optimizer_state_dict = optimizer._optim.state_dict(
+                        ) if args.sharding_stage == 2 else optimizer.state_dict(
+                        )
                         paddle.save(
-                            optimizer.state_dict(),
+                            optimizer_state_dict,
                             os.path.join(
                                 output_dir,
                                 "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
@@ -473,10 +475,8 @@ def do_train(args):
             del train_data_loader
 
 
-def wrap_sharding_2_3(accumulate_steps, model, optimizer, sharding_offload,
-                      use_recompute):
-    group = fleet.get_hybrid_communicate_group().get_check_parallel_group()
-    accumulate_grads = True if accumulate_steps > 1 else False
+def wrap_sharding_2_3(model, optimizer, sharding_offload, use_recompute):
+    group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
 
     if args.sharding_stage == 2:
         optimizer = ShardingOptimizerStage2(
@@ -484,15 +484,13 @@ def wrap_sharding_2_3(accumulate_steps, model, optimizer, sharding_offload,
             optim=optimizer,
             group=group,
             offload=sharding_offload)
-        model = ShardingStage2(
-            model, optimizer, group=group, accumulate_grads=accumulate_grads)
+        model = ShardingStage2(model, optimizer, group=group)
 
     elif args.sharding_stage == 3:
         model = ShardingStage3(
             model,
             optimizer,
             group=group,
-            accumulate_grads=accumulate_grads,
             sync_comm=use_recompute,
             offload=sharding_offload)
     return model, optimizer
