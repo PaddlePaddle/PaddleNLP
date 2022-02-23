@@ -109,7 +109,7 @@ class MegatronBertPretrainedModel(PretrainedModel):
             "num_attention_heads": 16,
             "num_hidden_layers": 24,
             "type_vocab_size": 2,
-            "vocab_size": 29056,
+            "vocab_size": 30592,
             "pad_token_id": 0
         }
     }
