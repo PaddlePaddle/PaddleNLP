@@ -115,7 +115,7 @@ CUDA_VISIBLE_DEVICES=2 python feature_extract.py \
 
 运行结束后会生成 corpus_embedding.npy
 
-生成了向量后，需要把数据抽炒入到 Milvus 库中，首先修改配置：
+生成了向量后，需要把数据插入到 Milvus 库中，首先修改配置：
 
 修改 config.py 的配置 ip 和端口，本项目使用的是8530端口，而 Milvus 默认的是19530，需要根据情况进行修改：
 

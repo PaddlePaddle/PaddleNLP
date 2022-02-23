@@ -25,7 +25,7 @@ op:
       #ir_optim
       ir_optim: True
       # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
-      device_type: 2
+      device_type: 1
       # 计算硬件ID，当devices为""或不写时为CPU预测；当devices为"0", "0,1,2"时为GPU预测，表示使用的GPU卡
       devices: '2'
       # Fetch结果列表，以client_config中fetch_var的alias_name为准, 如果没有设置则全部返回
