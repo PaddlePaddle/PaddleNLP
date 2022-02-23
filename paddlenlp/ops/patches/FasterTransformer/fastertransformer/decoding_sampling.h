@@ -100,7 +100,8 @@ public:
                    const float repeat_penalty = 1.0,
                    const bool prefix_lm = false,
                    const bool is_mbart = false,
-                   const int min_length = 0)
+                   const int min_length = 0,
+                   const int inner_coeff = 4)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -158,7 +159,8 @@ public:
                                         memory_hidden_units,
                                         is_fuse_qkv,
                                         normalization_before,
-                                        args_.act_);
+                                        args_.act_,
+                                        inner_coeff);
     decoder_->set_max_batch_size(batch_size);
 
     size_t from_tensor_size =

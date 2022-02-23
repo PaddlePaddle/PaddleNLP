@@ -97,6 +97,7 @@ private:
   int hidden_units_;
   int memory_hidden_units_;
   int normalization_before_;
+  int inner_coeff_ = 4;
   ActivationType act_;
 
   DataType_ *norm_from_tensor_buf_, *query_buf_;
@@ -141,14 +142,16 @@ public:
               int memory_hidden_units,
               bool is_fuse_QKV_in_normal_gemm = false,
               bool normalization_before = true,
-              ActivationType act = ActivationType::GELU)
+              ActivationType act = ActivationType::GELU,
+              const int inner_coeff = 4)
       // Activation function default to GELU for GPT.
       : head_num_(head_num),
         size_per_head_(size_per_head),
         memory_hidden_units_(memory_hidden_units),
         is_fuse_QKV_in_normal_gemm_(is_fuse_QKV_in_normal_gemm),
         normalization_before_(normalization_before),
-        act_(act) {
+        act_(act),
+        inner_coeff_(inner_coeff) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -195,7 +198,7 @@ public:
 
   int getWorkspaceSize() {
     assert(max_batch_size_ != -1);
-    return 13 * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
+    return (9 + inner_coeff_) * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
   }
 
   void set_tensor_parallel_param(const TensorParallelParam param) {
@@ -240,9 +243,9 @@ public:
     norm_cross_output_buf_ =
         cross_output_buf_ + buf_size;  // norm(multi-head attention_output)
     ffn_inner_buf_ =
-        norm_cross_output_buf_ + buf_size;  // 4 buf size to store inner product
+        norm_cross_output_buf_ + buf_size;  // inner_coeff_(4) buf size to store inner product
 
-    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + 4 * buf_size);
+    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + inner_coeff_ * buf_size);
     qkv_input_ = qkv_kernel_ + 3;
     qkv_buf_ = qkv_input_ + 3;
 
@@ -370,7 +373,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -404,7 +407,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -492,7 +495,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 
@@ -525,7 +528,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -673,7 +676,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -706,7 +709,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -802,7 +805,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 
@@ -836,7 +839,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -891,7 +894,7 @@ public:
         qk_buf_size +
         2 * m * t_parallel_param_.local_hidden_units_ /* trans_attn, attn */;
     return (m * hidden_units_ * 3 + attn_work_space_size +
-            m * t_parallel_param_.local_hidden_units_ * 4 /* ffn buffer */) *
+            m * t_parallel_param_.local_hidden_units_ * inner_coeff_ /* ffn buffer */) *
            sizeof(DataType_);
   }
 
@@ -989,7 +992,7 @@ public:
             ffn_inner_buf,
             decoder_output,
             m,
-            4 * t_parallel_param_.local_hidden_units_,
+            inner_coeff_ * t_parallel_param_.local_hidden_units_,
             hidden_units_,
             act_);
         POP_RANGE
@@ -1050,7 +1053,7 @@ public:
             ffn_inner_buf,
             ffn_out_buf,
             m,
-            4 * t_parallel_param_.local_hidden_units_,
+            inner_coeff_ * t_parallel_param_.local_hidden_units_,
             hidden_units_,
             act_);
         POP_RANGE

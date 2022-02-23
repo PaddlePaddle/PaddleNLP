@@ -108,7 +108,8 @@ public:
                      const int finished_candidate_num = -1,
                      const bool early_stopping = false,
                      const bool is_mbart = false,
-                     const int min_length = 0)
+                     const int min_length = 0,
+                     const int inner_coeff = 4)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -161,7 +162,8 @@ public:
                                         memory_hidden_units,
                                         is_fuse_qkv,
                                         normalization_before,
-                                        args_.act_);
+                                        args_.act_,
+                                        inner_coeff);
     decoder_->set_max_batch_size(batch_size * beam_width);
 
     size_t from_tensor_size =

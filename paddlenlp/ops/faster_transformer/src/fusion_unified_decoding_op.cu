@@ -99,6 +99,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const std::string& hidden_act,
     const bool early_stopping,
     const int min_length,
+    const int inner_coeff,
     cublasHandle_t cublas_handle_,
     cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
@@ -325,7 +326,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             -1,  /*finished_candidate_num*/
             false,  /*early_stopping*/
             false,  /*is_mbart*/
-            min_length);
+            min_length,
+            inner_coeff);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
@@ -361,7 +363,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             finished_candidate_num_,
             early_stopping,
             false,  /*is_mbart*/
-            min_length);
+            min_length,
+            inner_coeff);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
@@ -394,7 +397,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         1.0,  /*repeat_penalty*/
         true, /*prefix_lm*/
         false,  /*is_mbart*/
-        min_length);
+        min_length,
+        inner_coeff);
     unified_decoding_sampling_->forward_context(params, decoding_params);
     unified_decoding_sampling_->forward(params, decoding_params);
 
@@ -472,7 +476,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const bool pos_bias,
     const std::string& hidden_act,
     const bool early_stopping,
-    const int min_length) {
+    const int min_length,
+    const int inner_coeff) {
   auto stream = input_ids.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -547,6 +552,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
+          inner_coeff,
           cublas_handle_,
           cublaslt_handle_,
           stream);
@@ -616,6 +622,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
+          inner_coeff,
           cublas_handle_,
           cublaslt_handle_,
           stream);
