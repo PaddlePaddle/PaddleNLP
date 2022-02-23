@@ -286,7 +286,12 @@ class MBartEncoder(MBartPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            attention_mask.stop_gradient = True
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output

@@ -16,9 +16,11 @@ import collections
 import os
 import csv
 from contextlib import ExitStack
+import shutil
 
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url, _decompress
+from paddle.utils.download import get_path_from_url, _decompress, _get_unique_endpoints
+from paddle.distributed import ParallelEnv
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.utils.log import logger
 from . import DatasetBuilder
@@ -64,12 +66,17 @@ class XNLI(DatasetBuilder):
         if mode == 'train':
             if not os.path.exists(fullname):
                 get_path_from_url(url, default_root, zipfile_hash)
-            file_num = len(os.listdir(fullname))
-            if file_num != 15:
-                logger.warning(
-                    "Number of train files is %d != %d, decompress again." %
-                    (file_num, 15))
-                _decompress(os.path.join(default_root, os.path.basename(url)))
+            unique_endpoints = _get_unique_endpoints(ParallelEnv()
+                                                     .trainer_endpoints[:])
+            if ParallelEnv().current_endpoint in unique_endpoints:
+                file_num = len(os.listdir(fullname))
+                if file_num != len(ALL_LANGUAGES):
+                    logger.warning(
+                        "Number of train files is %d != %d, decompress again." %
+                        (file_num, len(ALL_LANGUAGES)))
+                    shutil.rmtree(fullname)
+                    _decompress(
+                        os.path.join(default_root, os.path.basename(url)))
         else:
             if not os.path.exists(fullname) or (
                     data_hash and not md5file(fullname) == data_hash):
@@ -79,7 +86,7 @@ class XNLI(DatasetBuilder):
 
     def _read(self, filename, split):
         """Reads data."""
-        language = self.config.get("language", "all_languages")
+        language = self.name
         if language == "all_languages":
             languages = ALL_LANGUAGES
         else:
