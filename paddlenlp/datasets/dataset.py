@@ -24,6 +24,7 @@ from collections import namedtuple
 from multiprocess import Pool, RLock
 import time
 import json
+import random
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -61,11 +62,12 @@ class DatasetTuple:
         return len(self.tuple)
 
 
-def generate_new_fingerprint(fingerprint, transform, **kwargs):
+def generate_new_fingerprint(fingerprint, transform=None, **kwargs):
     hasher = Hasher()
     if fingerprint is not None:
         hasher.update(fingerprint)
-    hasher.update(transform)
+    if transform is not None:
+        hasher.update(transform)
     for k, v in kwargs.items():
         if v is not None:
             hasher.update(k)
@@ -107,6 +109,7 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     from datasets import DatasetDict
     from datasets.features import ClassLabel
     try:
+        # TODO: cache for hf datasets
         hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
     except FileNotFoundError:
         raise FileNotFoundError("Couldn't find the dataset script for '" + path
@@ -419,24 +422,28 @@ class MapDataset(Dataset):
              load_from_cache=True,
              cache_file_name=None,
              new_fingerprint=None):
-        transform = sys._getframe().f_code.co_name
-        if new_fingerprint is None:
-            new_fingerprint = generate_new_fingerprint(
-                self.fingerprint, transform, fn=fn, lazy=lazy, batched=batched)
-        self.fingerprint = new_fingerprint
+        if not lazy:
+            transform = sys._getframe().f_code.co_name
+            if new_fingerprint is None:
+                new_fingerprint = generate_new_fingerprint(
+                    self.fingerprint,
+                    transform,
+                    fn=fn,
+                    lazy=lazy,
+                    batched=batched)
+            self.fingerprint = new_fingerprint
 
-        # load cache here
-        if self.cache_dir:
-            if cache_file_name is None:
-                cache_file_name = self._get_cache_file_path(transform,
-                                                            new_fingerprint)
-            if os.path.exists(cache_file_name) and load_from_cache:
-                print(f"Loading cached processed dataset at {cache_file_name}")
-                info = self.info.copy()
-                # TODO: also init IterDataset
-                self.new_data = MapDataset.load_from_json(
-                    cache_file_name).new_data
-                return self
+            # load cache here
+            if self.cache_dir:
+                if cache_file_name is None:
+                    cache_file_name = self._get_cache_file_path(transform,
+                                                                new_fingerprint)
+                if os.path.exists(cache_file_name) and load_from_cache:
+                    print(
+                        f"Loading cached processed dataset at {cache_file_name}")
+                    self.new_data = type(self).load_from_json(
+                        cache_file_name).new_data
+                    return self
 
         if batched:
             self.new_data = fn(self.new_data)
@@ -447,9 +454,10 @@ class MapDataset(Dataset):
             self.new_data = [
                 fn(self.new_data[idx]) for idx in range(len(self.new_data))
             ]
-        # save cache here
-        print(f"Saving cached processed dataset at {cache_file_name}")
-        save_json(cache_file_name, self.new_data)
+        if not lazy:
+            # save cache here
+            print(f"Saving cached processed dataset at {cache_file_name}")
+            save_json(cache_file_name, self.new_data)
         return self
 
 
@@ -472,9 +480,15 @@ class IterDataset(IterableDataset):
         self.data = data
         self._transform_pipline = []
         self._filter_pipline = []
+        self.info = kwargs
 
-        self.label_list = kwargs.get('label_list', None)
-        self.vocab_info = kwargs.get('vocab_info', None)
+        self.buffer_size = self.info.get('buffer_size', 1000)
+        self.label_list = self.info.get('label_list', None)
+        self.vocab_info = self.info.get('vocab_info', None)
+        self.cache_dir = self.info.get('cache_dir', None)
+        self.raw_cache_dir = self.info.get('raw_cache_dir', None)
+
+        self.fingerprint = self.info.get('fingerprint', None)
 
     def _transform(self, data):
         for fn in self._transform_pipline:
@@ -483,6 +497,29 @@ class IterDataset(IterableDataset):
 
     def _shard_filter(self, num_samples):
         return True
+
+    @classmethod
+    def load_from_json(cls, cache_file_names, cache_dir=None, **kwargs):
+        filenames = os.listdir(cache_file_names)
+        if cache_dir is None:
+            cache_dir = os.path.dirname(cache_file_names)
+        filenames = sorted(
+            map(lambda x: (int(x.split('-')[-1].rstrip('.json')), x),
+                filenames),
+            key=lambda x: x[0])
+        filenames = list(
+            map(lambda x: os.path.join(cache_file_names, x[1]), filenames))
+        return cls(filenames, cache_dir=cache_dir, **kwargs)
+
+    '''
+    def shuffle(self, buffer_size=None):
+        if isinstance(self.data, list):
+            random.shuffle(self.data)
+
+        self.shuffle_in_buffer = True
+        if buffer_size is not None:
+            self.buffer_size = buffer_size
+    '''
 
     def _filter(self, data):
         for fn in self._filter_pipline:
@@ -495,26 +532,95 @@ class IterDataset(IterableDataset):
         yields sample sequentially.
         """
         num_samples = 0
-        if inspect.isfunction(self.data):
-            for example in self.data():
-                if (not self._filter_pipline or
-                        self._filter(self._filter_pipline)
-                    ) and self._shard_filter(num_samples=num_samples):
-                    yield self._transform(
-                        example) if self._transform_pipline else example
-                num_samples += 1
-        else:
-            if inspect.isgenerator(self.data):
-                warnings.warn(
-                    'Reciving generator as data source, data can only be iterated once'
-                )
-            for example in self.data:
-                if (not self._filter_pipline or
-                        self._filter(self._filter_pipline)
-                    ) and self._shard_filter(num_samples=num_samples):
-                    yield self._transform(
-                        example) if self._transform_pipline else example
-                num_samples += 1
+        cache_raw = cache_processed = False
+
+        def read_shards(filenames):
+            for filename in filenames:
+                print(filename)
+                with open(filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for d in data:
+                        yield d
+
+        if isinstance(self.data, list):
+            data_source = read_shards(self.data)
+        elif inspect.isfunction(self.data):
+            data_source = self.data()
+        elif inspect.isgenerator(self.data):
+            warnings.warn(
+                'Reciving generator as data source, data can only be iterated once'
+            )
+            data_source = self.data
+
+        # Does it need to be cached
+        if self._transform_pipline:
+            buf_for_cache = []
+            cache_file_name = self._get_cache_file_path(self.fingerprint)
+            if not os.path.exists(cache_file_name):
+                cache_processed = True
+        if not isinstance(self.data,
+                          list) and not os.path.exists(self.raw_cache_dir):
+            buf_for_cache_raw = []
+            cache_raw = True
+
+        new_data = []
+
+        for example in data_source:
+            if (not self._filter_pipline or
+                    self._filter(self._filter_pipline)) and self._shard_filter(
+                        num_samples=num_samples):
+
+                # cache raw data here
+                if cache_raw:
+                    buf_for_cache_raw.append(example)
+                    if len(buf_for_cache_raw) == self.buffer_size:
+                        print("Caching raw data", num_samples + 1, 'to',
+                              self.raw_cache_dir)
+                        shard_name = os.path.join(
+                            self.raw_cache_dir,
+                            'cache-shard-' + str(num_samples + 1) + '.json')
+                        save_json(shard_name, buf_for_cache_raw)
+                        if not cache_processed:
+                            new_data.append(shard_name)
+                        buf_for_cache_raw = []
+
+                transformed_example = self._transform(
+                    example) if self._transform_pipline else example
+
+                # cache processed data here
+                if cache_processed:
+                    buf_for_cache.append(transformed_example)
+                    if len(buf_for_cache) == self.buffer_size:
+                        print("Caching processed data", num_samples + 1, 'to',
+                              cache_file_name)
+                        shard_name = os.path.join(
+                            cache_file_name,
+                            'cache-shard-' + str(num_samples + 1) + '.json')
+                        save_json(shard_name, buf_for_cache)
+                        new_data.append(shard_name)
+                        buf_for_cache = []
+                yield transformed_example
+            num_samples += 1
+
+        # finalize
+        if cache_raw and buf_for_cache_raw:
+            print("Caching raw data", num_samples, 'to', self.raw_cache_dir)
+            shard_name = os.path.join(
+                self.raw_cache_dir, 'cache-shard-' + str(num_samples) + '.json')
+            save_json(shard_name, buf_for_cache_raw)
+            new_data.append(shard_name)
+            if not cache_processed:
+                self.data = new_data
+            del buf_for_cache_raw
+        if cache_processed and buf_for_cache:
+            print("Caching processed data", num_samples, 'to', cache_file_name)
+            shard_name = os.path.join(
+                cache_file_name, 'cache-shard-' + str(num_samples) + '.json')
+            save_json(shard_name, buf_for_cache)
+            new_data.append(shard_name)
+            self.data = new_data
+            self._transform_pipline = []
+            del buf_for_cache
 
     def filter(self, fn):
         """
@@ -557,7 +663,16 @@ class IterDataset(IterableDataset):
         self._shard_filter = fn
         return self
 
-    def map(self, fn):
+    def _get_cache_file_path(self, new_fingerprint):
+        cache_file_path = os.path.join(self.cache_dir,
+                                       'cache-' + new_fingerprint)
+        return cache_file_path
+
+    def map(self,
+            fn,
+            new_fingerprint=None,
+            load_from_cache=True,
+            cache_file_name=None):
         """
         Performs specific function on the dataset to transform and update every sample.
 
@@ -565,8 +680,20 @@ class IterDataset(IterableDataset):
             fn (callable): Transformations to be performed. It receives single
                 sample as argument.
         """
+        if new_fingerprint is None:
+            new_fingerprint = generate_new_fingerprint(self.fingerprint, fn=fn)
+            self.fingerprint = new_fingerprint
 
-        self._transform_pipline.append(fn)
+        # load cache here
+        if self.cache_dir:
+            if cache_file_name is None:
+                cache_file_name = self._get_cache_file_path(new_fingerprint)
+            if os.path.exists(cache_file_name) and load_from_cache:
+                print(f"Loading cached processed dataset at {cache_file_name}")
+                self.data = type(self).load_from_json(cache_file_name).data
+                return self
+
+            self._transform_pipline.append(fn)
 
         return self
 
@@ -627,14 +754,36 @@ class DatasetBuilder:
                 while splits:
                     split = splits.pop()
                     # TODO: also init IterDataset
-                    cache_split_path = os.path.join(self.cache_dir, '-'.join(
-                        ['cache', self.__class__.__name__, split]) + '.json')
-                    if os.path.exists(cache_split_path):
-                        print('Reusing split', split, 'from', cache_split_path)
-                        datasets[split] = MapDataset.load_from_json(
-                            cache_split_path, cache_dir=self.cache_dir)
+                    if self.lazy:
+                        cache_split_path = os.path.join(
+                            self.cache_dir, '-'.join(
+                                ['cache', self.__class__.__name__, split]))
+                        if os.path.exists(cache_split_path):
+                            print('Reusing split', split, 'from',
+                                  cache_split_path)
+                            datasets[split] = IterDataset.load_from_json(
+                                cache_split_path,
+                                cache_dir=self.cache_dir,
+                                raw_cache_dir=cache_split_path,
+                                label_list=self.get_labels(),
+                                vocab_info=self.get_vocab())
+                        else:
+                            no_cache_splits.append(split)
                     else:
-                        no_cache_splits.append(split)
+                        cache_split_path = os.path.join(
+                            self.cache_dir,
+                            '-'.join(['cache', self.__class__.__name__, split])
+                            + '.json')
+                        if os.path.exists(cache_split_path):
+                            print('Reusing split', split, 'from',
+                                  cache_split_path)
+                            datasets[split] = MapDataset.load_from_json(
+                                cache_split_path,
+                                cache_dir=self.cache_dir,
+                                label_list=self.get_labels(),
+                                vocab_info=self.get_vocab())
+                        else:
+                            no_cache_splits.append(split)
                 splits = no_cache_splits
 
             parallel_env = dist.ParallelEnv()
@@ -653,6 +802,7 @@ class DatasetBuilder:
             # not receive proper singal send by the parent proc to exit.
             atexit.register(lambda: remove_if_exit(lock_files))
             for split in splits:
+                start = time.time()
                 filename = self._get_data(split)
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
                 if self.name is not None:
@@ -668,13 +818,14 @@ class DatasetBuilder:
                 else:
                     while not os.path.exists(lock_file):
                         time.sleep(1)
+                print('Download time for', split, 'is', time.time() - start)
                 datasets[split] = self.read(filename=filename, split=split)
-
-                # save cache here
-                cache_split_path = os.path.join(self.cache_dir, '-'.join(
-                    ['cache', self.__class__.__name__, split]) + '.json')
-                print('Saving split', split, 'to', cache_split_path)
-                save_json(cache_split_path, datasets[split].data)
+                if not self.lazy:
+                    # save cache here
+                    cache_split_path = os.path.join(self.cache_dir, '-'.join(
+                        ['cache', self.__class__.__name__, split]) + '.json')
+                    print('Saving split', split, 'to', cache_split_path)
+                    save_json(cache_split_path, datasets[split].data)
         else:
             assert isinstance(data_files, str) or isinstance(
                 data_files, tuple) or isinstance(
@@ -796,9 +947,12 @@ class DatasetBuilder:
                         yield example
 
             return IterDataset(
-                generate_examples(),
+                generate_examples,
                 label_list=label_list,
                 vocab_info=vocab_info,
+                cache_dir=self.cache_dir,
+                raw_cache_dir=os.path.join(self.cache_dir, '-'.join(
+                    ['cache', self.__class__.__name__, split])),
                 fingerprint=fingerprint)
         else:
             examples = self._read(
