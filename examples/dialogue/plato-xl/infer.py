@@ -76,22 +76,22 @@ def infer(args):
             paddle.device.cuda.synchronize()
             start = time.time()
 
-    outputs, _ = model.generate(
-        input_ids=data['input_ids'],
-        token_type_ids=data['type_ids'],
-        position_ids=data['pos_ids'],
-        decoder_position_ids=data['decoder_position_ids'],
-        attention_mask=data['attention_mask'],
-        decoder_type_ids=data['decoder_type_ids'],
-        role_ids=data['role_ids'],
-        decoder_role_ids=data['decoder_role_ids'],
-        seq_len=data['seq_len'],
-        max_length=64,
-        min_length=1,
-        decode_strategy='sampling',
-        top_k=5,
-        use_fp16_decoding=True,
-        use_faster=True)
+        outputs, _ = model.generate(
+            input_ids=data['input_ids'],
+            token_type_ids=data['type_ids'],
+            position_ids=data['pos_ids'],
+            decoder_position_ids=data['decoder_position_ids'],
+            attention_mask=data['attention_mask'],
+            decoder_type_ids=data['decoder_type_ids'],
+            role_ids=data['role_ids'],
+            decoder_role_ids=data['decoder_role_ids'],
+            seq_len=data['seq_len'],
+            max_length=64,
+            min_length=1,
+            decode_strategy='sampling',
+            top_k=5,
+            use_fp16_decoding=True,
+            use_faster=True)
 
     paddle.device.cuda.synchronize()
     print("Average time for FasterGeneration is {}ms. ".format((time.time(
