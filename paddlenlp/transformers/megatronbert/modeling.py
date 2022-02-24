@@ -16,9 +16,10 @@ import math
 
 import paddle
 from paddle import nn
-from .. import PretrainedModel, register_base_model
 import paddle.nn.functional as F
+
 from ...ops import einsum
+from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'MegatronBertModel', 'MegatronBertPretrainedModel',

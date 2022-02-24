@@ -67,9 +67,11 @@ class MegatronBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "megatronbert-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/"
+            "megatron-bert/megatronbert-cased/vocab.txt",
             "megatronbert-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt"
+            "http://bj.bcebos.com/paddlenlp/models/transformers/"
+            "megatron-bert/megatronbert-uncased/vocab.txt",
         }
     }
     pretrained_init_configuration = {

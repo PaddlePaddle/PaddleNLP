@@ -20,13 +20,10 @@ import json
 import math
 
 from functools import partial
+
 import numpy as np
-import paddle
 
-from paddle.io import DataLoader
 from args import parse_args
-
-import paddlenlp as ppnlp
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import MegatronBertTokenizer
@@ -34,6 +31,9 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import MegatronBertForQuestionAnswering
+
+import paddle
+from paddle.io import DataLoader
 
 MODEL_CLASSES = {
     "megatronbert": (MegatronBertForQuestionAnswering, MegatronBertTokenizer)
