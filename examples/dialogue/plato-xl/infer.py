@@ -26,10 +26,7 @@ def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group("Model")
-    group.add_argument("--init_from_ckpt", type=str, default="")
     group.add_argument("--vocab_size", type=int, default=8001)
-    group.add_argument("--latent_type_size", type=int, default=20)
-    group.add_argument("--num_layers", type=int, default=24)
 
     group = parser.add_argument_group("Task")
     group.add_argument("--is_cn", type=str2bool, default=False)
@@ -38,7 +35,6 @@ def setup_args():
     DialogReader.add_cmdline_args(parser)
 
     args = parse_args(parser)
-    args.batch_size *= args.latent_type_size
 
     return args
 
