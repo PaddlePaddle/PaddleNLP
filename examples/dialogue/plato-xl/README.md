@@ -25,6 +25,7 @@ pip install sentencepiece termcolor
 
 您可以从以下位置下载预训练模型文件：
 
+# todo: modify this url.
 * PLATO-XL, 72-layers, 32-heads, 3072-hidden, EN: [预训练模型](https://dialogue.bj.bcebos.com/Knover/projects/PLATO-XL/11B.tar)
 
 ```shell
