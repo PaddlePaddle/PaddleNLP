@@ -22,14 +22,11 @@ pip install sentencepiece
 
 ### 数据准备
 
-您可以从以下位置下载预训练模型文件：
+您可以从以下位置找到预训练模型文件：
 
-# todo: modify this url.
-* PLATO-XL, 72-layers, 32-heads, 3072-hidden, EN: [预训练模型](https://dialogue.bj.bcebos.com/Knover/projects/PLATO-XL/11B.tar)
+* PLATO-XL, 72-layers, 32-heads, 3072-hidden, EN: [预训练模型](https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl.pdparams)
 
-```shell
-wget https://dialogue.bj.bcebos.com/Knover/projects/PLATO-XL/11B.tar
-```
+若使用 `infer.py` 脚本进行测试，则无需单独下载上面的模型，脚本将自行下载。
 
 **NOTE:** PLATO-XL 网络参数量较大，即使是在使用 float16 的情况下，72 层网络至少需要显存约 24G，并且需要保证当前使用的 GPU 支持 float16 的计算。
 支持 float16 的 GPU 信息可以在 NVIDIA [官网](https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html#hardware-precision-matrix)上查询；

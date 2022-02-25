@@ -618,11 +618,13 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             if len(response_ids) > max_response_len - 1:
                 response_ids = response_ids[:max_response_len - 1]
             response_ids += [self.sep_token_id]
+
             if return_role_ids:
                 response_role_ids = [role_id] * len(response_ids)
 
         elif add_start_token_as_response:
             response_ids = [self.cls_token_id]
+
             if return_role_ids:
                 response_role_ids = [0]
 
@@ -648,6 +650,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         history_ids = []
         for i in range(len(history) - 1, -1, -1):
             role_id = None
+
             if return_role_ids and "\1" in history[i]:
                 history[i], role_id = history[i].split("\1")
                 role_id = int(role_id)
@@ -658,6 +661,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     tokens = tokens[1 - max_history_len:]
                     history_ids = (self.convert_tokens_to_ids(tokens) +
                                    [self.sep_token_id])
+
                     if role_id is not None:
                         history_role_ids = [role_id] * len(history_ids)
                     elif return_role_ids:
@@ -681,13 +685,17 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 ] * tokens_length[i]
 
         history_ids = knowledge_ids + history_ids
+
         if return_role_ids:
             history_role_ids = knowledge_role_ids + history_role_ids
+
         # Build output dictionnary
         encoded_inputs = {}
         encoded_inputs["input_ids"] = history_ids + response_ids
+
         if return_role_ids:
             encoded_inputs["role_ids"] = history_role_ids + response_role_ids
+
         # Check lengths
         sequence_length = len(encoded_inputs["input_ids"])
         assert sequence_length <= max_seq_len
