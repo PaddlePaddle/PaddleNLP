@@ -487,6 +487,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 position_ids. Defaults to True.
             return_token_type_ids (bool, optional): Whether to return the 
                 token_type_ids. Defaults to True.
+            return_role_ids (bool, optional): Whether to return the role_ids.
+                Defaults to False.
             return_attention_mask (bool, optional): Whether to return the 
                 attention_mask. Defaults to True.
             return_length (bool, optional): Whether to return the length of the
@@ -500,9 +502,12 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 returned sequences will be padded on the left. Defaults to False.
             return_tensors (bool, optional): Whether to convert the returned 
                 sequences to Tensor. Defaults to False.
-            is_split_into_words(bool, optinal): Whether or not the input text 
+            is_split_into_words (bool, optional): Whether or not the input text 
                 (`history`, `response` and `knowledge`) has been pretokenized. 
                 Defaults to True.
+            position_style (str, optional): Specify the involved positional style
+                which must one of [relative, continuous]. Defaults to continuous
+                which means start from 0 to maximum length of history.
 
         Returns: 
             dict: A dictionary containing the encoded sequence and other 
