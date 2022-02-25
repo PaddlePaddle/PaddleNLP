@@ -54,7 +54,7 @@ class MegatronBertTokenizer(BertTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import MegatronBertTokenizer
-                tokenizer = BertTokenizer.from_pretrained('MegatronBert-uncased')
+                tokenizer = MegatronBertTokenizer.from_pretrained('MegatronBert-uncased')
                 inputs = tokenizer('He was a puppeteer')
                 print(inputs)
 
