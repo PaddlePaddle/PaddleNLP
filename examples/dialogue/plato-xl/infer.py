@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import argparse
+from pprint import pprint
+
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 
 
@@ -107,8 +110,8 @@ def infer(args):
             use_faster=True)
 
     paddle.device.cuda.synchronize()
-    print("Average time for FasterGeneration is {}ms. ".format((time.time(
-    ) - start) / 100 * 1000))
+    print("Average time of FasterGeneration of PLATO-XL model is {}ms. ".format(
+        (time.time() - start) / 100 * 1000))
 
     # TODO: verify post process.
     result = postprocess_response(outputs[0].numpy(), tokenizer)
@@ -120,4 +123,6 @@ def infer(args):
 
 if __name__ == "__main__":
     args = setup_args()
+    pprint(args)
+
     infer(args)

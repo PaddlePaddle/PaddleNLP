@@ -6,7 +6,7 @@
 
 为了能够简易地构建一个高质量的开放域聊天机器人，本项目在 Paddle 上实现了 PLATO-XL 的预测模型，并实现了高性能的预测加速，而整套 float16 的方案可以确保在 32G V100 单卡上就能 load 并执行 11B 的 PLATO-XL 模型，无需再涉及 float32 相关计算。用户可以通过下载预训练模型快速构建一个开放域聊天机器人。
 
-PLATO-XL的训练过程及其他细节详见 [Knover](https://github.com/PaddlePaddle/Knover)
+PLATO-XL 的训练过程及其他细节详见 [Knover](https://github.com/PaddlePaddle/Knover)
 
 ## 快速开始
 
@@ -14,11 +14,10 @@ PLATO-XL的训练过程及其他细节详见 [Knover](https://github.com/PaddleP
 
 - python 3.7+
 - sentencepiece
-- termcolor  
 
 安装方式：
 ``` python
-pip install sentencepiece termcolor
+pip install sentencepiece
 ```
 
 ### 数据准备
@@ -36,25 +35,20 @@ wget https://dialogue.bj.bcebos.com/Knover/projects/PLATO-XL/11B.tar
 支持 float16 的 GPU 信息可以在 NVIDIA [官网](https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html#hardware-precision-matrix)上查询；
 您当前使用的 GPU 的 compute capability 同样可以在 NVIDIA [官网](https://developer.nvidia.com/zh-cn/cuda-gpus#compute)上找到，与上面链接中是否可使用 GPU 相对应。
 
-sentencepiece分词预训练模型和词表文件下载：
-
-```shell
-wget https://bj.bcebos.com/paddlenlp/models/transformers/plato2/data.tar.gz
-tar -zxf data.tar.gz
-```
-
 ### 高性能生成
 
 运行如下命令即可开始与聊天机器人用英语进行简单的对话
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python infer.py --vocab_path ./data/vocab.txt --spm_model_file ./data/spm.model --use_role --position_style relative
+python infer.py --use_role --position_style relative --max_out_len 64 --min_out_len 1 --topk 4
 ```
 
-以上参数表示：
+该脚本各个参数含义如下：
 
-* `--vocab_path`: 词表文件路径。
-* `--spm_model_file`: sentencepiece 分词预训练模型路径。
 * `--use_role`: 是否使用 role embedding。
 * `--position_style`: 位置编码方式，这里可以选择是 "relative" 或是 "continuous"。
+* `--max_out_len`: 最长的输出的长度。
+* `--min_out_len`: 最短的输出长度。
+* `--topk`: 用于 top_k sampling 的 k 值的设定。
+* `--topk`: 用于 top_p sampling 的 p 值的设定。
