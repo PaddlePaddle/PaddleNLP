@@ -83,6 +83,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini-vocab.txt",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl-vocab.txt",
         },
         "sentencepiece_model_file": {
             "unified_transformer-12L-cn":
@@ -91,6 +93,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini-spm.model",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl-spm.model",
         },
     }
     pretrained_init_configuration = {
@@ -101,6 +105,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
         "plato-mini": {
+            "do_lower_case": False
+        },
+        "plato-xl": {
             "do_lower_case": False
         },
     }
@@ -438,12 +445,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         max_knowledge_len=128,
                         return_position_ids=True,
                         return_token_type_ids=True,
+                        return_role_ids=False,
                         return_attention_mask=True,
                         return_length=False,
                         add_start_token_as_response=False,
                         pad_to_max_seq_len=False,
                         return_tensors=False,
-                        is_split_into_words=True):
+                        is_split_into_words=True,
+                        position_style="continuous"):
         """
         Main method to encode the single-turn or multi-turn dialogue conversation. 
         It will return a dictionary containing the encoded sequence and other 
@@ -583,16 +592,31 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 knowledge_ids = knowledge_ids[:max_knowledge_len - 1]
             knowledge_ids += [self.sep_token_id]
 
+        if return_role_ids:
+            response_role_ids = []
+
         response_ids = []
         if response is not None:
+            if return_role_ids:
+                if "\1" in response:
+                    response, role_id = response.split("\1")
+                    role_id = int(role_id)
+                else:
+                    role_id = 0
+
             tokens = self._tokenize(response, is_split_into_words)
             response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
                 tokens)
             if len(response_ids) > max_response_len - 1:
                 response_ids = response_ids[:max_response_len - 1]
             response_ids += [self.sep_token_id]
+            if return_role_ids:
+                response_role_ids = [role_id] * len(response_ids)
+
         elif add_start_token_as_response:
             response_ids = [self.cls_token_id]
+            if return_role_ids:
+                response_role_ids = [0]
 
         if task_type is not None:
             special_token = self.TASK_TO_SPECIAL_TOKEN[task_type]
@@ -605,25 +629,57 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         else:
             knowledge_ids = [self.cls_token_id] + knowledge_ids
 
+        if return_role_ids:
+            history_role_ids = []
+            tokens_length = []
+            knowledge_role_ids = [0] * len(knowledge_ids)
+
         max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
         if isinstance(history, str):
             history = [history]
         history_ids = []
         for i in range(len(history) - 1, -1, -1):
+            role_id = None
+            if return_role_ids and "\1" in history[i]:
+                history[i], role_id = history[i].split("\1")
+                role_id = int(role_id)
+
             tokens = self._tokenize(history[i], is_split_into_words)
             if len(history_ids) + len(tokens) + 1 > max_history_len:
                 if i == len(history) - 1:
                     tokens = tokens[1 - max_history_len:]
                     history_ids = (self.convert_tokens_to_ids(tokens) +
                                    [self.sep_token_id])
+                    if role_id is not None:
+                        history_role_ids = [role_id] * len(history_ids)
+                    elif return_role_ids:
+                        tokens_length = [len(history_ids)]
                 break
+
+            if role_id is not None:
+                # 1 stands for [SEP]
+                history_role_ids = [role_id] * (len(tokens) + 1
+                                                ) + history_role_ids
+            elif return_role_ids:
+                tokens_length = [len(tokens) + 1] + tokens_length
+
             history_ids = (self.convert_tokens_to_ids(tokens) +
                            [self.sep_token_id]) + history_ids
 
+        if return_role_ids and len(history_role_ids) == 0:
+            for i in range(len(tokens_length)):
+                history_role_ids = history_role_ids + [
+                    (len(tokens_length) - i) % 2
+                ] * tokens_length[i]
+
         history_ids = knowledge_ids + history_ids
+        if return_role_ids:
+            history_role_ids = knowledge_role_ids + history_role_ids
         # Build output dictionnary
         encoded_inputs = {}
         encoded_inputs["input_ids"] = history_ids + response_ids
+        if return_role_ids:
+            encoded_inputs["role_ids"] = history_role_ids + response_role_ids
         # Check lengths
         sequence_length = len(encoded_inputs["input_ids"])
         assert sequence_length <= max_seq_len
@@ -657,7 +713,17 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             encoded_inputs["seq_len"] = sequence_length
 
         if return_position_ids:
-            encoded_inputs["position_ids"] = list(range(sequence_length))
+            if position_style == "continuous":
+                encoded_inputs["position_ids"] = list(range(sequence_length))
+            elif position_style == "relative":
+                encoded_inputs["position_ids"] = [
+                    max_response_len + (sequence_length - 1) - i - 1
+                    for i in range(sequence_length - 1)
+                ] + [0]
+            else:
+                raise ValueError(
+                    "Expected position_style is one of [continuous, relative], but received {}".
+                    format(position_style))
             if pad_length > 0:
                 encoded_inputs["position_ids"] = [
                     self.pad_token_id

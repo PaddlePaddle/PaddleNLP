@@ -96,6 +96,26 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "plato-xl": {
+            "vocab_size": 8001,
+            "hidden_size": 3072,
+            "num_hidden_layers": 72,
+            "num_attention_heads": 32,
+            "intermediate_size": 18432,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 2,
+            "role_type_size": 128,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 30000,
+        }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -106,6 +126,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
@@ -115,7 +137,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
+            if isinstance(
+                    layer.weight,
+                    paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,

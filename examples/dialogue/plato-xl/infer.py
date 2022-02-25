@@ -13,26 +13,42 @@
 # limitations under the License.
 
 import argparse
-from collections import namedtuple
-
-from utils.args import parse_args, str2bool
-from readers.plato_reader import PlatoReader
-from readers.dialog_reader import DialogReader
-
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel
+from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 
 
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    group = parser.add_argument_group("Model")
-    group.add_argument("--vocab_size", type=int, default=8001)
-
-    group = parser.add_argument_group("Task")
-    group.add_argument("--is_cn", type=str2bool, default=False)
-
-    args, _ = parser.parse_known_args()
-    DialogReader.add_cmdline_args(parser)
+    parser.add_argument(
+        "--use_role",
+        action="store_true",
+        help="Whether to use role embeddings. ")
+    parser.add_argument(
+        "--position_style",
+        default="continuous",
+        choice=["continuous", "relative"],
+        type=str,
+        help="The type for positional embedding. Default is continuous. ")
+    parser.add_argument(
+        "--max_out_len",
+        default=64,
+        type=int,
+        help="Maximum output sequence length. ")
+    parser.add_argument(
+        "--min_out_len",
+        default=1,
+        type=int,
+        help="Minimum output sequence length. ")
+    parser.add_argument(
+        "--topk",
+        default=4,
+        type=int,
+        help="The k value for topk_sampling. Default is 4. ")
+    parser.add_argument(
+        "--topp",
+        default=0.0,
+        type=float,
+        help="The p value for topp_sampling. Default is 0.0f. ")
 
     args = parse_args(parser)
 
@@ -55,9 +71,7 @@ def postprocess_response(token_ids, tokenizer):
 def infer(args):
     model_name = 'plato-xl'
     model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
-    model.eval()
-
-    plato_reader = PlatoReader(args)
+    tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 
     context = [
         "Hi , Becky , what's up ?",
@@ -65,11 +79,12 @@ def infer(args):
         "What's the problem ?"
     ]
 
-    Example = namedtuple("Example", ["src", "data_id"])
-    example = Example(src=" [SEP] ".join(context), data_id=0)
-    record = plato_reader._convert_example_to_record(example)
-
-    data = plato_reader._pad_batch_records([record], dtype="float16")
+    data = tokenizer.dialogue_encode(
+        history=context,
+        add_start_token_as_response=True,
+        return_length=True,
+        return_role_ids=args.use_role,
+        position_style=args.position_style)
 
     for i in range(200):
         if 100 == i:
@@ -78,18 +93,16 @@ def infer(args):
 
         outputs, _ = model.generate(
             input_ids=data['input_ids'],
-            token_type_ids=data['type_ids'],
-            position_ids=data['pos_ids'],
-            decoder_position_ids=data['decoder_position_ids'],
+            token_type_ids=data['token_type_ids'],
+            position_ids=data['position_ids'],
             attention_mask=data['attention_mask'],
-            decoder_type_ids=data['decoder_type_ids'],
             role_ids=data['role_ids'],
-            decoder_role_ids=data['decoder_role_ids'],
             seq_len=data['seq_len'],
-            max_length=64,
-            min_length=1,
+            max_length=args.max_out_len,
+            min_length=args.min_out_len,
             decode_strategy='sampling',
-            top_k=5,
+            top_k=args.topk,
+            top_p=args.topp,
             use_fp16_decoding=True,
             use_faster=True)
 
@@ -97,6 +110,7 @@ def infer(args):
     print("Average time for FasterGeneration is {}ms. ".format((time.time(
     ) - start) / 100 * 1000))
 
+    # TODO: verify post process.
     result = postprocess_response(outputs[0].numpy(), tokenizer)
     result = "".join(result)
 
