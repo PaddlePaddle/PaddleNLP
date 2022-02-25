@@ -51,4 +51,4 @@ python infer.py --use_role --position_style relative --max_out_len 64 --min_out_
 * `--max_out_len`: 最长的输出的长度。
 * `--min_out_len`: 最短的输出长度。
 * `--topk`: 用于 top_k sampling 的 k 值的设定。
-* `--topk`: 用于 top_p sampling 的 p 值的设定。
+* `--topp`: 用于 top_p sampling 的 p 值的设定。
