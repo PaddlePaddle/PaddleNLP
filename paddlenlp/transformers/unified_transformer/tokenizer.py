@@ -506,7 +506,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 (`history`, `response` and `knowledge`) has been pretokenized. 
                 Defaults to True.
             position_style (str, optional): Specify the involved positional style
-                which must one of [relative, continuous]. Defaults to continuous
+                which must be one of [relative, continuous]. Defaults to continuous
                 which means start from 0 to maximum length of history.
 
         Returns: 
@@ -519,6 +519,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 A list of indices of input tokens to be feed to UnifiedTransformer 
                 model. If `return_tensors` is True, it is a Tensor with shape 
                 [1, sequence_length] and data type 'int64'.
+            - role_ids (list[int]|Tensor):
+                A list of indices of role indices. If `return_role_ids` is True,
+                it is a Tensor with shape [1, sequence_length] and data type 'int64'.
             - token_type_ids (list[int]|Tensor, optional):
                 A list of segment token indices to indicate whether the token 
                 belongs to the dialogue response. If `return_tensors` is True, 
@@ -722,9 +725,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 encoded_inputs["position_ids"] = list(range(sequence_length))
             elif position_style == "relative":
                 encoded_inputs["position_ids"] = [
-                    max_response_len + (sequence_length - 1) - i - 1
-                    for i in range(sequence_length - 1)
-                ] + [0]
+                    max_response_len + (len(history_ids)) - i - 1
+                    for i in range(len(history_ids))
+                ] + list(range(len(response_ids)))
             else:
                 raise ValueError(
                     "Expected position_style is one of [continuous, relative], but received {}".
