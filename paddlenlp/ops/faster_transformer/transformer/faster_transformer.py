@@ -838,16 +838,23 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         decoder_position_ids = position_ids[:, -1:]
         position_ids = position_ids[:, :-1]
 
-        return {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": attention_mask,
-            "use_cache": True,
-            "seq_len": seq_len,
-            "decoder_type_ids": decoder_type_ids,
-            "position_ids": position_ids,
-            "decoder_position_ids": decoder_position_ids
-        }
+        field_values = {}
+        if kwargs.get("role_ids", None) is not None:
+            role_ids = paddle.cast(role_ids, dtype="int32")
+            decoder_role_ids = role_ids[:, -1:]
+            role_ids = role_ids[:, :-1]
+            field_values["role_ids"] = role_ids
+            field_values["decoder_role_ids"] = decoder_role_ids
+
+        field_values["input_ids"] = input_ids
+        field_values["token_type_ids"] = token_type_ids
+        field_values["attention_mask"] = attention_mask
+        field_values["seq_len"] = seq_len
+        field_values["decoder_type_ids"] = decoder_type_ids
+        field_values["position_ids"] = position_ids
+        field_values["decoder_position_ids"] = decoder_position_ids
+
+        return field_values
 
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
@@ -966,7 +973,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
             seq_len = model_inputs.pop('seq_len')
             decoder_type_ids = model_inputs.pop('decoder_type_ids')
-            role_ids = None
+            role_ids = model_inputs.pop('role_ids', None)
+            decoder_role_ids = model_inputs.pop('decoder_role_ids', None)
             position_ids = model_inputs.pop('position_ids')
             decoder_position_ids = model_inputs.pop('decoder_position_ids')
         else:
