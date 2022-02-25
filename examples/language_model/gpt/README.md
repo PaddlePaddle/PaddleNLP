@@ -45,7 +45,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 下载以后通过以下命令解压：
 
 ```shell
-wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar ./
+wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
