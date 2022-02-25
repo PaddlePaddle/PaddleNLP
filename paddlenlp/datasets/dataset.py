@@ -536,7 +536,6 @@ class IterDataset(IterableDataset):
 
         def read_shards(filenames):
             for filename in filenames:
-                print(filename)
                 with open(filename, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     for d in data:

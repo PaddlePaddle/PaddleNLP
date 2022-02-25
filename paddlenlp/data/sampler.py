@@ -15,10 +15,11 @@
 import collections
 import functools
 import math
-import six
+import random
 
 import numpy as np
 import paddle.distributed as dist
+from paddle.io import IterableDataset
 
 
 class SamplerHelper(object):
@@ -422,3 +423,37 @@ class SamplerHelper(object):
             return iter(indices)
 
         return type(self)(self.data_source, _impl)
+
+
+class SamplerWrapper(IterableDataset):
+    def __init__(self, dataset, buffer_size):
+        self.data_source = dataset
+        self.buffer_size = buffer_size
+        self.shuffle_in_buf = False
+
+    def __iter__(self):
+        iter_buffers = [[], []]
+        reader = 0
+        writer = 1
+        for data in self.data_source:
+            if len(iter_buffers[reader]) < self.buffer_size:
+                iter_buffers[reader].append(data)
+            else:
+                if getattr(self, 'shuffle_in_buf', False):
+                    random.shuffle(iter_buffers[reader])
+                reader, writer = writer, reader
+                iter_buffers[reader].append(data)
+            if iter_buffers[writer]:
+                yield iter_buffers[writer].pop()
+
+        # finalize
+        if getattr(self, 'shuffle_in_buf', False):
+            random.shuffle(iter_buffers[reader])
+        for last in iter_buffers[writer] + iter_buffers[reader]:
+            yield last
+
+    def shuffle(self):
+        if isinstance(self.data_source.data, list):
+            random.shuffle(self.data_source.data)
+        self.shuffle_in_buf = True
+        return self
