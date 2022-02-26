@@ -154,7 +154,6 @@ class Predictor(object):
                 self.input_handles[1].copy_from_cpu(segment_ids)
                 self.predictor.run()
                 logits = self.output_handle.copy_to_cpu()
-                # print(logits.shape)
                 all_embeddings.append(logits)
                 examples = []
 
@@ -171,13 +170,10 @@ def read_text(file_path):
 
 
 if __name__ == "__main__":
-    # Define predictor to do prediction.
     predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    output_emb_size = 256
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     id2corpus = read_text(args.corpus_file)
 

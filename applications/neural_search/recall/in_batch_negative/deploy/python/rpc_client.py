@@ -28,10 +28,10 @@ for i, item in enumerate(list_data):
     feed[str(i)] = item
 
 print(feed)
-b_start = time.time()
+start_time = time.time()
 ret = client.predict(feed_dict=feed)
-b_end = time.time()
-print("time to cost :{} seconds".format(b_end - b_start))
+end_time = time.time()
+print("time to cost :{} seconds".format(end_time - start_time))
 
 result = np.array(eval(ret.value[0]))
 print(ret.key)
