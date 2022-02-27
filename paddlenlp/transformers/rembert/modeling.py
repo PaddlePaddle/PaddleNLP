@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 __all__ = [
     'RemBertModel', 'RemBertForMaskedLM', 'RemBertForQuestionAnswering',
     'RemBertForSequenceClassification', 'RemBertForMultipleChoice',
-    'RembertPretrainedModel'
+    'RembertPretrainedModel', 'RemBertForTokenClassification'
 ]
 
 
@@ -51,8 +51,7 @@ def gelu_new(x):
     Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
     the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
     """
-    return 0.5 * x * (1.0 + paddle.tanh(
-        math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
+    return F.gelu(x, approximate=True)
 
 
 ACT2FN = {
@@ -591,7 +590,7 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
                 position_ids=None,
                 attention_mask=None):
         r"""
-        The RemBertForQuestionAnswering forward method, overrides the __call__() special method.
+        The RemBertForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
@@ -611,7 +610,7 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import RemBertForQuestionAnswering
+                from paddlenlp.transformers import RemBertForSequenceClassification
                 from paddlenlp.transformers import RemBertTokenizer
 
                 tokenizer = RemBertTokenizer.from_pretrained('rembert')
@@ -728,12 +727,7 @@ class RemBertLMPredictionHead(nn.Layer):
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = get_activation(activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=self.transform.weight.dtype,
-            is_bias=False) if embedding_weights is None else embedding_weights
-        self.decoder_bias = self.create_parameter(
-            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.decoder = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -745,9 +739,7 @@ class RemBertLMPredictionHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
@@ -779,9 +771,9 @@ class RemBertForMaskedLM(RembertPretrainedModel):
         super(RemBertForMaskedLM, self).__init__()
         self.rembert = rembert
         self.cls = RemBertOnlyMLMHead(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
+            self.rembert.config["hidden_size"],
+            self.rembert.config["vocab_size"],
+            self.rembert.config["hidden_act"],
             embedding_weights=self.rembert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
@@ -795,13 +787,13 @@ class RemBertForMaskedLM(RembertPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                See :class:`BertModel`.
+                See :class:`RemBertModel`.
             token_type_ids (Tensor, optional):
-                See :class:`BertModel`.
+                See :class:`RemBertModel`.
             position_ids (Tensor, optional):
-                See :class:`BertModel`.
+                See :class:`RemBertModel`.
             attention_mask (Tensor, optional):
-                See :class:`BertModel`.
+                See :class:`RemBertModel`.
 
         Returns:
             Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
@@ -814,7 +806,7 @@ class RemBertForMaskedLM(RembertPretrainedModel):
                 from paddlenlp.transformers import RemBertForMaskedLM, RemBertTokenizer
 
                 tokenizer = RemBertTokenizer.from_pretrained('rembert')
-                model = BertForMaskedLM.from_pretrained('rembert')
+                model = RemBertForMaskedLM.from_pretrained('rembert')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -822,7 +814,7 @@ class RemBertForMaskedLM(RembertPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.bert(
+        outputs = self.rembert(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -832,7 +824,7 @@ class RemBertForMaskedLM(RembertPretrainedModel):
         return prediction_scores
 
 
-class BertForTokenClassification(RembertPretrainedModel):
+class RemBertForTokenClassification(RembertPretrainedModel):
     """
     RemBert Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
@@ -845,7 +837,7 @@ class BertForTokenClassification(RembertPretrainedModel):
     """
 
     def __init__(self, rembert, num_classes=2):
-        super(BertForTokenClassification, self).__init__()
+        super(RemBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.rembert = rembert  # allow rembert to be config
         self.dropout = nn.Dropout(self.rembert.config["hidden_dropout_prob"])
@@ -859,7 +851,7 @@ class BertForTokenClassification(RembertPretrainedModel):
                 position_ids=None,
                 attention_mask=None):
         r"""
-        The BertForTokenClassification forward method, overrides the __call__() special method.
+        The RemBertForTokenClassification forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
@@ -869,7 +861,7 @@ class BertForTokenClassification(RembertPretrainedModel):
             position_ids(Tensor, optional):
                 See :class:`RemBertModel`.
             attention_mask (list, optional):
-                See :class:`BertModel`.
+                See :class:`RemBertModel`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
@@ -880,7 +872,7 @@ class BertForTokenClassification(RembertPretrainedModel):
 
                 import paddle
                 from paddlenlp.transformers import RemBertForTokenClassification
-                from paddlenlp.transformers.bert.tokenizer import RemBertTokenizer
+                from paddlenlp.transformers import RemBertTokenizer
 
                 tokenizer = RemBertTokenizer.from_pretrained('rembert')
                 model = RemBertForTokenClassification.from_pretrained('rembert')
@@ -919,7 +911,7 @@ class RemBertForMultipleChoice(RembertPretrainedModel):
         self.num_choices = num_choices
         self.rembert = rembert
         self.dropout = nn.Dropout(self.rembert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"], 1)
+        self.classifier = nn.Linear(self.rembert.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
     def forward(self,

@@ -26,7 +26,7 @@
 
 #### 1、XTREME-XNLI
 XTREME-XNLI数据集为例：
-运行以下两个命令即可训练并评估LUKE在SQuAD1.1数据集的精度
+运行以下两个命令即可训练并评估RemBert在XTREME-XNLI数据集的精度
 
 ```shell
 python -m paddle.distributed.launch examples/language_model/rembert/main.py \

@@ -113,15 +113,15 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def load_example(args, fold='train'):
+def load_example(args, mode='train'):
     """Load data to DataLoader"""
     if args.task == 'paws':
         processor = MrpcProcessor()
     if args.task == 'xnli':
         processor = XNLIProcessor()
-    if fold == "train":
+    if mode == "train":
         examples = processor.get_train_examples(args.data_dir)
-    elif fold == "dev":
+    elif mode == "dev":
         examples = processor.get_dev_examples(args.data_dir)
     else:
         examples = processor.get_test_examples(args.data_dir)
@@ -158,7 +158,7 @@ def load_example(args, fold='train'):
 
         return input_ids, token_type_ids, label
 
-    if fold in ("dev", "test"):
+    if mode in ("dev", "test"):
         dataloader = DataLoader(
             datagenerator,
             batch_size=args.eval_batch_size,
@@ -203,11 +203,11 @@ def run(args):
         evaluate(model, args)
 
 
-def evaluate(model, args, fold='test'):
+def evaluate(model, args, mode='test'):
     """evaluate the model"""
     model.eval()
     metric = Accuracy()
-    eval_dataloader, processor = load_example(args, fold)
+    eval_dataloader, processor = load_example(args, mode)
     for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
         logits = model(input_ids=batch[0], token_type_ids=batch[1])
         labels = batch[2].reshape((
