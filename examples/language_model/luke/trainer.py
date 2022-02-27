@@ -11,26 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 
-import paddle
 from tqdm import tqdm
+
 from paddle.optimizer import AdamW
-from paddlenlp.transformers import LinearDecayWithWarmup
+import paddle
 import paddle.nn.functional as F
 
-
-class CrossEntropyLossForSQuAD(paddle.nn.Layer):
-    def __init__(self):
-        super(CrossEntropyLossForSQuAD, self).__init__()
-
-    def forward(self, y, label):
-        start_logits, end_logits = y
-        start_position, end_position = label
-        start_loss = paddle.nn.functional.cross_entropy(
-            input=start_logits, label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(
-            input=end_logits, label=end_position)
-        loss = (start_loss + end_loss) / 2
-        return loss
+from paddlenlp.transformers import LinearDecayWithWarmup
 
 
 def _create_model_arguments(batch):
@@ -57,7 +44,7 @@ class Trainer(object):
             if not any(nd in n for nd in ["bias", "norm"])
         ]
 
-    def train(self, is_op=False):
+    def train(self):
         model = self.model
 
         epoch = 0
@@ -76,17 +63,12 @@ class Trainer(object):
                             attention_mask=batch[2],
                             entity_ids=batch[3],
                             entity_position_ids=batch[4],
-                            entity_segment_ids=batch[5],
+                            entity_token_type_ids=batch[5],
                             entity_attention_mask=batch[6])
-                        if not is_op:
-                            loss_fn = CrossEntropyLossForSQuAD()
-                            loss = loss_fn(outputs, (batch[7], batch[8]))
 
-                        else:
-                            logits = outputs
-                            loss = F.binary_cross_entropy_with_logits(
-                                logits.reshape([-1]),
-                                batch[7].reshape([-1]).astype('float32'))
+                        loss = F.binary_cross_entropy_with_logits(
+                            outputs.reshape([-1]),
+                            batch[7].reshape([-1]).astype('float32'))
 
                     if self.args.gradient_accumulation_steps > 1:
                         loss = loss / self.args.gradient_accumulation_steps

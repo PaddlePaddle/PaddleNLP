@@ -14,16 +14,21 @@
 
 import logging
 import argparse
-from paddle.io import Dataset, DataLoader
+import os
+import json
+
 import numpy as np
+
 from paddlenlp.transformers import LukeTokenizer
 from paddlenlp.transformers import LukeForEntityClassification
-from utils.open_entity_processor import convert_examples_to_features, DatasetProcessor
+
 import paddle
-import json
+from paddle.io import Dataset, DataLoader
+
 from tqdm import tqdm
-from utils.trainer import Trainer
-import os
+
+from trainer import Trainer
+from open_entity_processor import convert_examples_to_features, DatasetProcessor
 
 ENTITY_TOKEN = "[ENTITY]"
 
@@ -37,16 +42,11 @@ parser.add_argument(
 parser.add_argument(
     "--data_dir", type=str, required=True, help="Dataset folder")
 parser.add_argument(
-    "--eval_batch_size",
-    type=int,
-    default=32,
-    help="Batch size per GPU/CPU for evaluating.")
-parser.add_argument(
     "--num_train_epochs", type=int, default=2, help="Number of training cycles")
 parser.add_argument(
     "--seed", type=int, default=42, help="random seed for initialization")
 parser.add_argument(
-    "--train_batch_size",
+    "--batch_size",
     type=int,
     default=8,
     help="Batch size per GPU/CPU for training.")
@@ -114,21 +114,21 @@ class DataGenerator(Dataset):
 
 
 @paddle.no_grad()
-def evaluate(args, model, fold="dev", output_file=None):
-    dataloader, _, _, label_list = load_examples(args, fold=fold)
+def evaluate(args, model, mode="dev", output_file=None):
+    dataloader, _, _, label_list = load_examples(args, mode=mode)
     model.eval()
 
     all_logits = []
     all_labels = []
 
-    for batch in tqdm(dataloader, desc=fold):
+    for batch in tqdm(dataloader, desc=mode):
         logits = model(
             input_ids=batch[0],
             token_type_ids=batch[1],
             attention_mask=batch[2],
             entity_ids=batch[3],
             entity_position_ids=batch[4],
-            entity_segment_ids=batch[5],
+            entity_token_type_ids=batch[5],
             entity_attention_mask=batch[6])
 
         logits = logits.tolist()
@@ -178,13 +178,13 @@ def evaluate(args, model, fold="dev", output_file=None):
     return dict(precision=precision, recall=recall, f1=f1)
 
 
-def load_examples(args, fold="train"):
+def load_examples(args, mode="train"):
     tokenizer = LukeTokenizer.from_pretrained(args.model_type)
     tokenizer.add_special_tokens(dict(additional_special_tokens=[ENTITY_TOKEN]))
     processor = DatasetProcessor()
-    if fold == "train":
+    if mode == "train":
         examples = processor.get_train_examples(args.data_dir)
-    elif fold == "dev":
+    elif mode == "dev":
         examples = processor.get_dev_examples(args.data_dir)
     else:
         examples = processor.get_test_examples(args.data_dir)
@@ -220,25 +220,18 @@ def load_examples(args, fold="train"):
             create_padded_sequence(6, 0),  # pad entity_attention_mask
             create_padded_sequence(7, 0), )  # convert to numpy array
 
-    if fold in ("dev", "test"):
-        dataloader = DataLoader(
-            dataset,
-            batch_size=args.eval_batch_size,
-            shuffle=False,
-            collate_fn=collate_fn)
-    else:
-        dataloader = DataLoader(
-            dataset,
-            shuffle=True,
-            batch_size=args.train_batch_size,
-            collate_fn=collate_fn)
+    dataloader = DataLoader(
+        dataset,
+        shuffle='train' in mode,
+        batch_size=args.batch_size,
+        collate_fn=collate_fn)
 
     return dataloader, examples, features, label_list
 
 
 if __name__ == '__main__':
     results = {}
-    train_dataloader, _, features, _ = load_examples(args, fold="train")
+    train_dataloader, _, features, _ = load_examples(args, mode="train")
     num_labels = len(features[0].labels)
     num_train_steps_per_epoch = len(
         train_dataloader) // args.gradient_accumulation_steps
@@ -250,7 +243,7 @@ if __name__ == '__main__':
         model=model,
         dataloader=train_dataloader,
         num_train_steps=num_train_steps)
-    trainer.train(is_op=True)
+    trainer.train()
     output_file = os.path.join(args.output_dir, f"test_predictions.jsonl")
     results.update({
         f"test_{k}": v

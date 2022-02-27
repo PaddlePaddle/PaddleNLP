@@ -256,7 +256,7 @@ class LukeTokenizer(RobertaTokenizer):
                  pad_to_max_seq_len=False,
                  truncation_strategy="longest_first",
                  return_position_ids=True,
-                 return_token_type_ids=True,
+                 return_token_type_ids=False,
                  return_attention_mask=True,
                  return_length=False,
                  return_overflowing_tokens=False,
@@ -659,12 +659,84 @@ class LukeTokenizer(RobertaTokenizer):
                                                          end + offset)
         return dict(
             entity_ids=entity_ids,
-            entity_segment_ids=entity_segment_ids,
+            entity_token_type_ids=entity_segment_ids,
             entity_attention_mask=entity_attention_mask,
             entity_position_ids=entity_position_ids)
 
     def _convert_entity_pos(self, text, entity_span):
-        _text_token = self.tokenize(text[0:entity_span[0]].strip())
-        _entity_token = self.tokenize(text[entity_span[0]:entity_span[1]].strip(
+        text_token = self.tokenize(text[0:entity_span[0]].strip())
+        entity_token = self.tokenize(text[entity_span[0]:entity_span[1]].strip(
         ))
-        return len(_text_token), len(_text_token) + len(_entity_token)
+        return len(text_token), len(text_token) + len(entity_token)
+
+    def get_offset_mapping(self, text):
+        tokens = self._tokenize(text)
+        offset_mapping = []
+        offset = 0
+        for token in tokens:
+            if token[0] == 'Ġ':
+                offset_mapping.append((offset + 1, offset + len(token)))
+            else:
+                offset_mapping.append((offset, offset + len(token)))
+            offset += len(token)
+
+        return offset_mapping
+
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
+        """
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
+
+        A Luke sequence pair mask has the following format:
+        ::
+
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
+            | first sequence    | second sequence |
+
+        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+
+        Returns:
+            List[int]: List of token_type_id according to the given sequence(s).
+        """
+        _sep = [self.sep_token_id]
+        _cls = [self.cls_token_id]
+        if token_ids_1 is None:
+            return len(_cls + token_ids_0 + _sep) * [0]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(_sep + token_ids_1 +
+                                                          _sep) * [1]
+
+    def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Args:
+            pair(bool):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
+
+        Returns:
+            int: Number of tokens added to sequences.
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification
+        tasks by concatenating and adding special tokens.
+        """
+        _cls = [self.cls_token_id]
+        _sep = [self.sep_token_id]
+        if token_ids_1 is None:
+            return _cls + token_ids_0 + _sep
+        return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep

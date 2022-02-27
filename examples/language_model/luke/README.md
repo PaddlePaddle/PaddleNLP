@@ -26,42 +26,31 @@ LUKE和现有CWRs之间的一个重要区别在于，它不仅将单词视为独
 下载SQuAD1.1数据集，主流机器阅读理解数据集
 [下载地址](https://data.deepai.org/squad1.1.zip)
 
-同时需要下载由LUKE官方提供的维基百科(实体)数据集
-[下载地址](https://drive.google.com/file/d/129tDJ3ev6IdbJiKOmO6GTgNANunhO_vt/view)
-
 #### 1、SQuAD1.1
 以SQuAD1.1数据集为例
-LUKE做阅读理解较为特殊，需要提供能够自动感知实体的数据集文件并需要安装以下环境：
-
-```shell
-pip install wikipedia2vec==1.0.5
-pip install regex
-```
 
 运行以下两个命令即可训练并评估LUKE在SQuAD1.1数据集的精度
 
 ```shell
-python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
-    --model_type luke-base \
-    --data_dir data/
-    --output_dir output/ \
-    --device gpu
-    --learning_rate 12e-6 \
+python -m paddle.distributed.launch examples/language_model/luke/run_squad.py
+    --model_type luke \
+    --device gpu \
+    --learning_rate 15e-6 \
     --num_train_epochs 2 \
-    --train_batch_size 8 \
+    --batch_size 8 \
+    --do_predict \
     --do_train \
-    --do_eval
+    --model_name_or_path luke-large
 ```
 其中参数释义如下：
-- `model_type` 指示了模型类型，当前支持`luke-base`和`luke-large`模型。
-- `data_dir` 数据集路径。
-- `train_batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `model_type` 指示了模型类型，当前支持`luke`
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
-- `output_dir` 表示模型保存路径。
 - `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 - `num_train_epochs` 表示需要训练的epoch数量
 - `do_train` 表示是否开启训练
-- `do_eval` 表示是否开启评估
+- `do_predict` 表示是否开启评估
+- `model_name_or_path` 模型的名称和路径,支持`luke-base` 和 `luke-large`
 
 训练结束后模型会对模型进行评估，其评估在验证集上完成, 训练完成后你将看到如下结果:
 ```text
@@ -72,7 +61,7 @@ python -m paddle.distributed.launch examples/language_model/luke/run_squad.py \
 
 ```shell
 python -m paddle.distributed.launch examples/language_model/luke/run_open_entity.py \
-    --model_type luke-base \
+    --model_type luke-large \
     --data_dir data/ \
     --output_dir output/ \
     --device gpu \

@@ -111,7 +111,7 @@ def convert_examples_to_features(examples, label_list, tokenizer,
         word_attention_mask = [1] * len(tokens)
         word_segment_ids = [0] * len(tokens)
 
-        entity_ids = [1, 0]
+        entity_ids = [2, 0]
         entity_attention_mask = [1, 0]
         entity_segment_ids = [0, 0]
         entity_position_ids = list(range(mention_start,
