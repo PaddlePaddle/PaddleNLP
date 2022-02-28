@@ -92,7 +92,9 @@ def prepare_train_features(examples, tokenizer, args):
             while sequence_ids[token_end_index] != 1:
                 token_end_index -= 1
             # Minus one more to reach actual text
-            token_end_index -= 2
+            token_end_index -= 1
+            if token_end_index >= len(offsets):
+                token_end_index = len(offsets) - 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             if not (offsets[token_start_index][0] <= start_char and
