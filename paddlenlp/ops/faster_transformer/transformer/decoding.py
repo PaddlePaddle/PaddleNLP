@@ -270,7 +270,7 @@ def infer_unified_decoding(
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _unk_id,
         _mask_id, _temperature, _len_penalty, _normalize_before, _pos_bias,
-        _hidden_act, _rel_len, _early_stopping, _min_length, _inner_coeff):
+        _hidden_act, _rel_len, _early_stopping, _min_length):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -335,8 +335,7 @@ def infer_unified_decoding(
         "hidden_act": _hidden_act,
         "rel_len": _rel_len,
         "early_stopping": _early_stopping,
-        "min_length": _min_length,
-        "inner_coeff": _inner_coeff
+        "min_length": _min_length
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -1129,8 +1128,6 @@ class InferUnifiedDecoding(nn.Layer):
             if arg not in ["self"]:
                 setattr(self, "_" + arg, value)
 
-        self.inner_coeff = self._model.intermediate_size // hidden_dims
-
         self.sub_modules = {
             "slf_ln_weight": [],
             "slf_ln_bias": [],
@@ -1507,8 +1504,7 @@ class InferUnifiedDecoding(nn.Layer):
             _hidden_act=self._hidden_act,
             _rel_len=rel_len,
             _early_stopping=early_stopping,
-            _min_length=min_length,
-            _inner_coeff=self.inner_coeff)
+            _min_length=min_length)
         ids = finalize(
             beam_size,
             output_ids,

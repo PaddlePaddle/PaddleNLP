@@ -834,17 +834,22 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         seq_len = kwargs.get("seq_len") - 1
 
-        position_ids = paddle.cast(kwargs.get("position_ids"), dtype="int32")
-        decoder_position_ids = position_ids[:, -1:]
-        position_ids = position_ids[:, :-1]
+        position_ids = kwargs.get("position_ids", None)
+        if position_ids is not None:
+            position_ids = paddle.cast(position_ids, dtype="int32")
+            decoder_position_ids = position_ids[:, -1:]
+            position_ids = position_ids[:, :-1]
+        else:
+            decoder_position_ids = None
 
         field_values = {}
-        if kwargs.get("role_ids", None) is not None:
+        role_ids = kwargs.get("role_ids", None)
+        if role_ids is not None:
             role_ids = paddle.cast(role_ids, dtype="int32")
             decoder_role_ids = role_ids[:, -1:]
             role_ids = role_ids[:, :-1]
-            field_values["role_ids"] = role_ids
-            field_values["decoder_role_ids"] = decoder_role_ids
+        else:
+            decoder_role_ids = None
 
         field_values["input_ids"] = input_ids
         field_values["token_type_ids"] = token_type_ids
@@ -853,6 +858,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         field_values["decoder_type_ids"] = decoder_type_ids
         field_values["position_ids"] = position_ids
         field_values["decoder_position_ids"] = decoder_position_ids
+        field_values["role_ids"] = role_ids
+        field_values["decoder_role_ids"] = decoder_role_ids
 
         return field_values
 
@@ -897,12 +904,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 input_ids,
                 token_type_ids,
                 attention_mask,
-                decoder_type_ids=None,
                 seq_len=None,
                 role_ids=None,
-                decoder_role_ids=None,
                 position_ids=None,
-                decoder_position_ids=None,
                 max_length=128,
                 min_length=0,
                 top_k=4,
@@ -932,61 +936,40 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 input_ids,
                 expand_size=num_beams,
                 token_type_ids=token_type_ids,
-                decoder_type_ids=decoder_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len,
-                role_ids=role_ids,
-                decoder_role_ids=decoder_role_ids,
-                decoder_position_ids=decoder_position_ids)
+                role_ids=role_ids)
         elif decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
                 expand_size=num_return_sequences,
                 token_type_ids=token_type_ids,
-                decoder_type_ids=decoder_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 seq_len=seq_len,
-                role_ids=role_ids,
-                decoder_role_ids=decoder_role_ids,
-                decoder_position_ids=decoder_position_ids)
+                role_ids=role_ids)
         elif decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
-                "decoder_type_ids": decoder_type_ids,
                 "position_ids": position_ids,
                 "attention_mask": attention_mask,
                 "seq_len": seq_len,
                 "role_ids": role_ids,
-                "decoder_role_ids": decoder_role_ids,
-                "decoder_position_ids": decoder_position_ids
             }
         else:
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = {}
-        if decoder_type_ids is None:
-            model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                              **model_kwargs)
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
 
-            seq_len = model_inputs.pop('seq_len')
-            decoder_type_ids = model_inputs.pop('decoder_type_ids')
-            role_ids = model_inputs.pop('role_ids', None)
-            decoder_role_ids = model_inputs.pop('decoder_role_ids', None)
-            position_ids = model_inputs.pop('position_ids')
-            decoder_position_ids = model_inputs.pop('decoder_position_ids')
-        else:
-            model_inputs["input_ids"] = input_ids
-            model_inputs["attention_mask"] = model_kwargs["attention_mask"]
-            model_inputs["token_type_ids"] = model_kwargs["token_type_ids"]
-            seq_len = model_kwargs["seq_len"]
-            decoder_type_ids = model_kwargs["decoder_type_ids"]
-            role_ids = model_kwargs["role_ids"]
-            decoder_role_ids = model_kwargs["decoder_role_ids"]
-            position_ids = model_kwargs["position_ids"]
-            decoder_position_ids = model_kwargs["decoder_position_ids"]
+        seq_len = model_inputs.pop('seq_len')
+        decoder_type_ids = model_inputs.pop('decoder_type_ids')
+        role_ids = model_inputs.pop('role_ids', None)
+        decoder_role_ids = model_inputs.pop('decoder_role_ids', None)
+        position_ids = model_inputs.pop('position_ids', None)
+        decoder_position_ids = model_inputs.pop('decoder_position_ids', None)
 
         return self.decoding(
             input_ids=model_inputs["input_ids"],

@@ -116,11 +116,13 @@ __global__ void start_id_embedding_kernel(T* from_tensor,
   for(int index = threadIdx.x; index < hidden_units; index += blockDim.x) {
 
     int position_index;
+    // Apply custom position ids to handle different position ids setting,
+    // such as relative position in PLATO-XL.
     if (position_id) {
       position_index = position_id[bid * max_length + seq_id] * hidden_units + index;
     } else {
-      // embedding lookup from word ids [batch, max_length] (part of [batch, max_length]) and [vocab, hidden] to generate embedding [batch, max_length, hidden]
       int step;
+      // Deal with the situation which input_sequences is padded left.
       if (seq_id < max_length - memory_seq_len[bid]) {
         step = start_step;
       } else {

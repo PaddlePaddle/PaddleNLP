@@ -99,7 +99,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const std::string& hidden_act,
     const bool early_stopping,
     const int min_length,
-    const int inner_coeff,
     cublasHandle_t cublas_handle_,
     cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream) {
@@ -171,6 +170,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
+
+  int inner_coeff = ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim;
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -476,8 +477,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const bool pos_bias,
     const std::string& hidden_act,
     const bool early_stopping,
-    const int min_length,
-    const int inner_coeff) {
+    const int min_length) {
   auto stream = input_ids.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -552,7 +552,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
-          inner_coeff,
           cublas_handle_,
           cublaslt_handle_,
           stream);
@@ -622,7 +621,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
-          inner_coeff,
           cublas_handle_,
           cublaslt_handle_,
           stream);
