@@ -519,7 +519,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 A list of indices of input tokens to be feed to UnifiedTransformer 
                 model. If `return_tensors` is True, it is a Tensor with shape 
                 [1, sequence_length] and data type 'int64'.
-            - role_ids (list[int]|Tensor):
+            - role_ids (list[int]|Tensor, optional):
                 A list of indices of role indices. If `return_role_ids` is True,
                 it is a Tensor with shape [1, sequence_length] and data type 'int64'.
             - token_type_ids (list[int]|Tensor, optional):
@@ -641,7 +641,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         if return_role_ids:
             history_role_ids = []
-            tokens_length = []
+            individual_history_length = []
             knowledge_role_ids = [0] * len(knowledge_ids)
 
         max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
@@ -665,7 +665,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     if role_id is not None:
                         history_role_ids = [role_id] * len(history_ids)
                     elif return_role_ids:
-                        tokens_length = [len(history_ids)]
+                        individual_history_length = [len(history_ids)]
                 break
 
             if role_id is not None:
@@ -673,16 +673,17 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 history_role_ids = [role_id] * (len(tokens) + 1
                                                 ) + history_role_ids
             elif return_role_ids:
-                tokens_length = [len(tokens) + 1] + tokens_length
+                individual_history_length = [len(tokens) + 1
+                                             ] + individual_history_length
 
             history_ids = (self.convert_tokens_to_ids(tokens) +
                            [self.sep_token_id]) + history_ids
 
         if return_role_ids and len(history_role_ids) == 0:
-            for i in range(len(tokens_length)):
+            for i in range(len(individual_history_length)):
                 history_role_ids = history_role_ids + [
-                    (len(tokens_length) - i) % 2
-                ] * tokens_length[i]
+                    (len(individual_history_length) - i) % 2
+                ] * individual_history_length[i]
 
         history_ids = knowledge_ids + history_ids
 
