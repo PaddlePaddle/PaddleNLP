@@ -58,8 +58,6 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 # yapf: enable
 args = parser.parse_args()
 
-DATASET_INFO = {"msra_ner": (ErnieDocTokenizer, "test", "test"), }
-
 
 def set_seed(args):
     random.seed(args.seed)
@@ -137,10 +135,10 @@ def evaluate(model, metric, data_loader, memories0):
 
 def do_train(args):
     set_seed(args)
-    tokenizer_class, eval_name, test_name, = DATASET_INFO[args.dataset]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    train_ds, eval_ds, test_ds = load_dataset(
-        args.dataset, splits=["train", eval_name, test_name])
+    tokenizer = ErnieDocTokenizer.from_pretrained(args.model_name_or_path)
+    train_ds, eval_ds = load_dataset(args.dataset, splits=["train", "test"])
+    test_ds = eval_ds
+
     num_classes = len(train_ds.label_list)
     no_entity_id = num_classes - 1
 
@@ -242,6 +240,7 @@ def do_train(args):
     memories = create_memory()
     tic_train = time.time()
     best_f1 = 0
+    stop_training = False
     for epoch in range(args.epochs):
         train_ds_iter.shuffle_sample()
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
@@ -293,7 +292,10 @@ def do_train(args):
                         tokenizer.save_pretrained(best_model_dir)
 
             if args.max_steps > 0 and global_steps >= args.max_steps:
-                return
+                stop_training = True
+                break
+        if stop_training:
+            break
 
     logger.info("Final test result:")
     eval_acc = evaluate(model, metric, test_dataloader, create_memory())

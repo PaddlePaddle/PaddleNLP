@@ -622,7 +622,7 @@ class InferTransformerDecoding(nn.Layer):
             load("FasterTransformer", verbose=True)
 
         size_per_head = d_model / n_head
-        # fuse_qkv can only support size_per_head is one of [32, 64, 128].
+        # fuse_qkv can only support size_per_head of [32, 64, 128].
         if size_per_head in [32, 64, 128]:
             self._fuse_qkv = True
         else:
