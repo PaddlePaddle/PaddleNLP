@@ -821,9 +821,11 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
                                       attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
-        input_ids = paddle.cast(input_ids, dtype="int32")
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, dtype="int32")
 
-        token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        if token_type_ids.dtype == paddle.int64:
+            token_type_ids = paddle.cast(token_type_ids, dtype="int32")
         decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
 
@@ -836,7 +838,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         position_ids = kwargs.get("position_ids", None)
         if position_ids is not None:
-            position_ids = paddle.cast(position_ids, dtype="int32")
+            if position_ids.dtype == paddle.int64:
+                position_ids = paddle.cast(position_ids, dtype="int32")
             decoder_position_ids = position_ids[:, -1:]
             position_ids = position_ids[:, :-1]
         else:
