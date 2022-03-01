@@ -72,7 +72,7 @@ class CSCTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "pinyin_vocab": "pinyin_vocab.txt"    
+        "pinyin_vocab": "pinyin_vocab.txt"
     }
     resource_files_urls = {
         "csc-ernie-1.0": {
@@ -81,7 +81,7 @@ class CSCTask(Task):
                 "cdc53e7e3985ffc78fedcdf8e6dca6d2"
             ],
             "pinyin_vocab": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",
                 "5599a8116b6016af573d08f8e686b4b2"
             ],
         }
