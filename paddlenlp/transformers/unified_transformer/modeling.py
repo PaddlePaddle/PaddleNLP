@@ -157,20 +157,27 @@ class UnifiedTransformerEmbeddings(nn.Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=2):
+                 type_vocab_size=2,
+                 role_type_size=None):
         super(UnifiedTransformerEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.role_embeddings = None if role_type_size is None else nn.Embedding(
+            role_type_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids, position_ids):
+    def forward(self, input_ids, token_type_ids, position_ids, role_ids=None):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
+
+        if self.role_embeddings is not None:
+            embeddings += self.role_embeddings(role_ids)
+
         embeddings = self.dropout(embeddings)
         return embeddings
 

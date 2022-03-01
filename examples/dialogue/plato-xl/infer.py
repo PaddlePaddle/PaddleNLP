@@ -29,7 +29,7 @@ def setup_args():
     parser.add_argument(
         "--position_style",
         default="continuous",
-        choice=["continuous", "relative"],
+        choices=["continuous", "relative"],
         type=str,
         help="The type for positional embedding. Default is continuous. ")
     parser.add_argument(
