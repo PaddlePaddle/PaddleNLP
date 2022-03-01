@@ -318,6 +318,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/156118227-78837467-5087-40ab-9717-5ab92855cf57.JPG" width="230" height="300" />
+</div>
 
 
 
