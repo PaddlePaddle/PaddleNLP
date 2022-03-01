@@ -10,7 +10,7 @@ python train_prophetnet.py \
     --epochs=4 \
     --lr=0.0001 \
     --warmup_init_lr=1e-07 \
-    --warmup_updates=1000 \
+    --warmup_steps=1000 \
     --clip_norm=0.1 \
     --num_workers=4 \
     --output_dir=./ckpt/cnndm
@@ -22,7 +22,7 @@ python train_prophetnet.py \
     --epochs=6 \
     --lr=0.0001 \
     --warmup_init_lr=1e-07 \
-    --warmup_updates=1000 \
+    --warmup_steps=1000 \
     --clip_norm=0.1 \
     --num_workers=8 \
     --output_dir=./ckpt/gigaword

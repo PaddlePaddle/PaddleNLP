@@ -25,7 +25,7 @@ parser.add_argument("--epochs", default=3, type=int)
 parser.add_argument("--lr", default=0.0001, type=float)
 parser.add_argument("--weight_decay", default=0.0, type=float)
 parser.add_argument("--warmup_init_lr", default=1e-07, type=float)
-parser.add_argument("--warmup_updates", default=1000, type=int)
+parser.add_argument("--warmup_steps", default=1000, type=int)
 parser.add_argument("--clip_norm", default=0.1, type=float)
 parser.add_argument("--num_workers", default=4, type=int)
 parser.add_argument("--output_dir", default="./ckpt/gigaword", type=str)
@@ -67,18 +67,18 @@ class InverseSquareRootSchedule(paddle.optimizer.lr.LRScheduler):
     def __init__(self,
                  warmup_init_lr,
                  warmup_end_lr,
-                 warmup_updates,
+                 warmup_steps,
                  last_epoch=-1,
                  verbose=False):
-        self.lr_step = (warmup_end_lr - warmup_init_lr) / warmup_updates
-        self.decay_factor = warmup_end_lr * warmup_updates**0.5
-        self.warmup_updates = warmup_updates
+        self.lr_step = (warmup_end_lr - warmup_init_lr) / warmup_steps
+        self.decay_factor = warmup_end_lr * warmup_steps**0.5
+        self.warmup_steps = warmup_steps
         self.warmup_init_lr = warmup_init_lr
         super(InverseSquareRootSchedule, self).__init__(warmup_init_lr,
                                                         last_epoch, verbose)
 
     def get_lr(self):
-        if self.last_epoch < self.warmup_updates:
+        if self.last_epoch < self.warmup_steps:
             self.base_lr = self.warmup_init_lr + self.last_epoch * self.lr_step
         else:
             self.base_lr = self.decay_factor * self.last_epoch**-0.5
@@ -146,7 +146,7 @@ epochs = args.epochs
 lr = args.lr
 weight_decay = args.weight_decay
 warmup_init_lr = args.warmup_init_lr
-warmup_updates = args.warmup_updates
+warmup_steps = args.warmup_steps
 clip_norm = args.clip_norm
 output_dir = args.output_dir
 
@@ -157,7 +157,7 @@ model = ProphetNetModel(
     **ProphetNetModel.pretrained_init_configuration["prophetnet-large-uncased"])
 model = ProphetNetForConditionalGeneration(model)
 
-lr_scheduler = InverseSquareRootSchedule(warmup_init_lr, lr, warmup_updates)
+lr_scheduler = InverseSquareRootSchedule(warmup_init_lr, lr, warmup_steps)
 
 optimizer = paddle.optimizer.Adam(
     learning_rate=lr_scheduler,
