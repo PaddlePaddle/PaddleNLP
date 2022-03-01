@@ -23,10 +23,12 @@ import itertools
 import numpy as np
 from .utils import download_file
 from .lexical_analysis import load_vocab, LacTask
+from .named_entity_recognition import NERTask
 
 usage = r"""
            from paddlenlp import Taskflow 
 
+           # 默认为LAC模式分词
            seg = Taskflow("word_segmentation")
            seg("第十四届全运会在西安举办")
            '''
@@ -37,12 +39,19 @@ usage = r"""
            '''
            [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
            '''
+
+           # 精确模式(使用WordTag模型)
+           seg = Taskflow("word_segmentation", model="wordtag")
+           seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
+           '''
+           ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
+           '''
          """
 
 
-class WordSegmentationTask(LacTask):
+class LACSegTask(LacTask):
     """
-    Segement the sentences to the words. 
+    Segement the sentences to the words using LAC mode. 
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -92,3 +101,29 @@ class WordSegmentationTask(LacTask):
         final_results = final_results if len(
             final_results) > 1 else final_results[0]
         return final_results
+
+
+class WordTagSegTask(NERTask):
+    """
+    Segement the sentences to the words using WordTag model. 
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+
+    """
+
+    def __init__(self, model, task, **kwargs):
+        super().__init__(model=model, task=task, **kwargs)
+
+    def _simplify_result(self, results):
+        simple_results = []
+        for result in results:
+            simple_result = []
+            if 'items' in result:
+                for item in result['items']:
+                    simple_result.append(item['item'])
+            simple_results.append(simple_result)
+        simple_results = simple_results[0] if len(
+            simple_results) == 1 else simple_results
+        return simple_results

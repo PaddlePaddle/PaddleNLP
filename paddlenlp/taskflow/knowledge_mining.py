@@ -27,12 +27,7 @@ import paddle
 import paddle.nn as nn
 from paddlenlp.layers.crf import LinearChainCrf
 from paddlenlp.utils.tools import compare_version
-if compare_version(paddle.version.full_version, "2.2.0") >= 0:
-    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
-    from paddle.text import ViterbiDecoder
-else:
-    raise RuntimeError('Taskflow requires paddle version >=2.2.0, but got %s' %
-                       paddle.version.full_version)
+from paddle.text import ViterbiDecoder
 
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple

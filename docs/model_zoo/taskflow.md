@@ -80,7 +80,17 @@ seg("第十四届全运会在西安举办")
 
 seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 >>> [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
+
+# 使用WordTag模型进行分词
+seg = Taskflow("word_segmentation", model="wordtag")
+seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
+>>> ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
+
+seg("国家卫健委修订完成了新型冠状病毒肺炎诊疗方案")
+>>> ['国家卫健委', '修订', '完成', '了', '新型冠状病毒肺炎', '诊疗', '方案']
 ```
+
+**NOTE**：使用WordTag模型进行分词，在公司名、机构名等实体词的切分上表现更好，但由于使用了预训练模型速度相对较慢，请结合具体应用场景选择分词模型。
 
 #### 自定义词典
 
@@ -93,7 +103,7 @@ seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 年 末
 ```
 
-以"平原上的火焰计划于年末上映"为例，原本的输出结果为：
+以默认模型为例，"平原上的火焰计划于年末上映"原本的输出结果为：
 
 ```text
 ['平原', '上', '的', '火焰', '计划', '于', '年末', '上映']
@@ -110,6 +120,8 @@ my_seg("平原上的火焰计划于年末上映")
 ```
 
 #### 自定义任务
+
+- 自定义LAC模型
 
 任务的默认路径为`$HOME/.paddlenlp/taskflow/word_sementation/lac/`，默认路径下包含了执行该任务需要的所有文件。
 
@@ -133,6 +145,30 @@ from paddlenlp import Taskflow
 
 my_seg = Taskflow("word_segmentation", task_path="./custom_task_path/")
 ```
+
+- 自定义WordTag模型
+
+任务的默认路径为`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag/`，默认路径下包含了执行该任务需要的所有文件。
+
+用户也可以使用自己的数据训练自定义WordTag模型，参考[NER-WordTag增量训练示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)。
+
+有了自定义模型后可通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
+
+自定义路径需要有如下文件（用户自己的模型权重、标签文件）：
+```text
+custom_task_path/
+├── model_state.pdparams
+└── tags.txt
+```
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_seg = Taskflow("word_segmentation", model="wordtag", task_path="./custom_task_path/")
+```
+
 #### 可配置参数说明
 
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。

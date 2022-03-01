@@ -23,7 +23,8 @@ from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
-from .word_segmentation import WordSegmentationTask
+from .word_segmentation import LACSegTask
+from .word_segmentation import WordTagSegTask
 from .pos_tagging import POSTaggingTask
 from .text_generation import TextGenerationTask
 from .poetry_generation import PoetryGenerationTask
@@ -101,11 +102,16 @@ TASKS = {
     "word_segmentation": {
         "models": {
             "lac": {
-                "task_class": WordSegmentationTask,
+                "task_class": LACSegTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
                 "task_flag": 'word_segmentation-gru_crf',
-            }
+            },
+            "wordtag": {
+                "task_class": WordTagSegTask,
+                "task_flag": 'word_segmentation-wordtag',
+                "linking": False,
+            },
         },
         "default": {
             "model": "lac"
