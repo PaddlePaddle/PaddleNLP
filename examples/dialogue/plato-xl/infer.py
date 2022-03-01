@@ -52,6 +52,21 @@ def setup_args():
         default=0.0,
         type=float,
         help="The p value for topp_sampling. Default is 0.0f. ")
+    parser.add_argument(
+        "--use_fp16_decoding",
+        action="store_true",
+        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument(
+        "--decoding_strategy",
+        default="sampling",
+        choices=["sampling", "beam_search"],
+        type=str,
+        help="The main strategy to decode. ")
+    parser.add_argument(
+        "--num_beams",
+        default=4,
+        type=int,
+        help="The number of candidate to procedure beam search. ")
 
     args = parse_args(parser)
 
@@ -103,10 +118,11 @@ def infer(args):
             seq_len=data['seq_len'],
             max_length=args.max_out_len,
             min_length=args.min_out_len,
-            decode_strategy='sampling',
+            decode_strategy=args.decoding_strategy,
             top_k=args.topk,
             top_p=args.topp,
-            use_fp16_decoding=True,
+            num_beams=args.num_beams,
+            use_fp16_decoding=args.use_fp16_decoding,
             use_faster=True)
 
     paddle.device.cuda.synchronize()
