@@ -678,20 +678,26 @@ def convert_params(faster_model,
                     params["slf_v_bias"].append(
                         (layer.self_attn.v_proj, "bias"))
                 else:
+                    # TODO(guosheng): Find the reason why we have to cast to
+                    # fp16 here and return the input tensor in transfer_param
+                    # rather than creating new weights in transfer_param when
+                    # converting to static.
                     w = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="weight",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv == 2)
+                        del_param=fuse_qkv ==
+                        2).astype("float16" if use_fp16 else "float32")
                     b = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="bias",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv == 2)
+                        del_param=fuse_qkv ==
+                        2).astype("float16" if use_fp16 else "float32")
                     params["slf_q_weight"].append((w, False))
                     params["slf_q_bias"].append((b, True))
                     setattr(faster_model, "slf_q_weight_" + str(i), w)
