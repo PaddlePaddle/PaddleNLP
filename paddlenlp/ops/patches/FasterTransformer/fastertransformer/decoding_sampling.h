@@ -99,7 +99,9 @@ public:
                    const float temperature = 1.0,
                    const float repeat_penalty = 1.0,
                    const bool prefix_lm = false,
-                   const bool is_mbart = false)
+                   const bool is_mbart = false,
+                   const int min_length = 0,
+                   const int inner_coeff = 4)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -120,6 +122,8 @@ public:
     args_.pos_bias_ = pos_bias;
     args_.temperature_ = temperature;
     args_.repeat_penalty_ = repeat_penalty;
+
+    args_.min_length_ = min_length;
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
@@ -155,7 +159,8 @@ public:
                                         memory_hidden_units,
                                         is_fuse_qkv,
                                         normalization_before,
-                                        args_.act_);
+                                        args_.act_,
+                                        inner_coeff);
     decoder_->set_max_batch_size(batch_size);
 
     size_t from_tensor_size =
@@ -341,6 +346,136 @@ public:
     }
   }
 
+  void forward_context(const DecoderInitParam<DataType_> *decoder_param,
+                       const DecodingInitParam<DataType_> decoding_params) {
+#ifndef NDEBUG
+      PRINT_FUNC_NAME_();
+#endif
+      const int input_len = decoding_params.request_input_len;
+      const int request_batch_size = decoding_params.request_batch_size;
+
+      const int max_input_len = decoding_params.max_input_len;
+
+      const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
+      const int m = local_batch_size * input_len;
+      const int h_1 = args_.hidden_units_;
+
+      DataType_* from_tensor[2];
+      DataType_* decoder_output;
+      DataType_* decoder_workspace;
+      void *buf = reinterpret_cast<void *>(allocator_.malloc(
+          decoder_->getContextWorkspaceSize(input_len, local_batch_size) + 
+          (m * h_1 + 2 * request_batch_size * input_len * h_1) * sizeof(DataType_)
+      ));
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      from_tensor[0] = (DataType_*) buf;
+      from_tensor[1] = from_tensor[0] + request_batch_size * input_len * h_1;
+      decoder_output = from_tensor[1] + request_batch_size * input_len * h_1;
+      decoder_workspace = decoder_output + m * h_1;
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+      if (args_.normalization_before_) {
+        start_ids_embeddings_kernel_launcher(from_tensor[0],
+                                            decoding_params.embedding_table,
+                                            decoding_params.position_encoding_table,
+                                            decoding_params.type_table,
+                                            decoding_params.type_id,
+                                            decoding_params.d_start_ids,
+                                            decoding_params.memory_sequence_length,
+                                            1,
+                                            input_len,
+                                            request_batch_size,
+                                            h_1,
+                                            decoding_params.stream,
+                                            decoding_params.role_id,
+                                            decoding_params.role_embedding_table,
+                                            decoding_params.position_ids);
+      } else {
+        // Memory reuse. from_tensor[1].
+        start_ids_embeddings_kernel_launcher(from_tensor[1],
+                                            decoding_params.embedding_table,
+                                            decoding_params.position_encoding_table,
+                                            decoding_params.type_table,
+                                            decoding_params.type_id,
+                                            decoding_params.d_start_ids,
+                                            decoding_params.memory_sequence_length,
+                                            1,
+                                            input_len,
+                                            request_batch_size,
+                                            h_1,
+                                            decoding_params.stream,
+                                            decoding_params.role_id,
+                                            decoding_params.role_embedding_table,
+                                            decoding_params.position_ids);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        layer_norm(from_tensor[1],
+                   decoding_params.layernorm.gamma,
+                   decoding_params.layernorm.beta,
+                   from_tensor[0],
+                   m,
+                   h_1,
+                   decoding_params.stream);
+      }
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
+      size_t cache_size = local_batch_size * dummy_decoder_max_seq_len *
+                args_.hidden_units_;
+
+      int in_id, out_id;
+      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+        in_id = layer & 0x1;
+        out_id = 1 - in_id;
+
+        decoder_->initialize(decoder_param[layer], decoder_buf_, cublas_workspace_, false);
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        size_t cache_offset = layer * cache_size;  // type T
+        decoder_->forward_context(decoder_workspace,
+                                  from_tensor[out_id],
+                                  K_cache_[0] + cache_offset,
+                                  V_cache_[0] + cache_offset,
+                                  from_tensor[in_id],
+                                  decoding_params.d_attn_mask,
+                                  local_batch_size,
+                                  input_len,
+                                  0,
+                                  dummy_decoder_max_seq_len,
+                                  layer == args_.decoder_layers_ - 1,
+                                  decoding_params.memory_sequence_length);
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+      } // end of for loop of layer
+      allocator_.free(buf);
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+  }
+
   void forward(const DecoderInitParam<DataType_> *param,
                DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
@@ -374,7 +509,9 @@ public:
       finished: false
       word_ids: start_id_
     */
-
+    if (decoding_params.output_scores) {
+   	  cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
+    }
     if (args_.candidate_num_ != 0) {
       sampling_init_kernelLauncher(finished_buf_,
                                    decoding_params.sequence_length,
@@ -440,31 +577,6 @@ public:
                             : (args_.batch_size_ * args_.seq_len_ *
                                args_.hidden_units_);  // type T
 
-    if (args_.prefix_lm_) {
-      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        // Use batch major
-        // put k/v_buf from shape [B, H, L, Dh]
-        // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
-        transpose_cache_batch_major_kernelLauncher(
-            K_cache_[0] + layer * cache_size,
-            V_cache_[0] + layer * cache_size,
-            param[layer].k_cache,
-            param[layer].v_cache,
-            decoding_params.memory_sequence_length,
-            args_.batch_size_,
-            args_.memory_max_seq_len_,
-            args_.seq_len_ + args_.memory_max_seq_len_,
-            args_.size_per_head_,
-            args_.head_num_,
-            decoding_params.stream);
-
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-      }
-    }
-
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       if (args_.normalization_before_) {
         if (args_.prefix_lm_) {
@@ -473,13 +585,16 @@ public:
                                      decoding_params.position_encoding_table,
                                      decoding_params.type_table,
                                      decoding_params.memory_sequence_length,
-                                     decoding_params.type_id,
+                                     decoding_params.decoder_type_id,
                                      word_ids_buf_,
                                      step,
                                      args_.batch_size_,
                                      args_.hidden_units_,
                                      args_.pos_bias_,
-                                     decoding_params.stream);
+                                     decoding_params.stream,
+                                     decoding_params.decoder_role_id,
+                                     decoding_params.role_embedding_table,
+                                     decoding_params.decoder_position_ids);
         } else {
           if (args_.is_mbart_) {
             embedding_lookup_sine_position_encoding_kernel_launcher(
@@ -519,13 +634,16 @@ public:
                                      decoding_params.position_encoding_table,
                                      decoding_params.type_table,
                                      decoding_params.memory_sequence_length,
-                                     decoding_params.type_id,
+                                     decoding_params.decoder_type_id,
                                      word_ids_buf_,
                                      step,
                                      args_.batch_size_,
                                      args_.hidden_units_,
                                      args_.pos_bias_,
-                                     decoding_params.stream);
+                                     decoding_params.stream,
+                                     decoding_params.decoder_role_id,
+                                     decoding_params.role_embedding_table,
+                                     decoding_params.decoder_position_ids);
         } else {
           // TODO(gongenlei): Only support Bart temporarily.
           embedding_position_lookups_bart_kernel_launcher(
@@ -804,7 +922,7 @@ public:
 #endif
         }
 
-        if (decoding_params.logits_mask) {
+        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(logits_buf_,
                                            finished_buf_,
                                            args_.batch_size_,
@@ -812,7 +930,9 @@ public:
                                            args_.vocab_size_padded_,
                                            args_.vocab_size_,
                                            decoding_params.stream,
-                                           decoding_params.logits_mask);
+                                           decoding_params.logits_mask,
+                                           (args_.min_length_ != 0 && step <= args_.min_length_),
+                                           args_.end_id_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -836,31 +956,55 @@ public:
 
         if (args_.candidate_num_ != 0) {
           // top k sampling
-          update_logits_without_softmax(logits_buf_,
-                                        embedding_bias_ptr,
-                                        args_.end_id_,
-                                        finished_buf_,
-                                        m,
-                                        n,
-                                        decoding_params.stream);
+          if (decoding_params.output_scores) {
+            softmax_kernelLauncher(logits_buf_,
+                                  embedding_bias_ptr,
+                                  args_.end_id_,
+                                  finished_buf_,
+                                  m,
+                                  n,
+                                  n,
+                                  decoding_params.stream);
+
+            // Return Score.
+            topK_sampling_kernel_kernelLauncher_v3(
+                topk_workspace_,
+                topk_workspace_size_,
+                logits_buf_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                decoding_params.output_scores,
+                finished_buf_,
+                curandstate_buf_,  // used as random number
+                args_,
+                decoding_params.stream,
+                args_.batch_size_);
+          } else {
+            update_logits_without_softmax(logits_buf_,
+                                          embedding_bias_ptr,
+                                          args_.end_id_,
+                                          finished_buf_,
+                                          m,
+                                          n,
+                                          decoding_params.stream);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
 #endif
 
-          topK_sampling_kernel_kernelLauncher_v2(
-              topk_workspace_,
-              topk_workspace_size_,
-              logits_buf_,
-              decoding_params.output_ids + (step - 1) * args_.batch_size_,
-              decoding_params.sequence_length,
-              finished_buf_,
-              curandstate_buf_,  // used as random number
-              args_,
-              decoding_params.stream,
-              args_.batch_size_);
-
+            topK_sampling_kernel_kernelLauncher_v2(
+                topk_workspace_,
+                topk_workspace_size_,
+                logits_buf_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                finished_buf_,
+                curandstate_buf_,  // used as random number
+                args_,
+                decoding_params.stream,
+                args_.batch_size_);
+          }
         } else if (args_.probability_threshold_ != 0.0) {
           // top p sampling
           softmax_kernelLauncher(logits_buf_,
@@ -877,21 +1021,40 @@ public:
           check_cuda_error(cudaGetLastError());
 #endif
 
-          topP_sampling_kernel_kernelLauncher_v2(
-              topp_workspace_,
-              topp_workspace_size_,
-              logits_buf_,
-              topp_id_vals_buf_,
-              topp_offset_buf_,
-              begin_topp_offset_buf_,
-              finished_buf_,
-              curandstate_buf_,
-              args_,
-              decoding_params.output_ids + (step - 1) * args_.batch_size_,
-              decoding_params.sequence_length,
-              n,
-              decoding_params.stream,
-              args_.batch_size_);
+          if (decoding_params.output_scores) {
+            topP_sampling_kernel_kernelLauncher_v3(
+                topp_workspace_,
+                topp_workspace_size_,
+                logits_buf_,
+                topp_id_vals_buf_,
+                topp_offset_buf_,
+                begin_topp_offset_buf_,
+                finished_buf_,
+                curandstate_buf_,
+                args_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                decoding_params.output_scores,
+                n,
+                decoding_params.stream,
+                args_.batch_size_);
+          } else {
+            topP_sampling_kernel_kernelLauncher_v2(
+                topp_workspace_,
+                topp_workspace_size_,
+                logits_buf_,
+                topp_id_vals_buf_,
+                topp_offset_buf_,
+                begin_topp_offset_buf_,
+                finished_buf_,
+                curandstate_buf_,
+                args_,
+                decoding_params.output_ids + (step - 1) * args_.batch_size_,
+                decoding_params.sequence_length,
+                n,
+                decoding_params.stream,
+                args_.batch_size_);
+          }
         }
       }
 
