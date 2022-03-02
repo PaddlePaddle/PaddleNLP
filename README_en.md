@@ -1,3 +1,5 @@
+
+
 English | [简体中文](./README.md)
 
 <p align="center">
@@ -212,13 +214,11 @@ Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for con
 To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
 
 ### WeChat
-Join our WeChat Technical Group for technical exchange right now! ⬇️
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/151304268-ae8f218c-ad32-4e9d-ae72-e8e101484272.jpg" width="200" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/156119400-1bdbfb6f-9af0-4886-8f98-7d17f386638f.jpg" width="210" height="200" />
 </div>
-
-
 
 
 ## ChangeLog
