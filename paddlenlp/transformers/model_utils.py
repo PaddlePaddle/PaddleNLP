@@ -171,6 +171,14 @@ class PretrainedModel(Layer, GenerationMixin):
                 initialization. If the keyword is in `__init__` argument names of
                 base model, update argument values of the base model; else update
                 argument values of derived model.
+            load_state_as_np (bool, optional): The weights read in can be choosed
+                to place on CPU or GPU though the model is on the default device.
+                If `True`, load the model weights as `numpy.ndarray` on CPU.
+                Otherwise, weights would be loaded as tensors on the default
+                device. Note that if on GPU, the latter would creates extra
+                temporary tensors in addition to the model weights, which
+                doubles the memory usage . Thus it is suggested to use `True`
+                for big models on GPU. Default to `False`.
 
         Returns:
             PretrainedModel: An instance of `PretrainedModel`.
@@ -192,6 +200,7 @@ class PretrainedModel(Layer, GenerationMixin):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
+        load_state_as_np = kwargs.pop("load_state_as_np", False)
 
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
@@ -293,9 +302,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
             base_args = base_arg.pop("init_args", ())
             base_kwargs = base_arg
-        # To init faster on CPU big model, maybe empty is better.
-        # paddle.nn.initializer.set_global_initializer(
-        #     paddle.nn.initializer.Constant(), paddle.nn.initializer.Constant())
+
         if cls == cls.base_model_class:
             # Update with newly provided args and kwargs for base model
             base_args = base_args if not args else args
@@ -325,7 +332,7 @@ class PretrainedModel(Layer, GenerationMixin):
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
 
-        state_dict = paddle.load(weight_path, return_numpy=True)
+        state_dict = paddle.load(weight_path, return_numpy=load_state_as_np)
 
         # Make sure we are able to load base models as well as derived models
         # (with heads)
@@ -358,6 +365,8 @@ class PretrainedModel(Layer, GenerationMixin):
         if len(unexpected_keys) > 0:
             logger.info("Weights from pretrained model not used in {}: {}".
                         format(model.__class__.__name__, unexpected_keys))
+        # Allow the float16 model to load float32 weights, which decreases memory
+        # usage in model loading stage and is useful to big models.
         dtype_prefix_len = len("paddle.")  # paddle.float16
         for k, v in model_to_load.state_dict().items():
             if not isinstance(v, np.ndarray):
