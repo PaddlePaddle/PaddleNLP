@@ -21,6 +21,7 @@ import paddle
 import paddle.inference as paddle_infer
 
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from paddlenlp.ops.ext_utils import load
 
 
 def setup_args():
@@ -31,11 +32,6 @@ def setup_args():
         default="./infer_model/",
         type=str,
         help="Path to save inference model of gpt. ")
-    parser.add_argument(
-        "--decoding_lib",
-        default="../../build/lib/libdecoding_op.so",
-        type=str,
-        help="Path of libdecoding_op.so. ")
     parser.add_argument(
         "--use_role",
         action="store_true",
@@ -82,8 +78,8 @@ def infer(args):
         return_role_ids=args.use_role,
         position_style=args.position_style)
 
-    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-        args.decoding_lib)
+    # Load FasterTransformer lib. 
+    load("FasterTransformer", verbose=True)
 
     config = paddle_infer.Config(args.inference_model_dir + "plato.pdmodel",
                                  args.inference_model_dir + "plato.pdiparams")
