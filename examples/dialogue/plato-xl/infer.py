@@ -124,7 +124,7 @@ def infer(args):
             token_type_ids=data['token_type_ids'],
             position_ids=data['position_ids'],
             attention_mask=data['attention_mask'],
-            role_ids=data['role_ids'],
+            role_ids=data.get('role_ids', None),
             seq_len=data['seq_len'],
             max_length=args.max_out_len,
             min_length=args.min_out_len,
