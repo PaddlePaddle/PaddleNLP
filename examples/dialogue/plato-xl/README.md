@@ -34,7 +34,7 @@ pip install sentencepiece
 
 ### 高性能生成
 
-运行如下命令即可开始与聊天机器人用英语进行简单的对话
+运行如下命令即可进行高性能预测，forward 将自动循环 200 次前向以供性能测试需要。
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
