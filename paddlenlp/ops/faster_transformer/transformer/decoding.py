@@ -691,29 +691,23 @@ def convert_params(faster_model,
                         attr="bias",
                         use_numpy=fuse_qkv == 2,
                         del_param=fuse_qkv == 2)
-                    # w = _concat_param(
-                    #     layer.self_attn.q_proj.weight,
-                    #     layer.self_attn.k_proj.weight,
-                    #     layer.self_attn.v_proj.weight,
-                    #     is_bias=False)
-                    # b = _concat_param(
-                    #     layer.self_attn.q_proj.bias,
-                    #     layer.self_attn.k_proj.bias,
-                    #     layer.self_attn.v_proj.bias,
-                    #     is_bias=True)
                     params["slf_q_weight"].append((w, False))
                     params["slf_q_bias"].append((b, True))
                     setattr(faster_model, "slf_q_weight_" + str(i), w)
                     setattr(faster_model, "slf_q_bias_" + str(i), b)
-                    params["slf_k_weight"].append((paddle.empty([0]), False))
-                    params["slf_k_bias"].append((paddle.empty([0]), True))
-                    params["slf_v_weight"].append((paddle.empty([0]), False))
-                    params["slf_v_bias"].append((paddle.empty([0]), True))
-                    # if fuse_qkv == 2:
-                    #     # TODO(guosheng): maybe model can't be export, resolve it
-                    #     del layer.self_attn.q_proj
-                    #     del layer.self_attn.k_proj
-                    #     del layer.self_attn.v_proj
+                    # TODO(guosheng): Tensor with size 0 might be failed in
+                    # paddle develop, thus use tensor with size 1 instead
+                    # temporarily. While size 0 seems all right in to_static.
+                    dummy_tensor = paddle.zeros([1])
+                    for key in [
+                            f"slf_{m}_{n}"
+                            for m in ("k", "v") for n in ("weight", "bias")
+                    ]:
+                        params[key].append((dummy_tensor, True
+                                            if key.endswith("bias") else False))
+                        setattr(faster_model, key + "_" + str(i),
+                                params[key][-1])
+
                 params["slf_out_weight"].append(
                     (layer.self_attn.out_proj, "weight"))
                 params["slf_out_bias"].append(
