@@ -252,25 +252,25 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             The id of special token `mask_token`. Defaults to 30000.
     """
 
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            normalize_before=True,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            initializer_range=0.02,
-            unk_token_id=0,
-            pad_token_id=0,
-            bos_token_id=1,
-            eos_token_id=2,
-            mask_token_id=30000, ):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 normalize_before=True,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 initializer_range=0.02,
+                 unk_token_id=0,
+                 pad_token_id=0,
+                 bos_token_id=1,
+                 eos_token_id=2,
+                 mask_token_id=30000,
+                 role_type_size=None):
         super(UnifiedTransformerModel, self).__init__()
         self.unk_token_id = unk_token_id
         self.pad_token_id = pad_token_id
@@ -281,7 +281,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
 
         self.embeddings = UnifiedTransformerEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+            max_position_embeddings, type_vocab_size, role_type_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,

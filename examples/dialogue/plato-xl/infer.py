@@ -16,7 +16,9 @@ import time
 import argparse
 from pprint import pprint
 
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+import paddle
+
+from paddlenlp.transformers import UnifiedTransformerModel, UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 
 
 def setup_args():
@@ -28,7 +30,7 @@ def setup_args():
         help="Whether to use role embeddings. ")
     parser.add_argument(
         "--position_style",
-        default="continuous",
+        default="relative",
         choices=["continuous", "relative"],
         type=str,
         help="The type for positional embedding. Default is continuous. ")
@@ -49,7 +51,7 @@ def setup_args():
         help="The k value for topk_sampling. Default is 4. ")
     parser.add_argument(
         "--topp",
-        default=0.0,
+        default=1.0,
         type=float,
         help="The p value for topp_sampling. Default is 0.0f. ")
     parser.add_argument(
@@ -68,7 +70,7 @@ def setup_args():
         type=int,
         help="The number of candidate to procedure beam search. ")
 
-    args = parse_args(parser)
+    args = parser.parse_args()
 
     return args
 
@@ -104,6 +106,14 @@ def infer(args):
         return_role_ids=args.use_role,
         position_style=args.position_style)
 
+    for name in data:
+        if name == "attention_mask":
+            data[name] = paddle.to_tensor(
+                data[name], dtype="float32").reshape([1, 1, 41, 41])
+        else:
+            data[name] = paddle.to_tensor(
+                data[name], dtype="int32").reshape([1, -1])
+
     for i in range(200):
         if 100 == i:
             paddle.device.cuda.synchronize()
@@ -129,9 +139,8 @@ def infer(args):
     print("Average time of FasterGeneration of PLATO-XL model is {}ms. ".format(
         (time.time() - start) / 100 * 1000))
 
-    # TODO: verify post process.
     result = postprocess_response(outputs[0].numpy(), tokenizer)
-    result = "".join(result)
+    result = " ".join(result)
 
     print("Model input:", context)
     print("Result:", result)
