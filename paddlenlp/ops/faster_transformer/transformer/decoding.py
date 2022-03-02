@@ -591,6 +591,37 @@ def convert_params(faster_model,
                    fuse_qkv=1,
                    use_fp16=False,
                    restore_data=False):
+    r"""
+    Convert parameters included in Transformer layer (`nn.TransformerEncoder`
+    and `gpt.modeling.TransformerDecoder`) from original models to the format
+    of faster models.
+
+    Args:
+        faster_model (Layer): The faster model object.
+        model (Layer): The Transformer layer. It can be an instance of
+            `nn.TransformerEncoder` or `gpt.modeling.TransformerDecoder`
+            currently, and `nn.TransformerDecoder` would be supported soon.
+        fuse_qkv (int): 0 for nofuse, 1 for fuse, 2 for fuse and delete the
+            unfused parameters. If environment variable `PPFG_QKV_MEM_OPT` is
+            set and the weights of q/k/v is fused, it will try to delete the
+            original unfused weights. Note the rollback to original model would
+            not be guarantee anymore when the faster model failed if the original
+            weights are deleted. Default to 1.
+        use_fp16 (bool): Whether to use float16. Maybe we should use the default
+            dtype as the highest priority later. Default to `False`.
+        restore_data (bool): If `False`, need to reload the weight values. It
+            should be `True` for weight loaded models. Default to `False`.
+
+    Returns:
+        defaultdict: Each value is a list including converted parameters in all
+            layers. For other parameters not included in Transformer module to
+            be converted, such as embeddings, you can achieve it by using the
+            returned dict `params` though `params['word_emb'].append()` directly
+            which would do CPU/GPU and fp32/fp16 transfer automatically.
+    """
+    if fuse_qkv == 1:
+        fuse_qkv = 2 if os.getenv("PPFG_QKV_MEM_OPT", "0") == "1" else 1
+
     class _list(list):
         def append(self, item):
             if isinstance(item[0], nn.Layer):
@@ -658,9 +689,11 @@ def convert_params(faster_model,
         return p
 
     def _convert(module):
-        if isinstance(module,
-                      (nn.TransformerEncoder, nn.TransformerDecoder,
-                       paddlenlp.transformers.gpt.modeling.TransformerDecoder)):
+        if isinstance(
+                module,
+            (
+                nn.TransformerEncoder,  # nn.TransformerDecoder,
+                paddlenlp.transformers.gpt.modeling.TransformerDecoder)):
             for i, layer in enumerate(module.layers):
                 # fuse_qkv: 0 for nofuse, 1 for fuse,
                 # 2 for fuse and delete the unfused
@@ -678,30 +711,28 @@ def convert_params(faster_model,
                     params["slf_v_bias"].append(
                         (layer.self_attn.v_proj, "bias"))
                 else:
-                    # TODO(guosheng): Find the reason why we have to cast to
-                    # fp16 here and return the input tensor in transfer_param
-                    # rather than creating new weights in transfer_param when
-                    # converting to static.
                     w = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="weight",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv ==
-                        2).astype("float16" if use_fp16 else "float32")
+                        del_param=fuse_qkv == 2)
                     b = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="bias",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv ==
-                        2).astype("float16" if use_fp16 else "float32")
+                        del_param=fuse_qkv == 2)
                     params["slf_q_weight"].append((w, False))
                     params["slf_q_bias"].append((b, True))
-                    setattr(faster_model, "slf_q_weight_" + str(i), w)
-                    setattr(faster_model, "slf_q_bias_" + str(i), b)
+                    # NOTE: use `params["slf_q_weight"][-1]` rather than `w`
+                    # since the appended tensor might be a new transfered tensor
+                    setattr(faster_model, "slf_q_weight_" + str(i),
+                            params["slf_q_weight"][-1])
+                    setattr(faster_model, "slf_q_bias_" + str(i),
+                            params["slf_q_bias"][-1])
                     # TODO(guosheng): Tensor with size 0 might be failed in
                     # paddle develop, thus use tensor with size 1 instead
                     # temporarily. While size 0 seems all right in to_static.
@@ -728,6 +759,7 @@ def convert_params(faster_model,
                 params["ffn_ln_weight"].append((layer.norm2, "weight"))
                 params["ffn_ln_bias"].append((layer.norm2, "bias"))
                 if isinstance(module, nn.TransformerDecoder):
+                    # TODO(guosheng): support nn.TransformerDecoder
                     pass
             if module.norm is not None:
                 params["decoder_ln_weight"].append((module.norm, "weight"))
