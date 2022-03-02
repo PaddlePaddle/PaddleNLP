@@ -559,8 +559,9 @@ def finalize(beam_size,
 def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
     param_shape = p.shape
     # Allow CPU/GPU and float16/float32 transfer
-    if (str(p.dtype)[-len(dtype):] == dtype and
-            str(p.place).startswith("CUDAPlace")):
+    # NOTE: str(p.place) differs between paddle develop and 2.2
+    if str(p.dtype)[-len(dtype):] == dtype and ("gpu" in str(p.place).lower() or
+                                                "cuda" in str(p.place).lower()):
         return p
     if restore_data:
         if in_dygraph_mode():
