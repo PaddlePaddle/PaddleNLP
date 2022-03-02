@@ -32,14 +32,19 @@ from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--task_name", type=str, default="afqmc", required=False, help="task_name")
+parser.add_argument("--task_name", type=str, required=True, help="task_name")
 parser.add_argument(
     "--input_dir",
     type=str,
-    default="afqmc",
-    required=False,
+    default="../pruning/pruned_models/",
+    required=True,
     help="Input task model directory.")
+parser.add_argument(
+    "--output_dir",
+    type=str,
+    default="./",
+    required=False,
+    help="Output model directory.")
 
 parser.add_argument(
     "--save_model_filename",
@@ -141,7 +146,8 @@ def quant_post(args, batch_size=8, algo='avg'):
     paddleslim.quant.quant_post_static(
         exe,
         args.input_dir,
-        os.path.join(args.task_name + '_quant_models', algo + str(batch_size)),
+        os.path.join(args.output_dir, args.task_name + '_quant_models',
+                     algo + str(batch_size)),
         save_model_filename=args.save_model_filename,
         save_params_filename=args.save_params_filename,
         algo=algo,

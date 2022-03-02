@@ -93,7 +93,7 @@ class LacTask(Task):
     resource_files_urls = {
         "lac": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/model_state.pdparams", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/lexical_analysis/lac/model_state.pdparams",
                 "3d4008c6c9d29424465829c9acf909bd"
             ],
             "tags": [
@@ -111,11 +111,7 @@ class LacTask(Task):
         }
     }
 
-    def __init__(self, 
-                 task, 
-                 model,
-                 user_dict=None,
-                 **kwargs):
+    def __init__(self, task, model, user_dict=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
         self._user_dict = user_dict
@@ -157,8 +153,7 @@ class LacTask(Task):
         """
         model_instance = BiGruCrf(self.kwargs['emb_dim'],
                                   self.kwargs['hidden_size'],
-                                  len(self._word_vocab), 
-                                  len(self._tag_vocab))
+                                  len(self._word_vocab), len(self._tag_vocab))
         # Load the model parameter for the predict
         state_dict = paddle.load(
             os.path.join(self._task_path, "model_state.pdparams"))

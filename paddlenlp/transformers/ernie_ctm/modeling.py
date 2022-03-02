@@ -398,6 +398,12 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
             input_ids=input_ids,

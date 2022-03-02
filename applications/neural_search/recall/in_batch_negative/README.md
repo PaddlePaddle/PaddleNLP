@@ -481,7 +481,11 @@ python export_to_serving.py \
 sh scripts/export_to_serving.sh
 ```
 
-然后启动server:
+Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，第二种是C++的方式，下面分别介绍这两种方式的用法：
+
+#### Pipeline方式
+
+启动 Pipeline Server:
 
 ```
 python web_service.py
@@ -516,6 +520,57 @@ PipelineClient::predict before time:1641450851.375738
 ```
 
 可以看到客户端发送了2条文本，返回了2个 embedding 向量
+
+#### C++的方式
+
+启动C++的Serving：
+
+```
+python -m paddle_serving_server.serve --model serving_server --port 9393 --gpu_id 2 --thread 5 --ir_optim True --use_trt --precision FP16
+```
+也可以使用脚本：
+
+```
+sh deploy/C++/start_server.sh
+```
+Client 可以使用 http 或者 rpc 两种方式，rpc 的方式为：
+
+```
+python deploy/C++/rpc_client.py
+```
+运行的输出为：
+```
+I0209 20:40:07.978225 20896 general_model.cpp:490] [client]logid=0,client_cost=395.695ms,server_cost=392.559ms.
+time to cost :0.3960278034210205 seconds
+{'output_embedding': array([[ 9.01343748e-02, -1.21870913e-01,  1.32834800e-02,
+        -1.57673359e-01, -2.60387752e-02,  6.98455423e-02,
+         1.58108603e-02,  3.89952064e-02,  3.22783105e-02,
+         3.49135026e-02,  7.66086206e-02, -9.12970975e-02,
+         6.25643134e-02,  7.21886680e-02,  7.03565404e-02,
+         5.44054210e-02,  3.25332815e-03,  5.01751155e-02,
+......
+```
+可以看到服务端返回了向量
+
+或者使用 http 的客户端访问模式：
+
+```
+python deploy/C++/http_client.py
+```
+运行的输出为：
+
+```
+(2, 64)
+(2, 64)
+outputs {
+  tensor {
+    float_data: 0.09013437479734421
+    float_data: -0.12187091261148453
+    float_data: 0.01328347995877266
+    float_data: -0.15767335891723633
+......
+```
+可以看到服务端返回了向量
 
 ## Reference
 

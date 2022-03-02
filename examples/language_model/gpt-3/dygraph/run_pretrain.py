@@ -38,6 +38,12 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
+# add sharding stage2/3
+from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.sharding_optimizer_stage2 import ShardingOptimizerStage2
+from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage2 import ShardingStage2
+from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage3 import ShardingStage3
+
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
     "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
@@ -146,6 +152,10 @@ def do_train(args):
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
 
+    # sharding stage2/3 not support hybrid parallel
+    if args.sharding_stage in [2, 3]:
+        assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support hybrid parallel later"
+
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
     data_world_size = args.dp_degree * args.sharding_degree
@@ -224,7 +234,7 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
 
-    if args.sharding_degree > 1:
+    if args.sharding_stage == 1 and args.sharding_degree > 1:
         optimizer = DygraphShardingOptimizer(
             hcg=fleet.get_hybrid_communicate_group(),
             user_defined_strategy=strategy,
@@ -255,15 +265,22 @@ def do_train(args):
 
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
         # level O2 means converting the network to FP16
-        model, optimizer = paddle.amp.decorate(
-            models=model,
-            optimizers=optimizer,
-            level='O2',
-            save_dtype='float32')
+        if args.sharding_stage in [2, 3]:
+            # TODO(Baibaifan): combine ShardingScaler and fleet.distributed_scaler in feature
+            scaler = ShardingScaler(scaler)
+        else:
+            scaler = fleet.distributed_scaler(scaler)
+        model = paddle.amp.decorate(
+            models=model, level='O2', save_dtype='float32')
 
-    if paddle.distributed.get_world_size() > 1:
+    # wrap sharding stage2/3 and add collective group
+    # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
+    if args.sharding_stage in [2, 3]:
+        model, optimizer = wrap_sharding_2_3(
+            model, optimizer, args.sharding_offload, args.use_recompute)
+
+    elif paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
 
@@ -340,12 +357,17 @@ def do_train(args):
                         loss = loss + loss_mbs
 
                     if args.use_pure_fp16:
-                        scaler.minimize(optimizer, loss)
+                        if args.sharding_stage in [2, 3]:
+                            scaler.step(optimizer)
+                            scaler.update()
+                        else:
+                            scaler.minimize(optimizer, loss)
                     else:
                         optimizer.step()
 
                     if lr_scheduler is not None:
                         lr_scheduler.step()
+
                     optimizer.clear_grad()
 
                 else:
@@ -406,7 +428,7 @@ def do_train(args):
                         global_step >= args.max_steps) and dp_rank == 0:
 
                     model_to_save = model._layers if paddle.distributed.get_world_size(
-                    ) > 1 else model
+                    ) > 1 and args.sharding_stage not in [2, 3] else model
                     output_dir = os.path.join(args.output_dir,
                                               "step_%d" % global_step)
                     os.makedirs(output_dir, exist_ok=True)
@@ -424,11 +446,17 @@ def do_train(args):
                                 "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
                                 format(mp_rank, sharding_rank, pp_rank)))
                     else:
+                        if args.sharding_stage == 3:
+                            # If parameter need to convert to cpu, please add convert2cpu=True
+                            model_to_save.get_all_parameters(convert2cpu=False)
                         if mp_rank == 0 and sharding_rank == 0:
                             tokenizer.save_pretrained(output_dir)
                         model_to_save.save_pretrained(output_dir)
+                        optimizer_state_dict = optimizer._optim.state_dict(
+                        ) if args.sharding_stage == 2 else optimizer.state_dict(
+                        )
                         paddle.save(
-                            optimizer.state_dict(),
+                            optimizer_state_dict,
                             os.path.join(
                                 output_dir,
                                 "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
@@ -445,6 +473,27 @@ def do_train(args):
                 reader_start = time.time()
 
             del train_data_loader
+
+
+def wrap_sharding_2_3(model, optimizer, sharding_offload, use_recompute):
+    group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
+
+    if args.sharding_stage == 2:
+        optimizer = ShardingOptimizerStage2(
+            params=model.parameters(),
+            optim=optimizer,
+            group=group,
+            offload=sharding_offload)
+        model = ShardingStage2(model, optimizer, group=group)
+
+    elif args.sharding_stage == 3:
+        model = ShardingStage3(
+            model,
+            optimizer,
+            group=group,
+            sync_comm=use_recompute,
+            offload=sharding_offload)
+    return model, optimizer
 
 
 if __name__ == "__main__":
