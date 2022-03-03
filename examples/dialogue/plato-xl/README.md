@@ -12,7 +12,7 @@
 * 支持 float16 的 GPU 信息可以在 NVIDIA [官网](https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html#hardware-precision-matrix) 上查询；
 * 您当前使用的 GPU 的 compute capability 同样可以在 NVIDIA [官网](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 上找到，与上面链接中表格对应。
 
-PLATO-XL 的训练过程及其他细节详见 [Knover](https://github.com/PaddlePaddle/Knover)
+PLATO-XL 的训练过程及其他细节详见 [Knover](https://github.com/PaddlePaddle/Knover/tree/develop/projects/PLATO-XL)
 
 ## 快速开始
 
