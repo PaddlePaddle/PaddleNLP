@@ -1,7 +1,7 @@
 简体中文 | [English](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="718" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -317,8 +317,9 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 - 现在就加入PaddleNLP的技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/150080081-8611d041-2e83-440f-9e8c-ba483fea27b5.jpg" width="250" height="300" />
-</div>  
+  <img src="https://user-images.githubusercontent.com/11793384/156118227-78837467-5087-40ab-9717-5ab92855cf57.JPG" width="230" height="300" />
+</div>
+
 
 
 

@@ -50,8 +50,8 @@ class Task(metaclass=abc.ABCMeta):
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
         else:
-            self._task_path = os.path.join(self._home_path, "taskflow", 
-                self.task, self.model)
+            self._task_path = os.path.join(self._home_path, "taskflow",
+                                           self.task, self.model)
         download_check(self._task_flag)
 
     @abstractmethod
@@ -112,8 +112,7 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
             # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
-            self._config.delete_pass(
-                "embedding_eltwise_layernorm_fuse_pass")
+            self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()

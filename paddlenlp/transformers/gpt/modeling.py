@@ -811,10 +811,11 @@ class GPTModel(GPTPretrainedModel):
             diagonal=1)
 
         if attention_mask is not None:
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
-
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1130,7 +1131,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.gpt.config["hidden_size"] // self.gpt.config[
             "num_attention_heads"]
-        if size_per_head not in [32, 64, 128]:
+        if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
                 "'size_per_head = %d' is not supported yet in the faster version of GPT"
                 % size_per_head)
@@ -1139,6 +1140,10 @@ class GPTLMHeadModel(GPTPretrainedModel):
             raise AttributeError(
                 "'forced_bos_token_id != None' is not supported yet in the faster version"
             )
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         self._faster_entry = FasterGPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
@@ -1151,13 +1156,16 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
+        if attention_mask is not None:
+            if len(attention_mask.shape) == 4:
+                attention_mask = attention_mask[:, -1, -1, :]
+            if "int" in paddle.fluid.data_feeder.convert_dtype(
+                    attention_mask.dtype):
+                attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
-
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,

@@ -4,21 +4,25 @@ import paddle
 import numpy as np
 
 
-def match_embedding_param(convert_parameter_name_dict):
+def match_embedding_param(convert_parameter_name_dict, static_para_prefix=""):
     convert_parameter_name_dict[
-        "embeddings.word_embeddings.weight"] = "word_embedding"
+        "embeddings.word_embeddings.weight"] = static_para_prefix + "word_embedding"
     convert_parameter_name_dict[
-        "embeddings.position_embeddings.weight"] = "pos_embedding"
+        "embeddings.position_embeddings.weight"] = static_para_prefix + "pos_embedding"
     convert_parameter_name_dict[
-        "embeddings.token_type_embeddings.weight"] = "sent_embedding"
+        "embeddings.token_type_embeddings.weight"] = static_para_prefix + "sent_embedding"
     convert_parameter_name_dict[
-        "embeddings.layer_norm.weight"] = "pre_encoder_layer_norm_scale"
+        "embeddings.task_type_embeddings.weight"] = static_para_prefix + "task_embedding"
     convert_parameter_name_dict[
-        "embeddings.layer_norm.bias"] = "pre_encoder_layer_norm_bias"
+        "embeddings.layer_norm.weight"] = static_para_prefix + "pre_encoder_layer_norm_scale"
+    convert_parameter_name_dict[
+        "embeddings.layer_norm.bias"] = static_para_prefix + "pre_encoder_layer_norm_bias"
     return convert_parameter_name_dict
 
 
-def match_encoder_param(convert_parameter_name_dict, layer_num=4):
+def match_encoder_param(convert_parameter_name_dict,
+                        layer_num=4,
+                        static_para_prefix=""):
     dygraph_proj_names = ["q", "k", "v", "out"]
     static_proj_names = ["query", "key", "value", "output"]
     dygraph_param_names = ["weight", "bias"]
@@ -28,7 +32,7 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
 
     # Firstly, converts the multihead_attention to the parameter.
     dygraph_format_name = "encoder.layers.{}.self_attn.{}_proj.{}"
-    static_format_name = "encoder_layer_{}_multi_head_att_{}_fc.{}_0"
+    static_format_name = static_para_prefix + "encoder_layer_{}_multi_head_att_{}_fc.{}_0"
     for i in range(0, layer_num):
         for dygraph_proj_name, static_proj_name in zip(dygraph_proj_names,
                                                        static_proj_names):
@@ -39,7 +43,7 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
 
     # Secondly, converts the encoder ffn parameter.     
     dygraph_ffn_linear_format_name = "encoder.layers.{}.linear{}.{}"
-    static_ffn_linear_format_name = "encoder_layer_{}_ffn_fc_{}.{}_0"
+    static_ffn_linear_format_name = static_para_prefix + "encoder_layer_{}_ffn_fc_{}.{}_0"
     for i in range(0, layer_num):
         for j in range(0, 2):
             for dygraph_param_name, static_param_name in zip(
@@ -49,7 +53,7 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
 
     # Thirdly, converts the multi_head layer_norm parameter.
     dygraph_encoder_attention_layer_norm_format_name = "encoder.layers.{}.norm1.{}"
-    static_encoder_attention_layer_norm_format_name = "encoder_layer_{}_post_att_layer_norm_{}"
+    static_encoder_attention_layer_norm_format_name = static_para_prefix + "encoder_layer_{}_post_att_layer_norm_{}"
     for i in range(0, layer_num):
         for dygraph_param_name, static_pararm_name in zip(
                 dygraph_layer_norm_param_names, static_layer_norm_param_names):
@@ -57,7 +61,7 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
                 static_encoder_attention_layer_norm_format_name.format(i, static_pararm_name)
 
     dygraph_encoder_ffn_layer_norm_format_name = "encoder.layers.{}.norm2.{}"
-    static_encoder_ffn_layer_norm_format_name = "encoder_layer_{}_post_ffn_layer_norm_{}"
+    static_encoder_ffn_layer_norm_format_name = static_para_prefix + "encoder_layer_{}_post_ffn_layer_norm_{}"
     for i in range(0, layer_num):
         for dygraph_param_name, static_pararm_name in zip(
                 dygraph_layer_norm_param_names, static_layer_norm_param_names):
@@ -66,28 +70,30 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
     return convert_parameter_name_dict
 
 
-def match_pooler_parameter(convert_parameter_name_dict):
-    convert_parameter_name_dict["pooler.dense.weight"] = "pooled_fc.w_0"
-    convert_parameter_name_dict["pooler.dense.bias"] = "pooled_fc.b_0"
+def match_pooler_parameter(convert_parameter_name_dict, static_para_prefix=""):
+    convert_parameter_name_dict[
+        "pooler.dense.weight"] = static_para_prefix + "pooled_fc.w_0"
+    convert_parameter_name_dict[
+        "pooler.dense.bias"] = static_para_prefix + "pooled_fc.b_0"
     return convert_parameter_name_dict
 
 
-def match_mlm_parameter(convert_parameter_name_dict):
+def match_mlm_parameter(convert_parameter_name_dict, static_para_prefix=""):
     # convert_parameter_name_dict["cls.predictions.decoder_weight"] = "word_embedding"
     convert_parameter_name_dict[
-        "cls.predictions.decoder_bias"] = "mask_lm_out_fc.b_0"
+        "cls.predictions.decoder_bias"] = static_para_prefix + "mask_lm_out_fc.b_0"
     convert_parameter_name_dict[
-        "cls.predictions.transform.weight"] = "mask_lm_trans_fc.w_0"
+        "cls.predictions.transform.weight"] = static_para_prefix + "mask_lm_trans_fc.w_0"
     convert_parameter_name_dict[
-        "cls.predictions.transform.bias"] = "mask_lm_trans_fc.b_0"
+        "cls.predictions.transform.bias"] = static_para_prefix + "mask_lm_trans_fc.b_0"
     convert_parameter_name_dict[
-        "cls.predictions.layer_norm.weight"] = "mask_lm_trans_layer_norm_scale"
+        "cls.predictions.layer_norm.weight"] = static_para_prefix + "mask_lm_trans_layer_norm_scale"
     convert_parameter_name_dict[
-        "cls.predictions.layer_norm.bias"] = "mask_lm_trans_layer_norm_bias"
+        "cls.predictions.layer_norm.bias"] = static_para_prefix + "mask_lm_trans_layer_norm_bias"
     return convert_parameter_name_dict
 
 
-def match_last_fc_parameter(convert_parameter_name_dict):
+def match_last_fc_parameter(convert_parameter_name_dict, static_para_prefix=""):
     convert_parameter_name_dict["classifier.weight"] = "_cls_out_w"
     convert_parameter_name_dict["classifier.bias"] = "_cls_out_b"
     return convert_parameter_name_dict

@@ -157,7 +157,7 @@ class WordTagTask(Task):
     """
 
     resource_files_names = {
-        "model_state": "model_state.pdparms",
+        "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "termtree_schema": "termtree_type.csv",
         "termtree_data": "termtree_data",
@@ -191,7 +191,6 @@ class WordTagTask(Task):
     def __init__(self,
                  model,
                  task,
-                 batch_size=1,
                  params_path=None,
                  tag_path=None,
                  term_schema_path=None,
@@ -419,11 +418,12 @@ class WordTagTask(Task):
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
         for sent_index in range(len(batch_texts)):
+            sent = batch_texts[sent_index]
             tags = [
                 self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+                for index in batch_pred_tags[sent_index][self.summary_num:len(
+                    sent) + self.summary_num]
             ]
-            sent = batch_texts[sent_index]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
             sent_out = []
