@@ -3,20 +3,46 @@ import paddle
 
 
 def convert_example(example, tokenizer):
-    encoded_inputs = tokenizer(text=example["sentence1"],text_pair=example["sentence2"], max_seq_len=512, pad_to_max_seq_len=True)
-    return tuple([np.array(x, dtype="int64") for x in [
-            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+    encoded_inputs = tokenizer(
+        text=example["sentence1"],
+        text_pair=example["sentence2"],
+        max_seq_len=512,
+        pad_to_max_seq_len=True)
+    return tuple([
+        np.array(
+            x, dtype="int64")
+        for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+            [example["label"]]
+        ]
+    ])
+
 
 def convert_iflytek_example(example, tokenizer):
-    encoded_inputs = tokenizer(text=example["sentence"], max_seq_len=512, pad_to_max_seq_len=True)
-    return tuple([np.array(x, dtype="int64") for x in [
-            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+    encoded_inputs = tokenizer(
+        text=example["sentence"], max_seq_len=512, pad_to_max_seq_len=True)
+    return tuple([
+        np.array(
+            x, dtype="int64")
+        for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+            [example["label"]]
+        ]
+    ])
 
 
 def convert_tnews_example(example, tokenizer):
-    encoded_inputs = tokenizer(text=example["sentence"], max_seq_len=128, pad_to_max_seq_len=True)
-    return tuple([np.array(x, dtype="int64") for x in [
-            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+    encoded_inputs = tokenizer(
+        text=example["sentence"], max_seq_len=128, pad_to_max_seq_len=True)
+    return tuple([
+        np.array(
+            x, dtype="int64")
+        for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+            [example["label"]]
+        ]
+    ])
+
 
 def convert_wsc_example(example, tokenizer):
     text_a = example['text']
@@ -39,19 +65,34 @@ def convert_wsc_example(example, tokenizer):
         text_a_list.insert(query_idx + len(query) + 2 + 1, "_")
 
     text_a = "".join(text_a_list)
-    encoded_inputs = tokenizer(text=text_a, max_seq_len=128, pad_to_max_seq_len=True)
-    return tuple([np.array(x, dtype="int64") for x in [
-            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+    encoded_inputs = tokenizer(
+        text=text_a, max_seq_len=128, pad_to_max_seq_len=True)
+    return tuple([
+        np.array(
+            x, dtype="int64")
+        for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+            [example["label"]]
+        ]
+    ])
+
 
 def convert_csl_example(example, tokenizer):
-    text_b=example['abst']
-    text_a=';'.join(example['keyword'])
-    encoded_inputs = tokenizer(text=text_a,text_pair=text_b, max_seq_len=512, pad_to_max_seq_len=True)
-    return tuple([np.array(x, dtype="int64") for x in [
-            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+    text_b = example['abst']
+    text_a = ';'.join(example['keyword'])
+    encoded_inputs = tokenizer(
+        text=text_a, text_pair=text_b, max_seq_len=512, pad_to_max_seq_len=True)
+    return tuple([
+        np.array(
+            x, dtype="int64")
+        for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+            [example["label"]]
+        ]
+    ])
 
 
-def do_wsc_predict(model,tokenizer,example):
+def do_wsc_predict(model, tokenizer, example):
     text_a = example['text']
     text_a_list = list(text_a)
     target = example['target']
@@ -72,7 +113,8 @@ def do_wsc_predict(model,tokenizer,example):
 
     text_a = "".join(text_a_list)
     # 把文本转换成input_ids,token_type_ids
-    encoded_text = tokenizer(text=text_a, max_seq_len=128, pad_to_max_seq_len=True)
+    encoded_text = tokenizer(
+        text=text_a, max_seq_len=128, pad_to_max_seq_len=True)
     # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
     # 把token_type_ids变成paddle tensor
@@ -84,10 +126,13 @@ def do_wsc_predict(model,tokenizer,example):
     return out2.numpy()[0]
 
 
-def do_predict(model,tokenizer,example):
+def do_predict(model, tokenizer, example):
     # 把文本转换成input_ids,token_type_ids
-    # example=test_ds[0]
-    encoded_text = tokenizer(text=example["sentence1"],text_pair=example["sentence2"], max_seq_len=512, pad_to_max_seq_len=True)
+    encoded_text = tokenizer(
+        text=example["sentence1"],
+        text_pair=example["sentence2"],
+        max_seq_len=512,
+        pad_to_max_seq_len=True)
     # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
     # 把token_type_ids变成paddle tensor
@@ -98,11 +143,13 @@ def do_predict(model,tokenizer,example):
     out2 = paddle.argmax(pooled_output, axis=1)
     return out2.numpy()[0]
 
-def do_csl_predict(model,tokenizer,example):
+
+def do_csl_predict(model, tokenizer, example):
     # 把文本转换成input_ids,token_type_ids
-    text_b=example['abst']
-    text_a=';'.join(example['keyword'])
-    encoded_text = tokenizer(text=text_a,text_pair=text_b, max_seq_len=512, pad_to_max_seq_len=True)
+    text_b = example['abst']
+    text_a = ';'.join(example['keyword'])
+    encoded_text = tokenizer(
+        text=text_a, text_pair=text_b, max_seq_len=512, pad_to_max_seq_len=True)
     # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
     # 把token_type_ids变成paddle tensor
@@ -111,16 +158,13 @@ def do_csl_predict(model,tokenizer,example):
     pooled_output = model(input_ids, segment_ids)
     # 取概率值最大的索引
     out2 = paddle.argmax(pooled_output, axis=1)
-    # print('预测的label标签为 {}'.format(out2.numpy()[0]))
-    # print('真实的label标签为 {}'.format(test_ds[0]['label']))
     return out2.numpy()[0]
 
 
-
-def do_tnews_predict(model,tokenizer,example):
+def do_tnews_predict(model, tokenizer, example):
     # 把文本转换成input_ids,token_type_ids
-    # example=test_ds[0]
-    encoded_text = tokenizer(text=example["sentence"], max_seq_len=512, pad_to_max_seq_len=True)
+    encoded_text = tokenizer(
+        text=example["sentence"], max_seq_len=512, pad_to_max_seq_len=True)
     # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
     # 把token_type_ids变成paddle tensor
@@ -129,6 +173,4 @@ def do_tnews_predict(model,tokenizer,example):
     pooled_output = model(input_ids, segment_ids)
     # 取概率值最大的索引
     out2 = paddle.argmax(pooled_output, axis=1)
-    # print('预测的label标签为 {}'.format(out2.numpy()[0]))
-    # print('真实的label标签为 {}'.format(test_ds[0]['label']))
     return out2.numpy()[0]

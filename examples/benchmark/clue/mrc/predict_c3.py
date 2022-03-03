@@ -12,13 +12,13 @@ import argparse
 import paddle
 from paddle.io import TensorDataset
 import paddlenlp as ppnlp
-from paddlenlp.transformers import ErnieForMultipleChoice,ErnieTokenizer
+from paddlenlp.transformers import ErnieForMultipleChoice, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
-from C3_preprocess import c3Processor,convert_examples_to_features
+from C3_preprocess import c3Processor, convert_examples_to_features
 
 
-def process_test_data(data_dir,processor, tokenizer,n_class,max_seq_length):
-    
+def process_test_data(data_dir, processor, tokenizer, n_class, max_seq_length):
+
     label_list = processor.get_labels()
     test_examples = processor.get_test_examples()
     feature_dir = os.path.join(data_dir,
@@ -56,16 +56,15 @@ def process_test_data(data_dir,processor, tokenizer,n_class,max_seq_length):
 
     return test_data
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-
 
     parser.add_argument(
         "--model_path",
         default="checkpoints",
         type=str,
-        help="The  path of the checkpoints .",
-    )
+        help="The  path of the checkpoints .", )
 
     args = parser.parse_args()
     return args
@@ -76,35 +75,35 @@ if __name__ == "__main__":
     print(args.model_path)
 
     test_batch_size = 4
-    max_seq_length=512
-    max_num_choices=4
-    batch_size=4
-    output_dir='checkpoints'
+    max_seq_length = 512
+    max_num_choices = 4
+    batch_size = 4
+    output_dir = 'checkpoints'
 
-    data_dir='data'
+    data_dir = 'data'
     processor = c3Processor(data_dir)
 
-    MODEL_NAME =args.model_path
+    MODEL_NAME = args.model_path
     tokenizer = ErnieTokenizer.from_pretrained(MODEL_NAME)
-    model = ErnieForMultipleChoice.from_pretrained(MODEL_NAME,
-                                                    num_choices=max_num_choices)
+    model = ErnieForMultipleChoice.from_pretrained(
+        MODEL_NAME, num_choices=max_num_choices)
 
-    test_data = process_test_data(output_dir,processor, tokenizer,max_num_choices,max_seq_length)
+    test_data = process_test_data(output_dir, processor, tokenizer,
+                                  max_num_choices, max_seq_length)
 
-    test_dataloader = paddle.io.DataLoader(dataset=test_data,
-                                                batch_size=test_batch_size,
-                                                drop_last=True,
-                                                num_workers=0)
-
-
-    
+    test_dataloader = paddle.io.DataLoader(
+        dataset=test_data,
+        batch_size=test_batch_size,
+        drop_last=True,
+        num_workers=0)
 
     logits_all = []
     for input_ids, input_mask, segment_ids, label_ids in tqdm(test_dataloader):
         with paddle.no_grad():
-            logits = model(input_ids=input_ids,
-                            token_type_ids=segment_ids,
-                            attention_mask=input_mask)
+            logits = model(
+                input_ids=input_ids,
+                token_type_ids=segment_ids,
+                attention_mask=input_mask)
             logits = logits.numpy()
             for i in range(len(logits)):
                 logits_all += [logits[i]]
@@ -114,19 +113,16 @@ if __name__ == "__main__":
     with open(submission_test, "w") as f:
         json.dump(test_preds, f)
 
-    data=json.load(open(submission_test))
+    data = json.load(open(submission_test))
 
-    print(len(data))
-
-    with open("data/test1.0.json","r",encoding="utf8") as f:
+    with open("data/test1.0.json", "r", encoding="utf8") as f:
         test_data = json.load(f)
 
-    ids=[]
+    ids = []
     for item in test_data:
         for sub_item in item[1]:
-            idx=sub_item['id']
+            idx = sub_item['id']
             ids.append(idx)
-    print(len(ids))
-    with open('c310_predict.json','w') as f:
-        for idx,item in zip(ids,data):
-            f.write('{'+'"id":{},"label":{}'.format(idx,item)+'}\n')
+    with open('c310_predict.json', 'w') as f:
+        for idx, item in zip(ids, data):
+            f.write('{' + '"id":{},"label":{}'.format(idx, item) + '}\n')
