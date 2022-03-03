@@ -84,10 +84,8 @@ if __name__ == "__main__":
     data_dir='data'
     processor = c3Processor(data_dir)
 
-    # MODEL_NAME = "bert-base-chinese"
     MODEL_NAME =args.model_path
     tokenizer = ErnieTokenizer.from_pretrained(MODEL_NAME)
-    # MODEL_NAME = 'checkpoint'
     model = ErnieForMultipleChoice.from_pretrained(MODEL_NAME,
                                                     num_choices=max_num_choices)
 
@@ -125,10 +123,8 @@ if __name__ == "__main__":
 
     ids=[]
     for item in test_data:
-        # print(item)
         for sub_item in item[1]:
             idx=sub_item['id']
-            # print(idx)
             ids.append(idx)
     print(len(ids))
     with open('c310_predict.json','w') as f:

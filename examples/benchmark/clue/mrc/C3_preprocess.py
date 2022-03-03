@@ -153,14 +153,10 @@ class c3Processor(DataProcessor):
                     if data[i][2 + k] == data[i][6]:
                         answer = str(k)
 
-                # label = tokenization.convert_to_unicode(answer)
                 label = answer
 
                 for k in range(4):
                     guid = "%s-%s-%s" % (set_type, i, k)
-                    # text_a = tokenization.convert_to_unicode(data[i][0])
-                    # text_b = tokenization.convert_to_unicode(data[i][k + 2])
-                    # text_c = tokenization.convert_to_unicode(data[i][1])
                     text_a = data[i][0]
                     text_b = data[i][k + 2]
                     text_c = data[i][1]
