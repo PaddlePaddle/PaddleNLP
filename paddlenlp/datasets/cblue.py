@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import json
 import os
@@ -80,15 +94,15 @@ class CBLUE(DatasetBuilder):
                 ],
                 'test': [
                     os.path.join('CMeEE', 'CMeEE_test.json'),
-                    'c45b3b3d79ca29776e3d9f009b7d6ee5', ['test']
+                    'c45b3b3d79ca29776e3d9f009b7d6ee5', ['text']
                 ]
             },
             'labels': [[
-                'B-dis', 'I-dis', 'E-dis', 'S-dis', 'B-pro', 'I-pro', 'E-pro',
-                'S-pro', 'B-equ', 'I-equ', 'E-equ', 'S-equ', 'B-dru', 'I-dru',
-                'E-dru', 'S-dru', 'B-ite', 'I-ite', 'E-ite', 'S-ite', 'B-bod',
-                'I-bod', 'E-bod', 'S-bod', 'B-dep', 'I-dep', 'E-dep', 'S-dep',
-                'B-mic', 'I-mic', 'E-mic', 'S-mic', 'O'
+                'B-bod', 'I-bod', 'E-bod', 'S-bod', 'B-dis', 'I-dis', 'E-dis',
+                'S-dis', 'B-pro', 'I-pro', 'E-pro', 'S-pro', 'B-dru', 'I-dru',
+                'E-dru', 'S-dru', 'B-ite', 'I-ite', 'E-ite', 'S-ite', 'B-mic',
+                'I-mic', 'E-mic', 'S-mic', 'B-equ', 'I-equ', 'E-equ', 'S-equ',
+                'B-dep', 'I-dep', 'E-dep', 'S-dep', 'O'
             ], ['B-sym', 'I-sym', 'E-sym', 'S-sym', 'O']]
         },
         'CMeIE': {
@@ -277,7 +291,8 @@ class CBLUE(DatasetBuilder):
                 for data in data_list:
                     text_len = len(data[input_keys[0]])
                     if data.get('entities', None):
-                        labels = [['O' * text_len], ['O' * text_len]]
+                        labels = [['O' for _ in range(text_len)],
+                                  ['O' for _ in range(text_len)]]
                         for entity in data['entities']:
                             start_idx = entity['start_idx']
                             end_idx = entity['end_idx']
@@ -291,6 +306,7 @@ class CBLUE(DatasetBuilder):
                                 for x in range(start_idx + 1, end_idx):
                                     labels[ltype][x] = 'I-' + etype
                         data.pop('entities')
+                        data['labels'] = labels
                     yield data
             elif self.name == 'CHIP-CDN-2C':
                 data_keys = f.readline().strip().split('\t')

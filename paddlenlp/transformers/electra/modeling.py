@@ -62,13 +62,8 @@ ACT2FN = {
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self,
-                 vocab_size,
-                 embedding_size,
-                 hidden_dropout_prob,
-                 max_position_embeddings,
-                 type_vocab_size,
-                 layer_norm_eps=1e-12):
+    def __init__(self, vocab_size, embedding_size, hidden_dropout_prob,
+                 max_position_embeddings, type_vocab_size):
         super(ElectraEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
@@ -76,7 +71,7 @@ class ElectraEmbeddings(nn.Layer):
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
                                                   embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=1e-12)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
@@ -96,6 +91,7 @@ class ElectraEmbeddings(nn.Layer):
         embeddings = input_embeddings + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
+
         return embeddings
 
 
@@ -263,8 +259,6 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-ehealth.pdparams"
         }
     }
-    layer_norm_eps = {"chinese-ehealth": 1e-5, "_default": 1e-12}
-    finetune_act = {"chinese-ehealth": "tanh", "_default": "gelu"}
 
     def init_weights(self):
         """
@@ -299,8 +293,7 @@ class ElectraPretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = self.layer_norm_eps.get(self.pretrained_model_name,
-                                                     1e-12)
+            layer._epsilon = getattr(self, 'layer_norm_eps', 1e-12)
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
@@ -391,8 +384,7 @@ class ElectraModel(ElectraPretrainedModel):
         self.initializer_range = initializer_range
         self.embeddings = ElectraEmbeddings(
             vocab_size, embedding_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size,
-            self.layer_norm_eps.get(self.pretrained_model_name, 1e-12))
+            max_position_embeddings, type_vocab_size)
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -653,6 +645,8 @@ class ElectraClassificationHead(nn.Layer):
             The dropout probability for all fully connected layers.
         num_classes (int):
             The number of classes.
+        activation (str):
+            The activation function name between layers.
 
     """
 
@@ -700,20 +694,32 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             The dropout probability for output of Electra.
             If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
             instance `electra`. Defaults to None.
+        activation (str, optional):
+            The activation function name for classifier.
+            Defaults to "gelu".
+        layer_norm_eps (float, optional):
+            The epsilon to initialize nn.LayerNorm layers.
+            Defaults to 1e-12.
     """
 
-    def __init__(self, electra, num_classes=2, dropout=None):
+    def __init__(self,
+                 electra,
+                 num_classes=2,
+                 dropout=None,
+                 activation="gelu",
+                 layer_norm_eps=1e-12):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
+        self.layer_norm_eps = layer_norm_eps
         self.classifier = ElectraClassificationHead(
             hidden_size=self.electra.config["hidden_size"],
             hidden_dropout_prob=dropout if dropout is not None else
             self.electra.config["hidden_dropout_prob"],
             num_classes=self.num_classes,
-            activation=self.finetune_act.get(self.pretrained_model_name,
-                                             "gelu"))
+            activation=activation)
         self.init_weights()
+        self.electra.embeddings.layer_norm._epsilon = layer_norm_eps
 
     def forward(self,
                 input_ids=None,
