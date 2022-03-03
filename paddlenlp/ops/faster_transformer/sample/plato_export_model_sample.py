@@ -25,7 +25,7 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import UnifiedTransformerModel, UnifiedTransformerLMHeadModel
+from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.ops import FasterUnifiedTransformer
 
 from paddlenlp.utils.log import logger
@@ -139,7 +139,7 @@ def do_predict(args):
             args.topp,
             args.decoding_strategy,
             tokenizer.cls_token_id,  # cls/bos
-            tokenizer.eos_token_id,  # eos
+            tokenizer.sep_token_id,  # sep/eos
             tokenizer.pad_token_id,  # pad
             args.num_beams,  # num_beams. Used for beam_search. 
             args.diversity_rate,  # diversity rate. Used for beam search. 
