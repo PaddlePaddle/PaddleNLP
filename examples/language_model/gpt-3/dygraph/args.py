@@ -224,6 +224,21 @@ def parse_args(MODEL_CLASSES):
         const=False,
         help="Using the recompute to save the memory.")
 
+    # add sharding stage2/3
+    parser.add_argument(
+        "--sharding_stage",
+        type=int,
+        default=1,
+        help="sharding stage1/2/3. Stage 1: The optimizer states are partitioned across the processes, so that each process updates only its partition. Stage 2: The reduced gradients for updating the model weights are also partitioned such that each process retains only the gradients corresponding to its portion of the optimizer states. Stage 3: The model parameters are partitioned across the processes. stage3 will automatically collect and partition them during the forward and backward passes."
+    )
+
+    parser.add_argument(
+        "--sharding_offload",
+        type=str2bool,
+        nargs='?',
+        const=False,
+        help="sharding stage2/3 cpu offload strategy.")
+
     # Pure FP16 config
     parser.add_argument(
         "--use_pure_fp16",

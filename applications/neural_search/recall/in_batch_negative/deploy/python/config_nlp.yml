@@ -22,6 +22,8 @@ op:
     local_service_conf:
       # client类型，包括brpc, grpc和local_predictor.local_predictor不启动Serving服务，进程内预测
       client_type: local_predictor
+      #ir_optim
+      ir_optim: True
       # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
       device_type: 1
       # 计算硬件ID，当devices为""或不写时为CPU预测；当devices为"0", "0,1,2"时为GPU预测，表示使用的GPU卡

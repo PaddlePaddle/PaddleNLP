@@ -1327,10 +1327,14 @@ class T5Model(T5PretrainedModel):
                 model = T5Model.from_pretrained('t5-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                input_ids = paddle.to_tensor([inputs["input_ids"]], dtype="int64")
+                decoder_inputs = tokenizer("It means you can")
+                decoder_input_ids = paddle.to_tensor([decoder_inputs["input_ids"]], dtype="int64")
 
-                outputs = model(**inputs)
+                outputs = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
                 last_hidden_state = outputs[0]
+                print(last_hidden_state.shape)
+                # [1, 5, 768]
 
         """
 

@@ -31,15 +31,17 @@ class ErnieEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            hidden_dropout_prob=0.1,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            pad_token_id=0,
-            weight_attr=None, ):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 pad_token_id=0,
+                 weight_attr=None,
+                 task_type_vocab_size=3,
+                 task_id=0,
+                 use_task_id=False):
         super(ErnieEmbeddings, self).__init__()
 
         self.word_embeddings = nn.Embedding(
@@ -51,10 +53,19 @@ class ErnieEmbeddings(nn.Layer):
             max_position_embeddings, hidden_size, weight_attr=weight_attr)
         self.token_type_embeddings = nn.Embedding(
             type_vocab_size, hidden_size, weight_attr=weight_attr)
+        self.use_task_id = use_task_id
+        self.task_id = task_id
+        if self.use_task_id:
+            self.task_type_embeddings = nn.Embedding(
+                task_type_vocab_size, hidden_size, weight_attr=weight_attr)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                task_type_ids=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             #seq_length = input_ids.shape[1]
@@ -69,6 +80,12 @@ class ErnieEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
+        if self.use_task_id:
+            if task_type_ids is None:
+                task_type_ids = paddle.ones_like(
+                    input_ids, dtype="int64") * self.task_id
+            task_type_embeddings = self.task_type_embeddings(task_type_ids)
+            embeddings = embeddings + task_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -274,7 +291,10 @@ class ErnieModel(ErniePretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=2,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 task_type_vocab_size=3,
+                 task_id=0,
+                 use_task_id=False):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -283,7 +303,8 @@ class ErnieModel(ErniePretrainedModel):
                 mean=0.0, std=self.initializer_range))
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
+            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr,
+            task_type_vocab_size, task_id, use_task_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -302,7 +323,8 @@ class ErnieModel(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                task_type_ids=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -371,10 +393,18 @@ class ErnieModel(ErniePretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
-            token_type_ids=token_type_ids)
+            token_type_ids=token_type_ids,
+            task_type_ids=task_type_ids)
 
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
