@@ -129,13 +129,13 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 
 ### 模型训练
 
-在模型训练之前，需要先下载词汇表文件word_dict.txt，用于构造词-id映射关系。
+在模型训练之前，需要先下载停用词表文件word_dict.txt，用于构建词表过滤停用词。
 
-```shell
-wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
-```
+停用词表文件参考：
+https://github.com/YueYongDev/stopwords/blob/master/%E7%99%BE%E5%BA%A6%E5%81%9C%E7%94%A8%E8%AF%8D%E8%A1%A8.txt
 
-**NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。
+
+**NOTE:** 同时停用词表的选择可以根据实际应用数据进行选择。
 
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
@@ -143,7 +143,7 @@ wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt
 CPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' \
+python train.py --vocab_path='./vocab.json' \
     --device=cpu \
     --network=bilstm \
     --lr=5e-4 \
@@ -157,7 +157,7 @@ GPU 启动：
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
-    --vocab_path='./senta_word_dict.txt' \
+    --vocab_path='./vocab.json' \
     --device=gpu \
     --network=bilstm \
     --lr=5e-4 \
@@ -169,7 +169,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 XPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' \
+python train.py --vocab_path='./vocab.json' \
     --device=xpu \
     --network=lstm \
     --lr=5e-4 \
@@ -180,7 +180,7 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 
 以上参数表示：
 
-* `vocab_path`: 词汇表文件路径。
+* `vocab_path`: 用于保存根据预料库构建的词汇表的文件路径。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
 * `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
@@ -209,7 +209,7 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --params_path=./checkpoints/final.pdparams --output_path=./static_graph_params
+python export_model.py --vocab_path=./vocab.json --network=bilstm --params_path=./checkpoints/final.pdparams --output_path=./static_graph_params
 ```
 
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
@@ -227,7 +227,7 @@ python deploy/python/predict.py --model_file=static_graph_params.pdmodel --param
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path='./vocab.json' \
     --device=cpu \
     --network=bilstm \
     --params_path=checkpoints/final.pdparams
@@ -237,7 +237,7 @@ GPU启动：
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path='./vocab.json' \
     --device=gpu \
     --network=bilstm \
     --params_path='./checkpoints/final.pdparams'
@@ -246,7 +246,7 @@ python predict.py --vocab_path='./senta_word_dict.txt' \
 XPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path='./vocab.json' \
     --device=xpu \
     --network=lstm \
     --params_path=checkpoints/final.pdparams
@@ -255,7 +255,7 @@ python predict.py --vocab_path='./senta_word_dict.txt' \
 将待预测数据分词完毕后，如以下示例：
 
 ```text
-这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般
+非常不错，服务很好，位于市中心区，交通方便，不过价格也高！
 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片
 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。
 ```
@@ -265,7 +265,7 @@ python predict.py --vocab_path='./senta_word_dict.txt' \
 如
 
 ```text
-Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般      Lable: negative
+Data: 非常不错，服务很好，位于市中心区，交通方便，不过价格也高！      Lable: negative
 Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Lable: negative
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Lable: positive
 ```

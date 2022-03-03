@@ -65,7 +65,33 @@ def preprocess_prediction_data(data, tokenizer):
     return examples
 
 
-def build_vocab(texts, unk_token="[UNK]", pad_token="[PAD]"):
+def read_stop_words(file_path):
+    with open(file_path, "r") as f:
+        stop_words = []
+        for line in f:
+            word = line.strip()
+            stop_words.append(word)
+    return stop_words
+
+
+def build_vocab(texts,
+                stop_words=[],
+                min_count=10,
+                unk_token="[UNK]",
+                pad_token="[PAD]"):
+    """
+    According to the texts, it is to build vocabulary.
+
+    Args:
+        texts (obj:`List[str]`): The raw corpus data.
+        stop_words (obj:`List[str]`): The list where each element is a word that will be
+            filtered from the texts.
+        min_count (obj:`int`): the minimum word frequency of words to be kept.
+
+    Returns:
+        word_index (obj:`Dict`): The vocabulary from the corpus data.
+
+    """
     documents = []
     word_counts = defaultdict(int)
     for text in texts:
@@ -73,11 +99,17 @@ def build_vocab(texts, unk_token="[UNK]", pad_token="[PAD]"):
             continue
         doc = []
         for word in jieba.cut(text):
+            if word in stop_words:
+                continue
             doc.append(word)
             word_counts[word] += 1
         documents.append(doc)
 
-    wcounts = list(word_counts.items())
+    wcounts = []
+    for word, count in word_counts.items():
+        if count < min_count:
+            continue
+        wcounts.append((word, count))
     wcounts.sort(key=lambda x: x[1], reverse=True)
     sorted_voc = [pad_token, unk_token]
     sorted_voc.extend(wc[0] for wc in wcounts)
