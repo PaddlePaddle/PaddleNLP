@@ -819,7 +819,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             hidden_act=self._hidden_act)
 
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      attention_mask, **kwargs):
+                                      attention_mask, seq_len, position_ids,
+                                      role_ids, **kwargs):
         input_ids = input_ids[:, :-1]
         if input_ids.dtype == paddle.int64:
             input_ids = paddle.cast(input_ids, dtype="int32")
@@ -834,9 +835,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             attention_mask == 0,
             dtype="float16" if self._use_fp16_decoding else "float32")
 
-        seq_len = kwargs.get("seq_len") - 1
+        seq_len = seq_len - 1
 
-        position_ids = kwargs.get("position_ids", None)
         if position_ids is not None:
             if position_ids.dtype == paddle.int64:
                 position_ids = paddle.cast(position_ids, dtype="int32")
@@ -846,7 +846,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             decoder_position_ids = None
 
         field_values = {}
-        role_ids = kwargs.get("role_ids", None)
         if role_ids is not None:
             role_ids = paddle.cast(role_ids, dtype="int32")
             decoder_role_ids = role_ids[:, -1:]
@@ -886,7 +885,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             return logits_mask_t
 
     @staticmethod
-    def expand_inputs_for_generation(input_ids, expand_size, **model_kwargs):
+    def expand_inputs_for_generation(input_ids, expand_size, token_type_ids,
+                                     position_ids, attention_mask, seq_len,
+                                     role_ids, **model_kwargs):
 
         index = paddle.tile(
             paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
@@ -894,12 +895,22 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         input_ids = paddle.gather(input_ids, index)
 
-        for item in model_kwargs:
-            if model_kwargs[item] is not None:
-                tensor = model_kwargs[item]
-                model_kwargs[item] = paddle.gather(tensor, index)
-            else:
-                model_kwargs[item] = None
+        if token_type_ids is not None:
+            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
+                                                           index)
+
+        if position_ids is not None:
+            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
+
+        if attention_mask is not None:
+            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
+                                                           index)
+
+        if seq_len is not None:
+            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
+
+        if role_ids is not None:
+            model_kwargs["role_ids"] = paddle.gather(role_ids, index)
 
         return input_ids, model_kwargs
 

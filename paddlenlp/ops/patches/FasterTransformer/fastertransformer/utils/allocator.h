@@ -83,6 +83,8 @@ public:
         stream_(stream) {}
 
   void *malloc(size_t size, const bool is_set_zero = true) const {
+    PD_CHECK(size > 0, "Allocated memory must be greater than 0. ");
+
     int64_t buf_size = static_cast<int64_t>(size);
     std::vector<int64_t> buf_dims({buf_size});
     auto buf = paddle::Tensor(paddle::PlaceType::kGPU, buf_dims);
