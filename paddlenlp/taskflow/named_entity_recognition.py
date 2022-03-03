@@ -54,10 +54,30 @@ class NERTask(WordTagTask):
 
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+        "tags": "tags.txt",
+    }
+    resource_files_urls = {
+        "wordtag": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
+                "12685d1d84c09fb851b6c1541af1146e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
+                "aa47cdf7c270943a24495bd5ff59dc00"
+            ],
+            "tags": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
+                "87db06ae6ca42565157045ab3e9a996f"
+            ],
+        }
+    }
+
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        self._user_dict = self.kwargs[
-            'user_dict'] if 'user_dict' in self.kwargs else None
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -67,11 +87,12 @@ class NERTask(WordTagTask):
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
         for sent_index in range(len(batch_texts)):
+            sent = batch_texts[sent_index]
             tags = [
                 self._index_to_tags[index]
-                for index in batch_pred_tags[sent_index][self.summary_num:-1]
+                for index in batch_pred_tags[sent_index][self.summary_num:len(
+                    sent) + self.summary_num]
             ]
-            sent = batch_texts[sent_index]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
             sent_out = []
@@ -80,11 +101,12 @@ class NERTask(WordTagTask):
             for ind, tag in enumerate(tags):
                 if partial_word == "":
                     partial_word = sent[ind]
-                    tags_out.append(tag.split('-')[1])
+                    tags_out.append(tag.split('-')[-1])
                     continue
-                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith(
+                        "O"):
                     sent_out.append(partial_word)
-                    tags_out.append(tag.split('-')[1])
+                    tags_out.append(tag.split('-')[-1])
                     partial_word = sent[ind]
                     continue
                 partial_word += sent[ind]

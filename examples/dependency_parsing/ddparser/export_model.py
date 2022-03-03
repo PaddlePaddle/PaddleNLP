@@ -33,9 +33,11 @@ if __name__ == "__main__":
 
     # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
+        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+            args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
-        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)       
+        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
+            args.encoding_model)
     else:
         pretrained_model = None
 
@@ -65,8 +67,7 @@ if __name__ == "__main__":
         n_words=n_words,
         pad_index=word_pad_index,
         eos_index=word_eos_index,
-        pretrained_model=pretrained_model,
-    )
+        pretrained_model=pretrained_model, )
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -81,7 +82,7 @@ if __name__ == "__main__":
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),                         
+                shape=[None, None], dtype="int64"),
         ])
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")

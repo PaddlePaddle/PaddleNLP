@@ -76,14 +76,15 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
             lines = []
             for line in f.readlines():
                 if not line.startswith(" "):
-                    if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
+                    if not line.startswith('#') and (len(line) == 1 or
+                                                     line.split()[0].isdigit()):
                         lines.append(line.strip())
                 else:
                     lines.append("")
 
         for i, line in enumerate(lines):
             if not line:
-                values = list(zip(*[j.split('\t') for j in lines[start:i]]))
+                values = list(zip(* [j.split('\t') for j in lines[start:i]]))
                 if split == "test":
                     ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
                 else:
@@ -93,12 +94,10 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                         "ID": ID,
                         "FORM": FORM,
                         "LEMMA": LEMMA,
-                        "CPOS": CPOS, 
+                        "CPOS": CPOS,
                         "POS": POS,
                         "FEATS": FEATS,
-                        "HEAD": HEAD, 
+                        "HEAD": HEAD,
                         "DEPREL": DEPREL,
                     }
                 start = i + 1
-
-        

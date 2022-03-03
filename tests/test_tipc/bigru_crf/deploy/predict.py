@@ -173,7 +173,7 @@ class Predictor(object):
             if use_tensorrt:
                 config.enable_tensorrt_engine(
                     max_batch_size=batch_size,
-                    min_subgraph_size=0,
+                    min_subgraph_size=1,
                     precision_mode=precision_mode,
                     use_calib_mode=use_calib_mode)
                 min_input_shape = {

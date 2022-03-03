@@ -790,6 +790,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
+        self._use_fp16_decoding = use_fp16_decoding
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
         self.unk_token_id = self._model.unk_token_id
         self.mask_token_id = self._model.mask_token_id
@@ -818,24 +819,51 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             hidden_act=self._hidden_act)
 
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      position_ids, attention_mask, **kwargs):
+                                      attention_mask, seq_len, position_ids,
+                                      role_ids, **kwargs):
         input_ids = input_ids[:, :-1]
-        decoding_type_id = token_type_ids[:, -1]
-        token_type_ids = token_type_ids[:, :-1]
-        position_ids = position_ids[:, :-1]
-        attention_mask = attention_mask[:, :, :-1, :-1]
-        seq_len = kwargs.get("seq_len") - 1
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, dtype="int32")
 
-        return {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "use_cache": True,
-            "seq_len": seq_len,
-            "decoding_type_id": paddle.cast(
-                decoding_type_id, dtype="int32")
-        }
+        if token_type_ids.dtype == paddle.int64:
+            token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        decoder_type_ids = token_type_ids[:, -1:]
+        token_type_ids = token_type_ids[:, :-1]
+
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        attention_mask = paddle.cast(
+            attention_mask == 0,
+            dtype="float16" if self._use_fp16_decoding else "float32")
+
+        seq_len = seq_len - 1
+
+        if position_ids is not None:
+            if position_ids.dtype == paddle.int64:
+                position_ids = paddle.cast(position_ids, dtype="int32")
+            decoder_position_ids = position_ids[:, -1:]
+            position_ids = position_ids[:, :-1]
+        else:
+            decoder_position_ids = None
+
+        field_values = {}
+        if role_ids is not None:
+            role_ids = paddle.cast(role_ids, dtype="int32")
+            decoder_role_ids = role_ids[:, -1:]
+            role_ids = role_ids[:, :-1]
+        else:
+            decoder_role_ids = None
+
+        field_values["input_ids"] = input_ids
+        field_values["token_type_ids"] = token_type_ids
+        field_values["attention_mask"] = attention_mask
+        field_values["seq_len"] = seq_len
+        field_values["decoder_type_ids"] = decoder_type_ids
+        field_values["position_ids"] = position_ids
+        field_values["decoder_position_ids"] = decoder_position_ids
+        field_values["role_ids"] = role_ids
+        field_values["decoder_role_ids"] = decoder_role_ids
+
+        return field_values
 
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
@@ -856,13 +884,45 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         else:
             return logits_mask_t
 
+    @staticmethod
+    def expand_inputs_for_generation(input_ids, expand_size, token_type_ids,
+                                     position_ids, attention_mask, seq_len,
+                                     role_ids, **model_kwargs):
+
+        index = paddle.tile(
+            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
+            [1, expand_size]).reshape([-1])
+
+        input_ids = paddle.gather(input_ids, index)
+
+        if token_type_ids is not None:
+            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
+                                                           index)
+
+        if position_ids is not None:
+            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
+
+        if attention_mask is not None:
+            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
+                                                           index)
+
+        if seq_len is not None:
+            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
+
+        if role_ids is not None:
+            model_kwargs["role_ids"] = paddle.gather(role_ids, index)
+
+        return input_ids, model_kwargs
+
     def forward(self,
                 input_ids,
                 token_type_ids,
-                position_ids,
                 attention_mask,
                 seq_len=None,
+                role_ids=None,
+                position_ids=None,
                 max_length=128,
+                min_length=0,
                 top_k=4,
                 top_p=0.0,
                 decode_strategy="sampling",
@@ -892,7 +952,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                seq_len=seq_len)
+                seq_len=seq_len,
+                role_ids=role_ids)
         elif decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
@@ -900,13 +961,15 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                seq_len=seq_len)
+                seq_len=seq_len,
+                role_ids=role_ids)
         elif decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
                 "attention_mask": attention_mask,
-                "seq_len": seq_len
+                "seq_len": seq_len,
+                "role_ids": role_ids,
             }
         else:
             raise ValueError(
@@ -916,21 +979,22 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                                                           **model_kwargs)
 
         seq_len = model_inputs.pop('seq_len')
-        decoding_type_id = model_inputs.pop('decoding_type_id')
-
-        outputs = self._model(**model_inputs)
-        if isinstance(outputs, tuple):
-            caches = outputs[1]
-        else:
-            raise RuntimeError('Not support.')
-
-        cache_k = [c.k for c in caches]
-        cache_v = [c.v for c in caches]
+        decoder_type_ids = model_inputs.pop('decoder_type_ids')
+        role_ids = model_inputs.pop('role_ids', None)
+        decoder_role_ids = model_inputs.pop('decoder_role_ids', None)
+        position_ids = model_inputs.pop('position_ids', None)
+        decoder_position_ids = model_inputs.pop('decoder_position_ids', None)
 
         return self.decoding(
-            cache_k=cache_k,
-            cache_v=cache_v,
+            input_ids=model_inputs["input_ids"],
+            attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
+            type_id=model_inputs["token_type_ids"],
+            decoder_type_id=decoder_type_ids,
+            role_id=role_ids,
+            decoder_role_id=decoder_role_ids,
+            position_id=position_ids,
+            decoder_position_id=decoder_position_ids,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
@@ -942,10 +1006,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             pad_token_id=pad_token_id,
             temperature=temperature,
             length_penalty=length_penalty,
-            decoding_type_id=decoding_type_id,
             pos_bias=True,
             forced_eos_token_id=forced_eos_token_id,
-            early_stopping=early_stopping)
+            early_stopping=early_stopping,
+            min_length=min_length)
 
     generate = forward
 
@@ -954,6 +1018,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
+        self._use_fp16_decoding = use_fp16_decoding
         self.unk_token_id = self._model.unk_token_id
         self.mask_token_id = self._model.mask_token_id
         self.bos_token_id = self._model.bos_token_id
@@ -983,23 +1048,28 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             hidden_act=self._hidden_act)
 
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      position_ids, attention_mask, **kwargs):
+                                      attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
-        decoding_type_id = token_type_ids[:, -1]
+        input_ids = paddle.cast(input_ids, dtype="int32")
+
+        token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
-        position_ids = position_ids[:, :-1]
+
         attention_mask = attention_mask[:, :, :-1, :-1]
+        attention_mask = paddle.cast(
+            attention_mask == 0,
+            dtype="float16" if self._use_fp16_decoding else "float32")
+
         seq_len = kwargs.get("seq_len") - 1
 
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
-            "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": True,
             "seq_len": seq_len,
-            "decoding_type_id": paddle.cast(
-                decoding_type_id, dtype="int32")
+            "decoder_type_ids": decoder_type_ids
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -1028,6 +1098,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 attention_mask,
                 seq_len=None,
                 max_length=128,
+                min_length=0,
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
@@ -1080,21 +1151,14 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
         seq_len = model_inputs.pop('seq_len')
-        decoding_type_id = model_inputs.pop('decoding_type_id')
-
-        outputs = self._model(**model_inputs)
-        if isinstance(outputs, tuple):
-            caches = outputs[1]
-        else:
-            raise RuntimeError('Not support.')
-
-        cache_k = [c.k for c in caches]
-        cache_v = [c.v for c in caches]
+        decoder_type_ids = model_inputs.pop('decoder_type_ids')
 
         return self.decoding(
-            cache_k=cache_k,
-            cache_v=cache_v,
+            input_ids=model_inputs["input_ids"],
+            attn_mask=model_inputs["attention_mask"],
             memory_seq_lens=seq_len,
+            type_id=model_inputs["token_type_ids"],
+            decoder_type_id=decoder_type_ids,
             beam_size=num_beams,
             diversity_rate=diversity_rate,
             topk=top_k,
@@ -1106,10 +1170,10 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             pad_token_id=pad_token_id,
             temperature=temperature,
             length_penalty=length_penalty,
-            decoding_type_id=decoding_type_id,
             forced_eos_token_id=forced_eos_token_id,
             pos_bias=False,
-            early_stopping=early_stopping)
+            early_stopping=early_stopping,
+            min_length=min_length)
 
     generate = forward
 
@@ -1252,6 +1316,7 @@ class FasterMBART(MBartPretrainedModel):
                 temperature=1.0,
                 num_return_sequences=1,
                 early_stopping=False,
+                forced_eos_token_id=None,
                 **model_kwargs):
 
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(

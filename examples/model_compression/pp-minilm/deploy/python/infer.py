@@ -25,7 +25,7 @@ from paddle import inference
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
-sys.path.append("../")
+sys.path.append("../../")
 from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
@@ -90,6 +90,12 @@ def parse_args():
         action='store_true',
         help="Whether collect shape range info.", )
     parser.add_argument(
+        "--use_faster_tokenizer",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to use FasterTokenizer to accelerate training or further inference."
+    )
+    parser.add_argument(
         "--int8",
         action='store_true',
         help="Whether to use int8 inference.", )
@@ -150,21 +156,54 @@ class Predictor(object):
                     use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
-            if args.collect_shape:
-                config.collect_shape_range_info(
-                    os.path.join(
-                        os.path.dirname(args.model_path), args.task_name +
-                        '_shape_range_info.pbtxt'))
+            # Set min/max/opt tensor shape of each trt subgraph input according
+            # to dataset.
+            # For example, the config of TNEWS data should be 16, 32, 32, 31, 128, 32.
+            min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
+            min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32
+            if args.use_faster_tokenizer:
+                min_input_shape = {
+                    "faster_tokenizer_1.tmp_0": [min_batch_size, min_seq_len],
+                    "faster_tokenizer_1.tmp_1": [min_batch_size, min_seq_len],
+                    "tmp_4": [min_batch_size, min_seq_len],
+                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len],
+                }
+                max_input_shape = {
+                    "faster_tokenizer_1.tmp_0": [max_batch_size, max_seq_len],
+                    "faster_tokenizer_1.tmp_1": [max_batch_size, max_seq_len],
+                    "tmp_4": [max_batch_size, max_seq_len],
+                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len],
+                }
+                opt_input_shape = {
+                    "faster_tokenizer_1.tmp_0": [opt_batch_size, opt_seq_len],
+                    "faster_tokenizer_1.tmp_1": [opt_batch_size, opt_seq_len],
+                    "tmp_4": [opt_batch_size, opt_seq_len],
+                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
+                }
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(
-                    os.path.join(
-                        os.path.dirname(args.model_path),
-                        args.task_name + "_shape_range_info.pbtxt"), True)
+                min_input_shape = {
+                    "input_ids": [min_batch_size, min_seq_len],
+                    "token_type_ids": [min_batch_size, min_seq_len],
+                    "tmp_4": [min_batch_size, min_seq_len],
+                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
+                }
+                max_input_shape = {
+                    "input_ids": [max_batch_size, max_seq_len],
+                    "token_type_ids": [max_batch_size, max_seq_len],
+                    "tmp_4": [max_batch_size, max_seq_len],
+                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
+                }
+                opt_input_shape = {
+                    "input_ids": [opt_batch_size, opt_seq_len],
+                    "token_type_ids": [opt_batch_size, opt_seq_len],
+                    "tmp_4": [opt_batch_size, opt_seq_len],
+                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
+                }
+            config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape,
+                                              opt_input_shape)
 
         predictor = paddle.inference.create_predictor(config)
 
-        input_handle = predictor.get_input_handle(predictor.get_input_names()[
-            0])
         input_handles = [
             predictor.get_input_handle(name)
             for name in predictor.get_input_names()
@@ -178,13 +217,75 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]
         return output
+
+    def faster_predict(self, dataset, args):
+        batch_num = 0
+        if 'sentence' in dataset[0]:
+            data = [example["sentence"] for example in dataset]
+            batches = [
+                data[idx:idx + args.batch_size]
+                for idx in range(0, len(data), args.batch_size)
+            ]
+            batch_num = len(batches)
+        else:
+            data1 = [example["sentence1"] for example in dataset]
+            data2 = [example["sentence2"] for example in dataset]
+            batches1 = [
+                data1[idx:idx + args.batch_size]
+                for idx in range(0, len(data1), args.batch_size)
+            ]
+            batches2 = [
+                data2[idx:idx + args.batch_size]
+                for idx in range(0, len(data1), args.batch_size)
+            ]
+            batch_num = len(batches1)
+        if args.perf:
+            for i in range(batch_num):
+                if 'sentence' in dataset[0]:
+                    output = self.predict_batch([batches[i]])
+                else:
+                    output = self.predict_batch([batches1[i], batches2[i]])
+                if i > args.perf_warmup_steps:
+                    break
+            time1 = time.time()
+            if 'sentence' in dataset[0]:
+                for i in range(batch_num):
+                    output = self.predict_batch([batches[i]])
+            else:
+                for i in range(batch_num):
+                    output = self.predict_batch([batches1[i], batches2[i]])
+            print("task name: %s, time: %s, " %
+                  (args.task_name, time.time() - time1))
+            return output
+
+        else:
+            labels = [example['label'] for example in dataset]
+
+            batched_labels = [
+                labels[idx:idx + args.batch_size]
+                for idx in range(0, len(labels), args.batch_size)
+            ]
+            metric = METRIC_CLASSES[args.task_name]()
+            metric.reset()
+
+            for i in range(batch_num):
+                if 'sentence' in dataset[0]:
+                    logits = self.predict_batch([batches[i]])
+                else:
+                    logits = self.predict_batch([batches1[i], batches2[i]])
+                correct = metric.compute(
+                    paddle.to_tensor(logits),
+                    paddle.to_tensor(batched_labels[i]))
+                metric.update(correct)
+
+            res = metric.accumulate()
+            print("task name: %s, acc: %s, " % (args.task_name, res), end='')
 
     def convert_predict_batch(self, args, data, tokenizer, batchify_fn,
                               label_list):
@@ -192,8 +293,8 @@ class Predictor(object):
         for example in data:
             example = convert_example(
                 example,
+                label_list,
                 tokenizer,
-                label_list=label_list,
                 max_seq_length=args.max_seq_length)
             examples.append(example)
 
@@ -214,8 +315,8 @@ class Predictor(object):
                     break
             time1 = time.time()
             for batch in batches:
-                self.convert_predict_batch(args, batch, tokenizer, batchify_fn,
-                                           dataset.label_list)
+                examples = self.convert_predict_batch(
+                    args, batch, tokenizer, batchify_fn, dataset.label_list)
                 input_ids, segment_ids, _ = batchify_fn(examples)
                 output = self.predict_batch([input_ids, segment_ids])
 
@@ -251,13 +352,21 @@ def main():
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-    ): fn(samples)
-    outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+    if not args.use_faster_tokenizer:
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    else:
+        trans_func = partial(
+            convert_example, label_list=dev_ds.label_list, is_test=False)
+        dev_ds = dev_ds.map(trans_func, lazy=True)
+    if not args.use_faster_tokenizer:
+        batchify_fn = lambda samples, fn=Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
+        ): fn(samples)
+        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+    else:
+        outputs = predictor.faster_predict(dev_ds, args=args)
 
 
 if __name__ == "__main__":

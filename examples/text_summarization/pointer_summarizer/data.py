@@ -352,7 +352,7 @@ class Vocab(object):
             self._count += 1
 
         # Read the vocab file and add words up to max_size
-        with open(vocab_file, 'r') as vocab_f:
+        with open(vocab_file, 'r', encoding='utf8') as vocab_f:
             for line in vocab_f:
                 pieces = line.split()
                 if len(pieces) != 2:

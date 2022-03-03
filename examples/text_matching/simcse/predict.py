@@ -55,7 +55,7 @@ def predict(model, data_loader):
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """
-    
+
     cosine_sims = []
 
     model.eval()
