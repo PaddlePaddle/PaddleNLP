@@ -23,7 +23,7 @@ from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
 from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
-from utils import convert_example
+from utils import convert_example, build_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -86,15 +86,18 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
     set_seed()
 
-    # Loads vocab.
-    if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
-
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    texts = []
+    for data in train_ds:
+        texts.append(data["text"])
+    for data in dev_ds:
+        texts.append(data["text"])
+
+    # Builds vocab
+    word2idx = build_vocab(texts)
+    vocab = Vocab.from_dict(word2idx, unk_token='[UNK]', pad_token='[PAD]')
+    vocab.to_json(args.vocab_path)
 
     # Constructs the network.
     network = args.network.lower()

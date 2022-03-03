@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections import defaultdict
+import re
+
+import jieba
 import numpy as np
 
 
@@ -59,3 +63,23 @@ def preprocess_prediction_data(data, tokenizer):
         ids = tokenizer.encode(text)
         examples.append([ids, len(ids)])
     return examples
+
+
+def build_vocab(texts, unk_token="[UNK]", pad_token="[PAD]"):
+    documents = []
+    word_counts = defaultdict(int)
+    for text in texts:
+        if not text:
+            continue
+        doc = []
+        for word in jieba.cut(text):
+            doc.append(word)
+            word_counts[word] += 1
+        documents.append(doc)
+
+    wcounts = list(word_counts.items())
+    wcounts.sort(key=lambda x: x[1], reverse=True)
+    sorted_voc = [pad_token, unk_token]
+    sorted_voc.extend(wc[0] for wc in wcounts)
+    word_index = dict(zip(sorted_voc, list(range(len(sorted_voc)))))
+    return word_index
