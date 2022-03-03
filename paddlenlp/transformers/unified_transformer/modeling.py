@@ -114,7 +114,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "bos_token_id": 1,
             "eos_token_id": 2,
-            "mask_token_id": 30000,
+            "mask_token_id": 8000,
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -127,7 +127,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
             "plato-xl":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
