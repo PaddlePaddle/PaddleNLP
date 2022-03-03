@@ -114,7 +114,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "bos_token_id": 1,
             "eos_token_id": 2,
-            "mask_token_id": 30000,
+            "mask_token_id": 8000,
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
