@@ -96,6 +96,26 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "plato-xl": {
+            "vocab_size": 8001,
+            "hidden_size": 3072,
+            "num_hidden_layers": 72,
+            "num_attention_heads": 32,
+            "intermediate_size": 18432,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 2,
+            "role_type_size": 128,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 8000,
+        }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -106,6 +126,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
@@ -115,7 +137,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
+            if isinstance(
+                    layer.weight,
+                    paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
@@ -133,20 +157,27 @@ class UnifiedTransformerEmbeddings(nn.Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=2):
+                 type_vocab_size=2,
+                 role_type_size=None):
         super(UnifiedTransformerEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.role_embeddings = None if role_type_size is None else nn.Embedding(
+            role_type_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids, position_ids):
+    def forward(self, input_ids, token_type_ids, position_ids, role_ids=None):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
+
+        if self.role_embeddings is not None:
+            embeddings += self.role_embeddings(role_ids)
+
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -221,25 +252,25 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             The id of special token `mask_token`. Defaults to 30000.
     """
 
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            normalize_before=True,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            initializer_range=0.02,
-            unk_token_id=0,
-            pad_token_id=0,
-            bos_token_id=1,
-            eos_token_id=2,
-            mask_token_id=30000, ):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 normalize_before=True,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 initializer_range=0.02,
+                 unk_token_id=0,
+                 pad_token_id=0,
+                 bos_token_id=1,
+                 eos_token_id=2,
+                 mask_token_id=30000,
+                 role_type_size=None):
         super(UnifiedTransformerModel, self).__init__()
         self.unk_token_id = unk_token_id
         self.pad_token_id = pad_token_id
@@ -250,7 +281,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
 
         self.embeddings = UnifiedTransformerEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+            max_position_embeddings, type_vocab_size, role_type_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
