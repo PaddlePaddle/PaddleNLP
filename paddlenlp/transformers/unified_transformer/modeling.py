@@ -137,7 +137,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
+            if isinstance(
+                    layer.weight,
+                    paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
                     # TODO(guosheng): `normal` does not support float16, and
                     # need to handle this when using fp16 as default dtype for
@@ -169,7 +171,7 @@ class UnifiedTransformerEmbeddings(nn.Layer):
             role_type_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids, position_ids, role_ids):
+    def forward(self, input_ids, token_type_ids, position_ids, role_ids=None):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
