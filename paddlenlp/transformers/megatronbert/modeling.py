@@ -517,7 +517,7 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
                 .. note::
                     A normal_initializer initializes weight matrices as normal distributions.
-                    See :meth:`ConvBertPretrainedModel.init_weights()` for how weights are initialized in `MegatronBertModel`.
+                    See :meth:`MegatronBertPretrainedModel.init_weights()` for how weights are initialized in `MegatronBertModel`.
 
 
         """
