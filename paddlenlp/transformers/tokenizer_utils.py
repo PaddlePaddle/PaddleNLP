@@ -41,7 +41,7 @@ from collections import OrderedDict
 
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
-    'is_chinese_char'
+    'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
 ]
 
 
@@ -139,6 +139,79 @@ def is_chinese_char(cp):
         return True
 
     return False
+
+
+def _is_nonnormalized_char(char):
+    """Check whther `chars` is a non-normalized character."""
+    cp = ord(char)
+    if ((0xFF00 <= cp <= 0xFFEF) or  # Halfwidth and Fullwidth Forms
+        (0xFE50 <= cp <= 0xFE6B) or  # Small Form Variants
+        (0x3358 <= cp <= 0x33FF) or  # CJK Compatibility
+        (0x249C <= cp <= 0x24E9)):  # Enclosed Alphanumerics: Ⓛ ⒰
+        return True
+
+    return False
+
+
+def _is_nonnormalized_numeric(char):
+    """Check whether `chars` is a non-normalized numeric character."""
+    cp = ord(char)
+    if ((0x2460 <= cp <= 0x249B) or  #
+        (0x24EA <= cp <= 0x24FF) or  #
+        (0x2776 <= cp <= 0x2793) or  # Enclosed Alphanumerics
+        (0x2160 <= cp <= 0x217F)):  # Number Forms
+        return True
+
+    return False
+
+
+def normalize_chars(text):
+    """
+    Normalize the text for multiligual and chinese models. Unicode range:
+    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
+    """
+    output = []
+    for char in text:
+        if _is_nonnormalized_char(char):
+            for c in unicodedata.normalize("NFKC", char):
+                output.append(c)
+        elif _is_nonnormalized_numeric(char):
+            output.append(" ")
+            for c in str(int(unicodedata.numeric(char))):
+                output.append(c)
+            output.append(" ")
+        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
+            output.append("凉")
+        else:
+            output.append(char)
+    return "".join(output)
+
+
+def _is_symbol(char):
+    """Check whether CP is the codepoint of a Symbol character."""
+    cp = ord(char)
+    if unicodedata.category(char).startswith('S') or (
+            cp in
+        [0x00ad, 0x00b2, 0x00ba, 0x3007, 0x00b5, 0x00d8, 0x014b, 0x01b1]):
+        return True
+    return False
+
+
+def tokenize_special_chars(text):
+    """Adds whitespace around any special character."""
+    output = []
+    for char in text:
+        cp = ord(char)
+        if ((0x3040 <= cp <= 0x30FF) or  # Japanese
+            (0x0370 <= cp <= 0x04FF) or  # Greek/Coptic & Cyrillic
+            (0x0250 <= cp <= 0x02AF) or  # IPA
+                _is_symbol(char)):
+            output.append(" ")
+            output.append(char)
+            output.append(" ")
+        else:
+            output.append(char)
+    return "".join(output)
 
 
 @dataclass(frozen=True, eq=True)

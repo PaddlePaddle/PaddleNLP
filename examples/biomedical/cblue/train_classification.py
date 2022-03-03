@@ -27,7 +27,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import MultiLabelsMetric
+from paddlenlp.metrics import MultiLabelsMetric, AccuracyAndF1
 from paddlenlp.ops.optimizer import ExponentialMovingAverage
 
 from utils import convert_example
@@ -36,30 +36,27 @@ METRIC_CLASSES = {
     'KUAKE-QIC': Accuracy,
     'KUAKE-QQR': Accuracy,
     'KUAKE-QTR': Accuracy,
-    'CHIP-CTC': partial(
-        MultiLabelsMetric, name='macro'),
-    'CHIP-STS': partial(
-        MultiLabelsMetric, name='macro'),
-    'CHIP-CDN-2C': partial(
-        MultiLabelsMetric, name='micro')
+    'CHIP-CTC': MultiLabelsMetric,
+    'CHIP-STS': MultiLabelsMetric,
+    'CHIP-CDN-2C': AccuracyAndF1
 }
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', choices=['KUAKE-QIC', 'KUAKE-QQR', 'KUAKE-QTR', 'CHIP-STS', 'CHIP-CTC', 'CHIP-CDN-2C'],
-                                 default='KUAKE-QIC', type=str, help='Dataset for token classfication tasks.')
+                                 default='KUAKE-QIC', type=str, help='Dataset for sequence classfication tasks.')
 parser.add_argument('--seed', default=1000, type=int, help='Random seed for initialization.')
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default='gpu', help='Select which device to train model, default to gpu.')
-parser.add_argument('--epochs', default=3, type=int, help='Total number of training epochs to perform.')
+parser.add_argument('--epochs', default=3, type=int, help='Total number of training epochs.')
 parser.add_argument('--batch_size', default=32, type=int, help='Batch size per GPU/CPU for training.')
 parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning sequence classification task.')
-parser.add_argument('--weight_decay', default=0.01, type=float, help="Weight decay if we apply some.")
-parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion over the training process.')
+parser.add_argument('--weight_decay', default=0.01, type=float, help="Weight decay of optimizer if we apply some.")
+parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion of learning rate over the training process.')
 parser.add_argument('--max_seq_length', default=128, type=int, help='The maximum total input sequence length after tokenization.')
 parser.add_argument('--init_from_ckpt', default=None, type=str, help='The path of checkpoint to be loaded.')
 parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
-parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkppoints.')
+parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
 parser.add_argument('--use_ema', default=False, type=bool, help='Use exponential moving average for evaluation.')
 parser.add_argument('--use_amp', default=False, type=distutils.util.strtobool, help='Enable mixed precision training.')
@@ -100,9 +97,13 @@ def evaluate(model, criterion, metric, data_loader):
     if isinstance(metric, Accuracy):
         metric_name = 'accuracy'
         result = metric.accumulate()
+    elif isinstance(metric, MultiLabelsMetric):
+        metric_name = 'macro f1'
+        _, _, result = metric.accumulate('macro')
     else:
-        metric_name = metric._name + ' f1'
-        _, _, result = metric.accumulate(metric._name)
+        metric_name = 'micro f1'
+        _, _, _, result, _ = metric.accumulate()
+
     print('eval loss: %.5f, %s: %.5f' % (np.mean(losses), metric_name, result))
     model.train()
     metric.reset()
@@ -143,7 +144,10 @@ def do_train():
         'cblue', args.dataset, splits=['train', 'dev', 'test'])
 
     model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained(
-        'chinese-ehealth', num_classes=len(train_ds.label_list))
+        'chinese-ehealth',
+        num_classes=len(train_ds.label_list),
+        activation='tanh',
+        layer_norm_eps=1e-5)
     tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained(
         'chinese-ehealth')
 
@@ -152,9 +156,9 @@ def do_train():
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Pad(axis=0, pad_val=args.max_seq_length - 1),  # position
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # segment
+        Pad(axis=0, pad_val=args.max_seq_length - 1, dtype='int64'),  # position
         Stack(dtype='int64')): [data for data in fn(samples)]
     train_data_loader = create_dataloader(
         train_ds,
@@ -172,7 +176,8 @@ def do_train():
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
-    model = paddle.DataParallel(model)
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
 
     num_training_steps = len(train_data_loader) * args.epochs
 
@@ -196,10 +201,13 @@ def do_train():
     if METRIC_CLASSES[args.dataset] is Accuracy:
         metric = METRIC_CLASSES[args.dataset]()
         metric_name = 'accuracy'
-    else:
+    elif METRIC_CLASSES[args.dataset] is MultiLabelsMetric:
         metric = METRIC_CLASSES[args.dataset](
             num_labels=len(train_ds.label_list))
-        metric_name = metric._name + ' f1'
+        metric_name = 'macro f1'
+    else:
+        metric = METRIC_CLASSES[args.dataset]()
+        metric_name = 'micro f1'
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     if args.use_ema and rank == 0:
@@ -222,8 +230,10 @@ def do_train():
 
             if isinstance(metric, Accuracy):
                 result = metric.accumulate()
+            elif isinstance(metric, MultiLabelsMetric):
+                _, _, result = metric.accumulate('macro')
             else:
-                _, _, result = metric.accumulate(metric._name)
+                _, _, _, result, _ = metric.accumulate()
 
             if args.use_amp:
                 scaler.scale(loss).backward()
@@ -259,11 +269,14 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, 'model_%d' % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                model._layers.save_pretrained(save_dir)
+                if paddle.distributed.get_world_size() > 1:
+                    model._layers.save_pretrained(save_dir)
+                else:
+                    model.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
-
-    print('Speed: %.2f steps/s' % (global_step / total_train_time))
+    if rank == 0:
+        print('Speed: %.2f steps/s' % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

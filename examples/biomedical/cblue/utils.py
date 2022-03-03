@@ -12,54 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unicodedata
 import numpy as np
 
-
-def _normalize(text):
-    """
-    Normalize the text for multiligual and chinese models. Unicode range:
-    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
-    """
-    output = []
-    for char in text:
-        cp = ord(char)
-        if (0xFF00 <= cp <= 0xFFEF or  # Halfwidth and Fullwidth Forms
-                0xFE50 <= cp <= 0xFE6B or  # Small Form Variants
-                0x3358 <= cp <= 0x33FF or  # CJK Compatibility
-                0x249C <= cp <= 0x24E9):  # Enclosed Alphanumerics: Ⓛ ⒰
-            for c in unicodedata.normalize('NFKC', char):
-                output.append(c)
-        elif (0x2460 <= cp <= 0x249B or 0x24EA <= cp <= 0x24FF or
-              0x2776 <= cp <= 0x2793 or  # Enclosed Alphanumerics
-              0x2160 <= cp <= 0x217F):  # Number Forms
-            output.append(' ')
-            for c in str(int(unicodedata.numeric(char))):
-                output.append(c)
-            output.append(' ')
-        elif cp == 0xF979:  # https://www.zhihu.com/question/20697984
-            output.append('凉')
-        else:
-            output.append(char)
-    return "".join(output)
-
-
-def _tokenize_special_chars(text):
-    output = []
-    for char in text:
-        cp = ord(char)
-        if (0x3040 <= cp <= 0x30FF or  # Japanese
-                0x0370 <= cp <= 0x04FF or  # Greek/Coptic & Cyrillic
-                0x0250 <= cp <= 0x02AF or  # IPA
-                cp in
-            [0x00ad, 0x00b2, 0x00ba, 0x3007, 0x00b5, 0x00d8, 0x014b, 0x01b1] or
-                unicodedata.category(char).startswith('S')):  # Symbol
-            output.append(' ')
-            output.append(char)
-            output.append(' ')
-        else:
-            output.append(char)
-    return ''.join(output)
+from paddlenlp.transformers import normalize_chars, tokenize_special_chars
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
@@ -106,9 +61,9 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     text_a = example['text_a']
     text_b = example.get('text_b', None)
 
-    text_a = _tokenize_special_chars(_normalize(text_a))
+    text_a = tokenize_special_chars(normalize_chars(text_a))
     if text_b is not None:
-        text_b = _tokenize_special_chars(_normalize(text_b))
+        text_b = tokenize_special_chars(normalize_chars(text_b))
 
     encoded_inputs = tokenizer(
         text=text_a,
