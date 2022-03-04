@@ -977,7 +977,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         model_inputs = self.prepare_inputs_for_generation(
             input_ids, token_type_ids, attention_mask, seq_len, position_ids,
-            role_ids)
+            role_ids, **model_kwargs)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
