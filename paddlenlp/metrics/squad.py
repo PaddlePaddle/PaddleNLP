@@ -278,7 +278,8 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
     for example in examples:
         qid = example['id']
         gold_answers = [
-            text for text in example['answers'] if normalize_answer(text)
+            text for text in example['answers']['text']
+            if normalize_answer(text)
         ]
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
