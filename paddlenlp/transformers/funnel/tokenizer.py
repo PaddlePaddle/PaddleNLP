@@ -15,7 +15,7 @@
 
 __all__ = ['FunnelTokenizer']
 
-from collections import Iterable
+from collections.abc import Iterable
 import os
 from ..bert.tokenizer import BertTokenizer
 from .. import BasicTokenizer, WordpieceTokenizer

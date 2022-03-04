@@ -510,10 +510,6 @@ class GenerationMixin(object):
 
     def _build_faster(self, kwargs):
         self._faster_entry = False
-        if kwargs['min_length'] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
         if kwargs['num_beam_groups'] != 1:
             # not support for group_beam_search yet in the faster version
             raise AttributeError(
@@ -744,16 +740,24 @@ class GenerationMixin(object):
                 if not hasattr(self, '_faster_entry'):
                     self._build_faster(args)
                 if self._faster_entry:
-                    output_ids = self._faster_entry(**args)
+                    output = self._faster_entry(**args)
+                    if isinstance(output, tuple):
+                        output_ids, dummy_srore = output
+                    else:
+                        output_ids = output
+                        # make result and faster result oneconsistent
+                        dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
                         output_ids = output_ids[:, :
                                                 num_return_sequences, :].reshape(
                                                     [-1, output_ids.shape[-1]])
+                        if dummy_srore is not None:
+                            dummy_srore = dummy_srore[:, :
+                                                      num_return_sequences].flatten(
+                                                      )
                     else:
                         output_ids = output_ids.transpose([1, 0])
-                    # make result and faster result oneconsistent
-                    dummy_srore = None
                     return output_ids, dummy_srore
 
             except Exception as e:

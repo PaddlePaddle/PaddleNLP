@@ -21,11 +21,18 @@ from ..electra.modeling import get_activation
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "ConvBertModel", "ConvBertPretrainedModel", "ConvBertForTotalPretraining",
-    "ConvBertDiscriminator", "ConvBertGenerator", "ConvBertClassificationHead",
-    "ConvBertForSequenceClassification", "ConvBertForTokenClassification",
-    "ConvBertPretrainingCriterion", "ConvBertForQuestionAnswering",
-    "ConvBertForMultipleChoice", "ConvBertForPretraining"
+    "ConvBertModel",
+    "ConvBertPretrainedModel",
+    "ConvBertForTotalPretraining",
+    "ConvBertDiscriminator",
+    "ConvBertGenerator",
+    "ConvBertClassificationHead",
+    "ConvBertForSequenceClassification",
+    "ConvBertForTokenClassification",
+    "ConvBertPretrainingCriterion",
+    "ConvBertForQuestionAnswering",
+    "ConvBertForMultipleChoice",
+    "ConvBertForPretraining",
 ]
 dtype_float = paddle.get_default_dtype()
 
@@ -115,7 +122,8 @@ class MultiHeadAttentionWithConv(Layer):
         self.need_weights = need_weights
         self.head_dim = embed_dim // num_heads
         self.scale = self.head_dim**-0.5
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+        assert self.head_dim * \
+            num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
         new_num_attention_heads = num_heads // head_ratio
         if num_heads // head_ratio < 1:
@@ -140,9 +148,7 @@ class MultiHeadAttentionWithConv(Layer):
             self.conv_kernel_layer = nn.Linear(
                 self.all_head_size, self.num_heads * self.conv_kernel_size)
             self.conv_out_layer = nn.Linear(embed_dim, self.all_head_size)
-            self.unfold = nn.Unfold(
-                kernel_sizes=[self.conv_kernel_size, 1],
-                paddings=[(self.conv_kernel_size - 1) // 2, 0], )
+            self.padding = (self.conv_kernel_size - 1) // 2
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
@@ -153,28 +159,34 @@ class MultiHeadAttentionWithConv(Layer):
         v = self.v_proj(value)
 
         if self.conv_type == "sdconv":
+            bs = paddle.shape(q)[0]
+            seqlen = paddle.shape(q)[1]
             mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
             conv_attn_layer = mixed_key_conv_attn_layer * q
-            batch_size = q.shape[0]
+
             # conv_kernel_layer
             conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
             conv_kernel_layer = tensor.reshape(
                 conv_kernel_layer, shape=[-1, self.conv_kernel_size, 1])
             conv_kernel_layer = F.softmax(conv_kernel_layer, axis=1)
-            # conv_out
             conv_out_layer = self.conv_out_layer(query)
-            conv_out_layer = tensor.reshape(
-                conv_out_layer, [batch_size, -1, self.all_head_size, 1])
-            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1, 3])
-            conv_out_layer = self.unfold(conv_out_layer)
-            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1])
+            conv_out_layer = F.pad(conv_out_layer,
+                                   pad=[self.padding, self.padding],
+                                   data_format="NLC")
+            conv_out_layer = paddle.stack(
+                [
+                    paddle.slice(
+                        conv_out_layer, axes=[1], starts=[i],
+                        ends=[i + seqlen]) for i in range(self.conv_kernel_size)
+                ],
+                axis=-1)
             conv_out_layer = tensor.reshape(
                 conv_out_layer,
                 shape=[-1, self.head_dim, self.conv_kernel_size])
             conv_out_layer = tensor.matmul(conv_out_layer, conv_kernel_layer)
             conv_out = tensor.reshape(
                 conv_out_layer,
-                shape=[batch_size, -1, self.num_heads, self.head_dim])
+                shape=[bs, seqlen, self.num_heads, self.head_dim])
 
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
         q = tensor.transpose(x=q, perm=[0, 2, 1, 3])

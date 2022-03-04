@@ -32,5 +32,3 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --logging_freq 20\
     --eval_freq 1000 \
     --device "gpu"
-
-# NOTE: please set use_sharding=True for sharding_degree > 1
