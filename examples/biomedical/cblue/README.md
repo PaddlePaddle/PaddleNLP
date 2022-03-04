@@ -10,7 +10,7 @@
 
 ## 数据集介绍
 
-本项目使用了中文医学语言理解测评（[Chinese Biomedical Language Understanding Evaluation，CBLUE](https://github.com/CBLUEbenchmark/CBLUE)）数据集，[<sup>[1]</sup>](#refer-anchor-cblue)其包括医学文本信息抽取（实体识别、关系抽取）、医学术语归一化、医学文本分类、医学句子关系判定和医学问答共5大类任务8个子任务。
+本项目使用了中文医学语言理解测评（[Chinese Biomedical Language Understanding Evaluation，CBLUE](https://github.com/CBLUEbenchmark/CBLUE)）数据集，其包括医学文本信息抽取（实体识别、关系抽取）、医学术语归一化、医学文本分类、医学句子关系判定和医学问答共5大类任务8个子任务。
 
 * CMeEE：中文医学命名实体识别
 * CMeIE：中文医学文本实体关系抽取
@@ -81,5 +81,4 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --dataset CHIP-C
 pip install xlrd==1.2.0
 ```
 
-<div id="refer-anchor-cblue"></div>
-- [1] CBLUE: A Chinese Biomedical Language Understanding Evaluation Benchmark [pdf](https://arxiv.org/abs/2106.08087) [git](https://github.com/CBLUEbenchmark/CBLUE) [web](https://tianchi.aliyun.com/specials/promotion/2021chinesemedicalnlpleaderboardchallenge)
+[1] CBLUE: A Chinese Biomedical Language Understanding Evaluation Benchmark [pdf](https://arxiv.org/abs/2106.08087) [git](https://github.com/CBLUEbenchmark/CBLUE) [web](https://tianchi.aliyun.com/specials/promotion/2021chinesemedicalnlpleaderboardchallenge)
