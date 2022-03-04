@@ -116,8 +116,7 @@ def infer(args):
                 data[name], dtype="float32").reshape([1, 1, 41, 41])
         else:
             data[name] = paddle.to_tensor(
-                data[name], dtype="int32"
-                if args.faster else "int64").reshape([1, -1])
+                data[name], dtype="int64").reshape([1, -1])
 
     for i in range(200):
         if 100 == i:
