@@ -975,8 +975,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
+        model_inputs = self.prepare_inputs_for_generation(
+            input_ids, token_type_ids, attention_mask, seq_len, position_ids,
+            role_ids)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
