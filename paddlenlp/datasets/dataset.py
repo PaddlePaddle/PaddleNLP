@@ -25,6 +25,8 @@ from multiprocess import Pool, RLock
 import time
 import paddlenlp
 import datasets
+import paddle
+paddle.disable_signal_handler()
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset

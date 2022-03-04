@@ -22,7 +22,6 @@ import math
 from functools import partial
 import numpy as np
 import paddle
-paddle.disable_signal_handler()
 
 from paddle.io import DataLoader
 from args import parse_args
@@ -204,7 +203,7 @@ def evaluate(model, data_loader, raw_dataset, args):
                 all_predictions, ensure_ascii=False, indent=4) + "\n")
 
     squad_evaluate(
-        examples=data_loader.dataset.data,
+        examples=[raw_data for raw_data in raw_dataset],
         preds=all_predictions,
         na_probs=scores_diff_json)
 
