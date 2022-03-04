@@ -836,6 +836,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             dtype="float16" if self._use_fp16_decoding else "float32")
 
         seq_len = seq_len - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
 
         if position_ids is not None:
             if position_ids.dtype == paddle.int64:
@@ -977,7 +979,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         model_inputs = self.prepare_inputs_for_generation(
             input_ids, token_type_ids, attention_mask, seq_len, position_ids,
-            role_ids, **model_kwargs)
+            role_ids)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
