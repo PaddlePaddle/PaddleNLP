@@ -842,11 +842,18 @@ class MegatronBertLMPredictionHead(nn.Layer):
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.decoder = nn.Linear(hidden_size, vocab_size)
+        self.decoder_weight = self.create_parameter(
+            shape=[vocab_size, hidden_size],
+            dtype=self.transform.weight.dtype,
+            is_bias=False)
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
-        hidden_states = self.decoder(hidden_states)
+        hidden_states = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight,
+            transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
