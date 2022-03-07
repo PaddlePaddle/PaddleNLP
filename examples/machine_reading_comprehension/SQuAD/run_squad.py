@@ -98,6 +98,7 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index = len(input_ids) - 1
             while sequence_ids[token_end_index] != 1:
                 token_end_index -= 1
+            token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             if not (offsets[token_start_index][0] <= start_char and
@@ -158,8 +159,7 @@ def prepare_validation_features(examples, tokenizer, args):
             (o if sequence_ids[k] == context_index else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
-        if () in tokenized_examples["offset_mapping"][i]:
-            print(tokenized_examples["offset_mapping"][i])
+
     return tokenized_examples
 
 
@@ -259,8 +259,7 @@ def run(args):
             prepare_train_features, tokenizer=tokenizer, args=args),
                                       batched=True,
                                       remove_columns=column_names,
-                                      num_proc=4,
-                                      load_from_cache_file=False)
+                                      num_proc=4)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -311,7 +310,6 @@ def run(args):
                     token_type_ids=token_type_ids,
                     attention_mask=attention_mask)
                 loss = criterion(logits, (start_positions, end_positions))
-
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
@@ -343,8 +341,7 @@ def run(args):
             prepare_validation_features, tokenizer=tokenizer, args=args),
                                   batched=True,
                                   remove_columns=column_names,
-                                  num_proc=4,
-                                  load_from_cache_file=False)
+                                  num_proc=4)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 

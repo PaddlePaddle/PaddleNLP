@@ -25,8 +25,7 @@ from multiprocess import Pool, RLock
 import time
 import paddlenlp
 import datasets
-import paddle
-paddle.disable_signal_handler()
+import paddlev
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -42,17 +41,16 @@ __all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
 DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
 # Patch for intranet
-from datasets import load_dataset as load_dataset_pd
+from datasets import load_dataset as origin_load_dataset
 
 
 def load_from_ppnlp(path, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
     path = os.path.join(ppnlp_path, path + '.py')
-    print(path)
-    return load_dataset_pd(path, **kwargs)
+    return origin_load_dataset(path, **kwargs)
 
 
-if os.environ.get('IS_INTRANET', '0') == '1':
+if os.environ.get('ISINTRANET', '0') == '1':
     datasets.load_dataset = load_from_ppnlp
 
 
