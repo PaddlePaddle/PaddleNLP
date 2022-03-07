@@ -886,36 +886,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         else:
             return logits_mask_t
 
-    @staticmethod
-    def expand_inputs_for_generation(input_ids, expand_size, token_type_ids,
-                                     position_ids, attention_mask, seq_len,
-                                     role_ids, **model_kwargs):
-
-        index = paddle.tile(
-            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
-            [1, expand_size]).reshape([-1])
-
-        input_ids = paddle.gather(input_ids, index)
-
-        if token_type_ids is not None:
-            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
-                                                           index)
-
-        if position_ids is not None:
-            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
-
-        if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
-                                                           index)
-
-        if seq_len is not None:
-            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
-
-        if role_ids is not None:
-            model_kwargs["role_ids"] = paddle.gather(role_ids, index)
-
-        return input_ids, model_kwargs
-
     def forward(self,
                 input_ids,
                 token_type_ids,
