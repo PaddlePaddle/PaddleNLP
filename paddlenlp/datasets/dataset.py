@@ -41,7 +41,7 @@ DATASETS_MODULE_PATH = "paddlenlp.datasets."
 class DatasetTuple:
     def __init__(self, splits):
         self.tuple_cls = namedtuple('datasets', splits)
-        self.tuple = self.tuple_cls(* [None for _ in splits])
+        self.tuple = self.tuple_cls(*[None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
@@ -645,6 +645,29 @@ class DatasetBuilder:
         label_list = self.get_labels()
         vocab_info = self.get_vocab()
 
+        def _create_dict(labels):
+            # For multiple labels in the form of list.
+            if isinstance(labels[0], list) or isinstance(labels[0], tuple):
+                label_dict = []
+                for sub_labels in labels:
+                    sub_dict = {}
+                    for i, label in enumerate(sub_labels):
+                        sub_dict[label] = i
+                    label_dict.append(sub_dict)
+            else:
+                label_dict = {}
+                for i, label in enumerate(labels):
+                    label_dict[label] = i
+            return label_dict
+
+        def _convert_label_to_id(labels, label_dict):
+            if isinstance(labels, list) or isinstance(labels, tuple):
+                for label_idx in range(len(labels)):
+                    labels[label_idx] = label_dict[labels[label_idx]]
+            else:
+                labels = label_dict[labels]
+            return labels
+
         if self.lazy:
 
             def generate_examples():
@@ -664,16 +687,15 @@ class DatasetBuilder:
 
                     # Convert class label to label ids.
                     if label_list is not None and example.get(label_col, None):
-                        label_dict = {}
-                        for i, label in enumerate(label_list):
-                            label_dict[label] = i
-                        if isinstance(example[label_col], list) or isinstance(
-                                example[label_col], tuple):
-                            for label_idx in range(len(example[label_col])):
-                                example[label_col][label_idx] = label_dict[
-                                    example[label_col][label_idx]]
+                        label_dict = _create_dict(label_list)
+                        # For multiple labels in the form of list.
+                        if isinstance(label_dict, list):
+                            for idx, sub_dict in enumerate(label_dict):
+                                example[label_col][idx] = _convert_label_to_id(
+                                    example[label_col][idx], sub_dict)
                         else:
-                            example[label_col] = label_dict[example[label_col]]
+                            example[label_col] = _convert_label_to_id(
+                                example[label_col], label_dict)
 
                         yield example
                     else:
@@ -709,18 +731,16 @@ class DatasetBuilder:
 
             # Convert class label to label ids.
             if label_list is not None and examples[0].get(label_col, None):
-                label_dict = {}
-                for i, label in enumerate(label_list):
-                    label_dict[label] = i
+                label_dict = _create_dict(label_list)
                 for idx in range(len(examples)):
-                    if isinstance(examples[idx][label_col], list) or isinstance(
-                            examples[idx][label_col], tuple):
-                        for label_idx in range(len(examples[idx][label_col])):
-                            examples[idx][label_col][label_idx] = label_dict[
-                                examples[idx][label_col][label_idx]]
+                    # For multiple labels in the form of list.
+                    if isinstance(label_dict, list):
+                        for i, sub_dict in enumerate(label_dict):
+                            examples[idx][label_col][i] = _convert_label_to_id(
+                                examples[idx][label_col][i], sub_dict)
                     else:
-                        examples[idx][label_col] = label_dict[examples[idx][
-                            label_col]]
+                        examples[idx][label_col] = _convert_label_to_id(
+                            examples[idx][label_col], label_dict)
 
             return MapDataset(
                 examples, label_list=label_list, vocab_info=vocab_info)
