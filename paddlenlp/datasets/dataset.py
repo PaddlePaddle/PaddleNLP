@@ -25,7 +25,6 @@ from multiprocess import Pool, RLock
 import time
 import paddlenlp
 import datasets
-import paddlev
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
