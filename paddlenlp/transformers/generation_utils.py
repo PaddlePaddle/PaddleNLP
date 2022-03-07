@@ -390,6 +390,10 @@ class GenerationMixin(object):
             model_kwargs["encoder_output"] = paddle.gather(encoder_output,
                                                            index)
 
+        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
+            role_ids = model_kwargs["role_ids"]
+            model_kwargs["role_ids"] = paddle.gather(role_ids, index)
+
         return input_ids, model_kwargs
 
     @staticmethod
@@ -407,17 +411,18 @@ class GenerationMixin(object):
             model_kwargs["cache"] = outputs[1]
 
         # update token_type_ids with last value
-        if "token_type_ids" in model_kwargs:
+        if "token_type_ids" in model_kwargs and model_kwargs[
+                "token_type_ids"] is not None:
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.concat(
-                [token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], axis=-1)
+                [token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
         # update position_ids
-        if "position_ids" in model_kwargs:
+        if "position_ids" in model_kwargs and model_kwargs[
+                "position_ids"] is not None:
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat(
-                [position_ids, position_ids[:, -1].reshape((-1, 1)) + 1],
-                axis=-1)
+                [position_ids, position_ids[:, -1:] + 1], axis=-1)
 
         # update attention_mask
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
@@ -447,6 +452,12 @@ class GenerationMixin(object):
                     ],
                     axis=-1)
             model_kwargs["attention_mask"] = attention_mask
+
+        # update role_ids
+        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
+            role_ids = model_kwargs["role_ids"]
+            model_kwargs["role_ids"] = paddle.concat(
+                [role_ids, role_ids[:, -1:]], axis=-1)
 
         return model_kwargs
 
