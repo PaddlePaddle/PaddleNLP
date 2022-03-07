@@ -27,7 +27,7 @@ import os
 import json
 import copy
 import logging
-from collections import Iterable
+from collections.abc import Iterable
 
 FUNNEL_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "funnel-transformer/small",  # B4-4-4H768
