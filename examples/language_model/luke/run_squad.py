@@ -41,7 +41,7 @@ def prepare_train_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
