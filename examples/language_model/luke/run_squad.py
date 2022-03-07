@@ -119,7 +119,7 @@ def prepare_validation_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
@@ -167,9 +167,8 @@ def evaluate(model, data_loader, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, token_type_ids, attention_mask = batch
-        start_logits_tensor, end_logits_tensor = model(
-            input_ids, attention_mask=attention_mask)
+        input_ids, _ = batch
+        start_logits_tensor, end_logits_tensor = model(input_ids)
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -239,7 +238,7 @@ def run(args):
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
-            print("init checkpoint from %s" % args.model_name_or_path)
+            print("Loads checkpoint from %s" % args.model_name_or_path)
 
     model = model_class.from_pretrained(args.model_name_or_path)
 
@@ -255,7 +254,6 @@ def run(args):
         train_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            'attention_mask': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
             "start_positions": Stack(dtype="int64"),
             "end_positions": Stack(dtype="int64")
         }): fn(samples)
@@ -294,10 +292,8 @@ def run(args):
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
-                logits = model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask, )
+                input_ids, _, start_positions, end_positions = batch
+                logits = model(input_ids)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
@@ -335,8 +331,7 @@ def run(args):
 
         dev_batchify_fn = lambda samples, fn=Dict({
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_type_id), }): fn(samples)
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)}): fn(samples)
 
         dev_data_loader = DataLoader(
             dataset=dev_ds,

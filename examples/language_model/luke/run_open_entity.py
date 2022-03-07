@@ -21,13 +21,15 @@ import numpy as np
 
 from paddlenlp.transformers import LukeTokenizer
 from paddlenlp.transformers import LukeForEntityClassification
+from paddlenlp.transformers import LinearDecayWithWarmup
 
 import paddle
 from paddle.io import Dataset, DataLoader
+from paddle.optimizer import AdamW
+import paddle.nn.functional as F
 
 from tqdm import tqdm
 
-from trainer import Trainer
 from open_entity_processor import convert_examples_to_features, DatasetProcessor
 
 ENTITY_TOKEN = "[ENTITY]"
@@ -88,6 +90,89 @@ parser.add_argument(
     help="Max entity position's length")
 
 args = parser.parse_args()
+
+
+class Trainer(object):
+    def __init__(self,
+                 args,
+                 model,
+                 dataloader,
+                 num_train_steps,
+                 step_callback=None):
+        self.args = args
+        self.model = model
+        self.dataloader = dataloader
+        self.num_train_steps = num_train_steps
+        self.step_callback = step_callback
+
+        self.optimizer, self.scheduler = self._create_optimizer(model)
+        self.wd_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
+
+    def train(self):
+        model = self.model
+
+        epoch = 0
+        global_step = 0
+
+        model.train()
+
+        with tqdm(total=self.num_train_steps) as pbar:
+            while True:
+                for step, batch in enumerate(self.dataloader):
+                    outputs = model(
+                        input_ids=batch[0],
+                        token_type_ids=batch[1],
+                        attention_mask=batch[2],
+                        entity_ids=batch[3],
+                        entity_position_ids=batch[4],
+                        entity_token_type_ids=batch[5],
+                        entity_attention_mask=batch[6])
+
+                    loss = F.binary_cross_entropy_with_logits(
+                        outputs.reshape([-1]),
+                        batch[7].reshape([-1]).astype('float32'))
+
+                    if self.args.gradient_accumulation_steps > 1:
+                        loss = loss / self.args.gradient_accumulation_steps
+                    loss.backward()
+                    if (step + 1) % self.args.gradient_accumulation_steps == 0:
+                        self.optimizer.step()
+                        self.scheduler.step()
+                        self.optimizer.clear_grad()
+                        pbar.set_description("epoch: %d loss: %.7f" %
+                                             (epoch, loss))
+                        pbar.update()
+                        global_step += 1
+
+                        if global_step == self.num_train_steps:
+                            break
+                output_dir = self.args.output_dir
+
+                model.save_pretrained(output_dir)
+                if global_step == self.num_train_steps:
+                    break
+                epoch += 1
+
+        return model, global_step
+
+    def _create_optimizer(self, model):
+        scheduler = self._create_scheduler()
+        clip = paddle.nn.ClipGradByNorm(clip_norm=1.0)
+        return AdamW(
+            parameters=model.parameters(),
+            grad_clip=clip,
+            learning_rate=scheduler,
+            apply_decay_param_fun=lambda x: x in self.wd_params,
+            weight_decay=self.args.weight_decay), scheduler
+
+    def _create_scheduler(self):
+        return LinearDecayWithWarmup(
+            learning_rate=self.args.learning_rate,
+            total_steps=self.num_train_steps,
+            warmup=self.args.warmup_proportion)
 
 
 class DataGenerator(Dataset):
@@ -250,6 +335,6 @@ if __name__ == '__main__':
         for k, v in evaluate(args, model, 'test', output_file).items()
     })
 
-    print("Results: %s", json.dumps(results, indent=2, sort_keys=True))
+    logging.info("Results: %s", json.dumps(results, indent=2, sort_keys=True))
     with open(os.path.join(args.output_dir, "results.json"), "w") as f:
         json.dump(results, f)
