@@ -177,9 +177,16 @@ class Task(metaclass=abc.ABCMeta):
         return inputs
 
     def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
-        """
-        Split the input texts into several short input texts automatically, ensure that the length of model input meets the requirements.
-        """
+        '''
+        Split the raw texts automatically for model inference.
+        Args:
+            input_texts (List[str]): input raw texts.
+            max_text_len (int): cutting length.
+            split_sentence (bool): If True, sentence-level split will be performed.
+        return:
+            short_input_texts (List[str]): the short input texts for model inference.
+            input_mapping (dict): mapping between raw text and short input texts.
+        '''
         input_mapping = {}
         short_input_texts = []
         cnt_org = 0
@@ -217,9 +224,15 @@ class Task(metaclass=abc.ABCMeta):
         return short_input_texts, input_mapping
 
     def _auto_joiner(self, short_results, input_mapping, is_dict=False):
-        """
-        Join the model output automatically.
-        """
+        '''
+        Join the short results automatically and generate the final results to match with the user inputs.
+        Args:
+            short_results (List[dict] / List[List[str]] / List[str]): input raw texts.
+            input_mapping (dict): cutting length.
+            is_dict (bool): whether the element type is dict, default to False.
+        return:
+            short_input_texts (List[str]): the short input texts for model inference.
+        '''
         concat_results = []
         elem_type = {} if is_dict else []
         for k, vs in input_mapping.items():

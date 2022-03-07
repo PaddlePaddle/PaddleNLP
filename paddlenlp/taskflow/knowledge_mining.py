@@ -25,9 +25,14 @@ from collections import OrderedDict
 import numpy as np
 import paddle
 import paddle.nn as nn
+try:
+    from paddle.text import ViterbiDecoder
+except:
+    raise ImportError(
+        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".
+        format(paddle.version.full_version))
 from paddlenlp.layers.crf import LinearChainCrf
 from paddlenlp.utils.tools import compare_version
-from paddle.text import ViterbiDecoder
 
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple

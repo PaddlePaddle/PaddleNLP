@@ -24,11 +24,22 @@ import itertools
 from .utils import download_file
 from .utils import TermTree
 from .knowledge_mining import WordTagTask
+from .lexical_analysis import LacTask
 from .utils import Customization
+
+POS_LABEL_WORDTAG = [
+    "介词", "介词_方位介词", "助词", "代词", "连词", "副词", "疑问词", "肯定词", "否定词", "数量词", "叹词",
+    "拟声词", "修饰词", "外语单词", "英语单词", "汉语拼音", "词汇用语", "w"
+]
+POS_LBEL_LAC = [
+    "n", "f", "s", "t", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "r",
+    "p", "c", "u", "xc", "w"
+]
 
 usage = r"""
           from paddlenlp import Taskflow 
 
+          # 默认为WordTag模式
           ner = Taskflow("ner")
           ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
@@ -40,10 +51,14 @@ usage = r"""
           '''
           [[('热梅茶', '饮食类_饮品'), ('是', '肯定词'), ('一道', '数量词'), ('以', '介词'), ('梅子', '饮食类'), ('为', '肯定词'), ('主要原料', '物体类'), ('制作', '场景事件'), ('的', '助词'), ('茶饮', '饮食类_饮品')], [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]]
           '''
+
+          # LAC模式
+          ner = Taskflow("ner", mode="lac")
+          ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           """
 
 
-class NERTask(WordTagTask):
+class NERWordTagTask(WordTagTask):
     """
     This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
     model will link the more meesage with the entity.
@@ -76,7 +91,7 @@ class NERTask(WordTagTask):
         }
     }
 
-    def __init__(self, model, task, **kwargs):
+    def __init__(self, model, task, return_entity=False, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         if self._user_dict:
             self._custom = Customization()
@@ -142,3 +157,59 @@ class NERTask(WordTagTask):
         results = self._auto_joiner(results, self.input_mapping, is_dict=True)
         results = self._simplify_result(results)
         return results
+
+
+class NERLACTask(LacTask):
+    """
+    Part-of-speech tagging task for the raw text.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    """
+
+    def __init__(self, model, task, return_entity=False, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+
+    def _postprocess(self, inputs):
+        """
+        The model output is the tag ids, this function will convert the model output to raw text.
+        """
+        batch_out = []
+        lengths = inputs['lens']
+        preds = inputs['result']
+        sents = inputs['text']
+        final_results = []
+        for sent_index in range(len(lengths)):
+            single_result = {}
+            tags = [
+                self._id2tag_dict[str(index)]
+                for index in preds[sent_index][:lengths[sent_index]]
+            ]
+            sent = sents[sent_index]
+            if self._custom:
+                self._custom.parse_customization(sent, tags)
+            sent_out = []
+            tags_out = []
+            parital_word = ""
+            for ind, tag in enumerate(tags):
+                if parital_word == "":
+                    parital_word = sent[ind]
+                    tags_out.append(tag.split('-')[0])
+                    continue
+                if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
+                    sent_out.append(parital_word)
+                    tags_out.append(tag.split('-')[0])
+                    parital_word = sent[ind]
+                    continue
+                parital_word += sent[ind]
+
+            if len(sent_out) < len(tags_out):
+                sent_out.append(parital_word)
+
+            result = list(zip(sent_out, tags_out))
+            final_results.append(result)
+        final_results = self._auto_joiner(final_results, self.input_mapping)
+        final_results = final_results if len(
+            final_results) > 1 else final_results[0]
+        return final_results

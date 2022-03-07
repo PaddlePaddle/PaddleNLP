@@ -81,6 +81,7 @@ class LacTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
+        user_dict(string): The user-defined dictionary, default to None.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 

@@ -21,9 +21,11 @@ import copy
 import itertools
 
 import numpy as np
+import jieba
 from .utils import download_file
+from .task import Task
 from .lexical_analysis import load_vocab, LacTask
-from .named_entity_recognition import NERTask
+from .named_entity_recognition import NERWordTagTask
 
 usage = r"""
            from paddlenlp import Taskflow 
@@ -40,8 +42,15 @@ usage = r"""
            [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
            '''
 
-           # 精确模式(使用WordTag模型)
-           seg = Taskflow("word_segmentation", model="wordtag")
+           # jieba快速模式
+           seg = Taskflow("word_segmentation", mode="fast")
+           seg("第十四届全运会在西安举办")
+           '''
+           ['第十四届', '全运会', '在', '西安', '举办']
+           '''
+
+           # wordtag精确模式
+           seg = Taskflow("word_segmentation", mode="accurate")
            seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
            '''
            ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
@@ -49,7 +58,57 @@ usage = r"""
          """
 
 
-class LACSegTask(LacTask):
+class SegJiebaTask(Task):
+    """
+    Word Segmentation task for the raw text.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        user_dict(string): The user-defined dictionary, default to None.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    """
+
+    def __init__(self, task, model, user_dict=None, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._user_dict = user_dict
+        if self._user_dict:
+            jieba.load_userdict(user_dict)
+
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        return None
+
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
+        return None
+
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        return None
+
+    def _preprocess(self, inputs):
+        inputs = self._check_input_text(inputs)
+        return inputs
+
+    def _postprocess(self, inputs):
+        results = inputs if len(inputs) > 1 else inputs[0]
+        return results
+
+    def _run_model(self, inputs):
+        def cut(string):
+            return jieba.lcut(string)
+
+        results = list(map(cut, inputs))
+        return results
+
+
+class SegLACTask(LacTask):
     """
     Segement the sentences to the words using LAC mode. 
     Args:
@@ -103,7 +162,7 @@ class LACSegTask(LacTask):
         return final_results
 
 
-class WordTagSegTask(NERTask):
+class SegWordTagTask(NERWordTagTask):
     """
     Segement the sentences to the words using WordTag model. 
     Args:
@@ -114,7 +173,7 @@ class WordTagSegTask(NERTask):
     """
 
     def __init__(self, model, task, **kwargs):
-        super().__init__(model=model, task=task, **kwargs)
+        super().__init__(model="wordtag", task=task, **kwargs)
 
     def _simplify_result(self, results):
         simple_results = []

@@ -20,9 +20,11 @@ import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import NERTask
+from .named_entity_recognition import WordTagNERTask
+from .named_entity_recognition import LACNERTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
+from .word_segmentation import JiebaSegTask
 from .word_segmentation import LACSegTask
 from .word_segmentation import WordTagSegTask
 from .pos_tagging import POSTaggingTask
@@ -53,15 +55,21 @@ TASKS = {
         }
     },
     "ner": {
-        "models": {
-            "wordtag": {
-                "task_class": NERTask,
-                "task_flag": 'ner-wordtag',
+        "modes": {
+            "accurate": {
+                "task_class": NERWordTagTask,
+                "task_flag": "ner-wordtag",
                 "linking": False,
+            },
+            "lac": {
+                "task_class": NERLACTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": "ner-lac",
             }
         },
         "default": {
-            "model": "wordtag"
+            "mode": "accurate"
         }
     },
     "poetry_generation": {
@@ -100,21 +108,25 @@ TASKS = {
         }
     },
     "word_segmentation": {
-        "models": {
+        "modes": {
+            "fast": {
+                "task_class": SegJiebaask,
+                "task_flag": "word_segmentation-jieba",
+            },
             "lac": {
-                "task_class": LACSegTask,
+                "task_class": SegLACTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
-                "task_flag": 'word_segmentation-gru_crf',
+                "task_flag": "word_segmentation-gru_crf",
             },
-            "wordtag": {
-                "task_class": WordTagSegTask,
-                "task_flag": 'word_segmentation-wordtag',
+            "accurate": {
+                "task_class": SegWordTagTask,
+                "task_flag": "word_segmentation-wordtag",
                 "linking": False,
             },
         },
         "default": {
-            "model": "lac"
+            "mode": "lac"
         }
     },
     "pos_tagging": {
@@ -208,21 +220,33 @@ class Taskflow(object):
         3) Offer the usage and help message.
     Args:
         task (str): The task name for the Taskflow, and get the task class from the name.
-        model (str, optional): The model name in the task, if set None, will use the default model.  
+        model (str, optional): The model name in the task, if set None, will use the default model. 
+        mode (str, optional): Select the mode of the task, only used in the tasks of word_segmentation and ner.
+            If set None, will use the default mode.
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
 
     """
 
-    def __init__(self, task, model=None, device_id=0, **kwargs):
+    def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
         assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
             task)
         self.task = task
-        if model is not None:
-            assert model in set(TASKS[task]['models'].keys(
-            )), "The model name:{} is not in task:[{}]".format(model, task)
+
+        if self.task in ["word_segmentation", "ner"]:
+            tag = "modes"
+            ind_tag = "mode"
+            self.model = mode
         else:
-            model = TASKS[task]['default']['model']
+            tag = "models"
+            ind_tag = "model"
+            self.model = model
+
+        if self.model is not None:
+            assert self.model in set(TASKS[task][tag].keys(
+            )), "The {} name:{} is not in task:[{}]".format(tag, model, task)
+        else:
+            self.model = TASKS[task]['default'][ind_tag]
         # Set the device for the task
         device = get_env_device()
         if device == 'cpu' or device_id == -1:
@@ -230,13 +254,12 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        self.model = model
         # Update the task config to kwargs
-        config_kwargs = TASKS[self.task]['models'][self.model]
+        config_kwargs = TASKS[self.task][tag][self.model]
         kwargs['device_id'] = device_id
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
-        task_class = TASKS[self.task]['models'][self.model]['task_class']
+        task_class = TASKS[self.task][tag][self.model]['task_class']
         self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
         task_list = TASKS.keys()
