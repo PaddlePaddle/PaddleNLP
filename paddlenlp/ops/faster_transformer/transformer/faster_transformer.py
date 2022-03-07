@@ -818,9 +818,14 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      attention_mask, seq_len, position_ids,
-                                      role_ids, **kwargs):
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      attention_mask,
+                                      seq_len,
+                                      position_ids=None,
+                                      role_ids=None,
+                                      **kwargs):
         input_ids = input_ids[:, :-1]
         if input_ids.dtype == paddle.int64:
             input_ids = paddle.cast(input_ids, dtype="int32")
@@ -849,7 +854,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         field_values = {}
         if role_ids is not None:
-            role_ids = paddle.cast(role_ids, dtype="int32")
+            if role_ids.dtype == paddle.int64:
+                role_ids = paddle.cast(role_ids, dtype="int32")
             decoder_role_ids = role_ids[:, -1:]
             role_ids = role_ids[:, :-1]
         else:
@@ -947,9 +953,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(
-            input_ids, token_type_ids, attention_mask, seq_len, position_ids,
-            role_ids)
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
