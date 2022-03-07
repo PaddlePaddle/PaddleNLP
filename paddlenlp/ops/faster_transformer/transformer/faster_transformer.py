@@ -836,6 +836,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             dtype="float16" if self._use_fp16_decoding else "float32")
 
         seq_len = seq_len - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
 
         if position_ids is not None:
             if position_ids.dtype == paddle.int64:
@@ -883,36 +885,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
-
-    @staticmethod
-    def expand_inputs_for_generation(input_ids, expand_size, token_type_ids,
-                                     position_ids, attention_mask, seq_len,
-                                     role_ids, **model_kwargs):
-
-        index = paddle.tile(
-            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
-            [1, expand_size]).reshape([-1])
-
-        input_ids = paddle.gather(input_ids, index)
-
-        if token_type_ids is not None:
-            model_kwargs["token_type_ids"] = paddle.gather(token_type_ids,
-                                                           index)
-
-        if position_ids is not None:
-            model_kwargs["position_ids"] = paddle.gather(position_ids, index)
-
-        if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.gather(attention_mask,
-                                                           index)
-
-        if seq_len is not None:
-            model_kwargs["seq_len"] = paddle.gather(seq_len, index)
-
-        if role_ids is not None:
-            model_kwargs["role_ids"] = paddle.gather(role_ids, index)
-
-        return input_ids, model_kwargs
 
     def forward(self,
                 input_ids,
@@ -975,8 +947,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
+        model_inputs = self.prepare_inputs_for_generation(
+            input_ids, token_type_ids, attention_mask, seq_len, position_ids,
+            role_ids)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')

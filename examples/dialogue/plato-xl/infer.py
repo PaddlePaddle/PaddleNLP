@@ -59,6 +59,10 @@ def setup_args():
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
+        "--faster",
+        action="store_true",
+        help="Whether to use faster generation. ")
+    parser.add_argument(
         "--decoding_strategy",
         default="sampling",
         choices=["sampling", "beam_search"],
@@ -112,7 +116,7 @@ def infer(args):
                 data[name], dtype="float32").reshape([1, 1, 41, 41])
         else:
             data[name] = paddle.to_tensor(
-                data[name], dtype="int32").reshape([1, -1])
+                data[name], dtype="int64").reshape([1, -1])
 
     for i in range(200):
         if 100 == i:
@@ -133,7 +137,7 @@ def infer(args):
             top_p=args.topp,
             num_beams=args.num_beams,
             use_fp16_decoding=args.use_fp16_decoding,
-            use_faster=True)
+            use_faster=args.faster)
 
     paddle.device.cuda.synchronize()
     print("Average time of FasterGeneration of PLATO-XL model is {}ms. ".format(
