@@ -158,6 +158,8 @@ def prepare_validation_features(examples, tokenizer, args):
             (o if sequence_ids[k] == context_index else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
+        if () in tokenized_examples["offset_mapping"][i]:
+            print(tokenized_examples["offset_mapping"][i])
     return tokenized_examples
 
 
@@ -257,7 +259,8 @@ def run(args):
             prepare_train_features, tokenizer=tokenizer, args=args),
                                       batched=True,
                                       remove_columns=column_names,
-                                      num_proc=4)
+                                      num_proc=4,
+                                      load_from_cache_file=False)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -340,7 +343,8 @@ def run(args):
             prepare_validation_features, tokenizer=tokenizer, args=args),
                                   batched=True,
                                   remove_columns=column_names,
-                                  num_proc=4)
+                                  num_proc=4,
+                                  load_from_cache_file=False)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
