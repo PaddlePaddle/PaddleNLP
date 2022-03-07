@@ -14,8 +14,11 @@
 from collections import defaultdict
 import re
 
+from paddlenlp import Taskflow
 import jieba
 import numpy as np
+
+word_segmenter = Taskflow("word_segmentation")
 
 
 def convert_example(example, tokenizer, is_test=False):
@@ -65,18 +68,10 @@ def preprocess_prediction_data(data, tokenizer):
     return examples
 
 
-def read_stop_words(file_path):
-    with open(file_path, "r") as f:
-        stop_words = []
-        for line in f:
-            word = line.strip()
-            stop_words.append(word)
-    return stop_words
-
-
 def build_vocab(texts,
-                stop_words=[],
-                min_count=10,
+                stopwords=[],
+                num_words=None,
+                min_freq=10,
                 unk_token="[UNK]",
                 pad_token="[PAD]"):
     """
@@ -84,9 +79,12 @@ def build_vocab(texts,
 
     Args:
         texts (obj:`List[str]`): The raw corpus data.
-        stop_words (obj:`List[str]`): The list where each element is a word that will be
+        num_words (obj:`int`): the maximum size of vocabulary.
+        stopwords (obj:`List[str]`): The list where each element is a word that will be
             filtered from the texts.
-        min_count (obj:`int`): the minimum word frequency of words to be kept.
+        min_freq (obj:`int`): the minimum word frequency of words to be kept.
+        unk_token (obj:`str`): Special token for unknow token.
+        pad_token (obj:`str`): Special token for padding token.
 
     Returns:
         word_index (obj:`Dict`): The vocabulary from the corpus data.
@@ -98,8 +96,8 @@ def build_vocab(texts,
         if not text:
             continue
         doc = []
-        for word in jieba.cut(text):
-            if word in stop_words:
+        for word in word_segmenter(text):
+            if word in stopwords:
                 continue
             doc.append(word)
             word_counts[word] += 1
@@ -107,10 +105,13 @@ def build_vocab(texts,
 
     wcounts = []
     for word, count in word_counts.items():
-        if count < min_count:
+        if count < min_freq:
             continue
         wcounts.append((word, count))
     wcounts.sort(key=lambda x: x[1], reverse=True)
+    if num_words is not None and len(wcounts) > (num_words - 2):
+        wcounts = wcounts[:(num_words - 2)]
+    # add the special pad_token and unk_token to the vocabulary 
     sorted_voc = [pad_token, unk_token]
     sorted_voc.extend(wc[0] for wc in wcounts)
     word_index = dict(zip(sorted_voc, list(range(len(sorted_voc)))))

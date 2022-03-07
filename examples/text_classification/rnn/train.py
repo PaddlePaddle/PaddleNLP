@@ -23,7 +23,7 @@ from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
 from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
-from utils import convert_example, build_vocab, read_stop_words
+from utils import convert_example, build_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -96,11 +96,13 @@ if __name__ == "__main__":
         texts.append(data["text"])
 
     # Reads stop words.
-    stop_words = read_stop_words(args.stop_words_path)
+    # Stopwords are just for example. 
+    # It should be updated according to the corpus.
+    stopwords = set(["的", "吗", "吧", "呀", "呜", "呢", "呗"])
     # Builds vocab.
     word2idx = build_vocab(
-        texts, stop_words, min_count=5, unk_token="[UNK]", pad_token="[PAD]")
-    vocab = Vocab.from_dict(word2idx, unk_token='[UNK]', pad_token='[PAD]')
+        texts, stopwords, min_freq=5, unk_token="[UNK]", pad_token="[PAD]")
+    vocab = Vocab.from_dict(word2idx, unk_token="[UNK]", pad_token="[PAD]")
     # Saves vocab.
     vocab.to_json(args.vocab_path)
 

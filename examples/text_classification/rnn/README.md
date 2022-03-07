@@ -129,15 +129,6 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 
 ### 模型训练
 
-在模型训练之前，需要先下载停用词表文件word_dict.txt，用于构建词表过滤停用词。
-
-停用词表文件参考：
-https://github.com/YueYongDev/stopwords/blob/master/%E7%99%BE%E5%BA%A6%E5%81%9C%E7%94%A8%E8%AF%8D%E8%A1%A8.txt
-
-
-**NOTE:** 同时停用词表的选择可以根据实际应用数据进行选择。
-
-
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 
 CPU 启动：
@@ -203,6 +194,8 @@ checkpoints/
 ```
 
 **NOTE:**
+
+* 训练脚本中停用词`stopwords`仅仅是示例作用，具体停用词使用需要根据实际应用数据进行选择。
 
 * 如需恢复模型训练，则init_from_ckpt只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt=checkpoints/0`即可，程序会自动加载模型参数`checkpoints/0.pdparams`，也会自动加载优化器状态`checkpoints/0.pdopt`。
 * 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
