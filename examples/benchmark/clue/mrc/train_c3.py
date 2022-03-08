@@ -124,7 +124,6 @@ def evaluate(model, dev_data_loader, metric):
 
 
 def do_train(model, metric, criterion, train_data_loader, dev_data_loader):
-
     model.train()
     global_step = 0
     tic_train = time.time()
@@ -146,7 +145,7 @@ def do_train(model, metric, criterion, train_data_loader, dev_data_loader):
 
             global_step += 1
 
-            # 每间隔 log_step 输出训练指标
+            # output logging every log_step 
             if global_step % log_step == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
@@ -201,7 +200,6 @@ if __name__ == "__main__":
 
     num_training_steps = len(train_data_loader) * EPOCH
 
-    # 定义 learning_rate_scheduler，负责在训练过程中对 lr 进行调度
     lr_scheduler = LinearDecayWithWarmup(2e-5, num_training_steps, 0)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -211,16 +209,12 @@ if __name__ == "__main__":
     ]
     grad_clip = paddle.nn.ClipGradByGlobalNorm(max_grad_norm)
 
-    # 定义 Optimizer
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=0.01,
         apply_decay_param_fun=lambda x: x in decay_params,
         grad_clip=grad_clip)
-    # 交叉熵损失
     criterion = paddle.nn.loss.CrossEntropyLoss()
-    # 评估的时候采用准确率指标
     metric = paddle.metric.Accuracy()
-    # 模型训练
     do_train(model, metric, criterion, train_data_loader, dev_data_loader)

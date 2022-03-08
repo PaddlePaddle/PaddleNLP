@@ -63,6 +63,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     print(args.model_path)
+
     test_ds = load_dataset(read_text, file_name='data/test.json', lazy=False)
 
     MODEL_NAME = args.model_path

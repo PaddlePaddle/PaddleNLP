@@ -52,7 +52,7 @@ def convert_wsc_example(example, tokenizer):
     query_idx = target['span1_index']
     pronoun = target['span2_text']
     pronoun_idx = target['span2_index']
-    # 给文本的span1_text位置加入"_"标记，然后给文本的span2_text位置加入"[]"
+    # Add "_" mark for the span1_text position and Add "[]" for the span2_text position
     if pronoun_idx > query_idx:
         text_a_list.insert(query_idx, "_")
         text_a_list.insert(query_idx + len(query) + 1, "_")
@@ -112,65 +112,58 @@ def do_wsc_predict(model, tokenizer, example):
         text_a_list.insert(query_idx + len(query) + 2 + 1, "_")
 
     text_a = "".join(text_a_list)
-    # 把文本转换成input_ids,token_type_ids
+    # convert raw text into input_ids,token_type_ids
     encoded_text = tokenizer(
         text=text_a, max_seq_len=128, pad_to_max_seq_len=True)
-    # 把input_ids变成paddle tensor
+
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
-    # 把token_type_ids变成paddle tensor
     segment_ids = paddle.to_tensor([encoded_text['token_type_ids']])
-    # 模型预测
+    # model prediction
     pooled_output = model(input_ids, segment_ids)
-    # 取概率值最大的索引
+    # get the index of the hgihest probability
     out2 = paddle.argmax(pooled_output, axis=1)
     return out2.numpy()[0]
 
 
 def do_predict(model, tokenizer, example):
-    # 把文本转换成input_ids,token_type_ids
+    # convert text into input_ids,token_type_ids
     encoded_text = tokenizer(
         text=example["sentence1"],
         text_pair=example["sentence2"],
         max_seq_len=512,
         pad_to_max_seq_len=True)
-    # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
-    # 把token_type_ids变成paddle tensor
     segment_ids = paddle.to_tensor([encoded_text['token_type_ids']])
-    # 模型预测
+    # model prediction
     pooled_output = model(input_ids, segment_ids)
-    # 取概率值最大的索引
+    # get the index of the hgihest probability
     out2 = paddle.argmax(pooled_output, axis=1)
     return out2.numpy()[0]
 
 
 def do_csl_predict(model, tokenizer, example):
-    # 把文本转换成input_ids,token_type_ids
+    # convert text into input_ids,token_type_ids
     text_b = example['abst']
     text_a = ';'.join(example['keyword'])
     encoded_text = tokenizer(
         text=text_a, text_pair=text_b, max_seq_len=512, pad_to_max_seq_len=True)
-    # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
-    # 把token_type_ids变成paddle tensor
     segment_ids = paddle.to_tensor([encoded_text['token_type_ids']])
-    # 模型预测
+    # model prediction
     pooled_output = model(input_ids, segment_ids)
-    # 取概率值最大的索引
+    # get the index of the hgihest probability
     out2 = paddle.argmax(pooled_output, axis=1)
     return out2.numpy()[0]
 
 
 def do_tnews_predict(model, tokenizer, example):
-    # 把文本转换成input_ids,token_type_ids
+    # convert text into input_ids,token_type_ids
     encoded_text = tokenizer(
         text=example["sentence"], max_seq_len=512, pad_to_max_seq_len=True)
-    # 把input_ids变成paddle tensor
     input_ids = paddle.to_tensor([encoded_text['input_ids']])
-    # 把token_type_ids变成paddle tensor
     segment_ids = paddle.to_tensor([encoded_text['token_type_ids']])
-    # 模型预测
+    # model prediction
     pooled_output = model(input_ids, segment_ids)
-    # 取概率值最大的索引
+    # get the index of the hgihest probability
     out2 = paddle.argmax(pooled_output, axis=1)
     return out2.numpy()[0]

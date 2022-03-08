@@ -24,12 +24,7 @@ SPIECE_UNDERLINE = '▁'
 
 
 class ChidExample(object):
-    def __init__(self,
-                 example_id,
-                 tag,
-                 doc_tokens,
-                 options,
-                 answer_index=None):
+    def __init__(self, example_id, tag, doc_tokens, options, answer_index=None):
         self.example_id = example_id
         self.tag = tag
         self.doc_tokens = doc_tokens
@@ -70,13 +65,14 @@ class InputFeatures(object):
         self.input_masks = input_masks
         self.segment_ids = segment_ids
         self.choice_masks = choice_masks
-        self.label = label  # 正确答案在所有候选答案中的index
+        # The index of the correct answer among all candidate answers
+        self.label = label
 
 
 def read_chid_examples(input_data_file, input_label_file, is_training=True):
     '''
-    将原始数据处理为如下形式：
-    part_passage遍历每个blak的周围位置
+    The raw data is processed into the following form:
+    part_passage traverse through every surroundings of the blank遍
     :param input_data:
     :param is_training:
     :return:
@@ -88,13 +84,13 @@ def read_chid_examples(input_data_file, input_label_file, is_training=True):
 
     def _is_chinese_char(cp):
         if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
-                (cp >= 0x3400 and cp <= 0x4DBF) or  #
-                (cp >= 0x20000 and cp <= 0x2A6DF) or  #
-                (cp >= 0x2A700 and cp <= 0x2B73F) or  #
-                (cp >= 0x2B740 and cp <= 0x2B81F) or  #
-                (cp >= 0x2B820 and cp <= 0x2CEAF) or
-                (cp >= 0xF900 and cp <= 0xFAFF) or  #
-                (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+            (cp >= 0x3400 and cp <= 0x4DBF) or  #
+            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+            (cp >= 0x2B820 and cp <= 0x2CEAF) or
+            (cp >= 0xF900 and cp <= 0xFAFF) or  #
+            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
             return True
 
         return False
@@ -134,7 +130,8 @@ def read_chid_examples(input_data_file, input_label_file, is_training=True):
         return "".join(output)
 
     def is_whitespace(c):
-        if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F or c == SPIECE_UNDERLINE:
+        if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(
+                c) == 0x202F or c == SPIECE_UNDERLINE:
             return True
         return False
 
@@ -187,9 +184,9 @@ def read_chid_examples(input_data_file, input_label_file, is_training=True):
         else:
             example_id += 1
     else:
-        print('原始样本个数：{}'.format(example_id))
+        print('Original samples are ：{}'.format(example_id))
 
-    print('实际生成总样例数：{}'.format(len(examples)))
+    print('The generated total examples are ：{}'.format(len(examples)))
     return examples
 
 
@@ -198,25 +195,28 @@ def add_tokens_for_around(tokens, pos, num_tokens):
     num_r = num_tokens - num_l
 
     if pos >= num_l and (len(tokens) - 1 - pos) >= num_r:
-        tokens_l = tokens[pos - num_l: pos]
-        tokens_r = tokens[pos + 1: pos + 1 + num_r]
+        tokens_l = tokens[pos - num_l:pos]
+        tokens_r = tokens[pos + 1:pos + 1 + num_r]
     elif pos <= num_l:
         tokens_l = tokens[:pos]
         right_len = num_tokens - len(tokens_l)
-        tokens_r = tokens[pos + 1: pos + 1 + right_len]
+        tokens_r = tokens[pos + 1:pos + 1 + right_len]
     elif (len(tokens) - 1 - pos) <= num_r:
         tokens_r = tokens[pos + 1:]
         left_len = num_tokens - len(tokens_r)
-        tokens_l = tokens[pos - left_len: pos]
+        tokens_l = tokens[pos - left_len:pos]
     else:
         raise ValueError('impossible')
 
     return tokens_l, tokens_r
 
 
-def convert_examples_to_features(examples, tokenizer, max_seq_length=128, max_num_choices=10):
+def convert_examples_to_features(examples,
+                                 tokenizer,
+                                 max_seq_length=128,
+                                 max_num_choices=10):
     '''
-    将所有候选答案放置在片段开头
+    Place all candidate answers at the beginning of the fragment
     '''
 
     def _loop(example, unique_id, label):
@@ -246,7 +246,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length=128, max_nu
                 all_doc_tokens.append(sub_token)
 
         pos = all_doc_tokens.index(tag)
-        num_tokens = max_tokens_for_doc - 5  # [unused1]和segA的成语
+        num_tokens = max_tokens_for_doc - 5
         tmp_l, tmp_r = add_tokens_for_around(all_doc_tokens, pos, num_tokens)
         num_l = len(tmp_l)
         num_r = len(tmp_r)
@@ -266,12 +266,14 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length=128, max_nu
                 tokens_r.extend(['[MASK]'] * 4)
             else:
                 tokens_r.append(token)
-        tokens_r = tokens_r[: num_r]
+        tokens_r = tokens_r[:num_r]
         del tmp_r
 
         for i, elem in enumerate(example.options):
             option = tokenizer.tokenize(elem)
-            tokens = ['[CLS]'] + option + ['[SEP]'] + tokens_l + ['[unused1]'] + tokens_r + ['[SEP]']
+            tokens = ['[CLS]'] + option + ['[SEP]'] + tokens_l + [
+                '[unused1]'
+            ] + tokens_r + ['[SEP]']
 
             input_id = tokenizer.convert_tokens_to_ids(tokens)
             input_mask = [1] * len(input_id)
@@ -319,7 +321,8 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length=128, max_nu
                 choice_masks=choice_masks,
                 label=label))
 
-    max_tokens_for_doc = max_seq_length - 3  # [CLS] choice [SEP] document [SEP]
+    # [CLS] choice [SEP] document [SEP]
+    max_tokens_for_doc = max_seq_length - 3
     features = []
     unique_id = 0
 
@@ -339,7 +342,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length=128, max_nu
 
 
 def logits_matrix_to_array(logits_matrix, index_2_idiom):
-    """从矩阵中计算全局概率最大的序列"""
+    """Compute the sequence with the highest global probability from a matrix"""
     logits_matrix = np.array(logits_matrix)
     logits_matrix = np.transpose(logits_matrix)
     tmp = []
@@ -402,18 +405,27 @@ def write_predictions(results, output_prediction_file):
     print("Writing predictions to: {}".format(output_prediction_file))
 
 
-def generate_input(data_file, label_file, example_file, feature_file, tokenizer, max_seq_length, max_num_choices,
+def generate_input(data_file,
+                   label_file,
+                   example_file,
+                   feature_file,
+                   tokenizer,
+                   max_seq_length,
+                   max_num_choices,
                    is_training=True):
     if os.path.exists(feature_file):
         features = pickle.load(open(feature_file, 'rb'))
     elif os.path.exists(example_file):
         examples = pickle.load(open(example_file, 'rb'))
-        features = convert_examples_to_features(examples, tokenizer, max_seq_length, max_num_choices)
+        features = convert_examples_to_features(examples, tokenizer,
+                                                max_seq_length, max_num_choices)
         pickle.dump(features, open(feature_file, 'wb'))
     else:
-        examples = read_chid_examples(data_file, label_file, is_training=is_training)
+        examples = read_chid_examples(
+            data_file, label_file, is_training=is_training)
         pickle.dump(examples, open(example_file, 'wb'))
-        features = convert_examples_to_features(examples, tokenizer, max_seq_length, max_num_choices)
+        features = convert_examples_to_features(examples, tokenizer,
+                                                max_seq_length, max_num_choices)
         pickle.dump(features, open(feature_file, 'wb'))
 
     return features

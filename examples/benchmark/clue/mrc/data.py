@@ -2,14 +2,15 @@ import collections
 import time
 import json
 import os
-from tqdm import tqdm 
+from tqdm import tqdm
 
 import paddle
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
+
 def read_text(file_name):
     with open(file_name, "r", encoding="utf8") as f:
-            input_data = json.load(f)["data"]
+        input_data = json.load(f)["data"]
     for entry in tqdm(input_data):
         title = entry.get("title", "").strip()
         for paragraph in entry["paragraphs"]:
@@ -18,24 +19,23 @@ def read_text(file_name):
                 qas_id = qa["id"]
                 question = qa["question"].strip()
                 answer_starts = [
-                        answer["answer_start"]
-                        for answer in qa.get("answers", [])
-                    ]
+                    answer["answer_start"] for answer in qa.get("answers", [])
+                ]
                 answers = [
-                        answer["text"].strip()
-                        for answer in qa.get("answers", [])
-                    ]
+                    answer["text"].strip() for answer in qa.get("answers", [])
+                ]
 
                 yield {
-                        'id': qas_id,
-                        'title': title,
-                        'context': context,
-                        'question': question,
-                        'answers': answers,
-                        'answer_starts': answer_starts
-                    }
+                    'id': qas_id,
+                    'title': title,
+                    'context': context,
+                    'question': question,
+                    'answers': answers,
+                    'answer_starts': answer_starts
+                }
 
-def prepare_train_features(examples,tokenizer,doc_stride,max_seq_length):
+
+def prepare_train_features(examples, tokenizer, doc_stride, max_seq_length):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -43,10 +43,7 @@ def prepare_train_features(examples,tokenizer,doc_stride,max_seq_length):
     questions = [examples[i]['question'] for i in range(len(examples))]
 
     tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=doc_stride,
-        max_seq_len=max_seq_length)
+        questions, contexts, stride=doc_stride, max_seq_len=max_seq_length)
 
     # Let's label those examples!
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -100,7 +97,9 @@ def prepare_train_features(examples,tokenizer,doc_stride,max_seq_length):
 
     return tokenized_examples
 
-def prepare_validation_features(examples,tokenizer,doc_stride,max_seq_length):
+
+def prepare_validation_features(examples, tokenizer, doc_stride,
+                                max_seq_length):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -108,10 +107,7 @@ def prepare_validation_features(examples,tokenizer,doc_stride,max_seq_length):
     questions = [examples[i]['question'] for i in range(len(examples))]
 
     tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=doc_stride,
-        max_seq_len=max_seq_length)
+        questions, contexts, stride=doc_stride, max_seq_len=max_seq_length)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -132,13 +128,12 @@ def prepare_validation_features(examples,tokenizer,doc_stride,max_seq_length):
     return tokenized_examples
 
 
-
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
     def forward(self, y, label):
-        start_logits, end_logits = y   # both shape are [batch_size, seq_len]
+        start_logits, end_logits = y  # both shape are [batch_size, seq_len]
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)

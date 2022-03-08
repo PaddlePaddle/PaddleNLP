@@ -11,8 +11,8 @@ from CHID_preprocess import RawResult, get_final_predictions, write_predictions,
 
 def process_test_data(input_dir, tokenizer, max_seq_length, max_num_choices):
 
-    # 测试文件有两个，一个是test1.0.json，另一个是test1.1.json。
-    # 可以根据情况使用test的json文件，本项目默认使用的是test1.0.json
+    # there are two test files，test1.0.json，test1.1.json。
+    # we use test1.0.json by default
     predict_file = 'work/test1.0.json'
 
     test_example_file = os.path.join(

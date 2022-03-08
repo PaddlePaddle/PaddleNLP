@@ -17,9 +17,10 @@ n_class = 4
 reverse_order = False
 sa_step = False
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                    datefmt='%m/%d/%Y %H:%M:%S',
-                    level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+    datefmt='%m/%d/%Y %H:%M:%S',
+    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +80,7 @@ class DataProcessor(object):
                 lines.append(line)
             return lines
 
+
 class c3Processor(DataProcessor):
     def __init__(self, data_dir):
         self.D = [[], [], []]
@@ -86,20 +88,24 @@ class c3Processor(DataProcessor):
 
         for sid in range(3):
             data = []
-            if(sid<2):
+            if (sid < 2):
                 for subtask in ["d", "m"]:
-                    with open(self.data_dir + "/" + subtask + "-" + ["train.json", "dev.json", "test.json"][sid],
-                            "r", encoding="utf8") as f:
+                    with open(
+                            self.data_dir + "/" + subtask + "-" +
+                        ["train.json", "dev.json", "test.json"][sid],
+                            "r",
+                            encoding="utf8") as f:
                         data += json.load(f)
             else:
 
-                with open(self.data_dir + "/" + "test1.0.json",
-                                "r", encoding="utf8") as f:
+                with open(
+                        self.data_dir + "/" + "test1.0.json", "r",
+                        encoding="utf8") as f:
                     data += json.load(f)
             if sid == 0:
                 random.shuffle(data)
 
-            if(sid<2):
+            if (sid < 2):
                 for i in range(len(data)):
                     for j in range(len(data[i][1])):
                         d = [
@@ -109,17 +115,22 @@ class c3Processor(DataProcessor):
                         for k in range(len(data[i][1][j]["choice"])):
                             d += [data[i][1][j]["choice"][k].lower()]
                         for k in range(len(data[i][1][j]["choice"]), 4):
-                            d += ['无效答案']  # 有些C3数据选项不足4个，添加[无效答案]能够有效增强模型收敛稳定性
+                            # add useless answer when the number of choice is less than 4.
+                            d += ['无效答案']
                         d += [data[i][1][j]["answer"].lower()]
                         self.D[sid] += [d]
             else:
                 for i in range(len(data)):
                     for j in range(len(data[i][1])):
-                        d = ['\n'.join(data[i][0]).lower(), data[i][1][j]["question"].lower()]
+                        d = [
+                            '\n'.join(data[i][0]).lower(),
+                            data[i][1][j]["question"].lower()
+                        ]
                         for k in range(len(data[i][1][j]["choice"])):
                             d += [data[i][1][j]["choice"][k].lower()]
                         for k in range(len(data[i][1][j]["choice"]), 4):
-                            d += ['无效答案']  # 有些C3数据选项不足4个，添加[无效答案]能够有效增强模型收敛稳定性
+                            # add useless answer when the number of choice is less than 4.
+                            d += ['无效答案']
                         d += [data[i][1][j]["choice"][0].lower()]
                         self.D[sid] += [d]
 
@@ -149,6 +160,8 @@ class c3Processor(DataProcessor):
             for (i, d) in enumerate(data):
                 answer = -1
                 # 这里data[i]有6个元素，0是context，1是问题，2~5是choice，6是答案
+                # there are 6 electments in data[i]
+                # 0 represents context, 1 represents question, 2~5 represents choice, 6 represents answer
                 for k in range(4):
                     if data[i][2 + k] == data[i][6]:
                         answer = str(k)
@@ -160,14 +173,22 @@ class c3Processor(DataProcessor):
                     text_a = data[i][0]
                     text_b = data[i][k + 2]
                     text_c = data[i][1]
-                    examples.append(InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label, text_c=text_c))
+                    examples.append(
+                        InputExample(
+                            guid=guid,
+                            text_a=text_a,
+                            text_b=text_b,
+                            label=label,
+                            text_c=text_c))
 
             with open(cache_dir, 'wb') as w:
                 pickle.dump(examples, w)
 
         return examples
 
-def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer):
+
+def convert_examples_to_features(examples, label_list, max_seq_length,
+                                 tokenizer):
     """Loads a data file into a list of `InputBatch`s."""
 
     print("#examples", len(examples))
@@ -224,12 +245,11 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         if ex_index < 2:
             logger.info("*** Example ***")
             logger.info("guid: %s" % (example.guid))
-            # logger.info("tokens: %s" % " ".join(
-            #     [tokenization.printable_text(x) for x in tokens]))
             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-            logger.info(
-                "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+            logger.info("input_mask: %s" %
+                        " ".join([str(x) for x in input_mask]))
+            logger.info("segment_ids: %s" %
+                        " ".join([str(x) for x in segment_ids]))
             logger.info("label: %s (id = %d)" % (example.label, label_id))
 
         features[-1].append(
