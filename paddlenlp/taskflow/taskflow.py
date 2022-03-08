@@ -20,13 +20,13 @@ import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import WordTagNERTask
-from .named_entity_recognition import LACNERTask
+from .named_entity_recognition import NERWordTagTask
+from .named_entity_recognition import NERLACTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
-from .word_segmentation import JiebaSegTask
-from .word_segmentation import LACSegTask
-from .word_segmentation import WordTagSegTask
+from .word_segmentation import SegJiebaTask
+from .word_segmentation import SegLACTask
+from .word_segmentation import SegWordTagTask
 from .pos_tagging import POSTaggingTask
 from .text_generation import TextGenerationTask
 from .poetry_generation import PoetryGenerationTask
@@ -110,7 +110,7 @@ TASKS = {
     "word_segmentation": {
         "modes": {
             "fast": {
-                "task_class": SegJiebaask,
+                "task_class": SegJiebaTask,
                 "task_flag": "word_segmentation-jieba",
             },
             "lac": {

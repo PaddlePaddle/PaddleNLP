@@ -31,7 +31,8 @@ POS_LABEL_WORDTAG = [
     "介词", "介词_方位介词", "助词", "代词", "连词", "副词", "疑问词", "肯定词", "否定词", "数量词", "叹词",
     "拟声词", "修饰词", "外语单词", "英语单词", "汉语拼音", "词汇用语", "w"
 ]
-POS_LBEL_LAC = [
+
+POS_LABEL_LAC = [
     "n", "f", "s", "t", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "r",
     "p", "c", "u", "xc", "w"
 ]
@@ -39,7 +40,7 @@ POS_LBEL_LAC = [
 usage = r"""
           from paddlenlp import Taskflow 
 
-          # 默认为WordTag模式
+          # WordTag精确模式
           ner = Taskflow("ner")
           ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
@@ -52,9 +53,19 @@ usage = r"""
           [[('热梅茶', '饮食类_饮品'), ('是', '肯定词'), ('一道', '数量词'), ('以', '介词'), ('梅子', '饮食类'), ('为', '肯定词'), ('主要原料', '物体类'), ('制作', '场景事件'), ('的', '助词'), ('茶饮', '饮食类_饮品')], [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]]
           '''
 
-          # LAC模式
-          ner = Taskflow("ner", mode="lac")
+          # 只返回命名实体词
+          ner = Taskflow("ner", entity_only=True)
           ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+          '''
+          [('孤女', '作品类_实体'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('小说', '作品类_概念'), ('作者', '人物类_概念'), ('余兼羽', '人物类_实体')]
+          '''
+
+          # 使用LAC模式，只返回命名实体词
+          ner = Taskflow("ner", mode="lac")
+          ner("三亚是一个美丽的城市")
+          '''
+          [('三亚', 'LOC')]
+          '''
           """
 
 
@@ -91,8 +102,9 @@ class NERWordTagTask(WordTagTask):
         }
     }
 
-    def __init__(self, model, task, return_entity=False, **kwargs):
-        super().__init__(model=model, task=task, **kwargs)
+    def __init__(self, model, task, entity_only=False, **kwargs):
+        super().__init__(model="wordtag", task=task, **kwargs)
+        self.entity_only = entity_only
         if self._user_dict:
             self._custom = Customization()
             self._custom.load_customization(self._user_dict)
@@ -142,6 +154,9 @@ class NERWordTagTask(WordTagTask):
             simple_result = []
             if 'items' in result:
                 for item in result['items']:
+                    if self.entity_only and item[
+                            'wordtag_label'] in POS_LABEL_WORDTAG:
+                        continue
                     simple_result.append((item['item'], item['wordtag_label']))
             simple_results.append(simple_result)
         simple_results = simple_results[0] if len(
@@ -168,8 +183,9 @@ class NERLACTask(LacTask):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, model, task, return_entity=False, **kwargs):
+    def __init__(self, model, task, entity_only=False, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+        self.entity_only = entity_only
 
     def _postprocess(self, inputs):
         """
@@ -207,7 +223,11 @@ class NERLACTask(LacTask):
             if len(sent_out) < len(tags_out):
                 sent_out.append(parital_word)
 
-            result = list(zip(sent_out, tags_out))
+            result = []
+            for s, t in zip(sent_out, tags_out):
+                if self.entity_only and t in POS_LABEL_LAC:
+                    continue
+                result.append((s, t))
             final_results.append(result)
         final_results = self._auto_joiner(final_results, self.input_mapping)
         final_results = final_results if len(
