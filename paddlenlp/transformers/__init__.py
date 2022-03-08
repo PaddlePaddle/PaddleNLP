@@ -94,3 +94,4 @@ from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
+from .byt5.tokenizer import *
