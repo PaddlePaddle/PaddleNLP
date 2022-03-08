@@ -1235,13 +1235,12 @@ class InferUnifiedDecoding(nn.Layer):
         params["type_emb"].append(
             (model.embeddings.token_type_embeddings, "weight"))
         if getattr(model.embeddings, "role_embeddings", None) is not None:
-            params["rol_emb"].append(
+            params["role_emb"].append(
                 (model.embeddings.role_embeddings, "weight"))
         else:
             # inputs of custom op cannot be None
-            params["rol_emb"].append(
-                (paddle.zeros(shape=[1]), False,
-                 partial(setattr(self, "default_role_emb"))))
+            params["role_emb"].append((paddle.zeros(shape=[1]), False, partial(
+                setattr, self, "default_role_emb")))
         if not self._normalize_before:
             # pre-norm params has been converted in `convert_params`, and this
             # is only for post-norm such as UNIMO.
@@ -1254,9 +1253,9 @@ class InferUnifiedDecoding(nn.Layer):
         # NOTE: newly created tensors should be layer attribute refered to be
         # able to convert to static graph.
         params["linear_weight"].append((model.lm_head.decoder_weight.t(), False,
-                                        partial(setattr(self, "dec_weight"))))
+                                        partial(setattr, self, "dec_weight")))
         params["linear_bias"].append((paddle.assign(model.lm_head.decoder_bias),
-                                      True, partial(setattr(self, "dec_bias"))))
+                                      True, partial(setattr, self, "dec_bias")))
         for k, v in params.items():
             setattr(self, k, v)
 
