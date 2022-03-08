@@ -24,14 +24,12 @@ __all__ = ['ByT5Tokenizer', ]
 
 class ByT5Tokenizer(AlbertEnglishTokenizer):
     """
-    Constructs a T5 tokenizer based on SentencePiece .
+    Construct a ByT5 tokenizer. ByT5 simply uses raw bytes utf-8 encoding.
     This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
     which contains most of the main methods. For more information regarding those methods,
     please refer to this superclass.
+
     Args:
-        sentencepiece_model_file (str):
-            The vocabulary file (ends with '.spm') required to instantiate
-            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
         do_lower_case (bool):
             Whether or not to lowercase the input when tokenizing. Defaults to `False`.
         remove_space (bool):
@@ -48,6 +46,7 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
         pad_token (str):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "<pad>".
+
     """
 
     def __init__(self,
@@ -172,7 +171,6 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
             return None
         return self.convert_tokens_to_ids(self.pad_token)
 
-# 这个函数和t5没有什么区别
     def _add_eos_if_not_present(self, token_ids):
         """Do not add eos again if user already added it."""
         if len(token_ids) > 0 and token_ids[-1] == self.eos_token_id:
@@ -204,7 +202,6 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
             token_ids_1 = self._add_eos_if_not_present(token_ids_1)
             return token_ids_0 + token_ids_1
 
-#这个与T5也一样
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
@@ -225,7 +222,6 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
             return len(token_ids_0 + eos) * [0]
         return len(token_ids_0 + eos + token_ids_1 + eos) * [0]
 
-#这个与T5也一样
     def get_special_tokens_mask(self,
                                 token_ids_0,
                                 token_ids_1=None,
@@ -253,7 +249,6 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
             return ([0] * len(token_ids_0)) + [1]
         return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
 
-#重写基类的tokenize方法
     def _tokenize(self, text, sample=False):
         tokens = [chr(i) for i in text.encode("utf-8")]
         return tokens
@@ -300,7 +295,6 @@ class ByT5Tokenizer(AlbertEnglishTokenizer):
         string = bstring.decode("utf-8", errors="ignore")
         return string
 
-    # ByT5Tokenizer 重写
     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
         return ()
 
