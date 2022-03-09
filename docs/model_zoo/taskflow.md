@@ -569,29 +569,29 @@ dialogue.interactive_mode(max_turn=3)
 
 * `max_turn`：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。
 
-## 定制任务
+## 模型微调
 
-Taskflow提供了定制接口来载入自己的模型，适配任务如下：
+Taskflow提供了定制接口来使用自己的数据对模型进行微调/训练，适配任务如下：
 
-|功能|模式/模型|默认路径|定制训练|
-| :--- | :---: | :---: | :---: |
-|word_segmentation|`mode="base"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|`$HOME/.paddlenlp/taskflow/word_segmentation/lac`|
-|word_segmentation|`mode="accurate"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`|
-|ner|`mode="fast"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|`$HOME/.paddlenlp/taskflow/ner/lac`|
-|ner|`mode="accurate"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|`$HOME/.paddlenlp/taskflow/ner/wordtag`|
-|text_correction|`model="csc-ernie-1.0"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc)|`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0`|
-|dependency_parsing|`model="ddparser"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`|
-|dependency_parsing|`model="ddparser-ernie-1.0"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0`|
-|dependency_parsing|`model="ddparser-ernie-gram-zh"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh`|
-|sentiment_analysis|`model="bilstm"`|暂无|`$HOME/.paddlenlp/taskflow/sentiment_analysis/bilstm`|
-|sentiment_analysis|`model="skep_ernie_1.0_large_ch"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep)|`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch`|
-|knowledge_mining|`model="wordtag"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag`|
-|knowledge_mining|`model="nptag"`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag)|`$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`|
+|任务名称|默认路径|定制训练示例|
+| :---: | :---: | :---: |
+|`Taskflow("word_segmentation", mode="base")`|`$HOME/.paddlenlp/taskflow/word_segmentation/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
+|`Taskflow("word_segmentation", mode="accurate")`|`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("ner", mode="fast")`|`$HOME/.paddlenlp/taskflow/ner/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
+|`Taskflow("ner", mode="accurate")`|`$HOME/.paddlenlp/taskflow/ner/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("text_correction", model="csc-ernie-1.0")`|`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc)|
+|`Taskflow("dependency_parsing", model="ddparser")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("dependency_parsing", model="ddparser-ernie-1.0")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("sentiment_analysis", model="bilstm")`|`$HOME/.paddlenlp/taskflow/sentiment_analysis/bilstm`|暂无|
+|`Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")`|`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep)|
+|`Taskflow("knowledge_mining", model="wordtag")`|`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("knowledge_mining", model="nptag")`|`$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag)|
 
 
 ### 定制任务示例
 
-这里我们以`命名实体识别`任务的WordTag模型为例，展示如何定制化训练自己的模型。
+这里我们以`命名实体识别`任务的WordTag模型为例，展示如何定制自己的模型。
 
 任务的默认路径为`$HOME/.paddlenlp/taskflow/ner/wordtag/`，该默认路径包含以下文件:
 
