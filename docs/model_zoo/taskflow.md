@@ -574,7 +574,7 @@ dialogue.interactive_mode(max_turn=3)
 Taskflow提供了定制接口来载入自己的模型，适配任务如下：
 
 |功能|模式/模型|默认路径|定制模型训练|
-| :--- | :---: | :---: |
+| :--- | :---: | :---: | :---: |
 |中文分词（word_segmentation）|`mode="base"`|`$HOME/.paddlenlp/taskflow/word_segmentation/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
 |中文分词（word_segmentation）|`mode="accurate"`|`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
 |命名实体识别（ner）|`mode="fast"`|`$HOME/.paddlenlp/taskflow/ner/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
@@ -613,7 +613,7 @@ custom_task_path/
 └── tags.txt # 定制标签文件
 ```
 
-使用Taskflow加载自定义模型进行一键预测：
+* 使用Taskflow加载自定义模型进行一键预测：
 
 ```python
 from paddlenlp import Taskflow
