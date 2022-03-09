@@ -168,8 +168,11 @@ def do_train(args):
     DEV, TEST, TOKENIZER_CLASS = DATASET_INFO[args.dataset]
     tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
 
-    train_ds, eval_ds, test_ds = load_dataset(
-        args.dataset, splits=['train', DEV, TEST])
+    train_ds, eval_ds = load_dataset(args.dataset, splits=['train', DEV])
+    if DEV == TEST:
+        test_ds = eval_ds
+    else:
+        test_ds = load_dataset(args.dataset, splits=[TEST])
 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
@@ -271,6 +274,7 @@ def do_train(args):
     memories = create_memory()
     tic_train = time.time()
     best_avg_metric = -1
+    stop_training = False
     for epoch in range(args.epochs):
         train_ds_iter.shuffle_sample()
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
@@ -326,7 +330,10 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
 
             if args.max_steps > 0 and global_steps >= args.max_steps:
-                return
+                stop_training = True
+                break
+        if stop_training:
+            break
     logger.info("Test:")
     evaluate(args, model, criterion,
              EM_AND_F1(), test_dataloader, create_memory(), tokenizer)
