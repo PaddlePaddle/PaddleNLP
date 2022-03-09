@@ -141,6 +141,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
                     layer.weight,
                     paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
+                    # TODO(guosheng): `normal` does not support float16, and
+                    # need to handle this when using fp16 as default dtype for
+                    # big models.
                     paddle.tensor.normal(
                         mean=0.0,
                         std=self.initializer_range
@@ -174,11 +177,9 @@ class UnifiedTransformerEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
-
-        # A model with role_embeddings can generate without role_ids. 
+        # A model with role_embeddings can generate without role_ids.
         if role_ids is not None:
             embeddings += self.role_embeddings(role_ids)
-
         embeddings = self.dropout(embeddings)
         return embeddings
 
