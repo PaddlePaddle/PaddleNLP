@@ -25,7 +25,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/ernie-1.0-dp8-gb512/log" \
-    run_pretrain_static.py \
+    run_pretrain.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0" \
     --input_dir "./data" \
@@ -110,7 +110,7 @@ CMRC2018 | 72.05/85.67 | - |
 
 ### 其他
 #### 模型参数转换
-本示例提供了静态图训练脚本，但Paddle目前主要的使用方式是动态图。因此，本示例提供了静态图参数到动态图参数的转换脚本：
+本示例提供了静态图训练脚本`run_pretrain_static.py`，启动参数与动态图一致。Paddle目前主要的使用方式是动态图，本示例提供了静态图参数到动态图参数的转换脚本：
 
 ```python
 python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_100000/static_vars
