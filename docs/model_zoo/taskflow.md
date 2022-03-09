@@ -569,11 +569,11 @@ dialogue.interactive_mode(max_turn=3)
 
 * `max_turn`：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。
 
-## 模型微调
+## 自定义任务
 
 Taskflow提供了定制接口来使用自己的数据对模型进行微调/训练，适配任务如下：
 
-|任务名称|默认路径|定制训练示例|
+|任务名称|默认路径||
 | :---: | :---: | :---: |
 |`Taskflow("word_segmentation", mode="base")`|`$HOME/.paddlenlp/taskflow/word_segmentation/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
 |`Taskflow("word_segmentation", mode="accurate")`|`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
@@ -591,7 +591,7 @@ Taskflow提供了定制接口来使用自己的数据对模型进行微调/训�
 
 ### 定制任务示例
 
-这里我们以`命名实体识别`任务的WordTag模型为例，展示如何定制自己的模型。
+这里我们以命名实体识别`Taskflow("ner", mode="accurate")`为例，展示如何定制自己的模型。
 
 任务的默认路径为`$HOME/.paddlenlp/taskflow/ner/wordtag/`，该默认路径包含以下文件:
 
