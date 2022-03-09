@@ -177,7 +177,8 @@ class UnifiedTransformerEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
-        if self.role_embeddings is not None:
+        # A model with role_embeddings can generate without role_ids.
+        if role_ids is not None:
             embeddings += self.role_embeddings(role_ids)
         embeddings = self.dropout(embeddings)
         return embeddings
