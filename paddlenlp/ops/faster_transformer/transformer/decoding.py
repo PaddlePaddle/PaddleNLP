@@ -1228,7 +1228,11 @@ class InferUnifiedDecoding(nn.Layer):
                 setattr(self, "_" + arg, value)
 
         params = convert_params(
-            self, model, fuse_qkv=1, use_fp16=use_fp16_decoding)
+            self,
+            model,
+            fuse_qkv=1,
+            use_fp16=use_fp16_decoding,
+            restore_data=True)
         params["word_emb"].append((model.embeddings.word_embeddings, "weight"))
         params["pos_emb"].append(
             (model.embeddings.position_embeddings, "weight"))
