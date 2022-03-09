@@ -363,6 +363,7 @@ public:
       DataType_* from_tensor[2];
       DataType_* decoder_output;
       DataType_* decoder_workspace;
+
       void *buf = reinterpret_cast<void *>(allocator_.malloc(
           decoder_->getContextWorkspaceSize(input_len, local_batch_size) + 
           (m * h_1 + 2 * request_batch_size * input_len * h_1) * sizeof(DataType_)

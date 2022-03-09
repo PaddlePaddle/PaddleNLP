@@ -818,8 +818,14 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             normalize_before=self._normalize_before,
             hidden_act=self._hidden_act)
 
-    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      attention_mask, **kwargs):
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      attention_mask,
+                                      seq_len,
+                                      position_ids=None,
+                                      role_ids=None,
+                                      **kwargs):
         input_ids = input_ids[:, :-1]
         if input_ids.dtype == paddle.int64:
             input_ids = paddle.cast(input_ids, dtype="int32")
@@ -834,9 +840,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             attention_mask == 0,
             dtype="float16" if self._use_fp16_decoding else "float32")
 
-        seq_len = kwargs.get("seq_len") - 1
+        seq_len = seq_len - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
 
-        position_ids = kwargs.get("position_ids", None)
         if position_ids is not None:
             if position_ids.dtype == paddle.int64:
                 position_ids = paddle.cast(position_ids, dtype="int32")
@@ -846,9 +853,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             decoder_position_ids = None
 
         field_values = {}
-        role_ids = kwargs.get("role_ids", None)
         if role_ids is not None:
-            role_ids = paddle.cast(role_ids, dtype="int32")
+            if role_ids.dtype == paddle.int64:
+                role_ids = paddle.cast(role_ids, dtype="int32")
             decoder_role_ids = role_ids[:, -1:]
             role_ids = role_ids[:, :-1]
         else:
@@ -884,24 +891,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
-
-    @staticmethod
-    def expand_inputs_for_generation(input_ids, expand_size, **model_kwargs):
-
-        index = paddle.tile(
-            paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1),
-            [1, expand_size]).reshape([-1])
-
-        input_ids = paddle.gather(input_ids, index)
-
-        for item in model_kwargs:
-            if model_kwargs[item] is not None:
-                tensor = model_kwargs[item]
-                model_kwargs[item] = paddle.gather(tensor, index)
-            else:
-                model_kwargs[item] = None
-
-        return input_ids, model_kwargs
 
     def forward(self,
                 input_ids,
