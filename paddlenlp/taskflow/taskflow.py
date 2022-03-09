@@ -61,7 +61,7 @@ TASKS = {
                 "task_flag": "ner-wordtag",
                 "linking": False,
             },
-            "lac": {
+            "fast": {
                 "task_class": NERLACTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
@@ -113,7 +113,7 @@ TASKS = {
                 "task_class": SegJiebaTask,
                 "task_flag": "word_segmentation-jieba",
             },
-            "lac": {
+            "base": {
                 "task_class": SegLACTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
@@ -126,7 +126,7 @@ TASKS = {
             },
         },
         "default": {
-            "mode": "lac"
+            "mode": "base"
         }
     },
     "pos_tagging": {

@@ -30,7 +30,7 @@ from .named_entity_recognition import NERWordTagTask
 usage = r"""
            from paddlenlp import Taskflow 
 
-           # 默认为LAC模式分词
+           # Taskflow base模式
            seg = Taskflow("word_segmentation")
            seg("第十四届全运会在西安举办")
            '''
@@ -42,14 +42,14 @@ usage = r"""
            [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
            '''
 
-           # jieba快速模式
+           # 快速模式分词
            seg = Taskflow("word_segmentation", mode="fast")
            seg("第十四届全运会在西安举办")
            '''
            ['第十四届', '全运会', '在', '西安', '举办']
            '''
 
-           # wordtag精确模式
+           # 精确模式分词
            seg = Taskflow("word_segmentation", mode="accurate")
            seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
            '''
