@@ -11,5 +11,5 @@ python -u -m paddle.distributed.launch --gpus '4' \
 	--dropout 0.3 \
     --output_emb_size 256 \
     --user_word_reptition \
-	--train_set_file "/wugaosheng/senteval_cn/STS-B/train.txt" \
-	--test_set_file "/wugaosheng/senteval_cn/STS-B/dev.tsv" 
+	--train_set_file "./senteval_cn/STS-B/train.txt" \
+	--test_set_file "./senteval_cn/STS-B/dev.tsv" 
