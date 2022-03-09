@@ -27,6 +27,16 @@ from .knowledge_mining import WordTagTask
 from .lexical_analysis import LacTask
 from .utils import Customization
 
+POS_LABEL_WORDTAG = [
+    "介词", "介词_方位介词", "助词", "代词", "连词", "副词", "疑问词", "肯定词", "否定词", "数量词", "叹词",
+    "拟声词", "修饰词", "外语单词", "英语单词", "汉语拼音", "词汇用语", "w"
+]
+
+POS_LABEL_LAC = [
+    "n", "f", "s", "t", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "r",
+    "p", "c", "u", "xc", "w"
+]
+
 usage = r"""
           from paddlenlp import Taskflow 
 
@@ -70,11 +80,6 @@ class NERWordTagTask(WordTagTask):
 
     """
 
-    POS_LABEL_WORDTAG = [
-        "介词", "介词_方位介词", "助词", "代词", "连词", "副词", "疑问词", "肯定词", "否定词", "数量词",
-        "叹词", "拟声词", "修饰词", "外语单词", "英语单词", "汉语拼音", "词汇用语", "w"
-    ]
-
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
@@ -110,10 +115,9 @@ class NERWordTagTask(WordTagTask):
         batch_results = []
         for sent_index in range(len(batch_texts)):
             sent = batch_texts[sent_index]
-            tags = [
-                self._index_to_tags[index] for index in batch_pred_tags[
-                    sent_index][self.summary_num:len(sent) + self.summary_num]
-            ]
+            indexes = batch_pred_tags[sent_index][self.summary_num:len(sent) +
+                                                  self.summary_num]
+            tags = [self._index_to_tags[index] for index in indexes]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
             sent_out = []
@@ -150,7 +154,7 @@ class NERWordTagTask(WordTagTask):
             if 'items' in result:
                 for item in result['items']:
                     if self.entity_only and item[
-                            'wordtag_label'] in self.POS_LABEL_WORDTAG:
+                            'wordtag_label'] in POS_LABEL_WORDTAG:
                         continue
                     simple_result.append((item['item'], item['wordtag_label']))
             simple_results.append(simple_result)
@@ -177,11 +181,6 @@ class NERLACTask(LacTask):
         model(string): The model name in the task.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
-
-    POS_LABEL_LAC = [
-        "n", "f", "s", "t", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q",
-        "r", "p", "c", "u", "xc", "w"
-    ]
 
     def __init__(self, model, task, entity_only=False, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
@@ -225,7 +224,7 @@ class NERLACTask(LacTask):
 
             result = []
             for s, t in zip(sent_out, tags_out):
-                if self.entity_only and t in self.POS_LABEL_LAC:
+                if self.entity_only and t in POS_LABEL_LAC:
                     continue
                 result.append((s, t))
             final_results.append(result)
