@@ -72,30 +72,46 @@ seg.help()
 
 ### 中文分词
 
-```python
-from paddlenlp import Taskflow
+* 支持三种模式分词
 
-seg = Taskflow("word_segmentation")
-seg("第十四届全运会在西安举办")
->>> ['第十四届', '全运会', '在', '西安', '举办']
+  * Base模式
 
-seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
->>> [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
+  ```python
+  from paddlenlp import Taskflow
 
-# 使用WordTag模型进行分词
-seg = Taskflow("word_segmentation", model="wordtag")
-seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
->>> ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
+  seg = Taskflow("word_segmentation")
+  seg("第十四届全运会在西安举办")
+  >>> ['第十四届', '全运会', '在', '西安', '举办']
 
-seg("国家卫健委修订完成了新型冠状病毒肺炎诊疗方案")
->>> ['国家卫健委', '修订', '完成', '了', '新型冠状病毒肺炎', '诊疗', '方案']
-```
+  seg(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
+  >>> [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
+  ```
 
-**NOTE**：使用WordTag模型进行分词，在公司名、机构名等实体词的切分上表现更好，但由于预训练模型体积较大，推理速度也相对较慢，请结合具体应用场景选择分词模型。
+  * 快速模式
+  Fast模式，利用『结巴』中文分词工具，实现文本快速切分。
+
+  ```python
+  from paddlenlp import Taskflow
+
+  seg = Taskflow("word_segmentation", mode="fast")
+  seg("第十四届全运会在西安举办")
+  >>> ['第十四届', '全运会', '在', '西安', '举办']
+  ```
+
+  * 精确模式
+  Accurate模式，试图将句子中的实体词完整切分，分词精确度高。
+
+  ```python
+  seg = Taskflow("word_segmentation", mode="accurate")
+  seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
+  >>> ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
+  ```
 
 #### 自定义词典
 
-用户可以通过装载自定义词典来定制化分词结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
+快速模式分词请参考[jieba词典载入](https://github.com/fxsjy/jieba#%E8%BD%BD%E5%85%A5%E8%AF%8D%E5%85%B8)。
+
+Base模式和精确模式可以参考以下方式使用自定义词典来对分词结果进行干预。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
 
 词典文件`user_dict.txt`示例：
 
@@ -634,3 +650,7 @@ from paddlenlp import Taskflow
 ner = Taskflow("ner", home_path="/workspace")
 ```
 通过以上方式即可将ner任务相关文件保存至`/workspace`路径下。
+
+## 参考资料
+
+1. [fxsjy/jieba](https://github.com/fxsjy/jieba)
