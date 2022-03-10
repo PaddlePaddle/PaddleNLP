@@ -5,37 +5,34 @@
 ## 效果评估
 本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。
 
-| 模型  | 策略| LCQMC | BQ_Corpus|STS-B|ATEC|
-| ------- |-------|-------|-----|------|-----|
-| ERNIE-1.0|-| 57.01 | **51.72** | 74.76 | 33.56 |
-| ERNIE-1.0|WR (word reptition)| **59.56** | 50.54 | **77.28** | **34.02** |
+| 模型| LCQMC | BQ_Corpus|STS-B|ATEC|
+|-------|-------|-----|------|-----|
+|SimCSE| 57.01 | **51.72** | 74.76 | 33.56 |
+| SimCSE + WR| **59.56** | 50.54 | **77.28** | **34.02** |
 
-中文数据集训练的超参数设置如下：
+SimCSE + WR 策略在中文数据集训练的超参数设置如下：
 
-| 策略| 数据集|epoch | learning rate | dropout| dup rate|
-|-------|-------|-------|-----|------|-----|
-| WR |LCQMC|1| 5E-5 | 0.3 | 0.32 |
-| WR |BQ_Corpus|1| 1E-5 | 0.3 |0.32 |
-| WR |STS-B|8| 5E-5 | 0.1 | 0.32 |
-| WR |ATEC|1| 5E-5 | 0.3 |  0.32 |
+| 数据集|epoch | learning rate | dropout| dup rate|
+|-------|-------|-----|------|-----|
+|LCQMC|1| 5E-5 | 0.3 | 0.32 |
+|BQ_Corpus|1| 1E-5 | 0.3 |0.32 |
+|STS-B|8| 5E-5 | 0.1 | 0.32 |
+|ATEC|1| 5E-5 | 0.3 |  0.32 |
+
 
 除此之外，在公开的英文数据集上做了 WR 策略的对比实验，实验结果如下：
 
-| 策略| STS12  | STS13 | STS14 | STS15 | STS16 | STSBenchmark | SICKRelatedness | Avg |
+| 模型| STS12  | STS13 | STS14 | STS15 | STS16 | STSBenchmark | SICKRelatedness | Avg |
 |-------|-------|-----|------|-----|-----|-----|-----|-----|
 |SimCSE| **68.46** | **81.90** | 71.57| 79.75 | 77.22 | 75.24 | 69.38 | 74.79 |
-|+ WR | 66.95 | 80.68 | **72.58**| **82.26** | **78.13** | **76.77** | **69.51** | **75.27**|
+|SimCSE + WR | 66.95 | 80.68 | **72.58**| **82.26** | **78.13** | **76.77** | **69.51** | **75.27**|
 
-英文数据集的训练超参数配置如下：
+SimCSE + WR 策略在英文数据集的训练超参数配置如下：
 
-| 策略| 数据集|epoch | learning rate | batch size| max_seq_length|dup rate|
-|-------|-------|-------|-----|------|-----|-----|
-| WR |wiki1m|1| 3E-5 | 64 |32| 0.32 |
+| 数据集|epoch | learning rate | batch size| max_seq_length|dup rate|
+|-------|-------|-----|------|-----|-----|
+|wiki1m|1| 3E-5 | 64 |32| 0.32 |
 
-
-**Note**:
-
-- 表格中所有实验训练均是单卡训练, batch_size=64, max_seq_length=64, eval_steps=100, lr 和 dropout 对模型效果影响较大: 我们实验中对 lr=(1E-5 5E-5) 和 dropout=(0.1 0.3) 超参进行了组合寻优。
 
 ## 快速开始
 
@@ -74,9 +71,8 @@ python -u -m paddle.distributed.launch --gpus '0' \
 
 可支持配置的参数：
 
-* `infer_with_fc_pooler`：可选，在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc;  建议打开模型效果最好。
-* `user_word_reptition`: 可选，在训练阶段使用 word reptition策略，默认关闭。
-* `dup_rate`: 可选，word reptition 的比例，默认是0.32。
+* `infer_with_fc_pooler`：可选，在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc;  建议关闭模型效果最好。
+* `dup_rate`: 可选，word reptition 的比例，默认是0.32，根据论文 Word Repetition 比例采用 0.32 效果最佳。
 * `scale`：可选，在计算 cross_entropy loss 之前对 cosine 相似度进行缩放的因子；默认为 20。
 * `dropout`：可选，SimCSE 网络前向使用的 dropout 取值；默认 0.1。
 * `save_dir`：可选，保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
