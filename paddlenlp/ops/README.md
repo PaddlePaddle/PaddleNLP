@@ -325,11 +325,11 @@ cd bin/
 
 ## FAQ
 
-问题 1：编译报错 `module not found: paddle`
+**问题 1**：编译报错 `module not found: paddle`
 
 解决方式：编译自定义 op，默认使用系统命令 `python` 所指定的 Python 的版本，需要启动相应的 conda 或是 virtualenv，或是在编译时候指定 `-DPY_CMD=python3.7`。
 
-问题 2：编译报错：
+**问题 2**：编译报错：
 
 ``` shell
 error: unrecognized command line option '-std=c++14'
@@ -337,7 +337,7 @@ error: unrecognized command line option '-std=c++14'
 
 解决方式：需要确认环境中是否有多个 `gcc8.2`。`nvcc` 默认使用系统默认的 `gcc`，所以需要将预期使用的 `gcc` 加入到相关环境变量中。
 
-问题 3：编译自定义 op C++ Demo 报错，报错可能是但不限于：
+**问题 3**：编译自定义 op C++ Demo 报错，报错可能是但不限于：
 
 ``` shell
 undefined reference to paddle_infer::Predictor::GetInputNames() ...
