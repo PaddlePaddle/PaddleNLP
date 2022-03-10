@@ -149,7 +149,7 @@ def do_predict(args):
 
     # Save converted static graph model
     paddle.jit.save(plato, os.path.join(args.inference_model_dir, "plato"))
-    logger.info("PLATO has been saved to {}".format(args.inference_model_dir))
+    logger.info("PLATO has been saved to {}.".format(args.inference_model_dir))
 
 
 if __name__ == "__main__":
