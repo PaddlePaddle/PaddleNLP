@@ -117,17 +117,17 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         cur_input_id = input_ids[batch_id]
         actual_len = np.count_nonzero(cur_input_id)
         dup_word_index = []
-        # if sequence length is less than 5, skip it
+        # If sequence length is less than 5, skip it
         if (actual_len > 5):
             dup_len = random.randint(a=0, b=max(2, int(dup_rate * actual_len)))
-            # skip cls and sep position
+            # Skip cls and sep position
             dup_word_index = random.sample(
                 list(range(1, actual_len - 1)), k=dup_len)
 
         r_input_id = []
         r_token_type_id = []
         for idx, word_id in enumerate(cur_input_id):
-            # insert duplicate word
+            # Insert duplicate word
             if idx in dup_word_index:
                 r_input_id.append(word_id)
                 r_token_type_id.append(token_type_ids[batch_id][idx])
@@ -139,7 +139,7 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
 
         if after_dup_len > rep_seq_len:
             rep_seq_len = after_dup_len
-    # padding the data to the same length
+    # Padding the data to the same length
     for batch_id in range(batch_size):
         after_dup_len = len(repetitied_input_ids[batch_id])
         pad_len = rep_seq_len - after_dup_len

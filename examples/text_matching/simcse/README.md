@@ -1,24 +1,16 @@
 # 无监督语义匹配模型 [SimCSE](https://arxiv.org/abs/2104.08821)
 
-我们实现了 SimCSE 模型，并在 4 个常用中文语义匹配数据集上对 SimCSE 模型的无监督匹配效果进行了评测。SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
+我们实现了 SimCSE 模型，并借鉴 ESimCSE 论文思想，通过 Word Repetition(WR) 策略进一步提升了 SimCSE 模型效果，在 4 个权威中文语义匹配数据集和 7 个权威英文语义匹配数据集上做了充分效果评测。SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
 
 ## 效果评估
-本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不适用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。
+本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。
 
 | 模型  | 策略| LCQMC | BQ_Corpus|STS-B|ATEC|
 | ------- |-------|-------|-----|------|-----|
-| ERNIE-1.0|Infer_with_fc| 52.33 | 43.75 | 66.66 | 29.78 |
 | ERNIE-1.0|-| 57.01 | **51.72** | 74.76 | 33.56 |
 | ERNIE-1.0|WR (word reptition)| **59.56** | 50.54 | **77.28** | **34.02** |
 
-除此之外，在公开的英文数据集上做了 WR 策略的对比实验，实验结果如下：
-
-| 策略| STS12  | STS13 | STS14 | STS15 | STS16 | STSBenchmark | SICKRelatedness | Avg |
-|-------|-------|-----|------|-----|-----|-----|-----|-----|
-|SimCSE| 68.46 | 81.90 | 71.57| 79.75 | 77.22 | 75.24 | 69.38 | 74.79 |
-|+ WR | 66.95 | 80.68 | **72.58**| **82.26** | **78.13** | **76.77** | **69.51** | **75.27**|
-
-## 超参数设置
+中文数据集训练的超参数设置如下：
 
 | 策略| 数据集|epoch | learning rate | dropout| dup rate|
 |-------|-------|-------|-----|------|-----|
@@ -27,8 +19,22 @@
 | WR |STS-B|8| 5E-5 | 0.1 | 0.32 |
 | WR |ATEC|1| 5E-5 | 0.3 |  0.32 |
 
+除此之外，在公开的英文数据集上做了 WR 策略的对比实验，实验结果如下：
+
+| 策略| STS12  | STS13 | STS14 | STS15 | STS16 | STSBenchmark | SICKRelatedness | Avg |
+|-------|-------|-----|------|-----|-----|-----|-----|-----|
+|SimCSE| **68.46** | **81.90** | 71.57| 79.75 | 77.22 | 75.24 | 69.38 | 74.79 |
+|+ WR | 66.95 | 80.68 | **72.58**| **82.26** | **78.13** | **76.77** | **69.51** | **75.27**|
+
+英文数据集的训练超参数配置如下：
+
+| 策略| 数据集|epoch | learning rate | batch size| max_seq_length|dup rate|
+|-------|-------|-------|-----|------|-----|-----|
+| WR |wiki1m|1| 3E-5 | 64 |32| 0.32 |
+
+
 **Note**:
-- Infer_with_fc 表示在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc, 由表格可知: 预测阶段不使用最后一层 fc 可以显著提升无监督语义匹配的效果。
+
 - 表格中所有实验训练均是单卡训练, batch_size=64, max_seq_length=64, eval_steps=100, lr 和 dropout 对模型效果影响较大: 我们实验中对 lr=(1E-5 5E-5) 和 dropout=(0.1 0.3) 超参进行了组合寻优。
 
 ## 快速开始
@@ -42,6 +48,7 @@ simcse/
 ├── model.py # SimCSE 模型组网代码
 ├── data.py # 无监督语义匹配训练数据、测试数据的读取逻辑
 ├── predict.py # 基于训练好的无监督语义匹配模型计算文本 Pair 相似度
+├── train.sh # 模型训练的脚本
 └── train.py # SimCSE 模型训练、评估逻辑
 ```
 
@@ -51,18 +58,18 @@ simcse/
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
 python -u -m paddle.distributed.launch --gpus '0' \
-	train.py \
-	--device gpu \
-	--save_dir ./checkpoints/ \
-	--batch_size 64 \
-	--learning_rate 5E-5 \
-	--epochs 1 \
-	--save_steps 100 \
-	--eval_steps 100 \
-	--max_seq_length 64 \
-	--dropout 0.3 \
-	--train_set_file "./senteval_cn/LCQMC/train.txt" \
-	--test_set_file "./senteval_cn/LCQMC/dev.tsv"
+    train.py \
+    --device gpu \
+    --save_dir ./checkpoints/ \
+    --batch_size 64 \
+    --learning_rate 5E-5 \
+    --epochs 1 \
+    --save_steps 100 \
+    --eval_steps 100 \
+    --max_seq_length 64 \
+    --dropout 0.3 \
+    --train_set_file "./senteval_cn/LCQMC/train.txt" \
+    --test_set_file "./senteval_cn/LCQMC/dev.tsv"
 ```
 
 可支持配置的参数：
