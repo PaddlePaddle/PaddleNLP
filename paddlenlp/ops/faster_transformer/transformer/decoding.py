@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import defaultdict
+from contextlib import contextmanager
 import os
 import numpy as np
 from functools import partial
@@ -236,7 +237,9 @@ def infer_gpt_decoding(
         "PositionEncEmb": pos_emb,
         "EmbWeight": linear_weight
     }
-
+    tensor_para_size = get_ft_para_conf().tensor_para_size
+    layer_para_size = get_ft_para_conf().layer_para_size
+    layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
     attrs = {
         "topk": topk,
         "topp": topp,
@@ -247,7 +250,10 @@ def infer_gpt_decoding(
         "bos_id": bos_id,
         "eos_id": eos_id,
         "temperature": temperature,
-        "use_fp16": use_fp16_decoding
+        "use_fp16": use_fp16_decoding,
+        "tensor_para_size": tensor_para_size,
+        "layer_para_size": layer_para_size,
+        "layer_para_batch_size": layer_para_batch_size
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -631,12 +637,21 @@ def convert_params(faster_model,
     """
     if fuse_qkv == 1:
         fuse_qkv = 2 if os.getenv("PPFG_QKV_MEM_OPT", "0") == "1" else 1
+    ft_para_conf = get_ft_para_conf()
 
     class _list(list):
         def append(self, item):
             if isinstance(item[0], nn.Layer):
-                layer, attr = item
+                # Axis is used for tensor slice in tensor parallel.
+                # Use None to make no slice on the tensor.
+                if len(item) == 2:
+                    layer, attr = item
+                    axis = None
+                else:
+                    layer, attr, axis = item
                 param = getattr(layer, attr)
+                if axis is not None and isinstance(layer, nn.Linear):
+                    param = ft_para_conf.slice_weight(param, axis)
                 param = transfer_param(
                     param,
                     is_bias=attr.endswith("bias"),
@@ -647,6 +662,8 @@ def convert_params(faster_model,
                 # NOTE: Compared with if branch, there is no layer attribute
                 # refered to the transfered param, thus we should set it as
                 # the layer attribute to be able to convert to static graph.
+                # Additionally, we suppose no need to process tensor parallel
+                # here since the param passed in might have been processed.
                 if len(item) == 2:
                     param, is_bias = item
                     attr_handle = lambda x: x
@@ -695,8 +712,14 @@ def convert_params(faster_model,
                     del v_proj.weight
                 else:
                     del v_proj.bias
+            q = ft_para_conf.slice_weight(q, 1)
+            k = ft_para_conf.slice_weight(k, 1)
+            v = ft_para_conf.slice_weight(v, 1)
             p = paddle.to_tensor(np.concatenate([q, k, v], axis=-1))
         else:
+            q = ft_para_conf.slice_weight(q, 1)
+            k = ft_para_conf.slice_weight(k, 1)
+            v = ft_para_conf.slice_weight(v, 1)
             p = paddle.concat([q, k, v], axis=-1)
             if del_param:
                 for i in [q_proj, k_proj, v_proj]:
@@ -712,22 +735,25 @@ def convert_params(faster_model,
             (
                 nn.TransformerEncoder,  # nn.TransformerDecoder,
                 paddlenlp.transformers.gpt.modeling.TransformerDecoder)):
+            num_layer = len(module.layers)
             for i, layer in enumerate(module.layers):
+                if not ft_para_conf.is_load(i, num_layer):
+                    continue
                 # fuse_qkv: 0 for nofuse, 1 for fuse,
                 # 2 for fuse and delete the unfused
                 if fuse_qkv == 0:
                     params["slf_q_weight"].append(
-                        (layer.self_attn.q_proj, "weight"))
+                        (layer.self_attn.q_proj, "weight", 1))
                     params["slf_q_bias"].append(
-                        (layer.self_attn.q_proj, "bias"))
+                        (layer.self_attn.q_proj, "bias", 1))
                     params["slf_k_weight"].append(
-                        (layer.self_attn.k_proj, "weight"))
+                        (layer.self_attn.k_proj, "weight", 1))
                     params["slf_k_bias"].append(
-                        (layer.self_attn.k_proj, "bias"))
+                        (layer.self_attn.k_proj, "bias", 1))
                     params["slf_v_weight"].append(
-                        (layer.self_attn.v_proj, "weight"))
+                        (layer.self_attn.v_proj, "weight", 1))
                     params["slf_v_bias"].append(
-                        (layer.self_attn.v_proj, "bias"))
+                        (layer.self_attn.v_proj, "bias", 1))
                 else:
                     w = _concat_param(
                         layer.self_attn.q_proj,
@@ -765,14 +791,16 @@ def convert_params(faster_model,
                                 params[key][-1])
 
                 params["slf_out_weight"].append(
-                    (layer.self_attn.out_proj, "weight"))
+                    (layer.self_attn.out_proj, "weight", 0))
                 params["slf_out_bias"].append(
                     (layer.self_attn.out_proj, "bias"))
                 params["slf_ln_weight"].append((layer.norm1, "weight"))
                 params["slf_ln_bias"].append((layer.norm1, "bias"))
-                params["ffn_inter_weight"].append((layer.linear1, "weight"))
-                params["ffn_inter_bias"].append((layer.linear1, "bias"))
-                params["ffn_out_weight"].append((layer.linear2, "weight"))
+                # Slice tensor when append according to axis(1 or 0) if parallel
+                # is enable.
+                params["ffn_inter_weight"].append((layer.linear1, "weight", 1))
+                params["ffn_inter_bias"].append((layer.linear1, "bias", 1))
+                params["ffn_out_weight"].append((layer.linear2, "weight", 0))
                 params["ffn_out_bias"].append((layer.linear2, "bias"))
                 params["ffn_ln_weight"].append((layer.norm2, "weight"))
                 params["ffn_ln_bias"].append((layer.norm2, "bias"))
@@ -1094,6 +1122,75 @@ class InferTransformerDecoding(nn.Layer):
         return ids
 
 
+# Patch for parallel inference to save memory
+class FTParaConf(object):
+    def __init__(self,
+                 tensor_para_size=1,
+                 layer_para_size=1,
+                 layer_para_batch_size=1):
+        self.no_para = tensor_para_size == 1 and layer_para_size == 1
+        self.tensor_para_size = tensor_para_size
+        self.layer_para_size = layer_para_size
+        self.layer_para_batch_size = layer_para_batch_size
+        # Maybe we should import mpi4py later.
+        self.rank = int(
+            os.environ.get(
+                "MPI_LOCALRANKID",  # MPICH
+                os.environ.get("OMPI_COMM_WORLD_RANK", 0)))  # OpenMPI
+        self.tensor_para_rank = self.rank % self.tensor_para_size
+        self.layer_para_rank = self.rank // self.tensor_para_size
+        # Should be set in `from_pretrained`
+        self.is_partial_model = False
+
+    def is_load(self, i, num_layer):
+        if self.no_para: return True
+        # Take into account model only including partial weights.
+        if self.is_partial_model: return True
+        layers_per_device = num_layer // self.layer_para_size
+        return (i >= layers_per_device * self.layer_para_rank
+                ) and i < layers_per_device * (self.layer_para_rank + 1)
+
+    def slice_weight(self, weight, axis):
+        if self.no_para: return weight
+        # Take into account model only including partial weights.
+        if self.is_partial_model: return weight
+        if len(weight.shape) == 1: axis = 0
+        local_size = weight.shape[axis] // self.tensor_para_rank
+        start_offset = self.tensor_para_rank * local_size
+        end_offset = start_offset + local_size
+        if len(weight.shape) == 1:
+            return weight[start_offset:end_offset]
+        return weight[:, start_offset:end_offset] if axis == 1 else weight[
+            start_offset:end_offset, :]
+
+    def set_partial_model(self, is_partial_model):
+        self.is_partial_model = is_partial_model
+
+
+# TODO(guosheng): Maybe use context-manager to allow multiple models.
+_ft_para_conf = FTParaConf()
+
+
+def get_ft_para_conf():
+    return _ft_para_conf
+
+
+@contextmanager
+def enable_ft_para(tensor_para_size=1,
+                   layer_para_size=1,
+                   layer_para_batch_size=1):
+    global _ft_para_conf
+    _ft_para_conf = FTParaConf(tensor_para_size, layer_para_size,
+                               layer_para_batch_size)
+
+    # def _init(self):
+    #     pass
+    # lazy init
+    # nn.TransformerEncoder.__init__ = None
+    # paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__ = None
+    # yield
+
+
 class InferGptDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
@@ -1116,6 +1213,7 @@ class InferGptDecoding(nn.Layer):
         self.size_per_head = int(self.model.gpt.config['hidden_size'] /
                                  self.head_num)
         self.num_layer = self.model.gpt.config['num_hidden_layers']
+        self.inner_size = self.model.gpt.config['intermediate_size']
 
         params = convert_params(
             self,
