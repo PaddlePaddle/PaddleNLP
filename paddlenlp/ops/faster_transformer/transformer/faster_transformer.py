@@ -303,10 +303,14 @@ class FasterTransformer(TransformerModel):
 
         self.load_dict(model_dict)
 
+        if self.enable_faster_encoder:
+            self = enable_faster_encoder(self, use_fp16=self.use_fp16_encoder)
+
     def export_params(self, init_from_params, place):
         '''
         This method is used for load static graph from dygraph checkpoint
         or export inference model using static graph. 
+        Do NOT support faster encoder. 
 
         Args:
             init_from_params (string):

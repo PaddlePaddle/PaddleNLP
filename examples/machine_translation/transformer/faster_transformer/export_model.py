@@ -15,6 +15,7 @@ from pprint import pprint
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
 from paddlenlp.ops import FasterTransformer
+from paddlenlp.ops import enable_faster_encoder
 from paddlenlp.utils.log import logger
 
 sys.path.append("../")
@@ -37,6 +38,15 @@ def parse_args():
         "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument(
+        "--enable_faster_encoder",
+        action="store_true",
+        help="Whether to use faster version encoder to predict. This is experimental option for now. "
+    )
+    parser.add_argument(
+        "--use_fp16_encoder",
+        action="store_true",
+        help="Whether to use fp16 encoder to predict. ")
     parser.add_argument(
         "--decoding_strategy",
         default="beam_search",
@@ -113,6 +123,8 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
+        enable_faster_encoder=args.enable_faster_encoder,
+        use_fp16_encoder=args.use_fp16_encoder,
         rel_len=args.use_rel_len,
         alpha=args.alpha)
 
