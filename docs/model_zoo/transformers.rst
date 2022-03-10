@@ -464,31 +464,31 @@ Transformer预训练模型汇总
 |                    |``rbtl3``                                                                         | Chinese      | 3-layer, 1024-hidden,                   |
 |                    |                                                                                  |              | 16-heads, 61M parameters.               |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-base-squad2``                                                           | English      | 12-layer, 768-hidden,                   |
+|                    |``nosaydomore/deepset-roberta-base-squad2``                                                           | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 124M parameters.              |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-en-base``                                                               | English      | 12-layer, 768-hidden,                   |
+|                    |``nosaydomore/roberta-en-base``                                                               | English      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 163M parameters.              |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-en-large``                                                              | English      | 24-layer, 1024-hidden,                  |
+|                    |``nosaydomore/roberta-en-large``                                                              | English      | 24-layer, 1024-hidden,                  |
 |                    |                                                                                  |              | 16-heads, 408M parameters.              |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``tiny-distilroberta-base``                                                       | English      | 2-layer, 2-hidden,                      |
+|                    |``nosaydomore/sshleifei-tiny-distilroberta-base``                                                       | English      | 2-layer, 2-hidden,                      |
 |                    |                                                                                  |              | 2-heads, 0.25M parameters.              |
 |                    |                                                                                  |              | Trained on English text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-base-chn-extractive-qa``                                                | Chinese      | 12-layer, 768-hidden,                   |
+|                    |``nosaydomore/uer-roberta-base-chn-extractive-qa``                                                | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 101M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-base-ft-chinanews-chn``                                                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |``nosaydomore/uer-roberta-base-ft-chinanews-chn``                                                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|                    |``roberta-base-ft-cluener2020-chn``                                               | Chinese      | 12-layer, 768-hidden,                   |
+|                    |``nosaydomore/uer-roberta-base-ft-cluener2020-chn``                                               | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 101M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+

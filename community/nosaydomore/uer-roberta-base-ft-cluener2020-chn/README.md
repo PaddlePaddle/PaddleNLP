@@ -1,4 +1,4 @@
-## uer/roberta-base-finetuned-cluener2020-chinese
+## nosaydomore/uer-roberta-base-ft-cluener2020-chn
 
 权重来源：https://huggingface.co/uer/roberta-base-finetuned-cluener2020-chinese
 
@@ -14,15 +14,10 @@ import numpy as np
 
 text = '江苏警方通报特斯拉冲进店铺'
 
-tokenizer = RobertaTokenizer.from_pretrained('uer/roberta-base-finetuned-cluener2020-chinese')
+tokenizer = RobertaTokenizer.from_pretrained('nosaydomore/uer-roberta-base-ft-cluener2020-chn')
 token = tokenizer(text)
 
-config = RobertaModel.pretrained_init_configuration[
-    'uer/roberta-base-finetuned-cluener2020-chinese']
-roberta = RobertaModel(**config)
-model = RobertaForTokenClassification(roberta, 32)
-model_state = paddle.load(os.path.join(path, "model_state.pdparams"))
-model.load_dict(model_state)
+model = RobertaForTokenClassification.from_pretrained('nosaydomore/uer-roberta-base-ft-cluener2020-chn', 32)
 model.eval()
 input_ids = paddle.to_tensor(token['input_ids'], dtype='int64').unsqueeze(0)
 with paddle.no_grad():

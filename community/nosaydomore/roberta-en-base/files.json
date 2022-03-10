@@ -1,0 +1,7 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta-en-base/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta-en-base/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta-en-base/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta-en-base/vocab.json",
+  "merges_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta-en-base/merges.txt"
+}
