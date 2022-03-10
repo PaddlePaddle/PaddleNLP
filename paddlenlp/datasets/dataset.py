@@ -45,6 +45,7 @@ from datasets import load_dataset as origin_load_dataset
 
 def load_from_ppnlp(path, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
+    path = os.path.split(path)[-1]
     path = os.path.join(ppnlp_path, path + '.py')
     return origin_load_dataset(path, **kwargs)
 
