@@ -756,8 +756,8 @@ def convert_params(faster_model,
                     # temporarily. While size 0 seems all right in to_static.
                     dummy_tensor = paddle.zeros([1])
                     for key in [
-                            f"slf_{m}_{n}"
-                            for m in ("k", "v") for n in ("weight", "bias")
+                            f"slf_{m}_{n}" for m in ("k", "v")
+                            for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))
