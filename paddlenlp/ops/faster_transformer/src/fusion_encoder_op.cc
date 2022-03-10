@@ -55,7 +55,6 @@ std::vector<paddle::Tensor> EncoderForward(
       input, paddle::Tensor(paddle::PlaceType::kGPU, shape)
     });
 
-    // auto encoder_out = paddle::Tensor(paddle::PlaceType::kGPU, shape);
     return EncoderCUDAForward(input,
                               attn_mask,
                               attn_query_weight,

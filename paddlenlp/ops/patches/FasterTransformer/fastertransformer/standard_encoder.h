@@ -539,8 +539,7 @@ public:
       printf("[ERROR] Standard transformer does not support INT8. \n");
       exit(-1);
 #endif
-      }
-      else {
+      } else {
         isConfigExist = access(GEMM_CONFIG, 0);
       }
       if (isConfigExist == -1) {

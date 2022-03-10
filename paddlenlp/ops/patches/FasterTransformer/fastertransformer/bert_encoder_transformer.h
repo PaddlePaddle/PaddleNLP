@@ -540,8 +540,7 @@ public:
         printf("[ERROR] BERT transformer encoder does not support INT8 in PaddleNLP. \n");
         exit(-1);
 #endif
-      }
-      else {
+      } else {
         isConfigExist = access(GEMM_CONFIG, 0);
       }
       if (isConfigExist == -1) {
