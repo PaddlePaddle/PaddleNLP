@@ -150,7 +150,6 @@ def prepare_validation_features(examples, tokenizer, args):
         stride=args.doc_stride,
         max_seq_len=args.max_seq_length,
         return_attention_mask=True)
-    print(tokenized_examples.keys())
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
     sample_mapping = tokenized_examples.pop("overflow_to_sample")
