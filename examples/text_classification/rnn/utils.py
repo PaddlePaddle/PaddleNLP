@@ -90,18 +90,14 @@ def build_vocab(texts,
         word_index (obj:`Dict`): The vocabulary from the corpus data.
 
     """
-    documents = []
     word_counts = defaultdict(int)
     for text in texts:
         if not text:
             continue
-        doc = []
         for word in word_segmenter(text):
             if word in stopwords:
                 continue
-            doc.append(word)
             word_counts[word] += 1
-        documents.append(doc)
 
     wcounts = []
     for word, count in word_counts.items():
@@ -109,6 +105,7 @@ def build_vocab(texts,
             continue
         wcounts.append((word, count))
     wcounts.sort(key=lambda x: x[1], reverse=True)
+    # -2 for the pad_token and unk_token which will be added to vocab.
     if num_words is not None and len(wcounts) > (num_words - 2):
         wcounts = wcounts[:(num_words - 2)]
     # add the special pad_token and unk_token to the vocabulary 

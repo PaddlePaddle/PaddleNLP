@@ -171,7 +171,7 @@ python train.py --vocab_path='./vocab.json' \
 
 以上参数表示：
 
-* `vocab_path`: 用于保存根据预料库构建的词汇表的文件路径。
+* `vocab_path`: 用于保存根据语料库构建的词汇表的文件路径。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
 * `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
@@ -258,9 +258,9 @@ python predict.py --vocab_path='./vocab.json' \
 如
 
 ```text
-Data: 非常不错，服务很好，位于市中心区，交通方便，不过价格也高！      Lable: negative
-Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Lable: negative
-Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Lable: positive
+Data: 非常不错，服务很好，位于市中心区，交通方便，不过价格也高！      Label: negative
+Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Label: negative
+Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Label: positive
 ```
 
 ## Reference

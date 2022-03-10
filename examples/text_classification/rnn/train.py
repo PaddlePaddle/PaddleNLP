@@ -32,7 +32,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="g
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The directory to vocab_path.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to save vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
     default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
