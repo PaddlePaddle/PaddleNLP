@@ -111,32 +111,32 @@ seg.help()
 
 * 自定义词典
 
-快速模式分词请参考[jieba词典载入](https://github.com/fxsjy/jieba#%E8%BD%BD%E5%85%A5%E8%AF%8D%E5%85%B8)。
+  快速模式分词请参考[jieba词典载入](https://github.com/fxsjy/jieba#%E8%BD%BD%E5%85%A5%E8%AF%8D%E5%85%B8)。
 
-Base模式和精确模式可以参考以下方式使用自定义词典来对分词结果进行干预。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
+  Base模式和精确模式可以参考以下方式使用自定义词典来对分词结果进行干预。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
 
-词典文件`user_dict.txt`示例：
+  词典文件`user_dict.txt`示例：
 
-```text
-平原上的火焰
-年 末
-```
+  ```text
+  平原上的火焰
+  年 末
+  ```
 
-以默认模型为例，"平原上的火焰计划于年末上映"原本的输出结果为：
+  以默认模型为例，"平原上的火焰计划于年末上映"原本的输出结果为：
 
-```text
-['平原', '上', '的', '火焰', '计划', '于', '年末', '上映']
-```
+  ```text
+  ['平原', '上', '的', '火焰', '计划', '于', '年末', '上映']
+  ```
 
-装载自定义词典及输出结果示例：
+  装载自定义词典及输出结果示例：
 
-```python
-from paddlenlp import Taskflow
+  ```python
+  from paddlenlp import Taskflow
 
-my_seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
-my_seg("平原上的火焰计划于年末上映")
->>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
-```
+  my_seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
+  my_seg("平原上的火焰计划于年末上映")
+  >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
+  ```
 
 #### 可配置参数说明
 
@@ -171,32 +171,32 @@ tag(["第十四届全运会在西安举办", "三亚是一个美丽的城市"])
 
 * 自定义词典
 
-用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
+  用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
 
-词典文件`user_dict.txt`示例：
+  词典文件`user_dict.txt`示例：
 
-```text
-赛里木湖/LAKE
-高/a 山/n
-海拔最高
-湖 泊
-```
+  ```text
+  赛里木湖/LAKE
+  高/a 山/n
+  海拔最高
+  湖 泊
+  ```
 
-以"赛里木湖是新疆海拔最高的高山湖泊"为例，原本的输出结果为：
+  以"赛里木湖是新疆海拔最高的高山湖泊"为例，原本的输出结果为：
 
-```text
-[('赛里木湖', 'LOC'), ('是', 'v'), ('新疆', 'LOC'), ('海拔', 'n'), ('最高', 'a'), ('的', 'u'), ('高山', 'n'), ('湖泊', 'n')]
-```
+  ```text
+  [('赛里木湖', 'LOC'), ('是', 'v'), ('新疆', 'LOC'), ('海拔', 'n'), ('最高', 'a'), ('的', 'u'), ('高山', 'n'), ('湖泊', 'n')]
+  ```
 
-装载自定义词典及输出结果示例：
+  装载自定义词典及输出结果示例：
 
-```python
-from paddlenlp import Taskflow
+  ```python
+  from paddlenlp import Taskflow
 
-my_tag = Taskflow("pos_tagging", user_dict="user_dict.txt")
-my_tag("赛里木湖是新疆海拔最高的高山湖泊")
->>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
-```
+  my_tag = Taskflow("pos_tagging", user_dict="user_dict.txt")
+  my_tag("赛里木湖是新疆海拔最高的高山湖泊")
+  >>> [('赛里木湖', 'LAKE'), ('是', 'v'), ('新疆', 'LOC'), ('海拔最高', 'n'), ('的', 'u'), ('高', 'a'), ('山', 'n'), ('湖', 'n'), ('泊', 'n')]
+  ```
 
 #### 可配置参数说明
 
@@ -264,32 +264,32 @@ Taskflow提供的NER任务共包含66种词性及专名类别标签，标签集�
 
 * 自定义词典
 
-用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
+  用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
 
-词典文件`user_dict.txt`示例：
+  词典文件`user_dict.txt`示例：
 
-```text
-长津湖/电影类_实体
-收/词汇用语 尾/术语类
-最 大
-海外票仓
-```
+  ```text
+  长津湖/电影类_实体
+  收/词汇用语 尾/术语类
+  最 大
+  海外票仓
+  ```
 
-以"《长津湖》收尾，北美是最大海外票仓"为例，原本的输出结果为：
+  以"《长津湖》收尾，北美是最大海外票仓"为例，原本的输出结果为：
 
-```text
-[('《', 'w'), ('长津湖', '作品类_实体'), ('》', 'w'), ('收尾', '场景事件'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最大', '修饰词'), ('海外', '场所类'), ('票仓', '词汇用语')]
-```
+  ```text
+  [('《', 'w'), ('长津湖', '作品类_实体'), ('》', 'w'), ('收尾', '场景事件'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最大', '修饰词'), ('海外', '场所类'), ('票仓', '词汇用语')]
+  ```
 
-装载自定义词典及输出结果示例：
+  装载自定义词典及输出结果示例：
 
-```python
-from paddlenlp import Taskflow
+  ```python
+  from paddlenlp import Taskflow
 
-my_ner = Taskflow("ner", user_dict="user_dict.txt")
-my_ner("《长津湖》收尾，北美是最大海外票仓")
->>> [('《', 'w'), ('长津湖', '电影类_实体'), ('》', 'w'), ('收', '词汇用语'), ('尾', '术语类'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最', '修饰词'), ('大', '修饰词'), ('海外票仓', '场所类')]
-```
+  my_ner = Taskflow("ner", user_dict="user_dict.txt")
+  my_ner("《长津湖》收尾，北美是最大海外票仓")
+  >>> [('《', 'w'), ('长津湖', '电影类_实体'), ('》', 'w'), ('收', '词汇用语'), ('尾', '术语类'), ('，', 'w'), ('北美', '世界地区类'), ('是', '肯定词'), ('最', '修饰词'), ('大', '修饰词'), ('海外票仓', '场所类')]
+  ```
 
 #### 可配置参数说明
 
@@ -480,32 +480,32 @@ wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
 
 * 自定义词典
 
-用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
+  用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为`item/tag`，如果不添加自定义标签，则使用模型默认标签。
 
-词典文件`user_dict.txt`示例：
+  词典文件`user_dict.txt`示例：
 
-```text
-长津湖/电影类_实体
-收/词汇用语 尾/术语类
-最 大
-海外票仓
-```
+  ```text
+  长津湖/电影类_实体
+  收/词汇用语 尾/术语类
+  最 大
+  海外票仓
+  ```
 
-以"《长津湖》收尾，北美是最大海外票仓"为例，原本的输出结果为：
+  以"《长津湖》收尾，北美是最大海外票仓"为例，原本的输出结果为：
 
-```text
-[{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 3, 'termid': '影视作品_eb_长津湖'}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收尾', 'offset': 5, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_收尾'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最大', 'offset': 11, 'wordtag_label': '修饰词', 'length': 2, 'termid': '修饰词_cb_最大'}, {'item': '海外', 'offset': 13, 'wordtag_label': '场所类', 'length': 2, 'termid': '区域场所_cb_海外'}, {'item': '票仓', 'offset': 15, 'wordtag_label': '词汇用语', 'length': 2}]}]
-```
+  ```text
+  [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 3, 'termid': '影视作品_eb_长津湖'}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收尾', 'offset': 5, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_收尾'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最大', 'offset': 11, 'wordtag_label': '修饰词', 'length': 2, 'termid': '修饰词_cb_最大'}, {'item': '海外', 'offset': 13, 'wordtag_label': '场所类', 'length': 2, 'termid': '区域场所_cb_海外'}, {'item': '票仓', 'offset': 15, 'wordtag_label': '词汇用语', 'length': 2}]}]
+  ```
 
-装载自定义词典及输出结果示例：
+  装载自定义词典及输出结果示例：
 
-```python
-from paddlenlp import Taskflow
+  ```python
+  from paddlenlp import Taskflow
 
-my_wordtag = Taskflow("knowledge_mining", user_dict="user_dict.txt")
-my_wordtag("《长津湖》收尾，北美是最大海外票仓")
->>> [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '电影类_实体', 'length': 3}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收', 'offset': 5, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '尾', 'offset': 6, 'wordtag_label': '术语类', 'length': 1, 'termid': '动物体构造_cb_动物尾巴'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1}, {'item': '大', 'offset': 12, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_大'}, {'item': '海外票仓', 'offset': 13, 'wordtag_label': '场所类', 'length': 4}]}]
-```
+  my_wordtag = Taskflow("knowledge_mining", user_dict="user_dict.txt")
+  my_wordtag("《长津湖》收尾，北美是最大海外票仓")
+  >>> [{'text': '《长津湖》收尾，北美是最大海外票仓', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '长津湖', 'offset': 1, 'wordtag_label': '电影类_实体', 'length': 3}, {'item': '》', 'offset': 4, 'wordtag_label': 'w', 'length': 1}, {'item': '收', 'offset': 5, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '尾', 'offset': 6, 'wordtag_label': '术语类', 'length': 1, 'termid': '动物体构造_cb_动物尾巴'}, {'item': '，', 'offset': 7, 'wordtag_label': 'w', 'length': 1}, {'item': '北美', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '世界地区_cb_北美'}, {'item': '是', 'offset': 10, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '最', 'offset': 11, 'wordtag_label': '修饰词', 'length': 1}, {'item': '大', 'offset': 12, 'wordtag_label': '修饰词', 'length': 1, 'termid': '修饰词_cb_大'}, {'item': '海外票仓', 'offset': 13, 'wordtag_label': '场所类', 'length': 4}]}]
+  ```
 
 #### 可配置参数说明
 
@@ -590,9 +590,9 @@ poetry(["林密不见人", "举头邀明月"])
   >>> ['吃过了,你呢', '我是李明啊']
   ```
 
-  * 交互模式（多轮对话）：
+  * 交互模式：
 
-  交互模式下，Taskflow能够记住之前的对话内容。
+  交互模式下，Taskflow具备多轮对话记忆功能。
 
   ```python
   from paddlenlp import Taskflow
