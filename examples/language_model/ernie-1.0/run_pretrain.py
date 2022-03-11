@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Pretrain  ERNIE in dygraph mode.
+ERNIE-1.0 pretraining scripts.
 """
 import argparse
 import os
