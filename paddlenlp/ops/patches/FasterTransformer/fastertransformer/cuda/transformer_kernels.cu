@@ -22,14 +22,14 @@ namespace fastertransformer {
 
 template <typename T>
 __inline__ __device__ T gelu(T x) {
-  float cdf =
-      0.5f *
-      (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
+  //float cdf =
+  //    0.5f *
+  //    (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
 
   // NOTE: The precision of gelu with or without approximate formulation
   // may cause serious problem in some cases. If necessary, the following
   // comments can be opened to use the non-approximate formulation.
-  // float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
+  float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
   return x * cdf;
 }
 
