@@ -761,20 +761,29 @@ def convert_params(faster_model,
                         dummy_tensor=dummy_tensor)
                     params["slf_q_weight"].append((w, False))
                     params["slf_q_bias"].append((b, True))
-                    # NOTE: use `params["slf_q_weight"][-1]` rather than `w`
-                    # since the appended tensor might be a new transfered tensor
-                    setattr(faster_model, "slf_q_weight_" + str(i),
-                            params["slf_q_weight"][-1])
-                    setattr(faster_model, "slf_q_bias_" + str(i),
-                            params["slf_q_bias"][-1])
+                    # NOTE: Use `params["slf_q_weight"][-1]` rather than `w`,
+                    # since the appended tensor might be a new transfered tensor.
+                    # Besides, to allow convert_params be called more than once,
+                    # we find a attr name not existing to avoid overwriting the
+                    # existing attr.
+                    attr = "slf_q_weight_" + str(i)
+                    while hasattr(faster_model, attr):
+                        attr += "_"
+                    setattr(faster_model, attr, params["slf_q_weight"][-1])
+                    attr = "slf_q_bias_" + str(i)
+                    while hasattr(faster_model, attr):
+                        attr += "_"
+                    setattr(faster_model, attr, params["slf_q_bias"][-1])
                     for key in [
                             f"slf_{m}_{n}"
                             for m in ("k", "v") for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))
-                        setattr(faster_model, key + "_" + str(i),
-                                params[key][-1])
+                        attr = key + "_" + str(i)
+                        while hasattr(faster_model, attr):
+                            attr += "_"
+                        setattr(faster_model, attr, params[key][-1])
 
                 params["slf_out_weight"].append(
                     (layer.self_attn.out_proj, "weight"))
