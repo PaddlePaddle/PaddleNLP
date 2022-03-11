@@ -3,7 +3,7 @@
 我们实现了 SimCSE 模型，并借鉴 ESimCSE 论文思想，通过 Word Repetition(WR) 策略进一步提升了 SimCSE 模型效果，在 4 个权威中文语义匹配数据集上做了充分效果评测。SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
 
 ## 效果评估
-本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。中文数据集的下载地址为[下载地址](https://paddlenlp.bj.bcebos.com/datasets/senteval_cn.zip)
+本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。中文数据集的下载地址为：[下载地址](https://paddlenlp.bj.bcebos.com/datasets/senteval_cn.zip)
 
 ### 中文语义匹配数据集效果
 
