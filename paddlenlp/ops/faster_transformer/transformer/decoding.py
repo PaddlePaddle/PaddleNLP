@@ -667,7 +667,8 @@ def convert_params(faster_model,
                       v_proj,
                       attr="weight",
                       use_numpy=True,
-                      del_param=False):
+                      del_param=False,
+                      dummy_tensor=None):
         # TODO(guosheng): maybe static graph need this
         # p = faster_model.create_parameter(
         #     shape=[q.shape[0], q.shape[1] + k.shape[1] + v.shape[1]],
@@ -704,6 +705,13 @@ def convert_params(faster_model,
                         del i.weight
                     else:
                         del i.bias
+        if del_param:
+            # NOTE: dygraph_to_static/convert_call_func.py would log the converted
+            # function. For linear layer, if we delete the params, log would fail.
+            # And the log requires weight to be a 2D tensor.
+            setattr(q_proj, attr, dummy_tensor)
+            setattr(k_proj, attr, dummy_tensor)
+            setattr(v_proj, attr, dummy_tensor)
         return p
 
     def _convert(module):
@@ -729,20 +737,28 @@ def convert_params(faster_model,
                     params["slf_v_bias"].append(
                         (layer.self_attn.v_proj, "bias"))
                 else:
+                    # TODO(guosheng): Tensor with size 0 might be failed in
+                    # paddle develop, thus use tensor with size 1 instead
+                    # temporarily. Besides, we use 2D tensor since jit log
+                    # requires that on linear weight. While size 0 seems all
+                    # right in jit.to_static/jit.save.
+                    dummy_tensor = paddle.zeros([1, 1])
                     w = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="weight",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv == 2)
+                        del_param=fuse_qkv == 2,
+                        dummy_tensor=dummy_tensor)
                     b = _concat_param(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
                         attr="bias",
                         use_numpy=fuse_qkv == 2,
-                        del_param=fuse_qkv == 2)
+                        del_param=fuse_qkv == 2,
+                        dummy_tensor=dummy_tensor)
                     params["slf_q_weight"].append((w, False))
                     params["slf_q_bias"].append((b, True))
                     # NOTE: use `params["slf_q_weight"][-1]` rather than `w`
@@ -751,10 +767,6 @@ def convert_params(faster_model,
                             params["slf_q_weight"][-1])
                     setattr(faster_model, "slf_q_bias_" + str(i),
                             params["slf_q_bias"][-1])
-                    # TODO(guosheng): Tensor with size 0 might be failed in
-                    # paddle develop, thus use tensor with size 1 instead
-                    # temporarily. While size 0 seems all right in to_static.
-                    dummy_tensor = paddle.zeros([1])
                     for key in [
                             f"slf_{m}_{n}"
                             for m in ("k", "v") for n in ("weight", "bias")
