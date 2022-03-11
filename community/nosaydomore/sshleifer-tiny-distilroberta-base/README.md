@@ -1,8 +1,8 @@
-## roberta-base
+## nosaydomore/sshleifer-tiny-distilroberta-base
 权重来源
-https://huggingface.co/roberta-base
+https://huggingface.co/sshleifer/tiny-distilroberta-base
 
-在英文数据集上预训练的roberta-base MaskedLM模型
+在英文数据集上预训练的tiny-distilroberta-base MaskedLM模型
 
 ```python
 from paddlenlp.transformers import (
@@ -13,8 +13,8 @@ import paddle
 import os
 import numpy as np
 
-model = RobertaForMaskedLM.from_pretrained('roberta-base')
-tokenizer = RobertaBPETokenizer.from_pretrained('roberta-base')
+model = RobertaForMaskedLM.from_pretrained('nosaydomore/sshleifei-tiny-distilroberta-base')
+tokenizer = RobertaBPETokenizer.from_pretrained('nosaydomore/sshleifei-tiny-distilroberta-base')
 text = ["The man worked as a", "."]  #"The man worked as a <mask>."
 tokens_list = []
 for i in range(2):
@@ -53,5 +53,5 @@ for i, id in enumerate(token_ids):
 print(pd_outputs_sentence)
 
 '''
-paddle:  The Ġman Ġworked Ġas Ġa [Ġmechanic=0.08702345192432404||Ġwaiter=0.08196478337049484||Ġbutcher=0.07332248240709305||Ġminer=0.046321991831064224||Ġguard=0.040149785578250885] .
+paddle:  The Ġman Ġworked Ġas Ġa [ĠMaul=2.2346646801452152e-05||ELS=2.2343869204632938e-05||Ġirregular=2.223450610472355e-05||ĠDr=2.2128451746539213e-05||³=2.2114407329354435e-05] .  
 '''
