@@ -108,8 +108,4 @@ def parse_args(MODEL_CLASSES):
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
 
-    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
-    for arg in vars(args):
-        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
-
     return args

@@ -669,5 +669,9 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    config = parse_args(MODEL_CLASSES)
-    do_train(config)
+    args = parse_args(MODEL_CLASSES)
+    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
+    do_train(args)

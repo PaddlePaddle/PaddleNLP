@@ -152,8 +152,6 @@ def run_evaluate(data_loader,
                  log_writer,
                  global_step,
                  args,
-                 is_last,
-                 eval_fetch,
                  task_name="valid"):
     model.eval()
     all_loss, all_lm_loss, all_sop_loss = [], [], []
@@ -175,14 +173,11 @@ def run_evaluate(data_loader,
                                       masked_lm_labels, next_sentence_labels)
         loss = lm_loss + sop_loss
 
-        if is_last:
-            all_loss.append(float(loss.item()))
-            all_lm_loss.append(float(lm_loss.item()))
-            all_sop_loss.append(float(sop_loss.item()))
+        all_loss.append(float(loss.item()))
+        all_lm_loss.append(float(lm_loss.item()))
+        all_sop_loss.append(float(sop_loss.item()))
 
         if eval_step >= iter_steps - 1:
-            if not is_last:
-                break
             average_loss = sum(all_loss) / len(all_loss)
             average_lm_loss = sum(all_lm_loss) / len(all_lm_loss)
             average_sop_loss = sum(all_sop_loss) / len(all_sop_loss)
@@ -215,12 +210,12 @@ def set_seed(args):
     paddle.seed(args.seed + idx)
 
 
-def args_post_process(args, topo):
-    default_global_batch_size = topo.data_info.size * args.micro_batch_size
+def args_post_process(args, worker_num):
+    default_global_batch_size = worker_num * args.micro_batch_size
     if args.global_batch_size is None:
         args.global_batch_size = default_global_batch_size
 
-    bsz_per_dp = args.global_batch_size // topo.data_info.size
+    bsz_per_dp = args.global_batch_size // worker_num
     micro_batch_size = args.micro_batch_size
     assert args.global_batch_size % micro_batch_size == 0, \
         "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
@@ -234,20 +229,32 @@ def args_post_process(args, topo):
 
 
 def do_train(args):
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.device)
+
+    worker_index = paddle.distributed.get_rank()
+    worker_num = paddle.distributed.get_world_size()
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+
+    if worker_num > 1:
+        paddle.distributed.init_parallel_env()
+
+    if args.dp_degree * args.sharding_degree == 1:
+        args.dp_degree = worker_num
+        args.sharding_degree = 1
+
+    args_post_process(args, worker_num)
+
+    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
-        "mp_degree": args.mp_degree,
-        "pp_degree": args.pp_degree,
-        "sharding_degree": args.sharding_degree
+        "mp_degree": 1,
+        "pp_degree": 1,
+        "sharding_degree": 1
     }
-
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     fleet.init(is_collective=True, strategy=strategy)
     hcg = fleet.get_hybrid_communicate_group()
@@ -259,29 +266,16 @@ def do_train(args):
     # Create the random seed for the worker
     set_seed(args)
 
-    assert args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num, \
+    assert args.dp_degree * args.sharding_degree == worker_num, \
         "The product of degree num should be equal to worker_num."
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
-
-    args_post_process(args, topo)
-
-    logger.info("The topo of hybrid parallelism:\n{}".format(topo))
-
-    # Create log write, train results show on last card of pipeline.
-    if topo.is_last:
-        log_writer_path = os.path.join(
-            args.output_dir, "train_log",
-            "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-                args.model_name_or_path, args.global_batch_size, args.use_amp,
-                args.use_recompute, worker_index).lower())
-        log_writer = LogWriter(log_writer_path)
+    # Create log write, 
+    log_writer_path = os.path.join(
+        args.output_dir, "train_log",
+        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.global_batch_size, args.use_amp,
+            args.use_recompute, worker_index).lower())
+    log_writer = LogWriter(log_writer_path)
 
     # Define the input data in the static mode
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
@@ -306,8 +300,6 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
-        if model_config["vocab_size"] % 8 != 0:
-            model_config["vocab_size"] += 8 - (model_config["vocab_size"] % 8)
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
@@ -366,8 +358,8 @@ def do_train(args):
         args,
         data_file,
         tokenizer,
-        data_world_size=topo.data_info.size,
-        data_world_rank=topo.data_info.rank,
+        data_world_size=worker_num,
+        data_world_rank=worker_index,
         max_seq_len=args.max_seq_len,
         current_step=global_step)
 
@@ -453,23 +445,20 @@ def do_train(args):
             global_step += 1
 
             if global_step % args.logging_freq == 0:
-                if topo.is_last:
-                    speed = args.logging_freq / (time.time() - tic_train)
-                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, loss.item(), lm_loss.item(),
-                        sop_loss.item(), speed, speed * args.global_batch_size,
-                        lr_scheduler.get_lr())
-                    addition_info = ""
-                    if args.use_amp:
-                        addition_info = " loss_scaling: %.1f, incr_count: %d, decr_count: %d" % (
-                            scaler._scale.numpy(), scaler._incr_count,
-                            scaler._decr_count)
-                    logger.info(common_loginfo + addition_info)
-                    log_writer.add_scalar("loss", loss.item(), global_step)
-                    log_writer.add_scalar("lm_loss",
-                                          lm_loss.item(), global_step)
-                    log_writer.add_scalar("sop_loss",
-                                          sop_loss.item(), global_step)
+                speed = args.logging_freq / (time.time() - tic_train)
+                common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                    global_step, loss.item(), lm_loss.item(), sop_loss.item(),
+                    speed, speed * args.global_batch_size,
+                    lr_scheduler.get_lr())
+                addition_info = ""
+                if args.use_amp:
+                    addition_info = " loss_scaling: %.1f, incr_count: %d, decr_count: %d" % (
+                        scaler._scale.numpy(), scaler._incr_count,
+                        scaler._decr_count)
+                logger.info(common_loginfo + addition_info)
+                log_writer.add_scalar("loss", loss.item(), global_step)
+                log_writer.add_scalar("lm_loss", lm_loss.item(), global_step)
+                log_writer.add_scalar("sop_loss", sop_loss.item(), global_step)
 
                 tic_train = time.time()
 
@@ -478,13 +467,16 @@ def do_train(args):
 
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
-                eval_fetch = []
-                if topo.is_last:
-                    eval_fetch = [loss, lm_loss, sop_loss]
 
-                run_evaluate(valid_data_loader, model, criterion,
-                             args.eval_iters, log_writer, global_step, args,
-                             topo.is_last, eval_fetch, "valid")
+                run_evaluate(
+                    valid_data_loader,
+                    model,
+                    criterion,
+                    args.eval_iters,
+                    log_writer,
+                    global_step,
+                    args,
+                    task_name="valid")
                 tic_train = time.time()
 
             def save_ckpt(output_dir, model, tokenizer, args, global_step):
@@ -536,9 +528,15 @@ def do_train(args):
                     paddle.distributed.barrier()
 
             if global_step >= args.max_steps:
-                run_evaluate(test_data_loader, model, criterion,
-                             args.test_iters, log_writer, global_step, args,
-                             topo.is_last, eval_fetch, "test")
+                run_evaluate(
+                    test_data_loader,
+                    model,
+                    criterion,
+                    args.test_iters,
+                    log_writer,
+                    global_step,
+                    args,
+                    task_name="test")
                 del train_data_loader
                 return
 
