@@ -1,9 +1,11 @@
 # 无监督语义匹配模型 [SimCSE](https://arxiv.org/abs/2104.08821)
 
-我们实现了 SimCSE 模型，并借鉴 ESimCSE 论文思想，通过 Word Repetition(WR) 策略进一步提升了 SimCSE 模型效果，在 4 个权威中文语义匹配数据集和 7 个权威英文语义匹配数据集上做了充分效果评测。SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
+我们实现了 SimCSE 模型，并借鉴 ESimCSE 论文思想，通过 Word Repetition(WR) 策略进一步提升了 SimCSE 模型效果，在 4 个权威中文语义匹配数据集上做了充分效果评测。SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹配和检索场景。
 
 ## 效果评估
-本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。
+本项目分别使用 LCQMC、BQ_Corpus、STS-B、ATEC 这 4 个中文语义匹配数据集的训练集作为无监督训练集(仅使用文本信息，不使用 Label)，并且在各自数据集上的验证集上进行效果评估，评估指标采用 SimCSE 论文中采用的 Spearman 相关系数，Spearman 相关系数越高，表示模型效果越好。中文数据集的下载地址为[下载地址](https://paddlenlp.bj.bcebos.com/datasets/senteval_cn.zip)
+
+### 中文语义匹配数据集效果
 
 | 模型| LCQMC | BQ_Corpus|STS-B|ATEC|
 |-------|-------|-----|------|-----|
@@ -12,26 +14,13 @@
 
 SimCSE + WR 策略在中文数据集训练的超参数设置如下：
 
-| 数据集|epoch | learning rate | dropout| dup rate|
-|-------|-------|-----|------|-----|
-|LCQMC|1| 5E-5 | 0.3 | 0.32 |
-|BQ_Corpus|1| 1E-5 | 0.3 |0.32 |
-|STS-B|8| 5E-5 | 0.1 | 0.32 |
-|ATEC|1| 5E-5 | 0.3 |  0.32 |
-
-
-除此之外，在公开的英文数据集上做了 WR 策略的对比实验，实验结果如下：
-
-| 模型| STS12  | STS13 | STS14 | STS15 | STS16 | STSBenchmark | SICKRelatedness | Avg |
-|-------|-------|-----|------|-----|-----|-----|-----|-----|
-|SimCSE| **68.46** | **81.90** | 71.57| 79.75 | 77.22 | 75.24 | 69.38 | 74.79 |
-|SimCSE + WR | 66.95 | 80.68 | **72.58**| **82.26** | **78.13** | **76.77** | **69.51** | **75.27**|
-
-SimCSE + WR 策略在英文数据集的训练超参数配置如下：
-
-| 数据集|epoch | learning rate | batch size| max_seq_length|dup rate|
+| 数据集|epoch | learning rate | dropout|batch size| dup rate|
 |-------|-------|-----|------|-----|-----|
-|wiki1m|1| 3E-5 | 64 |32| 0.32 |
+|LCQMC|1| 5E-5 | 0.3 |64| 0.32 |
+|BQ_Corpus|1| 1E-5 | 0.3 |64|0.32 |
+|STS-B|8| 5E-5 | 0.1 |64| 0.32 |
+|ATEC|1| 5E-5 | 0.3 | 64| 0.32 |
+
 
 
 ## 快速开始
