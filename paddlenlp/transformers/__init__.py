@@ -96,3 +96,5 @@ from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .luke.modeling import *
 from .luke.tokenizer import *
+from .ernie3.modeling import *
+from .ernie3.tokenizer import *

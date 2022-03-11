@@ -89,6 +89,11 @@ public:
   const int *d_start_lengths;
   const T *d_attn_mask;
 
+  // For Ernie3
+  const T *sharing_to_nlg_kernel = nullptr;
+  LayerNormWeight<T> nlg_decoder_layernorm;
+  LayerNormWeight<T> lm_out_layernorm;
+
   virtual ~DecodingInitParam() {}
 };
 
@@ -151,6 +156,13 @@ struct GptArguments : public DecodingSamplingArguments {
   float repetition_penalty_{1.0};
   int *vocab_mask{nullptr};
   int min_gpu_num_{1};
+};
+
+struct Ernie3Arguments : public GptArguments {
+  size_t nlg_head_num_;
+  size_t nlg_size_per_head_;
+  size_t nlg_hidden_units_;
+  int nlg_decoder_layers_;
 };
 
 struct TransformerSamplingArguments : public DecodingSamplingArguments {

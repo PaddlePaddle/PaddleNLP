@@ -328,6 +328,58 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                                           end_id);
 }
 
+template <typename T>
+__global__ void apply_min_length_penalty_kernel(T* log_probs,
+                                                const T* bias,
+                                                const bool* finished,
+                                                int beam_width,
+                                                int vocab_size_padded,
+                                                int vocab_size,
+                                                const bool min_penalty = false,
+                                                const int end_id = -1) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+  int bbid = blockIdx.y;  // batch_size * beam_size: index
+
+  const T MAX_T_VAL = (sizeof(T) == 2) ? HALF_FLT_MAX : 1e20f;
+  bool finish = (finished != nullptr) ? finished[bbid] : false;
+
+  if (!finish) {
+    for (int i = tid + bid * blockDim.x; i < vocab_size_padded; i += blockDim.x * gridDim.x) {
+      if (min_penalty && i == end_id) {
+        log_probs[i + bbid * vocab_size_padded] += -MAX_T_VAL;
+      } else{
+        log_probs[i + bbid * vocab_size_padded] += bias[i];
+      }
+    }
+  }
+}
+
+template <typename T>
+void apply_min_length_penalty_kernelLauncher(T* log_probs,
+                                            const T* bias,
+                                            const bool* finished,
+                                            int batch_size,
+                                            int beam_width,
+                                            int vocab_size_padded,
+                                            int vocab_size,
+                                            cudaStream_t stream,
+                                            const bool min_penalty,
+                                            const int end_id) {
+  dim3 block(256);
+  dim3 grid((vocab_size_padded + block.x - 1) / block.x,
+            beam_width * batch_size);
+
+  apply_min_length_penalty_kernel<T><<<grid, block, 0, stream>>>(log_probs,
+                                                                  bias,
+                                                                  finished,
+                                                                  beam_width,
+                                                                  vocab_size_padded,
+                                                                  vocab_size,
+                                                                  min_penalty,
+                                                                  end_id);
+  }
+
 template void init_kernelLauncher_v2(bool* finished,
                                      bool* alive_finished,
                                      int* sequence_length,
@@ -449,6 +501,31 @@ template void apply_logits_mask_kernelLauncher(
     int vocab_size,
     cudaStream_t stream,
     const half* logits_mask,
+    const bool min_penalty,
+    const int end_id);
+  
+// add bias for ernie3
+template void apply_min_length_penalty_kernelLauncher(
+    float* log_probs,
+    const float* bias,
+    const bool* finished,
+    int batch_size,
+    int beam_width,
+    int vocab_size_padded,
+    int vocab_size,
+    cudaStream_t stream,
+    const bool min_penalty,
+    const int end_id);
+
+template void apply_min_length_penalty_kernelLauncher(
+    half* log_probs,
+    const half* bias,
+    const bool* finished,
+    int batch_size,
+    int beam_width,
+    int vocab_size_padded,
+    int vocab_size,
+    cudaStream_t stream,
     const bool min_penalty,
     const int end_id);
 

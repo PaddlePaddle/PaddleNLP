@@ -24,7 +24,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding,
-                           InferMBartDecoding)
+                           InferMBartDecoding, InferErnie3Decoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
@@ -1364,5 +1364,79 @@ class FasterMBART(MBartPretrainedModel):
             alpha=length_penalty,
             temperature=temperature,
             early_stopping=early_stopping)
+
+    generate = forward
+
+
+class FasterErnie3(Ernie3PretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterErnie3, self).__init__()
+        self._model = model
+        self.use_fp16_decoding = use_fp16_decoding
+        self.decoding = InferErnie3Decoding(
+            model=model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self,
+                input_ids,
+                seq_len=None,
+                attention_mask=None,
+                top_k=4,
+                top_p=0.0,
+                min_length=0,
+                max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=0,
+                repetition_penalty=1.0,
+                decode_strategy="greedy_search",
+                num_return_sequences=1,
+                **model_kwargs):
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 dtype="int32")
+            if bos_token_id == pad_token_id and paddle.sum(
+                    paddle.any(input_ids == pad_token_id), dtype="int64") > 0:
+                seq_len = seq_len + 1
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
+            seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
+        return self.decoding(
+            input_ids,
+            mem_seq_len=seq_len,
+            attention_mask=attention_mask,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            forced_eos_token_id=forced_eos_token_id,
+            temperature=temperature,
+            repetition_penalty=repetition_penalty,
+            min_length=min_length)
+
+    def save_resources(self, tokenizer, path):
+        vocab_file = os.path.join(path, "vocab.txt")
+        tokenizer.save_resources(path)
 
     generate = forward

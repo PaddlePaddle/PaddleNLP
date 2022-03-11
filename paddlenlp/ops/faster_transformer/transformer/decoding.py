@@ -543,6 +543,104 @@ def infer_mbart_decoding(
     return output_ids, parent_ids, sequence_length
 
 
+def infer_ernie3_decoding(
+        input, attn_mask, mem_seq_len, word_emb, sharing_slf_ln_weight,
+        sharing_slf_ln_bias, sharing_slf_q_weight, sharing_slf_q_bias,
+        sharing_slf_k_weight, sharing_slf_k_bias, sharing_slf_v_weight,
+        sharing_slf_v_bias, sharing_slf_out_weight, sharing_slf_out_bias,
+        sharing_ffn_ln_weight, sharing_ffn_ln_bias, sharing_ffn_inter_weight,
+        sharing_ffn_inter_bias, sharing_ffn_out_weight, sharing_ffn_out_bias,
+        sharing_decoder_ln_weight, sharing_decoder_ln_bias,
+        sharing_to_nlg_weight, nlg_slf_ln_weight, nlg_slf_ln_bias,
+        nlg_slf_q_weight, nlg_slf_q_bias, nlg_slf_k_weight, nlg_slf_k_bias,
+        nlg_slf_v_weight, nlg_slf_v_bias, nlg_slf_out_weight, nlg_slf_out_bias,
+        nlg_ffn_ln_weight, nlg_ffn_ln_bias, nlg_ffn_inter_weight,
+        nlg_ffn_inter_bias, nlg_ffn_out_weight, nlg_ffn_out_bias,
+        nlg_decoder_ln_weight, nlg_decoder_ln_bias, trans_weight, trans_bias,
+        lm_ln_weight, lm_ln_bias, lm_out_weight, lm_out_bias, pos_emb, topk,
+        topp, max_out_len, sharing_head_num, sharing_size_per_head,
+        sharing_num_layer, nlg_head_num, nlg_size_per_head, nlg_num_layer,
+        bos_id, eos_id, temperature, repetition_penalty, min_length,
+        use_fp16_decoding):
+    helper = LayerHelper('fusion_ernie3', **locals())
+
+    inputs = {
+        "Input": input,
+        "AttentionMask": attn_mask,
+        "StartLength": mem_seq_len,
+        "WordEmbedding": word_emb,
+        "SharingSelfLayernormWeight@VECTOR": sharing_slf_ln_weight,
+        "SharingSelfLayernormBias@VECTOR": sharing_slf_ln_bias,
+        "SharingSelfQueryWeight@VECTOR": sharing_slf_q_weight,
+        "SharingSelfQueryBias@VECTOR": sharing_slf_q_bias,
+        "SharingSelfKeyWeight@VECTOR": sharing_slf_k_weight,
+        "SharingSelfKeyBias@VECTOR": sharing_slf_k_bias,
+        "SharingSelfValueWeight@VECTOR": sharing_slf_v_weight,
+        "SharingSelfValueBias@VECTOR": sharing_slf_v_bias,
+        "SharingSelfOutWeight@VECTOR": sharing_slf_out_weight,
+        "SharingSelfOutBias@VECTOR": sharing_slf_out_bias,
+        "SharingFFNLayernormWeight@VECTOR": sharing_ffn_ln_weight,
+        "SharingFFNLayernormBias@VECTOR": sharing_ffn_ln_bias,
+        "SharingFFNInterWeight@VECTOR": sharing_ffn_inter_weight,
+        "SharingFFNInterBias@VECTOR": sharing_ffn_inter_bias,
+        "SharingFFNOutWeight@VECTOR": sharing_ffn_out_weight,
+        "SharingFFNOutBias@VECTOR": sharing_ffn_out_bias,
+        "SharingDecoderLayernormWeight": sharing_decoder_ln_weight,
+        "SharingDecoderLayernormBias": sharing_decoder_ln_bias,
+        "SharingToNlgWeight": sharing_to_nlg_weight,
+        "NlgSelfLayernormWeight@VECTOR": nlg_slf_ln_weight,
+        "NlgSelfLayernormBias@VECTOR": nlg_slf_ln_bias,
+        "NlgSelfQueryWeight@VECTOR": nlg_slf_q_weight,
+        "NlgSelfQueryBias@VECTOR": nlg_slf_q_bias,
+        "NlgSelfKeyWeight@VECTOR": nlg_slf_k_weight,
+        "NlgSelfKeyBias@VECTOR": nlg_slf_k_bias,
+        "NlgSelfValueWeight@VECTOR": nlg_slf_v_weight,
+        "NlgSelfValueBias@VECTOR": nlg_slf_v_bias,
+        "NlgSelfOutWeight@VECTOR": nlg_slf_out_weight,
+        "NlgSelfOutBias@VECTOR": nlg_slf_out_bias,
+        "NlgFFNLayernormWeight@VECTOR": nlg_ffn_ln_weight,
+        "NlgFFNLayernormBias@VECTOR": nlg_ffn_ln_bias,
+        "NlgFFNInterWeight@VECTOR": nlg_ffn_inter_weight,
+        "NlgFFNInterBias@VECTOR": nlg_ffn_inter_bias,
+        "NlgFFNOutWeight@VECTOR": nlg_ffn_out_weight,
+        "NlgFFNOutBias@VECTOR": nlg_ffn_out_bias,
+        "NlgDecoderLayernormWeight": nlg_decoder_ln_weight,
+        "NlgDecoderLayernormBias": nlg_decoder_ln_bias,
+        "TransWeight": trans_weight,
+        "TransBias": trans_bias,
+        "LmLayernormWeight": lm_ln_weight,
+        "LmLayernormBias": lm_ln_bias,
+        "LmOutWeight": lm_out_weight,
+        "LmOutBias": lm_out_bias,
+        "PositionEncEmb": pos_emb,
+    }
+    attrs = {
+        "topk": topk,
+        "topp": topp,
+        "max_len": max_out_len,
+        "sharing_n_head": sharing_head_num,
+        "sharing_size_per_head": sharing_size_per_head,
+        "sharing_num_layer": sharing_num_layer,
+        "nlg_n_head": nlg_head_num,
+        "nlg_size_per_head": nlg_size_per_head,
+        "nlg_num_layer": nlg_num_layer,
+        "bos_id": bos_id,
+        "eos_id": eos_id,
+        "temperature": temperature,
+        "repetition_penalty": repetition_penalty,
+        "min_length": min_length,
+        "use_fp16": use_fp16_decoding
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    outputs = {'OutputIds': output_ids}
+
+    helper.append_op(
+        type='fusion_ernie3', inputs=inputs, outputs=outputs, attrs=attrs)
+
+    return output_ids
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -1875,3 +1973,148 @@ class InferMBartDecoding(nn.Layer):
             sequence_length,
             decoding_strategy=decoding_strategy)
         return ids
+
+
+class InferErnie3Decoding(nn.Layer):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
+            load("FasterTransformer", verbose=True)
+
+        super(InferErnie3Decoding, self).__init__()
+
+        self.use_fp16_decoding = use_fp16_decoding
+        self.model = model
+        self.sharing_head_num = self.model.ernie3.config['num_attention_heads']
+        self.sharing_size_per_head = int(
+            self.model.ernie3.config['hidden_size'] / self.sharing_head_num)
+        self.sharing_num_layer = self.model.ernie3.config['num_sharing_layers']
+        self.nlg_head_num = self.model.ernie3.config[
+            'branch_num_attention_heads']
+        self.nlg_size_per_head = int(
+            self.model.ernie3.config['branch_hidden_size'] / self.nlg_head_num)
+        self.nlg_num_layer = self.model.ernie3.config[
+            'num_hidden_layers'] - self.model.ernie3.config[
+                'num_sharing_layers']
+
+        sharing_params = convert_params(
+            self,
+            self.model.ernie3.sharing_encoder,
+            fuse_qkv=2,
+            use_fp16=use_fp16_decoding,
+            restore_data=True)
+        sharing_params['sharing_decoder_ln_weight'].append(
+            (self.model.ernie3.sharing_layer_norm, 'weight'))
+        sharing_params['sharing_decoder_ln_bias'].append(
+            (self.model.ernie3.sharing_layer_norm, 'bias'))
+        sharing_params['sharing_to_nlg_weight'].append(
+            (self.model.ernie3.sharing_to_nlg, 'weight'))
+        sharing_params['word_emb'].append(
+            (self.model.ernie3.embeddings.word_embeddings, 'weight'))
+        sharing_params['pos_emb'].append(
+            (self.model.ernie3.embeddings.position_embeddings, 'weight'))
+        sharing_params['trans_weight'].append(
+            (self.model.lm_head.lm_transform, 'weight'))
+        sharing_params['trans_bias'].append(
+            (self.model.lm_head.lm_transform, 'bias'))
+        sharing_params['lm_ln_weight'].append(
+            (self.model.lm_head.layer_norm, 'weight'))
+        sharing_params['lm_ln_bias'].append(
+            (self.model.lm_head.layer_norm, 'bias'))
+        # NOTE: newly created tensors should be layer attribute refered to be
+        # able to convert to static graph.
+        sharing_params['lm_out_weight'].append(
+            (self.model.lm_head.lm_out.weight.t(), False,
+             partial(setattr, self, "lm_head_lm_out_weight")))
+        sharing_params['lm_out_bias'].append(
+            (self.model.lm_head.lm_out, 'bias'))
+
+        for k, v in sharing_params.items():
+            if k.startswith('slf') or k.startswith('ffn'):
+                setattr(self, 'sharing_' + k, v)
+            else:
+                setattr(self, k, v)
+        nlg_params = convert_params(
+            self,
+            self.model.ernie3.nlg_encoder,
+            fuse_qkv=2,
+            use_fp16=use_fp16_decoding,
+            restore_data=True)
+        nlg_params['nlg_decoder_ln_weight'].append(
+            (self.model.ernie3.nlg_layer_norm, 'weight'))
+        nlg_params['nlg_decoder_ln_bias'].append(
+            (self.model.ernie3.nlg_layer_norm, 'bias'))
+
+        for k, v in nlg_params.items():
+            if k.startswith('slf') or k.startswith('ffn'):
+                setattr(self, 'nlg_' + k, v)
+            else:
+                setattr(self, k, v)
+
+    def forward(self,
+                input_ids,
+                mem_seq_len,
+                attention_mask=None,
+                topk=4,
+                topp=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                max_out_len=256,
+                temperature=1,
+                repetition_penalty=1.0,
+                min_length=0):
+        if attention_mask is None:
+            batch_size, input_length = paddle.shape(input_ids)
+            attention_mask = paddle.unsqueeze(
+                (input_ids != pad_token_id).astype("float32"), axis=[1])
+            causal_mask = paddle.tril(
+                paddle.ones(
+                    [batch_size, input_length, input_length], dtype="float32"))
+            attention_mask = paddle.logical_and(attention_mask, causal_mask)
+            if self.use_fp16_decoding:
+                attention_mask = paddle.cast(attention_mask, dtype="float16")
+
+        if self.use_fp16_decoding and attention_mask.dtype == paddle.float32:
+            attention_mask = paddle.cast(attention_mask, dtype="float16")
+
+        output_ids = infer_ernie3_decoding(
+            [input_ids], [attention_mask], [mem_seq_len], self.word_emb,
+            self.sharing_slf_ln_weight, self.sharing_slf_ln_bias,
+            self.sharing_slf_q_weight, self.sharing_slf_q_bias,
+            self.sharing_slf_k_weight, self.sharing_slf_k_bias,
+            self.sharing_slf_v_weight, self.sharing_slf_v_bias,
+            self.sharing_slf_out_weight, self.sharing_slf_out_bias,
+            self.sharing_ffn_ln_weight, self.sharing_ffn_ln_bias,
+            self.sharing_ffn_inter_weight, self.sharing_ffn_inter_bias,
+            self.sharing_ffn_out_weight, self.sharing_ffn_out_bias,
+            self.sharing_decoder_ln_weight, self.sharing_decoder_ln_bias,
+            self.sharing_to_nlg_weight, self.nlg_slf_ln_weight,
+            self.nlg_slf_ln_bias, self.nlg_slf_q_weight, self.nlg_slf_q_bias,
+            self.nlg_slf_k_weight, self.nlg_slf_k_bias, self.nlg_slf_v_weight,
+            self.nlg_slf_v_bias, self.nlg_slf_out_weight, self.nlg_slf_out_bias,
+            self.nlg_ffn_ln_weight, self.nlg_ffn_ln_bias,
+            self.nlg_ffn_inter_weight, self.nlg_ffn_inter_bias,
+            self.nlg_ffn_out_weight, self.nlg_ffn_out_bias,
+            self.nlg_decoder_ln_weight, self.nlg_decoder_ln_bias,
+            self.trans_weight, self.trans_bias, self.lm_ln_weight,
+            self.lm_ln_bias, self.lm_out_weight, self.lm_out_bias, self.pos_emb,
+            topk, topp, max_out_len, self.sharing_head_num,
+            self.sharing_size_per_head, self.sharing_num_layer,
+            self.nlg_head_num, self.nlg_size_per_head, self.nlg_num_layer,
+            bos_token_id, eos_token_id, temperature, repetition_penalty,
+            min_length, self.use_fp16_decoding)
+
+        output_ids = output_ids[paddle.shape(input_ids)[-1]:, :]
+        if forced_eos_token_id is not None:
+            output_ids[:, -1] = forced_eos_token_id
+        return output_ids
