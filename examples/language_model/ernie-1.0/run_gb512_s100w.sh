@@ -17,10 +17,6 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --max_seq_len 512 \
     --micro_batch_size 64 \
-    --global_batch_size 512 \
-    --sharding_degree 1\
-    --dp_degree 8 \
-    --use_sharding false \
     --use_amp true \
     --use_recompute false \
     --max_lr 0.0001 \
@@ -37,6 +33,3 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --eval_freq 1000 \
     --device "gpu"\
 
-# --check_accuracy true\
-
-# NOTE: please set use_sharding=True for sharding_degree > 1
