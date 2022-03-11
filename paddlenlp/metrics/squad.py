@@ -68,9 +68,11 @@ def compute_prediction(examples,
         features), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
+    example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
-        features_per_example[feature["example_id"]].append(i)
+        features_per_example[example_id_to_index[feature["example_id"]]].append(
+            i)
 
     # The dictionaries we have to fill.
     all_predictions = collections.OrderedDict()
@@ -81,7 +83,7 @@ def compute_prediction(examples,
     # Let's loop over all the examples!
     for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
-        feature_indices = features_per_example[example['id']]
+        feature_indices = features_per_example[example_index]
 
         min_null_prediction = None
         prelim_predictions = []
@@ -124,7 +126,9 @@ def compute_prediction(examples,
                             offset_mapping[start_index] is None or
                             offset_mapping[end_index] is None or
                             offset_mapping[start_index] == (0, 0) or
-                            offset_mapping[end_index] == (0, 0)):
+                            offset_mapping[end_index] == (0, 0) or
+                            len(offset_mapping[start_index]) == 0 or
+                            len(offset_mapping[end_index]) == 0):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
@@ -274,7 +278,8 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
     for example in examples:
         qid = example['id']
         gold_answers = [
-            text for text in example['answers'] if normalize_answer(text)
+            text for text in example['answers']['text']
+            if normalize_answer(text)
         ]
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
