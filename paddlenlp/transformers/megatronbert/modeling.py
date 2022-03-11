@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -357,7 +357,6 @@ class MegatronBertOutput(nn.Layer):
         return input_tensor + hidden_states
 
 
-# Based on transformers.models.bert.modeling_bert.BertLayer. Added LayerNorm.
 class MegatronBertLayer(nn.Layer):
     def __init__(self,
                  hidden_size=1024,
@@ -476,7 +475,7 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
         Args:
             vocab_size (int):
-                Vocabulary size of `inputs_ids` in `ConvBertModel`. Also is the vocab size of token embedding matrix.
+                Vocabulary size of `inputs_ids` in `MegatronBertModel`. Also is the vocab size of token embedding matrix.
                 Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `MegatronBert`.
             hidden_size (int, optional):
                 Dimensionality of the encoder layer and pooler layer. Defaults to `1024`.
@@ -771,12 +770,11 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None, ):
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
         r"""
         The MegatronBertForSequenceClassification forward method, overrides the __call__() special method.
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import random
@@ -35,10 +34,6 @@ from paddlenlp.transformers import MegatronBertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.transformers import MegatronBertForSequenceClassification
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -154,7 +149,7 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu", "npu"],
+        choices=["cpu", "gpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu/npu."
     )
     parser.add_argument(
@@ -187,8 +182,7 @@ def evaluate(model, loss_fct, metric, data_loader):
     metric.reset()
     for batch in data_loader:
         input_ids, segment_ids, labels = batch
-        attention_mask = input_ids != 0
-        logits = model(input_ids, attention_mask, segment_ids)
+        logits = model(input_ids, token_type_ids=segment_ids)
         loss = loss_fct(logits, labels)
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -353,11 +347,10 @@ def do_train(args):
             global_step += 1
 
             input_ids, segment_ids, labels = batch
-            attention_mask = input_ids != 0
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits = model(input_ids, attention_mask, segment_ids)
+                logits = model(input_ids, token_type_ids=segment_ids)
                 loss = loss_fct(logits, labels)
             if args.use_amp:
                 scaler.scale(loss).backward()

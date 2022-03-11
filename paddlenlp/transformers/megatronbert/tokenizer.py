@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -67,11 +67,9 @@ class MegatronBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "megatronbert-uncased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/"
-            "megatron-bert/megatronbert-cased/vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
             "megatronbert-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/"
-            "megatron-bert/megatronbert-uncased/vocab.txt",
+            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
         }
     }
     pretrained_init_configuration = {

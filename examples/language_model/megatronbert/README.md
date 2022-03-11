@@ -22,8 +22,8 @@ python -m paddle.distributed.launch run_squad.py \
     --batch_size=8 \
     --model_name_or_path=megatronbert-cased
     --learning_rate=1e-5 \
-    --output_dir=output/
-    --device=gpu
+    --output_dir=output/ \
+    --device=gpu \
     --num_train_epochs=2
 ```
 其中参数释义如下：
@@ -55,8 +55,8 @@ python -m paddle.distributed.launch run_squad.py \
     --batch_size=8 \
     --model_name_or_path=megatronbert-cased
     --learning_rate=1e-5 \
-    --output_dir=output/
-    --device=gpu
+    --output_dir=output/ \
+    --device=gpu \
     --num_train_epochs=2
 ```
 
@@ -87,7 +87,7 @@ python -m paddle.distributed.launch run_squad.py \
 ```shell
 python -m paddle.distributed.launch run_glue.py \
     --task_name=mnli \
-    --output_dir=output/
+    --output_dir=output/ \
     --model_name_or_path=megatronbert-cased \
     --learning_rate=1e-5 \
     --device=gpu \
