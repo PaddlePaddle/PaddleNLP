@@ -1,3 +1,5 @@
+
+
 English | [简体中文](./README.md)
 
 <p align="center">
@@ -215,7 +217,7 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/153517320-2e1f35b5-ae5a-42db-971c-ae96c6480778.jpg" width="210" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/156540669-c9453a1a-3ed1-4434-a68e-73b9e2f5f771.jpg" width="210" height="200" />
 </div>
 
 

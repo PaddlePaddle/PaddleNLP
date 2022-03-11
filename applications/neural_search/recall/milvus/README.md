@@ -100,35 +100,24 @@
 
 数据准备结束以后，我们开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
 
-Milvus 搭建完系统以后就可以插入和检索向量了，首先生成embedding向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
+Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 embedding 向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
-root_dir="checkpoints"
-python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
-        feature_extract.py \
-        --device gpu \
-        --recall_result_dir "recall_result_dir" \
-        --recall_result_file "recall_result.txt" \
-        --params_path "${root_dir}/model_40/model_state.pdparams" \
-        --hnsw_m 100 \
-        --hnsw_ef 100 \
-        --batch_size 4096 \
-        --output_emb_size 256\
-        --max_seq_length 60 \
-        --recall_num 50 \
-        --similar_text_pair "recall/test.csv" \
-        --corpus_file "milvus/milvus_data.csv"
+CUDA_VISIBLE_DEVICES=2 python feature_extract.py \
+        --model_dir=./output \
+        --corpus_file "data/milvus_data.csv"
 ```
+其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。
 
 |  数据量 |  时间 |
 | ------------ | ------------ |
-|1000万条|5hour50min03s|
+|1000万条|3hour40min39s|
 
 运行结束后会生成 corpus_embedding.npy
 
-生成了向量后，需要把数据抽炒入到Milvus库中，首先修改配置：
+生成了向量后，需要把数据插入到 Milvus 库中，首先修改配置：
 
-修改config.py的配置ip和端口，本项目使用的是8530端口，而milvus默认的是19530，需要根据情况进行修改：
+修改 config.py 的配置 ip 和端口，本项目使用的是8530端口，而 Milvus 默认的是19530，需要根据情况进行修改：
 
 ```
 MILVUS_HOST='your milvus ip'
@@ -146,7 +135,7 @@ python3 embedding_insert.py
 | ------------ | ------------ |
 |1000万条|12min24s|
 
-另外，milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
+另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
 
 ![](../../img/mem.png)
 
@@ -157,7 +146,7 @@ python3 embedding_insert.py
 python3 embedding_recall.py
 
 ```
-运行的结果为，表示的是召回的id和与当前的query计算的距离：
+运行的结果为，表示的是召回的 id 和与当前的 query 计算的距离：
 
 ```
 10000000
@@ -178,7 +167,7 @@ Status(code=0, message='Search vectors successfully!')
 | ------------ | ------------ |
 |100条|0.15351247787475586|
 
-如果测试的速度过慢，可以修改milvus配置里面的cache参数：
+如果测试的速度过慢，可以修改 Milvus 配置里面的 cache 参数：
 
 ```
 cache:
@@ -187,7 +176,7 @@ cache:
   preload_collection:
 
 ```
-把cache_size，insert_buffer_size调的越大，速度越快，调完后重启milvus
+把 cache_size，insert_buffer_size 调的越大，速度越快，调完后重启 Milvus
 
 
 修改代码的模型路径和样本：
