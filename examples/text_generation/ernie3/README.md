@@ -8,8 +8,47 @@
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v4.0#setup) 使用必要的环境
+* 环境依赖
+  - jieba
+  - h5py
+  - colorlog
+  - colorama
+  - seqeval
+  - multiprocess
+  - attrdict
+  - pyyaml
+  - tqdm
+  ```shell
+  pip install jieba h5py colorlog colorama seqeval multiprocess attrdict pyyaml
+  pip install -U tqdm
+  ```
+
+## 目录结构
+
+```text
+ernie3/
+├── faster_ernie3
+│   ├── ernie3_export_model_sample.py # 动转静模型导出代码
+│   ├── ernie3_inference.py           # 静态图推理代码
+├── infer.py                          # 动态图前向Demo代码
+└── README.md                         # 当前README.md文件
+```
 
 ## 快速开始
+
+### 环境准备
+
+首先，如果需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP:
+
+``` sh
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+```
+
+其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp：
+
+``` sh
+export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
+```
 
 ### ERNIE3 decoding 示例代码(动态图)
 
@@ -38,6 +77,9 @@ python infer.py \
 * `--max_out_len`: 字符串，表示任意生成的时候的开始 token。
 * `--decoding_strategy`: 解码策略。
 
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `ernie3_export_model_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
+注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib
+
 ### 导出基于 FasterErnie3 的预测库使用模型文件
 
 Ernie3的FasterGenerartion高性能预测功能底层依托于`FasterErnie3()`。
@@ -50,13 +92,6 @@ python faster_ernie3/ernie3_export_model_sample.py
 ```
 
 各个选项的意义与上文的 `infer.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。
-
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `ernie3_export_model_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
-
-注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib，与相同文档中 **`C++ 预测库使用自定义 op`** 编译产出不同。因此，在使用预测库前，还需要额外导出模型：
-  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
-  * 一次获取编译的基于预测库的可执行文件
-
 若是使用的模型是 ernie3-10b，保存之后，`./infer_model/` 目录下组织的结构如下：
 
 ``` text

@@ -29,10 +29,10 @@ from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
-                                    UnifiedTransformerPretrainedModel,
-                                    UNIMOPretrainedModel, BartPretrainedModel,
-                                    GPTPretrainedModel, MBartPretrainedModel)
+from paddlenlp.transformers import (
+    GPTChineseTokenizer, GPTTokenizer, UnifiedTransformerPretrainedModel,
+    UNIMOPretrainedModel, BartPretrainedModel, GPTPretrainedModel,
+    MBartPretrainedModel, Ernie3PretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
