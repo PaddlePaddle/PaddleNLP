@@ -3,3 +3,4 @@
   "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yaweisun/scibert_scivocab_uncased/model_state.pdparams",
   "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yaweisun/scibert_scivocab_uncased/tokenizer_config.json",
   "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/yaweisun/scibert_scivocab_uncased/vocab.txt"
+} 
