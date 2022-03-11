@@ -217,8 +217,9 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/156540669-c9453a1a-3ed1-4434-a68e-73b9e2f5f771.jpg" width="210" height="200" />
+  <img src="https://user-images.githubusercontent.com/11793384/157789232-999942ad-0362-47be-809c-87cb2f21dbad.jpg" width="210" height="200" />
 </div>
+
 
 
 ## ChangeLog
