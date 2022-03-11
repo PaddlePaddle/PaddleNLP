@@ -24,7 +24,7 @@ from paddlenlp.transformers import Ernie3Tokenizer, Ernie3ForGeneration
 from paddlenlp.ops.ext_utils import load
 
 
-def setup_args():
+def parse_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -42,19 +42,6 @@ def setup_args():
     return args
 
 
-def postprocess_response(token_ids, tokenizer):
-    """Post-process the decoded sequence. Truncate from the first <eos>."""
-    eos_pos = len(token_ids)
-    for i, tok_id in enumerate(token_ids):
-        if tok_id == tokenizer.sep_token_id:
-            eos_pos = i
-            break
-    token_ids = token_ids[:eos_pos]
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    tokens = tokenizer.merge_subword(tokens)
-    return tokens
-
-
 def tokenize_input(tokenizer, texts):
     input_ids = []
     max_len = 0
@@ -67,7 +54,6 @@ def tokenize_input(tokenizer, texts):
             input_ids[i] += [tokenizer.pad_token_id] * (
                 max_len - len(input_ids[i]))
     input_ids = np.asarray(input_ids, dtype="int32")
-    print(input_ids.shape)
     return input_ids
 
 
@@ -75,10 +61,7 @@ def infer(args):
     tokenizer = Ernie3Tokenizer.from_pretrained(args.model_name_or_path)
 
     texts = ["中国的首都是哪里"]
-
-    data = tokenize_input(tokenizer, texts)
-
-    print(data)
+    input_ids = tokenize_input(tokenizer, texts)
 
     # Load FasterTransformer lib. 
     load("FasterTransformer", verbose=True)
@@ -92,21 +75,20 @@ def infer(args):
     input_handles = {}
     input_names = predictor.get_input_names()
     input_handle = predictor.get_input_handle(input_names[0])
-    input_handle.copy_from_cpu(data)
+    input_handle.copy_from_cpu(input_ids)
 
     predictor.run()
 
     output_names = predictor.get_output_names()
     output_handle = predictor.get_output_handle(output_names[0])
-    output_data = output_handle.copy_to_cpu()  # numpy.ndarray类型
-    print(output_data)
+    output_data = output_handle.copy_to_cpu()
 
     for sample in output_data.transpose([1, 0]).tolist():
         print(tokenizer.convert_ids_to_string(sample))
 
 
 if __name__ == "__main__":
-    args = setup_args()
+    args = parse_args()
     pprint(args)
 
     infer(args)

@@ -42,12 +42,12 @@ def parse_args():
         "--inference_model_dir",
         default="./infer_model/",
         type=str,
-        help="Path to save inference model of gpt. ")
+        help="Path to save inference model of ernie3. ")
     parser.add_argument(
         "--topk",
         default=4,
         type=int,
-        help="The number of candidate to procedure beam search. ")
+        help="The number of candidate to procedure topk sampling. ")
     parser.add_argument(
         "--topp",
         default=0.0,
@@ -58,10 +58,10 @@ def parse_args():
     parser.add_argument(
         "--max_out_len", default=20, type=int, help="Maximum output length. ")
     parser.add_argument(
-        "--num_return_sequence",
+        "--num_return_sequences",
         default=1,
         type=int,
-        help="The number of returned sequence. ")
+        help="The number of returned sequences. ")
     parser.add_argument(
         "--temperature",
         default=0.9,
@@ -71,7 +71,7 @@ def parse_args():
         "--repetition_penalty",
         default=1.1,
         type=float,
-        help="The temperature to set. ")
+        help="The repetition_penalty to set. ")
     parser.add_argument(
         "--decoding_strategy",
         default="greedy_search",
@@ -132,7 +132,7 @@ def do_predict(args):
             args.temperature,
             args.repetition_penalty,
             args.decoding_strategy,
-            args.num_return_sequence
+            args.num_return_sequences
         ])
 
     # Save converted static graph model
