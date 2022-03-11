@@ -514,8 +514,7 @@ public:
                                               input_len,
                                               ite,
                                               dummy_decoder_max_seq_len,
-                                              false,
-                                              layer);
+                                              false);
 #ifndef NDEBUG
                     cudaDeviceSynchronize();
                     check_cuda_error(cudaGetLastError());
@@ -606,8 +605,7 @@ public:
                                               input_len,
                                               ite,
                                               dummy_decoder_max_seq_len,
-                                              layer == args_.nlg_decoder_layers_ - 1, // neet to layer == args_.nlg_decoder_layers_ - 1
-                                              layer);
+                                              layer == args_.nlg_decoder_layers_ - 1); // neet to layer == args_.nlg_decoder_layers_ - 1
                     in_id = 1 - in_id;
 
 #ifndef NDEBUG
@@ -922,8 +920,7 @@ public:
 				    false, 
 				    finished_buf_ + ite * local_batch,
 				    max_input_len, 
-				    decoding_params.d_start_lengths + ite * local_batch,
-				    false);
+				    decoding_params.d_start_lengths + ite * local_batch);
 		from_id = 1 - from_id;
 
 #ifndef NDEBUG
