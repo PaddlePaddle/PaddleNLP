@@ -485,12 +485,16 @@ class Ernie3ForGeneration(Ernie3PretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
+        if attention_mask is not None:
+            if len(attention_mask.shape) == 4:
+                attention_mask = attention_mask[:, -1, -1, :]
+            if "int" in paddle.fluid.data_feeder.convert_dtype(
+                    attention_mask.dtype):
+                attention_mask = (1.0 - attention_mask) * -1e4
         if sharing_cache is not None and nlg_cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
 
         return {
             "input_ids": input_ids,
@@ -500,6 +504,65 @@ class Ernie3ForGeneration(Ernie3PretrainedModel):
             "sharing_cache": sharing_cache,
             "nlg_cache": nlg_cache,
         }
+
+    @staticmethod
+    def update_model_kwargs_for_generation(outputs,
+                                           model_kwargs,
+                                           is_encoder_decoder=False):
+        # Update the model inputs during generation.
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
+        # and they contain pad value, the result vectors updated by this method
+        # may be different from expected. In this case, you need to rewrite the
+        # method.
+
+        # update cache
+        if isinstance(outputs, tuple):
+            model_kwargs["sharing_cache"] = outputs[1]
+            model_kwargs["nlg_cache"] = outputs[2]
+
+        # update token_type_ids with last value
+        if "token_type_ids" in model_kwargs:
+            token_type_ids = model_kwargs["token_type_ids"]
+            model_kwargs["token_type_ids"] = paddle.concat(
+                [token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], axis=-1)
+
+        # update position_ids
+        if "position_ids" in model_kwargs:
+            position_ids = model_kwargs["position_ids"]
+            model_kwargs["position_ids"] = paddle.concat(
+                [position_ids, position_ids[:, -1].reshape((-1, 1)) + 1],
+                axis=-1)
+
+        # update attention_mask
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            # nn.Pad2D don't support the data type `bool`
+            if convert_dtype(attention_mask.dtype) == 'bool':
+                attention_mask = paddle.cast(attention_mask, 'int64')
+            if len(attention_mask.shape) == 4:
+                attention_mask = nn.Pad2D(
+                    [0, 0, 0, 1], mode='replicate')(attention_mask)
+                attention_mask = nn.Pad2D(
+                    [0, 1, 0, 0], value=-1e4)(attention_mask)
+                dtype = convert_dtype(attention_mask.dtype)
+                if 'int' in dtype:
+                    attention_mask[:, :, -1, -1] = 1
+                elif 'float' in dtype:
+                    attention_mask[:, :, -1, -1] = 0.0
+                else:
+                    raise ValueError(
+                        'The data type of input `attention_mask` must '
+                        'be bool, int or float')
+            else:
+                attention_mask = paddle.concat(
+                    [
+                        attention_mask, paddle.ones(
+                            [attention_mask.shape[0], 1], dtype="int64")
+                    ],
+                    axis=-1)
+            model_kwargs["attention_mask"] = attention_mask
+
+        return model_kwargs
 
     def __getattr__(self, name):
         try:
