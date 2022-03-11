@@ -17,8 +17,8 @@ import math
 import paddle
 from paddle import nn
 import paddle.nn.functional as F
+from paddle import einsum
 
-from ...ops import einsum
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
