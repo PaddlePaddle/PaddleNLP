@@ -26,6 +26,7 @@ from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
 from paddle.utils.cpp_extension.cpp_extension import (
     CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
+import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 
@@ -132,6 +133,9 @@ class FasterTransformerExtension(CMakeExtension):
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
         self.cmake_args += [f"-DWITH_GPT=ON"]
+        # If use model parallel, 
+        no_para = ft_decoding.get_ft_para_conf().no_para
+        # self.cmake_args += [f"-DWITH_GPT=ON"]
         try:
             super(FasterTransformerExtension,
                   self).build_with_command(ext_builder)
@@ -151,6 +155,10 @@ class FasterTransformerExtension(CMakeExtension):
         # CMake file has fixed the name of lib, maybe we can copy it as the name
         # returned by `BuildExtension.get_ext_filename` after build.
         return "libdecoding_op.so"
+
+    @staticmethod
+    def is_para_available(self):
+        pass
 
 
 class BuildExtension(PaddleBuildExtension):

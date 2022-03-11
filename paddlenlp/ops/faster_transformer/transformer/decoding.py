@@ -657,6 +657,10 @@ def convert_params(faster_model,
                     is_bias=attr.endswith("bias"),
                     dtype="float16" if use_fp16 else "float32",
                     restore_data=restore_data)
+                # NOTE: Assignment to parameter 'weight' should be of type
+                # Parameter or None, thus delete first in case of param is
+                # a tensor.
+                delattr(layer, attr)
                 setattr(layer, attr, param)
             else:
                 # NOTE: Compared with if branch, there is no layer attribute
@@ -732,6 +736,8 @@ def convert_params(faster_model,
             # NOTE: dygraph_to_static/convert_call_func.py would log the converted
             # function. For linear layer, if we delete the params, log would fail.
             # And the log requires weight to be a 2D tensor.
+            # NOTE: Assignment to parameter 'weight' should be of type
+            # Parameter or None, thus delete before in case of tensor.
             setattr(q_proj, attr, dummy_tensor)
             setattr(k_proj, attr, dummy_tensor)
             setattr(v_proj, attr, dummy_tensor)
@@ -1176,7 +1182,7 @@ class FTParaConf(object):
         # Take into account model only including partial weights.
         if self.is_partial_model: return weight
         if len(weight.shape) == 1: axis = 0
-        local_size = weight.shape[axis] // self.tensor_para_rank
+        local_size = weight.shape[axis] // self.tensor_para_size
         start_offset = self.tensor_para_rank * local_size
         end_offset = start_offset + local_size
         if len(weight.shape) == 1:
@@ -1196,7 +1202,7 @@ def get_ft_para_conf():
     return _ft_para_conf
 
 
-@contextmanager
+# @contextmanager
 def enable_ft_para(tensor_para_size=1,
                    layer_para_size=1,
                    layer_para_batch_size=1):
