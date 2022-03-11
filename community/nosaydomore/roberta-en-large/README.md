@@ -1,4 +1,4 @@
-## roberta-large
+## nosaydomore/roberta-en-large
 权重来源
 https://huggingface.co/roberta-large
 
@@ -13,8 +13,8 @@ import paddle
 import os
 import numpy as np
 
-model = RobertaForMaskedLM.from_pretrained('roberta-large')
-tokenizer = RobertaBPETokenizer.from_pretrained('roberta-large')
+model = RobertaForMaskedLM.from_pretrained('nosaydomore/roberta-en-large')
+tokenizer = RobertaBPETokenizer.from_pretrained('nosaydomore/roberta-en-large')
 text = ["The man worked as a", "."]  #"The man worked as a <mask>."
 tokens_list = []
 for i in range(2):

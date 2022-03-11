@@ -1,16 +1,12 @@
-## uer/roberta-base-finetuned-chinanews-chinese
+## nosaydomore/uer-roberta-base-ft-chinanews-chn
 在chinanews数据集上微调的新闻分类模型
 
 ```python
-tokenizer = RobertaTokenizer.from_pretrained('uer/roberta-base-finetuned-chinanews-chinese')
+tokenizer = RobertaTokenizer.from_pretrained('nosaydomore/uer-roberta-base-ft-chinanews-chn')
 token = tokenizer('北京上个月召开了两会')
 # print(token)
-config = RobertaModel.pretrained_init_configuration[
-    'uer/roberta-base-finetuned-chinanews-chinese']
-roberta = RobertaModel(**config)
-model = RobertaForSequenceClassification(roberta, 7)
-model_state = paddle.load(os.path.join(path, "model_state.pdparams"))
-model.load_dict(model_state)
+
+model = RobertaForSequenceClassification.from_pretrained('nosaydomore/uer-roberta-base-ft-chinanews-chn', 7)
 model.eval()
 input_ids = paddle.to_tensor(token['input_ids'], dtype='int64').unsqueeze(0)
 with paddle.no_grad():
