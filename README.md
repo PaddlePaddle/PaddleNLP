@@ -23,12 +23,18 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
 
 - **易用的文本领域API**
   - 提供丰富的产业级预置任务能力[Taskflow](./docs/model_zoo/taskflow.md)和全流程的文本领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供100+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模的效率。
-
 - **多场景的应用示例**
   - 覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
-
 - **高性能分布式训练**
   - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成大规模预训练模型训练。
+
+## 社区交流
+
+微信扫描下方二维码加入官方交流群，与各行各业开发者充分交流，期待您的加入⬇️
+
+<div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/157790710-cfad5c8a-0edd-49d7-9711-eb1c683a687c.png" width="188" height="188" />
+</div>
 
 ## 安装
 
@@ -305,21 +311,6 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 - [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
 
 更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
-
-## 社区贡献与技术交流
-
-### 特殊兴趣小组
-
-- 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例等。
-
-### WeChat
-
-- 现在就加入PaddleNLP的技术交流群，一起交流NLP技术吧！⬇️
-
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/156540272-353d3d80-f2ec-410d-b863-b51f2d156a72.jpg" width="230" height="300" />
-</div>
-
 
 
 ## 版本更新

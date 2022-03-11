@@ -1,15 +1,12 @@
-## deepset/roberta-base-squad2
+## nosaydomore/uer-roberta-base-chinese-extractive-qa
+在中文数据集上训练roberta-base-qa model.
+权重来源：https://huggingface.co/uer/roberta-base-chinese-extractive-qa
 
-是一个QA_model，在squad2上训练
-
-模型来源：https://huggingface.co/deepset/roberta-base-squad2
-
-使用示例：
 ```python
 from paddlenlp.transformers import (
     RobertaModel, RobertaForMaskedLM, RobertaForQuestionAnswering,
     RobertaForSequenceClassification, RobertaForTokenClassification)
-from paddlenlp.transformers import RobertaTokenizer
+from paddlenlp.transformers import RobertaBPETokenizer, RobertaTokenizer
 import paddle
 import os
 import numpy as np
@@ -50,36 +47,24 @@ def decode(start, end, topk, max_answer_len, undesired_tokens):
 
     return starts, ends, scores
 
-tokenizer = RobertaTokenizer.from_pretrained('deepset_roberta_base_squad2')
-questions = ['Where do I live?']
-contexts = ['My name is Sarah and I live in London']
+tokenizer = RobertaTokenizer.from_pretrained('nosaydomore/uer-roberta-base-chinese-extractive-qa')
+questions = ['著名诗歌《假如生活欺骗了你》的作者是']
+contexts = [
+    '普希金从那里学习人民的语言，吸取了许多有益的养料，这一切对普希金后来的创作产生了很大的影响。这两年里，普希金创作了不少优秀的作品，如《囚徒》、《致大海》、《致凯恩》和《假如生活欺骗了你》等几十首抒情诗，叙事诗《努林伯爵》，历史剧《鲍里斯·戈都诺夫》，以及《叶甫盖尼·奥涅金》前六章。'
+]
+token = tokenizer(questions, contexts, stride=256, max_seq_len=256)
+token_type_ids = token[0]["token_type_ids"]
+offset_mapping = token[0]["offset_mapping"]
+st_idx = len(token_type_ids) - sum(token_type_ids)
 
-token = tokenizer(
-    questions,
-    contexts,
-    stride=128,
-    max_seq_len=64,
-    return_attention_mask=True,
-    return_special_tokens_mask=True)
-# print(token)
-special_tokens_mask = token[0]['special_tokens_mask']
-count = 3
-st_idx = 0
-for i in special_tokens_mask:
-    st_idx += 1
-    if i == 1:
-        count -= 1
-    if count == 0:
-        break
-
-input_ids = token[0]['input_ids']
-offset_mapping = token[0]['offset_mapping']
-
-input_ids = paddle.to_tensor(input_ids, dtype='int64').unsqueeze(0)
-
-model = RobertaForQuestionAnswering.from_pretrained(path)
+model = RobertaForQuestionAnswering.from_pretrained('nosaydomore/uer-roberta-base-chinese-extractive-qa')
 model.eval()
-start, end = model(input_ids=input_ids)
+input_ids = paddle.to_tensor(
+    token[0]['input_ids'], dtype='int64').unsqueeze(0)
+token_type_ids = paddle.to_tensor(
+    token[0]['token_type_ids'], dtype='int64').unsqueeze(0)
+with paddle.no_grad():
+    start, end = model(input_ids, token_type_ids)
 start_ = start[0].numpy()
 end_ = end[0].numpy()
 undesired_tokens = np.ones_like(input_ids[0].numpy())
@@ -104,5 +89,5 @@ print("ans: {}".format(contexts[0][start_idx:end_idx]),
         'score:{}'.format(score.item()))
 
 '''
-ans: London score:0.7772307395935059
+ans: 普希金 score:0.9766426086425781
 '''
