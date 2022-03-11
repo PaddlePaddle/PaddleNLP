@@ -293,17 +293,21 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_dst)
 
+# Encoder patches.
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/standard_encoder.h standard_encoder_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/standard_encoder.h standard_encoder_h_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/open_attention.h open_attention_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/open_attention.cu open_attention_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.cu open_attention_cu_dst)
 
-# Encoder patches.
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/standard_encoder.h standard_encoder_h_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/standard_encoder.h standard_encoder_h_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/CMakeLists.txt fastertransformer_cmakelists_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/CMakeLists.txt fastertransformer_cmakelists_dst)
 # Encoder patches end.
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
@@ -327,6 +331,7 @@ set(FT_PATCH_COMMAND
   && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
   && cp ${open_attention_h_src} ${open_attention_h_dst}
   && cp ${open_attention_cu_src} ${open_attention_cu_dst}
+  && cp ${fastertransformer_cmakelists_src} ${fastertransformer_cmakelists_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
@@ -355,7 +360,7 @@ ExternalProject_Add(
   UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=OFF
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=OFF
 )
 # -DBUILD_GPT=${WITH_GPT} 
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
