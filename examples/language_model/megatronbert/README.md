@@ -37,7 +37,7 @@ python -m paddle.distributed.launch run_squad.py \
 训练结束后模型会对模型进行评估，其评估在验证集上完成, 训练完成后你将看到如下结果:
 ```text
 {
-  "exact": 88.78902554399244,
+  "exact": 88.78902554399243,
   "f1": 94.4082803514958,
   "total": 10570,
   "HasAns_exact": 88.78902554399244,
