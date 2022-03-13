@@ -118,7 +118,7 @@ class SegLACTask(LacTask):
     """
 
     def __init__(self, task, model, **kwargs):
-        super().__init__(task=task, model=model, **kwargs)
+        super().__init__(task=task, model="lac", **kwargs)
 
     def _postprocess(self, inputs):
         """

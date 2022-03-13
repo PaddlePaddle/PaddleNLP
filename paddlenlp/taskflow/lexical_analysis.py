@@ -26,7 +26,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ..datasets import load_dataset, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from .utils import download_file, add_docstrings, dygraph_mode_guard
+from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import Customization
 from .task import Task
 from .models import BiGruCrf
@@ -230,14 +230,15 @@ class LacTask(Task):
         """
         results = []
         lens = []
-        for batch in inputs['data_loader']:
-            input_ids, seq_len = batch
-            self.input_handles[0].copy_from_cpu(input_ids.numpy())
-            self.input_handles[1].copy_from_cpu(seq_len.numpy())
-            self.predictor.run()
-            tags_ids = self.output_handle[0].copy_to_cpu()
-            results.extend(tags_ids.tolist())
-            lens.extend(seq_len.tolist())
+        with dygraph_mode_guard():
+            for batch in inputs['data_loader']:
+                input_ids, seq_len = batch
+                self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                self.input_handles[1].copy_from_cpu(seq_len.numpy())
+                self.predictor.run()
+                tags_ids = self.output_handle[0].copy_to_cpu()
+                results.extend(tags_ids.tolist())
+                lens.extend(seq_len.tolist())
         inputs['result'] = results
         inputs['lens'] = lens
         return inputs
