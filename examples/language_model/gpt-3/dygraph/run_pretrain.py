@@ -271,6 +271,7 @@ def do_train(args):
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
+        scaler = scaler if args.use_pure_fp16 else None
         model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
                                                      args.sharding_offload)
 
