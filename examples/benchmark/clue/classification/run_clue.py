@@ -46,9 +46,7 @@ METRIC_CLASSES = {
     "csl": Accuracy,
 }
 
-MODEL_CLASSES = {
-    "ernie-1.0": (ErnieForSequenceClassification, ErnieTokenizer),
-}
+MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
 
 
 def parse_args():
