@@ -1,13 +1,19 @@
 # RoBERTa预训练（Masked Language Modeling）
 本项目是RoBERTa模型在 Paddle 2.0上的开源实现，包含了数据tokenization和预训练代码。本项目旨在用简练清晰的代码完成基本预训练任务（仅Masked Language Model）。该代码易于理解，便于修改和定制。
 ## 快速开始
-本目录下包含：
+本目录下包含:
+
 collator.py: 数据采样class
+
 create_data.py: tokenize数据（使用HF datasets导入和预处理wikipedia数据）
+
 modeling_roberta.py: roberta模型
+
 run_pretrain.py: 预训练代码
+
 运行如下：
-‘’‘
+
+```
 python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 --model_name_or_path roberta-en-base \
 --batch_size 16 \
@@ -23,7 +29,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 --device gpu \
 --max_seq_length 512 \
 --amp True
-’‘’
+```
 
 其中参数释义如下：
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
