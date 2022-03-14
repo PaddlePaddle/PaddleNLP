@@ -73,12 +73,11 @@ python infer.py \
 * `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
 * `--temperature`: temperature 的设定。
 * `--min_out_len`: 最长的生成长度。
-* `--max_length`: 最长的生成长度。
 * `--max_out_len`: 字符串，表示任意生成的时候的开始 token。
 * `--decoding_strategy`: 解码策略。
 
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `ernie3_export_model_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
-注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `ernie3_export_model_sample.py` 时使用 `--decoding_lib ../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
+注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib
 
 ### 导出基于 FasterErnie3 的预测库使用模型文件
 
@@ -114,4 +113,4 @@ python faster_ernie3/ernie3_inference.py \
 
 ### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterErnie3 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
+C++ 预测库使用 FasterErnie3 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
