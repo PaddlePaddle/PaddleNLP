@@ -856,6 +856,10 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             raise AttributeError(
                 "'repetition_penalty != 1' is not supported yet in the faster version"
             )
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         self._faster_entry = FasterMBART(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
