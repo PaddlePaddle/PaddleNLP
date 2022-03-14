@@ -226,13 +226,14 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     if src_mask.dtype == paddle.float16:
         src_mask = paddle.cast(src_mask, dtype="float32")
     src_mask = src_mask == 0.0
-    src_mask = paddle.cast(src_mask, src.dtype)
+    if src_mask.dtype != src.dtype:
+        src_mask = paddle.cast(src_mask, src.dtype)
 
-    # transpose_src_mask: [batch_size, 1, sequence_length, 1]
-    transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
-
-    # src_mask: [batch_size, 1, sequence_length, sequence_length]
-    src_mask = src_mask * transpose_src_mask
+    if len(src_mask.shape) == 4:
+        # transpose_src_mask: [batch_size, 1, sequence_length, 1]
+        transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
+        # src_mask: [batch_size, 1, sequence_length, sequence_length]
+        src_mask = src_mask * transpose_src_mask
 
     if getattr(self, "q_weight", None) is None:
         self.q_weight = []

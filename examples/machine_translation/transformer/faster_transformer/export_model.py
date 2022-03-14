@@ -163,6 +163,8 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.enable_faster_encoder = ARGS.enable_faster_encoder
+    args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
     args.topk = ARGS.topk
