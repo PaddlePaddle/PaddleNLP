@@ -3,11 +3,11 @@
 [CLUE](https://www.cluebenchmarks.com/)自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。
 是目前应用最广泛的中文语言测评指标之一，被包括阿里巴巴达摩院、腾讯 AI 实验室、华为诺亚方舟实验室在内的 20 多家国内语言实验室所采纳。学术引用 100+，github star 超 6000+。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)
 
-本项目是 CLUE 评测任务 在 Paddle 2.0 上的开源实现。
+本项目是 CLUE 评测任务 在 Paddle 2.2.2 上的开源实现。
 
 ## 快速开始
 
-### 启动CLUE任务
+### 启动 CLUE 任务
 以 CLUE/TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
 
 #### 单卡训练
@@ -18,10 +18,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-1.0
+export MODEL_PATH=ernie-3.0-base
 
 python -u ./run_clue.py \
-    --model_type ernie-1.0  \
+    --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
     --max_seq_length ${MAX_SEQ_LEN} \
@@ -43,16 +43,17 @@ python -u ./run_clue.py \
 
 #### 多卡训练
 ```shell
+
 unset CUDA_VISIBLE_DEVICES
 export TASK_NAME=TNEWS
 export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-1.0
+export MODEL_PATH=ernie-3.0-base
 
 python -m paddle.distributed.launch --gpus "0,1" run_clue.py \
-    --model_type ernie-1.0  \
+    --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
     --max_seq_length ${MAX_SEQ_LEN} \
@@ -95,9 +96,10 @@ global step 300/10008, epoch: 0, batch: 299, rank_id: 0, loss: 1.847109, lr: 0.0
 eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
 ```
 
-使用各种预训练模型进行 Fine-tuning ，在 CLUE 验证集上有如下结果：
+使用各种预训练模型进行 Fine-tuning，在 CLUE 的各验证集上有如下结果：
 
-| Model CLUE Score      | AFMQC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018 | CHID | C3   |
-| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | -------- | ---- | ---- |
-| ERNIE Base3.0         | 75.49 | 58.73 | 60.25   | 83.29 | 79.86 | 86.84       | 82.40 | 89.48    |      |      |
-| RoBERTa-wwm-ext-large | 76.20 |       | 62.10   | 84.02 | 79.15 | 90.13       | 82.03 |          |      |      |
+| CLUE Score            | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
+| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
+| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
+| ERNIE Base3.0         | 75.49   | 58.73   | 60.25   | 83.29   | 79.86   | 86.84       | 82.40   | 89.48    |         |         |
+| RoBERTa-wwm-ext-large | 76.20   | 59.36   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
