@@ -141,6 +141,9 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
                     layer.weight,
                     paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
+                    # TODO(guosheng): `normal` does not support float16, and
+                    # need to handle this when using fp16 as default dtype for
+                    # big models.
                     paddle.tensor.normal(
                         mean=0.0,
                         std=self.initializer_range
@@ -174,10 +177,9 @@ class UnifiedTransformerEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
-
-        if self.role_embeddings is not None:
+        # A model with role_embeddings can generate without role_ids.
+        if role_ids is not None:
             embeddings += self.role_embeddings(role_ids)
-
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -302,7 +304,8 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 position_ids,
                 attention_mask,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                role_ids=None):
         r"""
         The UnifiedTransformerModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -347,6 +350,10 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 method. See :meth:`paddle.nn.TransformerEncoder.gen_cache` 
                 method for more details. It is only used for inference and 
                 should be None for training. Defaults to None.
+            role_ids (Tensor, optional):
+                Indices of role ids indicated different roles.
+                 It's data type should be `int64` and has a shape of 
+                [batch_size, sequence_length]. Defaults to None.
 
         Returns:
             Tensor|tuple: If `use_cache` is False, it is a tensor 
@@ -376,8 +383,8 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 outputs = model(**inputs)
         """
 
-        embedding_output = self.embeddings(input_ids, token_type_ids,
-                                           position_ids)
+        embedding_output = self.embeddings(
+            input_ids, token_type_ids, position_ids, role_ids=role_ids)
         if use_cache:
             if cache is None:
                 cache = self.encoder.gen_cache(embedding_output)
@@ -449,7 +456,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 attention_mask,
                 masked_positions=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                role_ids=None):
         r"""
         The UnifiedTransformerLMHeadModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -466,6 +474,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             use_cache: (bool, optional): 
                 See :class:`UnifiedTransformerModel`.
             cache (list, optional): 
+                See :class:`UnifiedTransformerModel`.
+            role_ids: (Tensor, optional):
                 See :class:`UnifiedTransformerModel`.
 
         Returns:
@@ -496,9 +506,14 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.unified_transformer(input_ids, token_type_ids,
-                                           position_ids, attention_mask,
-                                           use_cache, cache)
+        outputs = self.unified_transformer(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            use_cache,
+            cache,
+            role_ids=role_ids)
         sequence_output = outputs[0] if use_cache else outputs
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
@@ -545,12 +560,17 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                                       use_cache=False,
                                       cache=None,
                                       **kwargs):
+
+        role_ids = kwargs.get("role_ids", None)
+
         # only last token for inputs_ids if cache is defined in kwargs
         if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
-            token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
-            attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+            input_ids = input_ids[:, -1:]
+            token_type_ids = token_type_ids[:, -1:]
+            position_ids = position_ids[:, -1:]
+            attention_mask = attention_mask[:, :, -1:, :]
+            if role_ids is not None:
+                role_ids = role_ids[:, -1:]
 
         return {
             "input_ids": input_ids,
@@ -558,7 +578,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
+            "role_ids": role_ids
         }
 
     def __getattr__(self, name):

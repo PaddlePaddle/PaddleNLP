@@ -1571,6 +1571,7 @@ class PretrainedTokenizer(object):
                     "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
                 )
 
+        batch_outputs = {}
         batch_encode_inputs = []
         for example_id, tokens_or_pair_tokens in enumerate(
                 batch_text_or_text_pairs):
@@ -1691,27 +1692,34 @@ class PretrainedTokenizer(object):
                             range(len(encoded_inputs["input_ids"])))
 
                     encoded_inputs['overflow_to_sample'] = example_id
-                    batch_encode_inputs.append(encoded_inputs)
+                    for key, value in encoded_inputs.items():
+                        if key not in batch_outputs:
+                            batch_outputs[key] = []
+                        batch_outputs[key].append(value)
                     if offset + length == len(second_ids):
                         break
                     offset += min(length, stride)
 
             else:
-                batch_encode_inputs.append(
-                    self.encode(
-                        first_ids,
-                        second_ids,
-                        max_seq_len=max_seq_len,
-                        pad_to_max_seq_len=pad_to_max_seq_len,
-                        truncation_strategy=truncation_strategy,
-                        return_position_ids=return_position_ids,
-                        return_token_type_ids=return_token_type_ids,
-                        return_attention_mask=return_attention_mask,
-                        return_length=return_length,
-                        return_overflowing_tokens=return_overflowing_tokens,
-                        return_special_tokens_mask=return_special_tokens_mask))
+                encoded_inputs = self.encode(
+                    first_ids,
+                    second_ids,
+                    max_seq_len=max_seq_len,
+                    pad_to_max_seq_len=pad_to_max_seq_len,
+                    truncation_strategy=truncation_strategy,
+                    return_position_ids=return_position_ids,
+                    return_token_type_ids=return_token_type_ids,
+                    return_attention_mask=return_attention_mask,
+                    return_length=return_length,
+                    return_overflowing_tokens=return_overflowing_tokens,
+                    return_special_tokens_mask=return_special_tokens_mask)
 
-        return batch_encode_inputs
+                for key, value in encoded_inputs.items():
+                    if key not in batch_outputs:
+                        batch_outputs[key] = []
+                    batch_outputs[key].append(value)
+
+        return batch_outputs
 
     def get_offset_mapping(self, text):
         """
