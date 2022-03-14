@@ -100,4 +100,4 @@ eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
 | Model CLUE Score      | AFMQC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018 | CHID | C3   |
 | --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | -------- | ---- | ---- |
 | ERNIE Base3.0         | 76.23 | 59.29 | 61.02   | 83.62 | 79.86 | 86.84       | 82.77 |          |      |      |
-| RoBERTa-wwm-ext-large |       |       |         |       |       |             |       |          |      |      |
+| RoBERTa-wwm-ext-large |       |       |         | 84.02 | 79.15 | 90.13       |       |          |      |      |
