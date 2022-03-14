@@ -15,7 +15,6 @@ from pprint import pprint
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
 from paddlenlp.ops import FasterTransformer
-from paddlenlp.ops import enable_faster_encoder
 from paddlenlp.utils.log import logger
 
 sys.path.append("../")
