@@ -14,7 +14,7 @@
 
 import paddle
 import paddle.nn as nn
-
+from paddle.fluid.data_feeder import convert_dtype
 from .. import PretrainedModel, register_base_model
 
 __all__ = ['Ernie3Model', 'Ernie3PretrainedModel', 'Ernie3ForGeneration']
