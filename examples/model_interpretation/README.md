@@ -71,7 +71,6 @@ NLP可解释评估
 ### 评估指标
 __合理性__：评估模型预测依赖的证据与人工标注证据的拟合度，我们这里使用macro-F1作为评估指标，其中模型预测依赖证据可以由本模块提供的证据分析方法（位于/model_interpretation/task/目录下）给出。<br>
 
-<br>
 <p align="center">
 <img src="model_interpretation/imgs/equation1.png" /> <br>
 </p>
@@ -79,12 +78,10 @@ __合理性__：评估模型预测依赖的证据与人工标注证据的拟合�
 
 __一致性__：评估(原始输入，对应扰动输入)对中词重要度排序的一致性。证据分析方法对输入中每个词赋予一个重要度，基于该重要度对输入中所有词进行排序。我们使用搜索排序中的MAP（mean average precision）指标来计算两个排序的一致性。这里给出了MAP的两种计算方式，分别见以下两个公式：<br>
 公式一（正在使用）：<br>
-<br>
 <p align="center">
 <img src="model_interpretation/imgs/equation5.png" /> <br>
 </p>
 公式二：<br>
-<br>
 <p align="center">
 <img src="model_interpretation/imgs/equation2.png" /> <br>
 </p>
@@ -92,11 +89,9 @@ __一致性__：评估(原始输入，对应扰动输入)对中词重要度排�
 
 __忠诚性__：评估模型给出的证据的忠诚性，即模型是否真的基于给出的证据进行预测的。这里从充分性和完备性两个角度进行评估。充分性，即模型给出的证据是否包含了预测需要的全部信息（即y<sub>r<sub>i</sub></sub> = y<sub>x<sub>i</sub></sub>，其中r<sub>i</sub>表示输入x<sub>i</sub>的证据，y<sub>x</sub>表示模型对输入x的预测结果）；完备性，即模型对输入x的预测结果（即y<sub>x<sub>i</sub>\r<sub>i</sub></sub> ≠ y<sub>x<sub>i</sub></sub>，其中x<sub>i</sub>\r<sub>i</sub>表示从输入x<sub>i</sub>中去除证据r<sub>i</sub>）。基于这两个维度，我们提出了一个新的指标New-P，计算方式如下：<br>
 
-<br>
 <p align="center">
 <img src="model_interpretation/imgs/equation3.png" /> <br>
 </p>
-<br>
 <p align="center">
 <img src="model_interpretation/imgs/equation4.png" /> <br>
 </p>
