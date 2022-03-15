@@ -230,15 +230,15 @@ class LacTask(Task):
         """
         results = []
         lens = []
-        with dygraph_mode_guard():
-            for batch in inputs['data_loader']:
-                input_ids, seq_len = batch
-                self.input_handles[0].copy_from_cpu(input_ids.numpy())
-                self.input_handles[1].copy_from_cpu(seq_len.numpy())
-                self.predictor.run()
-                tags_ids = self.output_handle[0].copy_to_cpu()
-                results.extend(tags_ids.tolist())
-                lens.extend(seq_len.tolist())
+        for batch in inputs['data_loader']:
+            input_ids, seq_len = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(seq_len.numpy())
+            self.predictor.run()
+            tags_ids = self.output_handle[0].copy_to_cpu()
+            results.extend(tags_ids.tolist())
+            lens.extend(seq_len.tolist())
+
         inputs['result'] = results
         inputs['lens'] = lens
         return inputs

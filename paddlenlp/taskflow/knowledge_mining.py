@@ -458,15 +458,14 @@ class WordTagTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         all_pred_tags = []
-        with dygraph_mode_guard():
-            for batch in inputs['data_loader']:
-                input_ids, token_type_ids, seq_len = batch
-                self.input_handles[0].copy_from_cpu(input_ids.numpy())
-                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-                self.input_handles[2].copy_from_cpu(seq_len.numpy())
-                self.predictor.run()
-                pred_tags = self.output_handle[0].copy_to_cpu()
-                all_pred_tags.extend(pred_tags.tolist())
+        for batch in inputs['data_loader']:
+            input_ids, token_type_ids, seq_len = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+            self.input_handles[2].copy_from_cpu(seq_len.numpy())
+            self.predictor.run()
+            pred_tags = self.output_handle[0].copy_to_cpu()
+            all_pred_tags.extend(pred_tags.tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs
 
@@ -723,22 +722,20 @@ class NPTagTask(Task):
         all_scores_can = []
         all_preds_can = []
         pred_ids = []
-        with dygraph_mode_guard():
-            for batch in inputs['data_loader']:
-                input_ids, token_type_ids, label_indices = batch
-                self.input_handles[0].copy_from_cpu(input_ids.numpy())
-                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-                self.predictor.run()
-                logits = self.output_handle[0].copy_to_cpu()
-                for i, l in zip(label_indices, logits):
-                    score = l[i[0]:i[-1] + 1, self._vocab_ids]
-                    # Find topk candidates of scores and predicted indices.
-                    score_can, pred_id_can = self._find_topk(
-                        score, k=4, axis=-1)
+        for batch in inputs['data_loader']:
+            input_ids, token_type_ids, label_indices = batch
+            self.input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+            self.predictor.run()
+            logits = self.output_handle[0].copy_to_cpu()
+            for i, l in zip(label_indices, logits):
+                score = l[i[0]:i[-1] + 1, self._vocab_ids]
+                # Find topk candidates of scores and predicted indices.
+                score_can, pred_id_can = self._find_topk(score, k=4, axis=-1)
 
-                    all_scores_can.extend([score_can.tolist()])
-                    all_preds_can.extend([pred_id_can.tolist()])
-                    pred_ids.extend([pred_id_can[:, 0].tolist()])
+                all_scores_can.extend([score_can.tolist()])
+                all_preds_can.extend([pred_id_can.tolist()])
+                pred_ids.extend([pred_id_can[:, 0].tolist()])
         inputs['all_scores_can'] = all_scores_can
         inputs['all_preds_can'] = all_preds_can
         inputs['pred_ids'] = pred_ids
