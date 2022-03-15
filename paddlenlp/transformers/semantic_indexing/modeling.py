@@ -19,11 +19,11 @@ import paddle.nn.functional as F
 from ..ernie.modeling import ErniePretrainedModel
 
 __all__ = [
-    'ErnieMatchingPretrainedModel', 'ErnieMatchingModel', 'DualErnieForMatching'
+    'ErnieSemanticIndexingPretrainedModel', 'ErnieForRespresent', 'DualEncoder'
 ]
 
 
-class ErnieMatchingPretrainedModel(ErniePretrainedModel):
+class ErnieSemanticIndexingPretrainedModel(ErniePretrainedModel):
     """
     A class for pretrained ERNIE models for matching. It provides ERNIE related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
@@ -35,7 +35,7 @@ class ErnieMatchingPretrainedModel(ErniePretrainedModel):
     """
 
     pretrained_init_configuration = {
-        "ernie-base-matching-query": {
+        "ernie-base-cn-query": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
@@ -48,7 +48,7 @@ class ErnieMatchingPretrainedModel(ErniePretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
         },
-        "ernie-base-matching-title": {
+        "ernie-base-cn-title": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
@@ -59,15 +59,45 @@ class ErnieMatchingPretrainedModel(ErniePretrainedModel):
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
             "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "ernie-base-en-query": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "ernie-base-en-title": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
             "pad_token_id": 0,
         },
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "ernie-base-matching-query":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_base_matching_query.pdparams",
-            "ernie-base-matching-title":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_base_matching_title.pdparams",
+            "ernie-base-cn-query":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query.pdparams",
+            "ernie-base-cn-title":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title.pdparams",
+            "ernie-base-en-query":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query.pdparams",
+            "ernie-base-en-title":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title.pdparams",
         }
     }
 
@@ -77,7 +107,7 @@ class ErnieMatchingPretrainedModel(ErniePretrainedModel):
             layer._epsilon = 1e-5
 
 
-class ErnieMatchingModel(ErnieMatchingPretrainedModel):
+class ErnieForRespresent(ErnieSemanticIndexingPretrainedModel):
     """
     Example:
 
@@ -85,8 +115,8 @@ class ErnieMatchingModel(ErnieMatchingPretrainedModel):
 
             from paddlenlp.transformers import ErnieMatchingModel
 
-            query_model = ErnieMatchingModel.from_pretrained("ernie-base-matching-query")
-            title_model = ErnieMatchingModel.from_pretrained("ernie-base-matching-title")
+            query_model = ErnieMatchingModel.from_pretrained("ernie-base-cn-query")
+            title_model = ErnieMatchingModel.from_pretrained("ernie-base-cn-title")
         
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -96,7 +126,7 @@ class ErnieMatchingModel(ErnieMatchingPretrainedModel):
     """
 
     def __init__(self, ernie):
-        super(ErnieMatchingModel, self).__init__()
+        super(ErnieForRespresent, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.apply(self.init_weights)
 
@@ -116,7 +146,7 @@ class ErnieMatchingModel(ErnieMatchingPretrainedModel):
         return pooled_output
 
 
-class DualErnieForMatching(nn.Layer):
+class DualEncoder(nn.Layer):
     """
     This class encapsulates two ERNIE matching models into one model, so query
     embedding and title embedding could be obtained using one model. And this
