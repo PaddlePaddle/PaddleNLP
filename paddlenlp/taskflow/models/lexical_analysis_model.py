@@ -19,11 +19,12 @@ import paddle.nn.functional as F
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.utils.tools import compare_version
 
-if compare_version(paddle.version.full_version, "2.2.0") >= 0:
-    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
+try:
     from paddle.text import ViterbiDecoder
-else:
-    from paddlenlp.layers.crf import ViterbiDecoder
+except:
+    raise ImportError(
+        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".
+        format(paddle.version.full_version))
 
 
 class BiGruCrf(nn.Layer):
