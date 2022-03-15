@@ -13,7 +13,7 @@
 
 from ..ernie.tokenizer import ErnieTokenizer
 
-__all__ = ['ErnieTokenizer']
+__all__ = ['ErnieMatchingTokenizer']
 
 
 class ErnieMatchingTokenizer(ErnieTokenizer):
