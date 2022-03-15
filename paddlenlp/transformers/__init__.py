@@ -98,3 +98,5 @@ from .luke.modeling import *
 from .luke.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .ernie_matching.modeling import *
+from .ernie_matching.tokenizer import *
