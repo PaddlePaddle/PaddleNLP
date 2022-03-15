@@ -322,3 +322,29 @@ python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_pa
 cd bin/
 ./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_file path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"
 ```
+
+## FAQ
+
+**问题 1**：编译报错 `module not found: paddle`
+
+解决方式：编译自定义 op，默认使用系统命令 `python` 所指定的 Python 的版本，需要启动相应的 conda 或是 virtualenv，或是在编译时候指定 `-DPY_CMD=python3.7`。
+
+**问题 2**：编译报错：
+
+``` shell
+error: unrecognized command line option '-std=c++14'
+```
+
+解决方式：需要确认环境中是否有多个 `gcc8.2`。`nvcc` 默认使用系统默认的 `gcc`，所以需要将预期使用的 `gcc` 加入到相关环境变量中。
+
+**问题 3**：编译自定义 op C++ Demo 报错，报错可能是但不限于：
+
+``` shell
+undefined reference to paddle_infer::Predictor::GetInputNames() ...
+undefined reference to paddle_infer::Predictor::GetOutputNames() ...
+undefined reference to paddle::AnalysisConfig::SetModel(std::string const&, std::string const&) ...
+
+undefined reference to google::FlagRegisterer::FlagRegisterer ...
+```
+
+解决方式：PaddlePaddle 编译的时候如果使用了 CXX11 ABI，自行编写 demo 并编译自定义 OP 时候需要在 CMakeLists.txt 里面加 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1) 或是 cmake 时候加上对应选项。
