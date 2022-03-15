@@ -19,20 +19,21 @@ import paddle.nn.functional as F
 from ..ernie.modeling import ErniePretrainedModel
 
 __all__ = [
-    'ErnieMatchingPretrainedModel', 'ErnieMatchingModel', 'ErnieForMatching'
+    'ErnieMatchingPretrainedModel', 'ErnieMatchingModel', 'DualErnieForMatching'
 ]
 
 
 class ErnieMatchingPretrainedModel(ErniePretrainedModel):
-    r"""
+    """
     A class for pretrained ERNIE models for matching. It provides ERNIE related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. 
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
-
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for
+    more details.
     """
+
     pretrained_init_configuration = {
         "ernie-base-matching-query": {
             "attention_probs_dropout_prob": 0.1,
@@ -74,46 +75,6 @@ class ErnieMatchingPretrainedModel(ErniePretrainedModel):
         """ Initialization hook """
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
-
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 task_type_vocab_size=3,
-                 task_id=0,
-                 use_task_id=False):
-        super(ErnieModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        weight_attr = paddle.ParamAttr(
-            initializer=nn.initializer.TruncatedNormal(
-                mean=0.0, std=self.initializer_range))
-        self.embeddings = ErnieEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr,
-            task_type_vocab_size, task_id, use_task_id)
-        encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,
-            weight_attr=weight_attr,
-            normalize_before=False)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = ErniePooler(hidden_size, weight_attr)
-        self.apply(self.init_weights)
 
 
 class ErnieMatchingModel(ErnieMatchingPretrainedModel):
