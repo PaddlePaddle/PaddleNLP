@@ -23,16 +23,16 @@ from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
 from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
-from utils import convert_example
+from utils import convert_example, build_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
+parser.add_argument("--epochs", type=int, default=15, help="Number of epoches for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The directory to dataset.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to save vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
     default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
@@ -84,17 +84,26 @@ def create_dataloader(dataset,
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-    set_seed()
+    set_seed(1000)
 
-    # Loads vocab.
-    if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
-
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    texts = []
+    for data in train_ds:
+        texts.append(data["text"])
+    for data in dev_ds:
+        texts.append(data["text"])
+
+    # Reads stop words.
+    # Stopwords are just for example. 
+    # It should be updated according to the corpus.
+    stopwords = set(["的", "吗", "吧", "呀", "呜", "呢", "呗"])
+    # Builds vocab.
+    word2idx = build_vocab(
+        texts, stopwords, min_freq=5, unk_token="[UNK]", pad_token="[PAD]")
+    vocab = Vocab.from_dict(word2idx, unk_token="[UNK]", pad_token="[PAD]")
+    # Saves vocab.
+    vocab.to_json(args.vocab_path)
 
     # Constructs the network.
     network = args.network.lower()
