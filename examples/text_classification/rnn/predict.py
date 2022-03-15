@@ -24,7 +24,7 @@ from utils import preprocess_prediction_data
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The path to vocabulary.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
     default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
@@ -76,8 +76,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device.lower())
 
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.from_json(args.vocab_path)
     label_map = {0: 'negative', 1: 'positive'}
 
     # Constructs the newtork.
@@ -149,7 +148,7 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
     data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+        '非常不错，服务很好，位于市中心区，交通方便，不过价格也高！',
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
         '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
     ]
