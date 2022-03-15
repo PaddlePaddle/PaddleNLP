@@ -77,8 +77,9 @@ def infer(args):
         input_handles[name] = predictor.get_input_handle(name)
         if name == "attention_mask":
             input_handles[name].copy_from_cpu(
-                np.asarray(
-                    data[name], dtype="float32").reshape([1, 1, 101, 101]))
+                np.expand_dims(
+                    np.asarray(
+                        data[name], dtype="float32"), axis=(0, 1)))
         else:
             input_handles[name].copy_from_cpu(
                 np.asarray(
