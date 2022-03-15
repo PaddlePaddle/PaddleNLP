@@ -1043,7 +1043,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
         seq_len = kwargs.get("seq_len") - 1
         if seq_len.dtype == paddle.int64:
-            seq_len = paddle.cast(seq_len)
+            seq_len = paddle.cast(seq_len, dtype="int32")
 
         return {
             "input_ids": input_ids,
