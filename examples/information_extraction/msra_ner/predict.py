@@ -40,26 +40,6 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", 
 # yapf: enable
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
-                              max_seq_len=512):
-    labels = example['labels']
-    example = example['tokens']
-    tokenized_input = tokenizer(
-        example,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
-
-    # -2 for [CLS] and [SEP]
-    if len(tokenized_input['input_ids']) - 2 < len(labels):
-        labels = labels[:len(tokenized_input['input_ids']) - 2]
-    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
-    tokenized_input['labels'] += [no_entity_id] * (
-        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
-
-    return tokenized_input
-
-
 def parse_decodes(input_words, id2label, decodes, lens):
     decodes = [x for batch in decodes for x in batch]
     lens = [x for batch in lens for x in batch]
