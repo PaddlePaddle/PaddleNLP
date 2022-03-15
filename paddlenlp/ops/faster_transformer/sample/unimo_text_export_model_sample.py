@@ -31,8 +31,7 @@ def parse_args():
         "--model_name_or_path",
         default="unimo-text-1.0-lcsts-new",
         type=str,
-        help="The model name to specify the gpt to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt-cpm-large-cn']. "
-    )
+        help="The model name to specify the UNIMOText to use. ")
     parser.add_argument(
         "--inference_model_dir",
         default="./infer_model/",
