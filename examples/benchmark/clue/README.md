@@ -20,7 +20,7 @@ export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
-python -u ./run_clue.py \
+python -u ./run_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -52,7 +52,7 @@ export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
-python -m paddle.distributed.launch --gpus "0,1" run_clue.py \
+python -m paddle.distributed.launch --gpus "0,1" run_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -101,5 +101,5 @@ eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
 | CLUE Score            | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
 | --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
 | Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
-| ERNIE Base3.0         | 75.49   | 58.73   | 60.25   | 83.29   | 79.86   | 86.84       | 82.40   | 89.48    |         |         |
-| RoBERTa-wwm-ext-large | 76.20   | 59.36   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
+| ERNIE 3.0 Base        | 75.49   | 58.73   | 60.25   | 83.29   | 79.86   | 86.84       | 82.40   | 89.48    |         |         |
+| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
