@@ -17,7 +17,6 @@ import os
 from roberta.tokenizer_utils import PretrainedTokenizer
 from roberta.bert_tokenizer import BasicTokenizer, WordpieceTokenizer
 
-
 __all__ = ['RobertaTokenizer', ]
 
 

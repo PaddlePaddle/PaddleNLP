@@ -16,7 +16,12 @@
 """
 import numpy as np
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False, language='ch'):
+
+def convert_example(example,
+                    tokenizer,
+                    max_seq_length=512,
+                    is_test=False,
+                    language='ch'):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 

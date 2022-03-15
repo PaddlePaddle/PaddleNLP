@@ -89,12 +89,14 @@ def create_dataloader(dataset,
 if __name__ == "__main__":
     paddle.set_device(args.device)
     set_seed()
-    
+
     if args.language == 'ch':
         tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
-    
+
         # Loads dataset.
-        train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])    # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
+        train_ds, dev_ds = load_dataset(
+            "chnsenticorp", splits=["train", "dev"]
+        )  # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
 
         # Constructs the newtork.
         vocab_size = len(tokenizer.vocab)
@@ -104,41 +106,48 @@ if __name__ == "__main__":
     else:
         # Loads vocab.
         if not os.path.exists(args.vocab_path):
-            raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                            args.vocab_path)
+            raise RuntimeError('The vocab_path  can not be found in the path %s'
+                               % args.vocab_path)
         vocab = Vocab.load_vocabulary(
             args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-        
+
         tokenizer = CharTokenizer(vocab)
-    
+
         # Loads dataset.
-        train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])    # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
-    
+        train_ds, dev_ds = load_dataset(
+            "glue", "sst-2", splits=["train", "dev"]
+        )  # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
+
         # Constructs the newtork.
         vocab_size = len(vocab)
         num_classes = len(train_ds.label_list)
         pad_token_id = 0
         pad_value = vocab.token_to_idx.get('[PAD]', 0)
-    
+
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(attention_layer=attention, 
-                                 vocab_size=vocab_size,
-                                 lstm_hidden_size=lstm_hidden_size,
-                                 num_classes=num_classes,
-                                 padding_idx=pad_token_id)
-    
+    model = BiLSTMAttentionModel(
+        attention_layer=attention,
+        vocab_size=vocab_size,
+        lstm_hidden_size=lstm_hidden_size,
+        num_classes=num_classes,
+        padding_idx=pad_token_id)
+
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
-    trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False, language=args.language)
-    
+    trans_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        is_test=False,
+        language=args.language)
+
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_value),  # input_ids
-        Stack(dtype="int64"),   # seq len
-        Stack(dtype="int64")    # label
+        Stack(dtype="int64"),  # seq len
+        Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    
+
     train_loader = create_dataloader(
         train_ds,
         trans_fn=trans_fn,

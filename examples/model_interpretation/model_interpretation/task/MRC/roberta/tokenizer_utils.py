@@ -45,6 +45,7 @@ __all__ = [
 
 COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
 
+
 def convert_to_unicode(text):
     """
     Converts `text` to Unicode (if it's not already), assuming utf-8 input.
@@ -1250,10 +1251,10 @@ class PretrainedTokenizer(object):
                                                                      pair_ids)
                     token_type_ids = self.create_token_type_ids_from_sequences(
                         ids, pair_ids)
-                    
+
                     context_start_id = len(ids) + 3
                     context_end_id = len(ids) + len(pair_ids) + 2
-                    
+
                     # Build output dictionnary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
@@ -1265,10 +1266,10 @@ class PretrainedTokenizer(object):
                     if return_length:
                         encoded_inputs["seq_len"] = len(encoded_inputs[
                             "input_ids"])
-                        
+
                     encoded_inputs['context_start_id'] = context_start_id
                     encoded_inputs['context_end_id'] = context_end_id
-                    
+
                     # Check lengths
                     assert max_seq_len is None or len(encoded_inputs[
                         "input_ids"]) <= max_seq_len

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
  This script includes code to calculating accuracy for results form textual similarity task
 """
@@ -21,6 +20,7 @@ import time
 import math
 import argparse
 
+
 def get_args():
     """
     get args
@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument('--golden_path', required=True)
     parser.add_argument('--pred_path', required=True)
     parser.add_argument('--language', required=True, choices=['ch', 'en'])
-    
+
     args = parser.parse_args()
     return args
 
@@ -42,14 +42,14 @@ def load_from_file(args):
     """
     golden_f = open(args.golden_path, 'r')
     pred_f = open(args.pred_path, 'r')
-        
+
     golden_labels, pred_labels = {}, {}
 
     for golden_line in golden_f.readlines():
         golden_dict = json.loads(golden_line)
         id = golden_dict['sent_id']
         golden_labels[id] = int(golden_dict['sent_label'])
-    
+
     for pred_line in pred_f.readlines():
         pred_dict = json.loads(pred_line)
         id = pred_dict['id']
@@ -60,6 +60,7 @@ def load_from_file(args):
     result['pred_labels'] = pred_labels
 
     return result
+
 
 def cal_acc(golden_label, pred_label):
     """
@@ -81,13 +82,13 @@ def main(args):
     result = load_from_file(args)
     golden_label = result['golden_labels']
     pred_label = result['pred_labels']
-    
-    acc = cal_acc(golden_label, pred_label)    
+
+    acc = cal_acc(golden_label, pred_label)
     return acc, len(pred_label)
 
 
 if __name__ == '__main__':
     args = get_args()
-    acc, num = main(args)                 
+    acc, num = main(args)
     print('total\tnum: %d\tacc: %.1f' \
         % (num, acc * 100))

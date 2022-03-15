@@ -38,13 +38,18 @@ parser.add_argument('--network', type=str, default="lstm",
                     help="Which network you would like to choose bow, cnn, lstm or gru ?")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams',
                     help="The path of model parameter to be loaded.")
-parser.add_argument("--language", type=str, required=True, 
+parser.add_argument("--language", type=str, required=True,
                     help="Language that this model based on")
 args = parser.parse_args()
 # yapf: enable
 
 
-def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
+def interpreter(model,
+                data,
+                label_map,
+                batch_size=1,
+                pad_token_id=0,
+                vocab=None):
     """
     Predicts the data labels.
 
@@ -70,13 +75,13 @@ def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None
         Pad(axis=0, pad_val=pad_token_id),  # title_ids
         Stack(dtype="int64"),  # query_seq_lens
         Stack(dtype="int64"),  # title_seq_lens
-        Stack(dtype='int64'),
-    ): [data for data in fn(samples)]
+        Stack(dtype='int64'), ): [data for data in fn(samples)]
 
     model.train()
     results = []
     for batch in batches:
-        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(batch)
+        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(
+            batch)
         query_ids = paddle.to_tensor(query_ids)
         title_ids = paddle.to_tensor(title_ids)
         query_seq_lens = paddle.to_tensor(query_seq_lens)
@@ -93,18 +98,21 @@ def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None
         predicted_class_probs = predicted_class_probs.sum()
         P.autograd.backward([predicted_class_probs])
         # print(query_emb.grad)
-        q_gradients = ((query_emb * query_emb.grad).sum(-1).detach()
-                       ).abs()     # gradients: (1, seq_len)
+        q_gradients = (
+            (query_emb *
+             query_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
         q_grad_output = q_gradients / q_gradients.sum(-1, keepdim=True)
         # q_grad_output = F.softmax(q_grad_output, axis=1)
         # print(title_emb.grad)
-        t_gradients = ((title_emb * title_emb.grad).sum(-1).detach()
-                       ).abs()     # gradients: (1, seq_len)
+        t_gradients = (
+            (title_emb *
+             title_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
         t_grad_output = t_gradients / t_gradients.sum(-1, keepdim=True)
         # t_grad_output = F.softmax(t_grad_output, axis=1)
 
         model.clear_gradients()
-        for query_id, title_id in zip(query_ids.numpy().tolist(), title_ids.numpy().tolist()):
+        for query_id, title_id in zip(query_ids.numpy().tolist(),
+                                      title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]
             title = [vocab._idx_to_token[idx] for idx in title_id]
         results.append([q_grad_output, query, t_grad_output, title])
@@ -132,8 +140,7 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
 
-    dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["dev", "test"])
+    dev_ds, test_ds = load_dataset("lcqmc", splits=["dev", "test"])
 
     dev_examples = preprocess_data(dev_ds.data, tokenizer, args.language)
     test_examples = preprocess_data(test_ds.data, tokenizer, args.language)

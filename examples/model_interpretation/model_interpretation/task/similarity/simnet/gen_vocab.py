@@ -36,7 +36,7 @@ if sys.argv[1] == 'ch':
         for k, v in vocab.items():
             if v > 3:
                 f.write(k + '\n')
-                
+
 else:
     tokenizer = spacy.load('en_core_web_sm')
     vocab = defaultdict(int)
@@ -53,7 +53,7 @@ else:
                 vocab[word] += 1
             for word in title:
                 vocab[word] += 1
-        
+
     with open("vocab_QQP", "w") as f:
         for k, v in vocab.items():
             if v > 3:

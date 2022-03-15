@@ -44,25 +44,69 @@ from roberta.tokenizer import RobertaTokenizer
 from roberta.modeling import RobertaForQuestionAnswering
 sys.path.remove('../task/MRC')
 
+
 def get_args():
     parser = argparse.ArgumentParser('MRC predict with roberta')
-    parser.add_argument('--base_model', required=True, choices=['roberta_base', 'roberta_large'])
-    parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
-    parser.add_argument('--max_seq_len', type=int, default=128, help='max sentence length, should not greater than 512')
+    parser.add_argument(
+        '--base_model',
+        required=True,
+        choices=['roberta_base', 'roberta_large'])
+    parser.add_argument(
+        '--from_pretrained',
+        type=str,
+        required=True,
+        help='pretrained model directory or tag')
+    parser.add_argument(
+        '--max_seq_len',
+        type=int,
+        default=128,
+        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=32, help='batchsize')
     parser.add_argument('--epoch', type=int, default=3, help='epoch')
-    parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
+    parser.add_argument(
+        '--data_dir',
+        type=str,
+        required=True,
+        help='data directory includes train / develop data')
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
-    parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
-    parser.add_argument('--use_amp', action='store_true',
-                        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices')
-    parser.add_argument('--n-samples', type=int, default=25, help='number of samples used for smooth gradient method')
-    parser.add_argument('--output_dir', type=Path, required=True, help='interpretable output directory')
-    parser.add_argument("--doc_stride", type=int, default=128, help="When splitting up a long document into chunks, how much stride to take between chunks.")
-    parser.add_argument("--language", type=str, required=True, help="language that the model based on")
+    parser.add_argument(
+        '--init_checkpoint',
+        type=str,
+        default=None,
+        help='checkpoint to warm start from')
+    parser.add_argument(
+        '--wd',
+        type=float,
+        default=0.01,
+        help='weight decay, aka L2 regularizer')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
+    parser.add_argument(
+        '--n-samples',
+        type=int,
+        default=25,
+        help='number of samples used for smooth gradient method')
+    parser.add_argument(
+        '--output_dir',
+        type=Path,
+        required=True,
+        help='interpretable output directory')
+    parser.add_argument(
+        "--doc_stride",
+        type=int,
+        default=128,
+        help="When splitting up a long document into chunks, how much stride to take between chunks."
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        required=True,
+        help="language that the model based on")
     parser.add_argument("--input_data", type=str, required=True)
     args = parser.parse_args()
     return args
@@ -77,7 +121,11 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(
+        questions,
+        contexts,
+        stride=args.doc_stride,
+        max_seq_len=args.max_seq_len)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -96,10 +144,14 @@ def map_fn_DuCheckList(examples, args, tokenizer):
                 for k, o in enumerate(tokenized_example["offset_mapping"])
             ]
         else:
-            n = tokenized_example['offset_mapping'].index((0, 0), 1) + 2  # context start position
-            m = len(tokenized_example['offset_mapping']) - 1  # context end position + 1
-            tokenized_examples[i]["offset_mapping"] = [(o if n <= k <= m else None)
-                                                    for k, o in enumerate(tokenized_example["offset_mapping"])]
+            n = tokenized_example['offset_mapping'].index(
+                (0, 0), 1) + 2  # context start position
+            m = len(tokenized_example[
+                'offset_mapping']) - 1  # context end position + 1
+            tokenized_examples[i]["offset_mapping"] = [
+                (o if n <= k <= m else None)
+                for k, o in enumerate(tokenized_example["offset_mapping"])
+            ]
 
     return tokenized_examples
 
@@ -121,23 +173,26 @@ def init_roberta_var(args):
         tokenizer = RobertaBPETokenizer.from_pretrained(args.from_pretrained)
 
     model = RobertaForQuestionAnswering.from_pretrained(args.from_pretrained)
-    map_fn = functools.partial(map_fn_DuCheckList, args=args, tokenizer=tokenizer)
+    map_fn = functools.partial(
+        map_fn_DuCheckList, args=args, tokenizer=tokenizer)
     dev_ds = RCInterpret().read(os.path.join(args.data_dir, 'dev'))
     #dev_ds = load_dataset('squad', splits='dev_v2', data_files=None)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = P.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_batch_sampler = P.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id), 
+                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
                 "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id )
             }): fn(samples)
-            
-    dev_dataloader = P.io.DataLoader(dataset=dev_ds, 
-                                     batch_sampler=dev_batch_sampler,
-                                     collate_fn=batchify_fn,
-                                     return_list=True)
-    
-    return model, tokenizer, dev_dataloader, dev_ds                            
-    
+
+    dev_dataloader = P.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
+    return model, tokenizer, dev_dataloader, dev_ds
+
 
 @P.no_grad()
 def evaluate(model, data_loader, args):
@@ -150,7 +205,8 @@ def evaluate(model, data_loader, args):
 
     for batch in data_loader:
         input_ids, token_type_ids = batch
-        loss, start_logits_tensor, end_logits_tensor, cls_logits = model(input_ids, token_type_ids)
+        loss, start_logits_tensor, end_logits_tensor, cls_logits = model(
+            input_ids, token_type_ids)
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 print("Processing example: %d" % len(all_start_logits))
@@ -159,10 +215,10 @@ def evaluate(model, data_loader, args):
 
             all_start_logits.append(start_logits_tensor.numpy()[idx])
             all_end_logits.append(end_logits_tensor.numpy()[idx])
-    
+
     all_predictions, all_nbest_json, scores_diff_json, all_feature_index = compute_prediction(
-        data_loader.dataset.data, data_loader.dataset.new_data, (all_start_logits, all_end_logits),
-        True, 20, args.max_seq_len, 0.0)
+        data_loader.dataset.data, data_loader.dataset.new_data,
+        (all_start_logits, all_end_logits), True, 20, args.max_seq_len, 0.0)
 
     # Can also write all_nbest_json and scores_diff_json files if needed
     input_data = load_data(args.input_data)
@@ -174,7 +230,6 @@ def evaluate(model, data_loader, args):
             temp['pred_feature'] = all_feature_index[id]
             f.write(json.dumps(temp, ensure_ascii=False) + "\n")
 
-    
 
 if __name__ == "__main__":
     args = get_args()
@@ -184,9 +239,9 @@ if __name__ == "__main__":
         raise ValueError('unsupported base model name.')
 
     with P.amp.auto_cast(enable=args.use_amp):
-        
+
         sd = P.load(args.init_checkpoint)
         model.set_dict(sd)
         print('load model from %s' % args.init_checkpoint)
-        
+
         evaluate(model, dataloader, args)

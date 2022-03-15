@@ -37,26 +37,64 @@ sys.path.remove('..')
 from utils import convert_example
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--base_model", type=str, choices=['roberta_base', 'roberta_large'])
-parser.add_argument("--save_dir", default='./checkpoint', type=str, 
-                    help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int, 
-                    help="The maximum total input sequence length after tokenization. "
-                    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, 
-                    help="Linear warmup proption over the training process.")
-parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", 
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--language', choices=['ch', 'en'], required=True, default=None, 
-                    help="Language that the model is built for")
+parser.add_argument(
+    "--base_model", type=str, choices=['roberta_base', 'roberta_large'])
+parser.add_argument(
+    "--save_dir",
+    default='./checkpoint',
+    type=str,
+    help="The output directory where the model checkpoints will be written.")
+parser.add_argument(
+    "--max_seq_length",
+    default=128,
+    type=int,
+    help="The maximum total input sequence length after tokenization. "
+    "Sequences longer than this will be truncated, sequences shorter will be padded."
+)
+parser.add_argument(
+    "--batch_size",
+    default=32,
+    type=int,
+    help="Batch size per GPU/CPU for training.")
+parser.add_argument(
+    "--learning_rate",
+    default=5e-5,
+    type=float,
+    help="The initial learning rate for Adam.")
+parser.add_argument(
+    "--weight_decay",
+    default=0.0,
+    type=float,
+    help="Weight decay if we apply some.")
+parser.add_argument(
+    "--epochs",
+    default=3,
+    type=int,
+    help="Total number of training epochs to perform.")
+parser.add_argument(
+    "--warmup_proportion",
+    default=0.0,
+    type=float,
+    help="Linear warmup proption over the training process.")
+parser.add_argument(
+    "--init_from_ckpt",
+    type=str,
+    default=None,
+    help="The path of checkpoint to be loaded.")
+parser.add_argument(
+    "--seed", type=int, default=1000, help="random seed for initialization")
+parser.add_argument(
+    '--device',
+    choices=['cpu', 'gpu', 'xpu'],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.")
+parser.add_argument(
+    '--language',
+    choices=['ch', 'en'],
+    required=True,
+    default=None,
+    help="Language that the model is built for")
 args = parser.parse_args()
-
 
 print('\n-----------  Configuration Arguments -----------')
 for arg, value in sorted(six.iteritems(vars(args))):
@@ -138,20 +176,25 @@ def do_train():
         train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
         if args.base_model == 'roberta_base':
             tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-            model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_classes=2)
+            model = RobertaForSequenceClassification.from_pretrained(
+                'roberta-wwm-ext', num_classes=2)
         elif args.base_model == 'roberta_large':
-            tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext-large')
-            model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext-large', num_classes=2)
+            tokenizer = RobertaTokenizer.from_pretrained(
+                'roberta-wwm-ext-large')
+            model = RobertaForSequenceClassification.from_pretrained(
+                'roberta-wwm-ext-large', num_classes=2)
     else:
-        train_ds, dev_ds = load_dataset('glue', "sst-2", splits=["train", "dev"])
+        train_ds, dev_ds = load_dataset(
+            'glue', "sst-2", splits=["train", "dev"])
         #for English version, we load models from local machine
         if args.base_model == 'roberta_base':
             tokenizer = RobertaBPETokenizer.from_pretrained('roberta-base')
-            model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_classes=2)
+            model = RobertaForSequenceClassification.from_pretrained(
+                'roberta-base', num_classes=2)
         elif args.base_model == 'roberta_large':
             tokenizer = RobertaBPETokenizer.from_pretrained('roberta-large')
-            model = RobertaForSequenceClassification.from_pretrained('roberta-large', num_classes=2)
-    
+            model = RobertaForSequenceClassification.from_pretrained(
+                'roberta-large', num_classes=2)
 
     trans_func = partial(
         convert_example,
@@ -219,7 +262,8 @@ def do_train():
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
-                       log_per_step / (time.time() - tic_train)), flush=True)
+                       log_per_step / (time.time() - tic_train)),
+                    flush=True)
                 tic_train = time.time()
             loss.backward()
             optimizer.step()

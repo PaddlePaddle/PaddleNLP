@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
   This script is used to evaluate the performance of the MRC model (F1)
 """
@@ -29,6 +28,7 @@ if six.PY2:
     sys.setdefaultencoding('utf8')
 import argparse
 from paddlenlp.metrics.squad import squad_evaluate
+
 
 def _tokenize_chinese_chars(text):
     """
@@ -83,9 +83,9 @@ def _normalize(in_str):
     """
     in_str = in_str.lower()
     sp_char = [
-        u':', u'_', u'`', u'，', u'。', u'：', u'？', u'！', u'(', u')',
-        u'“', u'”', u'；', u'’', u'《', u'》', u'……', u'·', u'、', u',',
-        u'「', u'」', u'（', u'）', u'－', u'～', u'『', u'』', '|'
+        u':', u'_', u'`', u'，', u'。', u'：', u'？', u'！', u'(', u')', u'“', u'”',
+        u'；', u'’', u'《', u'》', u'……', u'·', u'、', u',', u'「', u'」', u'（', u'）',
+        u'－', u'～', u'『', u'』', '|'
     ]
     out_segs = []
     for char in in_str:
@@ -98,7 +98,7 @@ def _normalize(in_str):
 
 def find_lcs(s1, s2):
     """find the longest common subsequence between s1 ans s2"""
-    m = [[0 for i in range(len(s2)+1)] for j in range(len(s1)+1)]
+    m = [[0 for i in range(len(s2) + 1)] for j in range(len(s1) + 1)]
     max_len = 0
     p = 0
     for i in range(len(s1)):
@@ -186,7 +186,7 @@ def read_dataset(file_path):
         golden[ins['sent_id']] = ins
     f.close()
     return golden
-    
+
 
 def read_model_prediction(file_path):
     f = open(file_path, 'r')
@@ -242,4 +242,3 @@ if __name__ == '__main__':
                 ins['is_impossible'] = False
             res.append(ins)
         squad_evaluate(examples=res, preds=pred_ans)
-        

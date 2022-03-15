@@ -45,6 +45,7 @@ __all__ = [
 
 COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
 
+
 def convert_to_unicode(text):
     """
     Converts `text` to Unicode (if it's not already), assuming utf-8 input.

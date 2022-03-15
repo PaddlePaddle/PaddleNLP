@@ -76,7 +76,12 @@ def _wordpiece(token, vocab, unk_token, prefix='##', sentencepiece_prefix=''):
     else:
         return sub_tokens, sub_pos
 
-def _wordpiece_wo_unk(token, vocab, unk_token, prefix='##', sentencepiece_prefix=''):
+
+def _wordpiece_wo_unk(token,
+                      vocab,
+                      unk_token,
+                      prefix='##',
+                      sentencepiece_prefix=''):
     """ wordpiece: helloworld => [hello, ##world] """
     chars = list(token)
     if len(chars) > _max_input_chars_per_word:
@@ -123,7 +128,8 @@ class ErnieTokenizer(object):
         'ernie-gen-large-en': bce + 'model-ernie-gen-large-en.1.tar.gz',
         'ernie-gram-zh': bce + 'model-ernie-gram-zh.1.tar.gz',
         'ernie-gram-en': bce + 'model-ernie-gram-en.1.tar.gz',
-        'ernie-2.0-large-ch': '/home/disk1/pengshuyuan/model-interp/ernie_large_ch/ernie_2.0_large_ch',
+        'ernie-2.0-large-ch':
+        '/home/disk1/pengshuyuan/model-interp/ernie_large_ch/ernie_2.0_large_ch',
     }
 
     @classmethod
@@ -139,14 +145,15 @@ class ErnieTokenizer(object):
                 pretrain_dir = Path(url)
             else:
                 log.info('pretrain dir %s not in %s, read from local' %
-                        (pretrain_dir_or_url, repr(cls.resource_map)))
+                         (pretrain_dir_or_url, repr(cls.resource_map)))
                 pretrain_dir = Path(pretrain_dir_or_url)
             if not pretrain_dir.exists():
-                raise ValueError('pretrain dir not found: %s, optional: %s' % (pretrain_dir, cls.resource_map.keys()))
+                raise ValueError('pretrain dir not found: %s, optional: %s' %
+                                 (pretrain_dir, cls.resource_map.keys()))
             vocab_path = pretrain_dir / 'vocab.txt'
             if not vocab_path.exists():
                 raise ValueError('no vocab file in pretrain dir: %s' %
-                                pretrain_dir)
+                                 pretrain_dir)
         vocab_dict = {
             j.strip().split('\t')[0]: i
             for i, j in enumerate(
@@ -171,7 +178,10 @@ class ErnieTokenizer(object):
             raise ValueError('expect `vocab` to be instance of dict, got %s' %
                              type(vocab))
         self.vocab = vocab
-        self.inverse_vocab = [item[0] for item in sorted(self.vocab.items(), key=lambda x: x[1])]
+        self.inverse_vocab = [
+            item[0] for item in sorted(
+                self.vocab.items(), key=lambda x: x[1])
+        ]
         self.lower = lower
         self.prefix = wordpiece_prefix
         self.sentencepiece_prefix = sentencepiece_prefix
@@ -231,8 +241,8 @@ class ErnieTokenizer(object):
         len2 = len(id2)
         half = seqlen // 2
         if len1 > len2:
-            len1_truncated, len2_truncated = max(half, seqlen - len2), min(
-                half, len2)
+            len1_truncated, len2_truncated = max(half, seqlen - len2), min(half,
+                                                                           len2)
         else:
             len1_truncated, len2_truncated = min(half, seqlen - len1), max(
                 half, seqlen - len1)
@@ -256,13 +266,12 @@ class ErnieTokenizer(object):
         text_id_type = np.zeros_like(text_id, dtype=np.int64)
         if pair is not None:
             pair_id = np.array(
-                self.convert_tokens_to_ids(self.tokenize(pair)),
-                dtype=np.int64)
+                self.convert_tokens_to_ids(self.tokenize(pair)), dtype=np.int64)
         else:
             pair_id = []
         if truncate_to is not None:
-            text_id, pair_id = self.truncate(text_id, [] if pair_id is None
-                                             else pair_id, truncate_to)
+            text_id, pair_id = self.truncate(text_id, [] if pair_id is None else
+                                             pair_id, truncate_to)
 
         ret_id, ret_id_type = self.build_for_ernie(text_id, pair_id)
         return ret_id, ret_id_type

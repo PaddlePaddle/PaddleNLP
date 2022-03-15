@@ -512,7 +512,7 @@ class TransformerEncoderLayer(Layer):
             d_model,
             nhead,
             dropout=attn_dropout,
-            need_weights=True,          # interpret
+            need_weights=True,  # interpret
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0])
         self.linear1 = Linear(
@@ -566,11 +566,13 @@ class TransformerEncoderLayer(Layer):
         # Add cache for encoder for the usage like UniLM
         if cache is None:
             # src = self.self_attn(src, src, src, src_mask)
-            src, att_weights = self.self_attn(src, src, src, src_mask)  # interpret
+            src, att_weights = self.self_attn(src, src, src,
+                                              src_mask)  # interpret
         else:
             # src, incremental_cache = self.self_attn(src, src, src, src_mask, cache)
-            src, att_weights, incremental_cache = self.self_attn(src, src, src, src_mask, cache)     # interpret
-            
+            src, att_weights, incremental_cache = self.self_attn(
+                src, src, src, src_mask, cache)  # interpret
+
         src = residual + self.dropout1(src)
         if not self.normalize_before:
             src = self.norm1(src)
@@ -583,9 +585,9 @@ class TransformerEncoderLayer(Layer):
         if not self.normalize_before:
             src = self.norm2(src)
         # return src if cache is None else (src, incremental_cache)
-        return (src, att_weights) if cache is None else (src, att_weights, incremental_cache)   # interpret
-    
-    
+        return (src, att_weights) if cache is None else (
+            src, att_weights, incremental_cache)  # interpret
+
     def gen_cache(self, src):
         r"""
         Generates cache for `forward` usage. The generated cache is an 
@@ -681,16 +683,18 @@ class TransformerEncoder(Layer):
         src_mask = _convert_attention_mask(src_mask, src.dtype)
 
         output = src
-        att_weights_list = []   # interpret
+        att_weights_list = []  # interpret
         new_caches = []
         for i, mod in enumerate(self.layers):
             if cache is None:
                 # output = mod(output, src_mask=src_mask)
-                output, att_weights = mod(output, src_mask=src_mask)     # interpret
+                output, att_weights = mod(output,
+                                          src_mask=src_mask)  # interpret
                 att_weights_list.append(att_weights)
             else:
                 # output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
-                output, att_weights, new_cache = mod(output, src_mask=src_mask, cache=cache[i])  # interpret
+                output, att_weights, new_cache = mod(
+                    output, src_mask=src_mask, cache=cache[i])  # interpret
                 att_weights_list.append(att_weights)
                 new_caches.append(new_cache)
 
@@ -698,9 +702,9 @@ class TransformerEncoder(Layer):
             output = self.norm(output)
 
         # return output if cache is None else (output, new_caches)
-        return (output, att_weights_list) if cache is None else (output, att_weights_list, new_caches)    # interpret
-    
-    
+        return (output, att_weights_list) if cache is None else (
+            output, att_weights_list, new_caches)  # interpret
+
     def gen_cache(self, src):
         r"""
         Generates cache for `forward` usage. The generated cache is a list, and

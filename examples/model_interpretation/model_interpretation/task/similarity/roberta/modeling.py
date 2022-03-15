@@ -78,6 +78,7 @@ class RobertaPooler(nn.Layer):
     """
     An abstract class for RobertaPooler
     """
+
     def __init__(self, hidden_size):
         super(RobertaPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -355,18 +356,21 @@ class RobertaModel(RobertaPretrainedModel):
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
         # CLS: 101; SEP: 102; PAD: 0
-        baseline_ids = paddle.to_tensor([101] + [0]*(input_ids.shape[1]-2) + [102],
-                                        dtype=input_ids.dtype,
-                                        place=input_ids.place,
-                                        stop_gradient=input_ids.stop_gradient)
-        
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
-        baseline_embedding_output = self.embeddings(input_ids=baseline_ids,
-                                                    position_ids=position_ids,
-                                                    token_type_ids=token_type_ids)
-        
+        baseline_ids = paddle.to_tensor(
+            [101] + [0] * (input_ids.shape[1] - 2) + [102],
+            dtype=input_ids.dtype,
+            place=input_ids.place,
+            stop_gradient=input_ids.stop_gradient)
+
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids)
+        baseline_embedding_output = self.embeddings(
+            input_ids=baseline_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids)
+
         if noise is not None:
             if noise.upper() == 'GAUSSIAN':
                 pass
@@ -375,9 +379,9 @@ class RobertaModel(RobertaPretrainedModel):
                                     * (embedding_output - baseline_embedding_output)
             else:
                 raise ValueError('unsupported noise method: %s' % (noise))
-        
-        
-        encoder_outputs, att_weights_list = self.encoder(embedding_output, attention_mask)    # interpret
+
+        encoder_outputs, att_weights_list = self.encoder(
+            embedding_output, attention_mask)  # interpret
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
         result = [sequence_output, pooled_output, att_weights_list]
@@ -527,16 +531,15 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         return logits
-    
-    
+
     def forward_interpret(self,
-                         input_ids,
-                         token_type_ids=None,
-                         position_ids=None,
-                         attention_mask=None,
-                         noise=None,
-                         i=None,
-                         n_samples=None):
+                          input_ids,
+                          token_type_ids=None,
+                          position_ids=None,
+                          attention_mask=None,
+                          noise=None,
+                          i=None,
+                          n_samples=None):
         """
         The forward function used when we are interpreting the model
         """
@@ -548,11 +551,11 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             noise=noise,
             i=i,
             n_samples=n_samples)
-        
+
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         probs = self.softmax(logits)
-        
+
         return probs, att_weights_list, embedding_output
 
 

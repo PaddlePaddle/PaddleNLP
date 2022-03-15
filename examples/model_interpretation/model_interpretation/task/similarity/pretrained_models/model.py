@@ -24,7 +24,8 @@ class PointwiseMatching(nn.Layer):
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
         # num_labels = 2 (similar or dissimilar)
-        self.classifier = nn.Linear(self.ptm.config['roberta'].config["hidden_size"], 2)
+        self.classifier = nn.Linear(
+            self.ptm.config['roberta'].config["hidden_size"], 2)
 
     def forward(self,
                 input_ids,

@@ -38,6 +38,7 @@ __all__ = [
 
 COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
 
+
 def register_base_model(cls):
     """
     A decorator for `PretrainedModel` class. It first retrieves the parent class

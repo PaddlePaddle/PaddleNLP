@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
  This script includes code to calculating NewP score for results form
  sentiment analysis, textual similarity, and MRC task
@@ -21,12 +20,13 @@ import os
 import json
 import numpy as np
 
+
 def get_args():
     """
     get args
     """
     parser = argparse.ArgumentParser('NewP eval')
-    
+
     parser.add_argument('--pred_path', required=True)
     parser.add_argument('--golden_path', required=True)
 
@@ -63,10 +63,12 @@ def analysis(args, instance, gold_list):
     for ins in instance:
         golden_label = ins['pred_label']
         text_correct = 1 if ins['rationale_pred'] == golden_label else 0
-        text_exclusive_correct = 1 if ins['no_rationale_pred'] == golden_label else 0 
-        New_P_correct = 1 if (text_correct == 1 and text_exclusive_correct == 0) else 0
+        text_exclusive_correct = 1 if ins[
+            'no_rationale_pred'] == golden_label else 0
+        New_P_correct = 1 if (text_correct == 1 and
+                              text_exclusive_correct == 0) else 0
         New_P_list.append(New_P_correct)
-    
+
     total_New_P = np.sum(New_P_list) / len(gold_list) if len(gold_list) else 0
 
     print('total\t%d\t%.1f' % (len(New_P_list), 100 * total_New_P))

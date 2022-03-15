@@ -345,18 +345,21 @@ class RobertaModel(RobertaPretrainedModel):
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
         # CLS: 101; SEP: 102; PAD: 0
-        baseline_ids = paddle.to_tensor([101] + [0]*(input_ids.shape[1]-2) + [102],
-                                        dtype=input_ids.dtype,
-                                        place=input_ids.place,
-                                        stop_gradient=input_ids.stop_gradient)
-        
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
-        baseline_embedding_output = self.embeddings(input_ids=baseline_ids,
-                                                    position_ids=position_ids,
-                                                    token_type_ids=token_type_ids)
-        
+        baseline_ids = paddle.to_tensor(
+            [101] + [0] * (input_ids.shape[1] - 2) + [102],
+            dtype=input_ids.dtype,
+            place=input_ids.place,
+            stop_gradient=input_ids.stop_gradient)
+
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids)
+        baseline_embedding_output = self.embeddings(
+            input_ids=baseline_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids)
+
         if noise is not None:
             if noise.upper() == 'GAUSSIAN':
                 pass
@@ -366,13 +369,15 @@ class RobertaModel(RobertaPretrainedModel):
                 #                     stop_gradient=False)
                 # orig_embedded = orig_embedded + noise
             if noise.upper() == 'INTEGRATED':
-                embedding_output = baseline_embedding_output + i / (n_samples - 1) * (embedding_output - baseline_embedding_output)
+                embedding_output = baseline_embedding_output + i / (
+                    n_samples - 1) * (embedding_output -
+                                      baseline_embedding_output)
             else:
                 raise ValueError('unsupported noise method: %s' % (noise))
-        
-        
+
         # encoder_outputs = self.encoder(embedding_output, attention_mask)
-        encoder_outputs, att_weights_list = self.encoder(embedding_output, attention_mask)    # interpret
+        encoder_outputs, att_weights_list = self.encoder(
+            embedding_output, attention_mask)  # interpret
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
         return sequence_output, pooled_output, att_weights_list, embedding_output
@@ -520,8 +525,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         return logits
-    
-    
+
     def forward_interpet(self,
                          input_ids,
                          token_type_ids=None,
@@ -538,11 +542,11 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             noise=noise,
             i=i,
             n_samples=n_samples)
-        
+
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         probs = self.softmax(logits)
-        
+
         return probs, att_weights_list, embedding_output
 
 

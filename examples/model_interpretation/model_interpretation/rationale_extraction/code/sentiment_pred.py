@@ -42,32 +42,73 @@ from roberta.tokenizer import RobertaTokenizer
 from roberta.modeling import RobertaForSequenceClassification
 sys.path.remove('../task/senti')
 
+
 def get_args():
     parser = argparse.ArgumentParser('sentiment analysis prediction')
 
-    parser.add_argument('--base_model', required=True, choices=['roberta_base', 'roberta_large', 'lstm'])
-    parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
-    parser.add_argument('--max_seq_len', type=int, default=128, help='max sentence length, should not greater than 512')
+    parser.add_argument(
+        '--base_model',
+        required=True,
+        choices=['roberta_base', 'roberta_large', 'lstm'])
+    parser.add_argument(
+        '--from_pretrained',
+        type=str,
+        required=True,
+        help='pretrained model directory or tag')
+    parser.add_argument(
+        '--max_seq_len',
+        type=int,
+        default=128,
+        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=1, help='batchsize')
-    parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
+    parser.add_argument(
+        '--data_dir',
+        type=str,
+        required=True,
+        help='data directory includes train / develop data')
     parser.add_argument('--eval', action='store_true')
 
-    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
-    parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
-    parser.add_argument('--use_amp', action='store_true',
-                        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices')
-    parser.add_argument('--inter_mode', type=str, default="attention",
-                        choices=["attention",
-                                 "simple_gradient", "smooth_gradient", "integrated_gradient",
-                                 "lime"],
-                        help='appoint the mode of interpretable.')
-    parser.add_argument('--n-samples', type=int, default=25,
-                        help='number of samples used for smooth gradient method')
-    parser.add_argument('--output_dir', type=Path,
-                        required=True, help='interpretable output directory')
+    parser.add_argument(
+        '--init_checkpoint',
+        type=str,
+        default=None,
+        help='checkpoint to warm start from')
+    parser.add_argument(
+        '--wd',
+        type=float,
+        default=0.01,
+        help='weight decay, aka L2 regularizer')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
+    parser.add_argument(
+        '--inter_mode',
+        type=str,
+        default="attention",
+        choices=[
+            "attention", "simple_gradient", "smooth_gradient",
+            "integrated_gradient", "lime"
+        ],
+        help='appoint the mode of interpretable.')
+    parser.add_argument(
+        '--n-samples',
+        type=int,
+        default=25,
+        help='number of samples used for smooth gradient method')
+    parser.add_argument(
+        '--output_dir',
+        type=Path,
+        required=True,
+        help='interpretable output directory')
     parser.add_argument('--start_id', type=int, default=0)
     parser.add_argument("--vocab_path", type=str)
-    parser.add_argument('--language', type=str, required=True, help='Language that the model is built for')
+    parser.add_argument(
+        '--language',
+        type=str,
+        required=True,
+        help='Language that the model is built for')
     args = parser.parse_args()
     return args
 
@@ -77,12 +118,9 @@ class Senti_data(DatasetBuilder):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
                 line_split = json.loads(line)
-                yield {
-                    'id': line_split['id'],
-                    'context': line_split['context']
-                }
-            
-            
+                yield {'id': line_split['id'], 'context': line_split['context']}
+
+
 def create_dataloader(dataset,
                       trans_fn=None,
                       mode='train',
@@ -120,13 +158,10 @@ def create_dataloader(dataset,
 
 def map_fn_senti(examples, tokenizer, language):
     print('load data %d' % len(examples))
-        
+
     contexts = [example['context'] for example in examples]
-    tokenized_examples = tokenizer(
-        contexts,
-        max_seq_len=args.max_seq_len
-    )
-    
+    tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
+
     return tokenized_examples
 
 
@@ -151,22 +186,28 @@ def init_lstm_var(args):
         tokenizer = CharTokenizer(vocab)
         padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
-    trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=True, language=args.language)
-    
+    trans_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        is_test=True,
+        language=args.language)
+
     #init attention layer    
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(attention_layer=attention,
-                                vocab_size=len(tokenizer.vocab),
-                                lstm_hidden_size=lstm_hidden_size,
-                                num_classes=2,
-                                padding_idx=padding_idx)
+    model = BiLSTMAttentionModel(
+        attention_layer=attention,
+        vocab_size=len(tokenizer.vocab),
+        lstm_hidden_size=lstm_hidden_size,
+        num_classes=2,
+        padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
-    dev_ds = Senti_data().read(os.path.join(args.data_dir, 'dev'), args.language)
+    dev_ds = Senti_data().read(
+        os.path.join(args.data_dir, 'dev'), args.language)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=padding_idx),  # input_ids
-        Stack(dtype="int64"),   # seq len
+        Stack(dtype="int64"),  # seq len
     ): [data for data in fn(samples)]
 
     dev_loader = create_dataloader(
@@ -175,39 +216,43 @@ def init_lstm_var(args):
         batch_size=args.batch_size,
         mode='validation',
         batchify_fn=batchify_fn)
-        
+
     return model, tokenizer, dev_loader
 
 
 def init_roberta_var(args):
     tokenizer = None
-    if args.language=="ch":
+    if args.language == "ch":
         tokenizer = RobertaTokenizer.from_pretrained(args.from_pretrained)
     else:
         tokenizer = RobertaBPETokenizer.from_pretrained(args.from_pretrained)
-    model = RobertaForSequenceClassification.from_pretrained(args.from_pretrained, 
-                                                             hidden_dropout_prob=0,
-                                                             attention_probs_dropout_prob=0,                                                        
-                                                             dropout=0,
-                                                             num_labels=2, 
-                                                             name='', 
-                                                             return_inter_score=True)
+    model = RobertaForSequenceClassification.from_pretrained(
+        args.from_pretrained,
+        hidden_dropout_prob=0,
+        attention_probs_dropout_prob=0,
+        dropout=0,
+        num_labels=2,
+        name='',
+        return_inter_score=True)
 
     map_fn = partial(map_fn_senti, tokenizer=tokenizer, language=args.language)
-    
-    dev_ds = Senti_data().read(os.path.join(args.data_dir, 'dev'), args.language)
+
+    dev_ds = Senti_data().read(
+        os.path.join(args.data_dir, 'dev'), args.language)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = P.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_batch_sampler = P.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
         "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
     }): fn(samples)
-    
-    dataloader = P.io.DataLoader(dataset=dev_ds,
-                                 batch_sampler=dev_batch_sampler,
-                                 collate_fn=batchify_fn,
-                                 return_list=True)
-    
+
+    dataloader = P.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
     return model, tokenizer, dataloader
 
 
@@ -226,22 +271,23 @@ if __name__ == "__main__":
         # load model
         sd = P.load(args.init_checkpoint)
         model.set_dict(sd)
-        model.train()       # 为了取梯度，加载模型时dropout设为0
+        model.train()  # 为了取梯度，加载模型时dropout设为0
         print('load model from %s' % args.init_checkpoint)
-        
+
         get_sub_word_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
-        
+
         for step, d in tqdm(enumerate(dataloader)):
             if step + 1 < args.start_id:
                 continue
-            
+
             result = {}
             if args.base_model.startswith('roberta'):
                 input_ids, token_type_ids = d
                 fwd_args = [input_ids, token_type_ids]
                 fwd_kwargs = {}
 
-                tokens = tokenizer.convert_ids_to_tokens(input_ids[0, 1:-1].tolist())   # list
+                tokens = tokenizer.convert_ids_to_tokens(
+                    input_ids[0, 1:-1].tolist())  # list
 
             elif args.base_model == 'lstm':
                 if args.language == 'ch':
@@ -249,21 +295,29 @@ if __name__ == "__main__":
                     #input_ids = P.to_tensor([input_ids[0][0]])
                     fwd_args = [input_ids, seq_lens]
                     fwd_kwargs = {}
-                    tokens = [tokenizer.inverse_vocab[input_id] for input_id in input_ids.tolist()[0]]
+                    tokens = [
+                        tokenizer.inverse_vocab[input_id]
+                        for input_id in input_ids.tolist()[0]
+                    ]
                 else:
-                    input_ids, seq_lens= d
+                    input_ids, seq_lens = d
                     fwd_args = [input_ids, seq_lens]
                     fwd_kwargs = {}
-                    tokens = [tokenizer.vocab.idx_to_token[input_id] for input_id in input_ids.tolist()[0]]
-            
-            
+                    tokens = [
+                        tokenizer.vocab.idx_to_token[input_id]
+                        for input_id in input_ids.tolist()[0]
+                    ]
+
             result['id'] = dataloader.dataset.data[step]['id']
-            
-            probs, atts, embedded = model.forward_interpet(*fwd_args, **fwd_kwargs)
+
+            probs, atts, embedded = model.forward_interpet(*fwd_args,
+                                                           **fwd_kwargs)
             pred_label = P.argmax(probs, axis=-1).tolist()[0]
-            
+
             result['pred_label'] = pred_label
-            result['probs'] = [float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()]
+            result['probs'] = [
+                float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()
+            ]
             if args.language == 'en':
                 result['context'] = tokenizer.convert_tokens_to_string(tokens)
             else:

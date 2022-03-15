@@ -40,13 +40,13 @@ parser.add_argument("--save_dir", type=str, default='checkpoints/',
 parser.add_argument("--batch_size", type=int, default=64,
                     help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str,
-                    default="./vocab.char", 
+                    default="./vocab.char",
                     help="The directory to dataset. Chinese version uses vocab.char while English version uses vocab_QQP")
 parser.add_argument('--network', type=str, default="lstm",
                     help="Which network you would like to choose bow, cnn, lstm or gru ?")
 parser.add_argument("--init_from_ckpt", type=str, default=None,
                     help="The path of checkpoint to be loaded.")
-parser.add_argument("--language", type=str, required=True, 
+parser.add_argument("--language", type=str, required=True,
                     help="Language that this model based on")
 args = parser.parse_args()
 # yapf: enable
@@ -102,9 +102,11 @@ if __name__ == "__main__":
 
     # Loads dataset.
     if args.language == 'ch':
-        train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])
+        train_ds, dev_ds, test_ds = load_dataset(
+            "lcqmc", splits=["train", "dev", "test"])
     else:
-        train_ds, dev_ds, test_ds = load_dataset("glue", "qqp", splits=["train", "dev", "test"]) 
+        train_ds, dev_ds, test_ds = load_dataset(
+            "glue", "qqp", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
     model = SimNet(
@@ -122,7 +124,11 @@ if __name__ == "__main__":
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
     tokenizer = CharTokenizer(vocab, args.language)
-    trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False, language=args.language)
+    trans_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        is_test=False,
+        language=args.language)
     train_loader = create_dataloader(
         train_ds,
         trans_fn=trans_fn,

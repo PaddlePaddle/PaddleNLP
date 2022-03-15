@@ -1,7 +1,7 @@
 NLP可解释评估
 ===
 深度学习模型在很多NLP任务上已经取得巨大成功，但其常被当作一个黑盒使用，内部预测机制对使用者是不透明的。这使得深度学习模型结果不被人信任，增加落地难度，尤其是在医疗、法律等特殊领域。同时，当模型出现效果不好或鲁棒性差等问题时，由于不了解其内部机制，导致很难对模型进行优化。近期，深度学习模型的可解释性被越来越多的人关注。但模型的可解释性评估还不够完善，本模块提供了3个NLP任务的评测数据和相关评测指标，旨在评估模型的可解释性。模块包含以下功能：
-    
+
     1. 完善可解释性评估体系，提供了评测数据和对应的评测指标
     2. 提供了3种典型的证据抽取方法，分别是基于注意力（attention-based）、梯度（gradient-based）和线性模型（LIME）的证据抽取方法，并在LSTM、Transformer（RoBERTa-base和RoBERTa-large）等常用模型网络结构上完成实验验证，分别验证模型结构复杂度、模型参数规模对模型可解释的影响
     3. 提供模型较全面的评估报告，含模型本身准确率等效果、以及在3个可解释评测指标上的结果
@@ -103,9 +103,9 @@ __忠诚性__：评估模型给出的证据的忠诚性，即模型是否真的�
 Attention-based（[Jain and Wallace, 2019](https://arxiv.org/pdf/1902.10186.pdf)）：
 
    将注意力分数作为词重要度。注意力分数的获取取决于具体模型架构，我们提供了基于LSTM和transformer框架的提取方法，见每个具体任务下的saliency_map目录。
-   
+
 Gradient-based（[Sundararajan et al., 2017](https://arxiv.org/pdf/1703.01365.pdf)）：
-   
+
    基于梯度给出每个词重要度。我们这里给出了integrated gradient计算方式，具体见saliency_map目录或论文[Axiomatic attribution for deep networks](https://arxiv.org/pdf/1703.01365.pdf)。
 
 Linear-based（[Ribeiro et al.. 2016](https://arxiv.org/pdf/1602.04938.pdf)）：
@@ -213,7 +213,7 @@ pip3 install paddlepaddle-gpu
     model_interpretation/evaluation/consistency/run_MAP.sh
 #### 忠诚性（faithfulness）：
     model_interpretation/evaluation/faithfulness/run_NewP.sh
-    
+
 ### 评估报告
 中文情感分析评估报告样例：
 <table>

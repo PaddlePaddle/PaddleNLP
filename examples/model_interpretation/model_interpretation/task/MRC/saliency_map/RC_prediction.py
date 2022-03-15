@@ -37,23 +37,64 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
+
 def get_args():
     parser = argparse.ArgumentParser('MRC task with roberta')
-    parser.add_argument('--base_model', required=True, choices=['roberta_base', 'roberta_large'])
-    parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
-    parser.add_argument('--max_seq_len', type=int, default=128, help='max sentence length, should not greater than 512')
+    parser.add_argument(
+        '--base_model',
+        required=True,
+        choices=['roberta_base', 'roberta_large'])
+    parser.add_argument(
+        '--from_pretrained',
+        type=str,
+        required=True,
+        help='pretrained model directory or tag')
+    parser.add_argument(
+        '--max_seq_len',
+        type=int,
+        default=128,
+        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=32, help='batchsize')
     parser.add_argument('--epoch', type=int, default=3, help='epoch')
-    parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
-    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
-    parser.add_argument('--use_amp', action='store_true',
-                        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices')
-    parser.add_argument('--n-samples', type=int, default=25, help='number of samples used for smooth gradient method')
-    parser.add_argument('--output_dir', type=Path, required=True, help='interpretable output directory')
-    parser.add_argument("--doc_stride", type=int, default=128, help="When splitting up a long document into chunks, how much stride to take between chunks.")
-    parser.add_argument("--language", type=str, required=True, help="language that the model based on")
+    parser.add_argument(
+        '--data_dir',
+        type=str,
+        required=True,
+        help='data directory includes train / develop data')
+    parser.add_argument(
+        '--init_checkpoint',
+        type=str,
+        default=None,
+        help='checkpoint to warm start from')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
+    parser.add_argument(
+        '--n-samples',
+        type=int,
+        default=25,
+        help='number of samples used for smooth gradient method')
+    parser.add_argument(
+        '--output_dir',
+        type=Path,
+        required=True,
+        help='interpretable output directory')
+    parser.add_argument(
+        "--doc_stride",
+        type=int,
+        default=128,
+        help="When splitting up a long document into chunks, how much stride to take between chunks."
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        required=True,
+        help="language that the model based on")
     args = parser.parse_args()
     return args
+
 
 def map_fn_DuCheckList(examples, args, tokenizer):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
@@ -64,7 +105,11 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(
+        questions,
+        contexts,
+        stride=args.doc_stride,
+        max_seq_len=args.max_seq_len)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -83,10 +128,14 @@ def map_fn_DuCheckList(examples, args, tokenizer):
                 for k, o in enumerate(tokenized_example["offset_mapping"])
             ]
         else:
-            n = tokenized_example['offset_mapping'].index((0, 0), 1) + 2  # context start position
-            m = len(tokenized_example['offset_mapping']) - 1  # context end position + 1
-            tokenized_examples[i]["offset_mapping"] = [(o if n <= k <= m else None)
-                                                    for k, o in enumerate(tokenized_example["offset_mapping"])]
+            n = tokenized_example['offset_mapping'].index(
+                (0, 0), 1) + 2  # context start position
+            m = len(tokenized_example[
+                'offset_mapping']) - 1  # context end position + 1
+            tokenized_examples[i]["offset_mapping"] = [
+                (o if n <= k <= m else None)
+                for k, o in enumerate(tokenized_example["offset_mapping"])
+            ]
 
     return tokenized_examples
 
@@ -101,20 +150,22 @@ def init_roberta_var(args):
     map_fn = partial(map_fn_DuCheckList, args=args, tokenizer=tokenizer)
     dev_ds = RCInterpret().read(args.data_dir)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = P.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_batch_sampler = P.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id), 
+                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
                 "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id )
             }): fn(samples)
-            
-    dev_dataloader = P.io.DataLoader(dataset=dev_ds, 
-                                     batch_sampler=dev_batch_sampler,
-                                     collate_fn=batchify_fn,
-                                     return_list=True)
-    
-    return model, tokenizer, dev_dataloader, dev_ds                            
 
-    
+    dev_dataloader = P.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
+    return model, tokenizer, dev_dataloader, dev_ds
+
+
 @P.no_grad()
 def evaluate(model, data_loader, args):
     model.eval()
@@ -126,7 +177,8 @@ def evaluate(model, data_loader, args):
 
     for batch in data_loader:
         input_ids, token_type_ids = batch
-        loss, start_logits_tensor, end_logits_tensor, cls_logits = model(input_ids, token_type_ids)
+        loss, start_logits_tensor, end_logits_tensor, cls_logits = model(
+            input_ids, token_type_ids)
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 log.debug("Processing example: %d" % len(all_start_logits))
@@ -135,16 +187,21 @@ def evaluate(model, data_loader, args):
 
             all_start_logits.append(start_logits_tensor.numpy()[idx])
             all_end_logits.append(end_logits_tensor.numpy()[idx])
-    
+
     all_predictions, all_nbest_json, scores_diff_json, all_feature_index = compute_prediction(
-        data_loader.dataset.data, data_loader.dataset.new_data, (all_start_logits, all_end_logits),
-        True, 20, args.max_seq_len, 0.0)
+        data_loader.dataset.data, data_loader.dataset.new_data,
+        (all_start_logits, all_end_logits), True, 20, args.max_seq_len, 0.0)
 
     # Can also write all_nbest_json and scores_diff_json files if needed
     with open(os.path.join(args.output_dir, 'predict_ans'), 'w') as f_ans_pred:
-        f_ans_pred.write(json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
-    with open(os.path.join(args.output_dir, 'predict_feature_index'), 'w') as f_feature_index:
-        f_feature_index.write(json.dumps(all_feature_index, ensure_ascii=False, indent=4) + "\n")
+        f_ans_pred.write(
+            json.dumps(
+                all_predictions, ensure_ascii=False, indent=4) + "\n")
+    with open(os.path.join(args.output_dir, 'predict_feature_index'),
+              'w') as f_feature_index:
+        f_feature_index.write(
+            json.dumps(
+                all_feature_index, ensure_ascii=False, indent=4) + "\n")
 
     #squad_evaluate(examples=data_loader.dataset.data, preds=all_predictions, na_probs=scores_diff_json)
     #model.train()

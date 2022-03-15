@@ -65,9 +65,10 @@ def preprocess_prediction_data(data, tokenizer):
     examples = []
     for text in data:
         # ids = tokenizer.encode(text)                        # JiebaTokenizer
-        ids = tokenizer.encode(text)[0].tolist()[1:-1]      # ErnieTokenizer        list[ids]
-        examples.append([ids, len(ids)]) 
-      
+        ids = tokenizer.encode(text)[0].tolist()[
+            1:-1]  # ErnieTokenizer        list[ids]
+        examples.append([ids, len(ids)])
+
     return examples
 
 
@@ -78,7 +79,6 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class CharTokenizer:
-
     def __init__(self, vocab):
         self.tokenizer = list
         self.vocab = vocab
@@ -91,13 +91,13 @@ class CharTokenizer:
             get_idx_from_word(word, self.vocab.token_to_idx,
                               self.vocab.unk_token) for word in words
         ]
-    
+
     def tokenize(self, sentence, wo_unk=True):
         return sentence.strip().split()
-    
+
     def convert_tokens_to_string(self, tokens):
         return ' '.join(tokens)
-    
+
     def convert_tokens_to_ids(self, tokens):
         # tocheck
         pass

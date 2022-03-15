@@ -48,30 +48,71 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.getLogger().setLevel(logging.DEBUG)
 
+
 def get_args():
     parser = argparse.ArgumentParser('interpret sentiment analysis task')
-    parser.add_argument('--base_model', required=True, choices=['roberta_base', 'roberta_large', 'lstm'])
-    parser.add_argument('--from_pretrained', type=str, required=True, help='pretrained model directory or tag')
-    parser.add_argument('--max_seq_len', type=int, default=128, help='max sentence length, should not greater than 512')
+    parser.add_argument(
+        '--base_model',
+        required=True,
+        choices=['roberta_base', 'roberta_large', 'lstm'])
+    parser.add_argument(
+        '--from_pretrained',
+        type=str,
+        required=True,
+        help='pretrained model directory or tag')
+    parser.add_argument(
+        '--max_seq_len',
+        type=int,
+        default=128,
+        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=1, help='batchsize')
-    parser.add_argument('--data_dir', type=str, required=True, help='data directory includes train / develop data')
+    parser.add_argument(
+        '--data_dir',
+        type=str,
+        required=True,
+        help='data directory includes train / develop data')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--init_checkpoint', type=str, default=None, help='checkpoint to warm start from')
-    parser.add_argument('--wd', type=float, default=0.01, help='weight decay, aka L2 regularizer')
-    parser.add_argument('--use_amp', action='store_true',
-                        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices')
-    parser.add_argument('--inter_mode', type=str, default="attention",
-                        choices=["attention",
-                                 "simple_gradient", "smooth_gradient", "integrated_gradient",
-                                 "lime"],
-                        help='appoint the mode of interpretable.')
-    parser.add_argument('--n-samples', type=int, default=25,
-                        help='number of samples used for smooth gradient method')
-    parser.add_argument('--output_dir', type=Path,
-                        required=True, help='interpretable output directory')
+    parser.add_argument(
+        '--init_checkpoint',
+        type=str,
+        default=None,
+        help='checkpoint to warm start from')
+    parser.add_argument(
+        '--wd',
+        type=float,
+        default=0.01,
+        help='weight decay, aka L2 regularizer')
+    parser.add_argument(
+        '--use_amp',
+        action='store_true',
+        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+    )
+    parser.add_argument(
+        '--inter_mode',
+        type=str,
+        default="attention",
+        choices=[
+            "attention", "simple_gradient", "smooth_gradient",
+            "integrated_gradient", "lime"
+        ],
+        help='appoint the mode of interpretable.')
+    parser.add_argument(
+        '--n-samples',
+        type=int,
+        default=25,
+        help='number of samples used for smooth gradient method')
+    parser.add_argument(
+        '--output_dir',
+        type=Path,
+        required=True,
+        help='interpretable output directory')
     parser.add_argument('--start_id', type=int, default=0)
     parser.add_argument('--vocab_path', type=str, required=True)
-    parser.add_argument('--language', type=str, required=True, help='language that the model is built for')
+    parser.add_argument(
+        '--language',
+        type=str,
+        required=True,
+        help='language that the model is built for')
     args = parser.parse_args()
     return args
 
@@ -81,10 +122,7 @@ class Senti_data(DatasetBuilder):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
                 line_split = json.loads(line)
-                yield {
-                    'id' : line_split['id'],
-                    'context': line_split['context']
-                }
+                yield {'id': line_split['id'], 'context': line_split['context']}
 
 
 def create_dataloader(dataset,
@@ -125,11 +163,8 @@ def create_dataloader(dataset,
 def map_fn_senti(examples, tokenizer):
     log.debug('load data %d' % len(examples))
     contexts = [example['context'] for example in examples]
-    tokenized_examples = tokenizer(
-        contexts,
-        max_seq_len=args.max_seq_len
-    )
-    
+    tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
+
     return tokenized_examples
 
 
@@ -145,22 +180,27 @@ def init_lstm_var(args):
         tokenizer = CharTokenizer(vocab)
         padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
-    trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=True, language=args.language)
-    
+    trans_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        is_test=True,
+        language=args.language)
+
     #init attention layer    
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(attention_layer=attention,
-                                vocab_size=len(tokenizer.vocab),
-                                lstm_hidden_size=lstm_hidden_size,
-                                num_classes=2,
-                                padding_idx=padding_idx)
+    model = BiLSTMAttentionModel(
+        attention_layer=attention,
+        vocab_size=len(tokenizer.vocab),
+        lstm_hidden_size=lstm_hidden_size,
+        num_classes=2,
+        padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
     dev_ds = Senti_data().read(args.data_dir)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=padding_idx),  # input_ids
-        Stack(dtype="int64"),   # seq len
+        Stack(dtype="int64"),  # seq len
     ): [data for data in fn(samples)]
 
     dev_loader = create_dataloader(
@@ -169,54 +209,58 @@ def init_lstm_var(args):
         batch_size=args.batch_size,
         mode='validation',
         batchify_fn=batchify_fn)
-        
+
     return model, tokenizer, dev_loader
 
 
 def init_roberta_var(args):
     tokenizer = None
-    if args.language=="ch":
+    if args.language == "ch":
         tokenizer = RobertaTokenizer.from_pretrained(args.from_pretrained)
     else:
         tokenizer = RobertaBPETokenizer.from_pretrained(args.from_pretrained)
-    model = RobertaForSequenceClassification.from_pretrained(args.from_pretrained, 
-                                                             hidden_dropout_prob=0,
-                                                             attention_probs_dropout_prob=0,                                                        
-                                                             dropout=0,
-                                                             num_labels=2, 
-                                                             name='', 
-                                                             return_inter_score=True)
+    model = RobertaForSequenceClassification.from_pretrained(
+        args.from_pretrained,
+        hidden_dropout_prob=0,
+        attention_probs_dropout_prob=0,
+        dropout=0,
+        num_labels=2,
+        name='',
+        return_inter_score=True)
 
     map_fn = partial(map_fn_senti, tokenizer=tokenizer)
-    
+
     dev_ds = Senti_data().read(args.data_dir)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = P.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_batch_sampler = P.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
         "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
     }): fn(samples)
-    
-    dataloader = P.io.DataLoader(dataset=dev_ds,
-                                 batch_sampler=dev_batch_sampler,
-                                 collate_fn=batchify_fn,
-                                 return_list=True)
-    
+
+    dataloader = P.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
     return model, tokenizer, dataloader
 
 
-def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict, result, out_handle):
+def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
+                             result, out_handle):
     if args.base_model.startswith('roberta'):
-        inter_score = atts[-1][:, :, 0, :].mean(1)            # (bsz, seq)
-        inter_score = inter_score[0][1: -1]                   # remove CLS and SEP
-        input_ids = input_ids[0][1: -1]
-        
+        inter_score = atts[-1][:, :, 0, :].mean(1)  # (bsz, seq)
+        inter_score = inter_score[0][1:-1]  # remove CLS and SEP
+        input_ids = input_ids[0][1:-1]
+
     elif args.base_model == 'lstm':
         inter_score = atts[0]
         input_ids = input_ids[0]
-        
+
     length = (inter_score > 0).cast('int32').sum(-1).tolist()[0]
-    assert len(tokens) == length, f"%s: {len(tokens)} != {length}" % (step+1)
+    assert len(tokens) == length, f"%s: {len(tokens)} != {length}" % (step + 1)
 
     char_attribution_dict = {}
     #collect scores in different situation
@@ -233,68 +277,80 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict, re
                 cur_token_score = 0
                 for j in range(sub_word_len):
                     cur_token_score += inter_score.tolist()[sub_word_count]
-                    sub_word_count+=1
-                char_attribution_dict[i] = (sub_word_id_dict[i][0], cur_token_score)
+                    sub_word_count += 1
+                char_attribution_dict[i] = (sub_word_id_dict[i][0],
+                                            cur_token_score)
         elif args.base_model == 'lstm':
             idx = 0
             for word, sub_word_score in zip(tokens, inter_score.tolist()):
                 char_attribution_dict[idx] = (word, sub_word_score)
                 idx += 1
-                            
+
     result['char_attri'] = collections.OrderedDict()
-    for token_id, token_info in sorted(char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+    for token_id, token_info in sorted(
+            char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
         result['char_attri'][token_id] = token_info
-                
+
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
 
-def extract_integrated_gradient_scores(args, atts, input_ids, tokens, sub_word_id_dict, fwd_args, fwd_kwargs, model, result, pred_label, err_total, out_handle):
+def extract_integrated_gradient_scores(
+        args, atts, input_ids, tokens, sub_word_id_dict, fwd_args, fwd_kwargs,
+        model, result, pred_label, err_total, out_handle):
     embedded_grads_list = []
     for i in range(args.n_samples):
-        probs, _, embedded = model.forward_interpet(*fwd_args, **fwd_kwargs,
-                                                    noise='integrated', 
-                                                    i=i,
-                                                    n_samples=args.n_samples)                               
+        probs, _, embedded = model.forward_interpet(
+            *fwd_args,
+            **fwd_kwargs,
+            noise='integrated',
+            i=i,
+            n_samples=args.n_samples)
         predicted_class_prob = probs[0][pred_label]
         predicted_class_prob.backward(retain_graph=False)
         embedded_grad = embedded.grad
         model.clear_gradients()
         embedded_grads_list.append(embedded_grad)
-                        
-        if i == 0:
-            baseline_pred_confidence = probs.tolist()[0][pred_label]     # scalar
-            baseline_embedded = embedded        # Tensor(1, seq_len, embed_size)
-        elif i == args.n_samples - 1:
-            pred_confidence = probs.tolist()[0][pred_label]              # scalar
-            pred_embedded = embedded            # Tensor(1, seq_len, embed_size)
-                    
-    embedded_grads_tensor = P.to_tensor(embedded_grads_list,
-                                        dtype='float32',
-                                        place=P.CUDAPlace(0),
-                                        stop_gradient=True)
-    
-    trapezoidal_grads = (embedded_grads_tensor[1:] + embedded_grads_tensor[:-1]) / 2
-    integral_grads = trapezoidal_grads.sum(0) / trapezoidal_grads.shape[0]  # Tensor(1, seq_len, embed_size)
 
-    inter_score = (pred_embedded - baseline_embedded) * integral_grads      # Tensor(1, seq_len, embed_size)
-    inter_score = inter_score.sum(-1)   # Tensor(1, seq_len)
+        if i == 0:
+            baseline_pred_confidence = probs.tolist()[0][pred_label]  # scalar
+            baseline_embedded = embedded  # Tensor(1, seq_len, embed_size)
+        elif i == args.n_samples - 1:
+            pred_confidence = probs.tolist()[0][pred_label]  # scalar
+            pred_embedded = embedded  # Tensor(1, seq_len, embed_size)
+
+    embedded_grads_tensor = P.to_tensor(
+        embedded_grads_list,
+        dtype='float32',
+        place=P.CUDAPlace(0),
+        stop_gradient=True)
+
+    trapezoidal_grads = (
+        embedded_grads_tensor[1:] + embedded_grads_tensor[:-1]) / 2
+    integral_grads = trapezoidal_grads.sum(0) / trapezoidal_grads.shape[
+        0]  # Tensor(1, seq_len, embed_size)
+
+    inter_score = (pred_embedded - baseline_embedded
+                   ) * integral_grads  # Tensor(1, seq_len, embed_size)
+    inter_score = inter_score.sum(-1)  # Tensor(1, seq_len)
 
     # eval err
     delta_pred_confidence = pred_confidence - baseline_pred_confidence
     sum_gradient = inter_score.sum().tolist()[0]
-    err = (delta_pred_confidence - sum_gradient + 1e-12) / (delta_pred_confidence + 1e-12)
+    err = (delta_pred_confidence - sum_gradient + 1e-12) / (
+        delta_pred_confidence + 1e-12)
     err_total.append(np.abs(err))
 
     print_str = '%s\t%d\t%.3f\t%.3f\t%.3f\t%.3f'
-    print_vals = (result['id'], args.n_samples, delta_pred_confidence, sum_gradient, err, np.average(err_total))
+    print_vals = (result['id'], args.n_samples, delta_pred_confidence,
+                  sum_gradient, err, np.average(err_total))
     log.debug(print_str % print_vals)
 
-    inter_score = inter_score.abs()     # Tensor(1, seq_len)
+    inter_score = inter_score.abs()  # Tensor(1, seq_len)
     inter_score.stop_gradient = True
-                
+
     char_attribution_dict = {}
     if args.base_model.startswith('roberta'):
-        inter_score = inter_score[0][1: -1]
+        inter_score = inter_score[0][1:-1]
         length = (inter_score > 0).cast('int32').sum(-1).tolist()[0]
         assert len(tokens) == length, f"{len(tokens) } != {length}"
         if args.language == 'en':
@@ -304,14 +360,15 @@ def extract_integrated_gradient_scores(args, atts, input_ids, tokens, sub_word_i
                 cur_token_score = 0
                 for j in range(sub_word_len):
                     cur_token_score += inter_score.tolist()[sub_word_count]
-                    sub_word_count+=1
-                char_attribution_dict[i] = (sub_word_id_dict[i][0], cur_token_score)
+                    sub_word_count += 1
+                char_attribution_dict[i] = (sub_word_id_dict[i][0],
+                                            cur_token_score)
         else:
             idx = 0
             for token, score in zip(tokens, inter_score.numpy().tolist()):
                 char_attribution_dict[idx] = (token, score)
                 idx += 1
-                            
+
     elif args.base_model == 'lstm':
         inter_score = inter_score[0]
         length = (inter_score > 0).cast('int32').sum(-1).tolist()[0]
@@ -319,35 +376,40 @@ def extract_integrated_gradient_scores(args, atts, input_ids, tokens, sub_word_i
         idx = 0
         for word, sub_word_score in zip(tokens, inter_score.tolist()):
             char_attribution_dict[idx] = (word, sub_word_score)
-            idx+=1
-                        
+            idx += 1
+
     result['char_attri'] = collections.OrderedDict()
-    for token_id, token_info in sorted(char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+    for token_id, token_info in sorted(
+            char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
         result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
     return err_total
 
 
-def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs, result, lime_err_total, lime_score_total, lime_relative_err_total, out_handle):
-    explainer = LimeTextExplainer(class_names=['neg', 'pos'], verbose=False, language=args.language)
+def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
+                        result, lime_err_total, lime_score_total,
+                        lime_relative_err_total, out_handle):
+    explainer = LimeTextExplainer(
+        class_names=['neg', 'pos'], verbose=False, language=args.language)
 
     if_lstm = (args.base_model == 'lstm')
     explain_res = None
-    
+
     text_instance = ''
     if args.language == 'ch':
         text_instance = ''.join(tokens)
     else:
         text_instance = result['context']
-        
-    explain_res = explainer.explain_instance(text_instance=text_instance,
-                                            tokenizer=tokenizer,
-                                            pred_label=pred_label,
-                                            classifier_fn=model.forward_interpet,
-                                            num_samples=5000,
-                                            if_lstm=if_lstm)
-                
+
+    explain_res = explainer.explain_instance(
+        text_instance=text_instance,
+        tokenizer=tokenizer,
+        pred_label=pred_label,
+        classifier_fn=model.forward_interpet,
+        num_samples=5000,
+        if_lstm=if_lstm)
+
     exp, indexed_string, relative_err, err = explain_res
 
     score = exp.score[pred_label]
@@ -362,18 +424,19 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs, resul
     log.debug('relative_err: %.2f' % relative_err)
     log.debug('err: %.2f' % err)
     log.debug('ridge_pred: %.2f\tpred: %.2f\tdelta: %.2f' %
-            (ridge_pred, model_pred, ridge_pred - model_pred))
+              (ridge_pred, model_pred, ridge_pred - model_pred))
 
-    for kind, local_exp in local_exps.items(): #only have one iteration here
+    for kind, local_exp in local_exps.items():  #only have one iteration here
         char_attribution_dict = []
-        
+
         for idx in range(len(tokens)):
             t = tokens[idx].replace('Ġ', '')
             for word_id, attribution in local_exp:
                 if indexed_string.inverse_vocab[word_id] == t:
                     char_attribution_dict.append((idx, t, attribution))
                     break
-        char_attribution_dict = sorted(char_attribution_dict, key=lambda x:abs(x[2]), reverse=True)
+        char_attribution_dict = sorted(
+            char_attribution_dict, key=lambda x: abs(x[2]), reverse=True)
 
         result['char_attri'] = collections.OrderedDict()
         for s in char_attribution_dict:
@@ -395,16 +458,16 @@ if __name__ == "__main__":
     assert args.eval, 'INTERPRETER must be run in eval mode'
     with P.amp.auto_cast(enable=args.use_amp), \
         open(os.path.join(args.output_dir, 'interpret' + f'.{args.inter_mode}'), 'w') as out_handle:
-        
+
         # load model
         sd = P.load(args.init_checkpoint)
         model.set_dict(sd)
-        model.train()       # set dropout to 0 in order to get the gradient
+        model.train()  # set dropout to 0 in order to get the gradient
         log.debug('load model from %s' % args.init_checkpoint)
-        
+
         get_sub_word_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
         for step, d in tqdm(enumerate(dataloader)):
-            if step + 1 < args.start_id:    #start from the step's instance
+            if step + 1 < args.start_id:  #start from the step's instance
                 continue
             #initialize input_ids, fwd_args, tokens
             result = {}
@@ -412,31 +475,41 @@ if __name__ == "__main__":
                 input_ids, token_type_ids = d
                 fwd_args = [input_ids, token_type_ids]
                 fwd_kwargs = {}
-                tokens = tokenizer.convert_ids_to_tokens(input_ids[0, 1:-1].tolist())   # list
+                tokens = tokenizer.convert_ids_to_tokens(
+                    input_ids[0, 1:-1].tolist())  # list
 
             elif args.base_model == 'lstm':
                 if args.language == 'ch':
                     input_ids, seq_lens = d
                     fwd_args = [input_ids, seq_lens]
                     fwd_kwargs = {}
-                    tokens = [tokenizer.inverse_vocab[input_id] for input_id in input_ids.tolist()[0]]
+                    tokens = [
+                        tokenizer.inverse_vocab[input_id]
+                        for input_id in input_ids.tolist()[0]
+                    ]
                 else:
-                    input_ids, seq_lens= d
+                    input_ids, seq_lens = d
                     fwd_args = [input_ids, seq_lens]
                     fwd_kwargs = {}
-                    tokens = [tokenizer.vocab.idx_to_token[input_id] for input_id in input_ids.tolist()[0]]
-            
+                    tokens = [
+                        tokenizer.vocab.idx_to_token[input_id]
+                        for input_id in input_ids.tolist()[0]
+                    ]
+
             result['id'] = dataloader.dataset.data[step]['id']
-            
-            probs, atts, embedded = model.forward_interpet(*fwd_args, **fwd_kwargs)
+
+            probs, atts, embedded = model.forward_interpet(*fwd_args,
+                                                           **fwd_kwargs)
             pred_label = P.argmax(probs, axis=-1).tolist()[0]
-            
+
             result['pred_label'] = pred_label
-            result['probs'] = [float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()]
+            result['probs'] = [
+                float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()
+            ]
             sub_word_id_dict = []
             err_total = []
             lime_err_total, lime_score_total, lime_relative_err_total = [], [], []
-            
+
             if args.language == 'ch':
                 result['context'] = ''.join(tokens)
             else:
@@ -444,28 +517,36 @@ if __name__ == "__main__":
                 #if for English model, we prepare a sub_word_id_dict which allows us to serach the original word by sub-word ids
                 if args.base_model.startswith('roberta'):
                     context_list = result['context'].split()
-                    context_list = context_list[0: 1] + [' %s' % word for word in context_list[1:]]
+                    context_list = context_list[
+                        0:1] + [' %s' % word for word in context_list[1:]]
                     sub_word_id_dict = []
                     for context_word in context_list:
                         sub_word_id = get_sub_word_ids(context_word)
-                        sub_word_id_dict.append((context_word, len(list(sub_word_id))))
-            
+                        sub_word_id_dict.append(
+                            (context_word, len(list(sub_word_id))))
+
             # attention
             if args.inter_mode == "attention":
                 #extract attention scores and write resutls to file
-                extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict, result, out_handle)
-            
+                extract_attention_scores(args, atts, input_ids, tokens,
+                                         sub_word_id_dict, result, out_handle)
+
             # integrated_gradient
             elif args.inter_mode == 'integrated_gradient':
-                err_total = extract_integrated_gradient_scores(args, atts, input_ids, tokens, sub_word_id_dict, fwd_args, fwd_kwargs, model, result, pred_label, err_total, out_handle)
+                err_total = extract_integrated_gradient_scores(
+                    args, atts, input_ids, tokens, sub_word_id_dict, fwd_args,
+                    fwd_kwargs, model, result, pred_label, err_total,
+                    out_handle)
 
             # LIME
             elif args.inter_mode == 'lime':
-                    lime_err_total, lime_score_total, lime_relative_err_total = extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs, result, lime_err_total, lime_score_total, lime_relative_err_total, out_handle)
-                
+                lime_err_total, lime_score_total, lime_relative_err_total = extract_LIME_scores(
+                    args, tokenizer, tokens, pred_label, model, probs, result,
+                    lime_err_total, lime_score_total, lime_relative_err_total,
+                    out_handle)
+
             else:
-                raise KeyError(
-                    f"Unkonwn interpretable mode: {args.inter_mode}")
+                raise KeyError(f"Unkonwn interpretable mode: {args.inter_mode}")
 
         if args.inter_mode == 'lime':
             log.debug(np.average(np.array(lime_relative_err_total)))

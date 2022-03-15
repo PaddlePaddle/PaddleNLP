@@ -38,7 +38,12 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
+def interpreter(model,
+                data,
+                label_map,
+                batch_size=1,
+                pad_token_id=0,
+                vocab=None):
     """
     Predicts the data labels.
 
@@ -62,33 +67,35 @@ def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_token_id),  # query_ids
         Pad(axis=0, pad_val=pad_token_id),  # title_ids
-        Stack(dtype="int64"),       # query_seq_lens
-        Stack(dtype="int64"),       # title_seq_lens
+        Stack(dtype="int64"),  # query_seq_lens
+        Stack(dtype="int64"),  # title_seq_lens
     ): [data for data in fn(samples)]
 
     model.eval()
     results = []
     for batch in batches:
-        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(batch)
+        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(
+            batch)
         query_ids = paddle.to_tensor(query_ids)
         title_ids = paddle.to_tensor(title_ids)
         query_seq_lens = paddle.to_tensor(query_seq_lens)
         title_seq_lens = paddle.to_tensor(title_seq_lens)
-        
+
         logits, attention, _ = model.forward_interpret(
             query_ids, title_ids, query_seq_lens, title_seq_lens)
         query_att = attention[0]
         title_att = attention[1]
 
         model.clear_gradients()
-        for query_id, title_id in zip(query_ids.numpy().tolist(), title_ids.numpy().tolist()):
+        for query_id, title_id in zip(query_ids.numpy().tolist(),
+                                      title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]
             title = [vocab._idx_to_token[idx] for idx in title_id]
         results.append([query_att, query, title_att, title])
-        
+
         print('query_att: %s' % query_att.shape)
         print('title_att: %s' % title_att.shape)
-        
+
         # print([query_att, query, title_att, title])
 
     return results
@@ -97,7 +104,8 @@ def interpreter(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None
 if __name__ == "__main__":
     paddle.set_device(args.device + ':2')
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(
+        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     tokenizer = CharTokenizer(vocab, args.language)
     label_map = {0: 'dissimilar', 1: 'similar'}
 
@@ -112,8 +120,7 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
 
-    dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["dev", "test"])
+    dev_ds, test_ds = load_dataset("lcqmc", splits=["dev", "test"])
 
     dev_examples = preprocess_data(dev_ds.data, tokenizer, args.language)
     test_examples = preprocess_data(test_ds.data, tokenizer, args.language)
@@ -124,4 +131,3 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         pad_token_id=vocab.token_to_idx.get('[PAD]', 0),
         vocab=vocab)
-

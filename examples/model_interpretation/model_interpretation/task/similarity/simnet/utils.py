@@ -39,7 +39,7 @@ def convert_example(example, tokenizer, is_test=False, language='en'):
         q_name = "sentence1"
         t_name = "sentence2"
         label = "labels"
-        
+
     query, title = example[q_name], example[t_name]
     query_ids = np.array(tokenizer.encode(query), dtype="int64")
     query_seq_len = np.array(len(query_ids), dtype="int64")
@@ -121,7 +121,6 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class CharTokenizer:
-
     def __init__(self, vocab, language):
         self.tokenizer = list
         self.vocab = vocab
@@ -136,13 +135,13 @@ class CharTokenizer:
             get_idx_from_word(word, self.vocab.token_to_idx,
                               self.vocab.unk_token) for word in words
         ]
-        
+
     def tokenize(self, sentence, wo_unk=True):
         return sentence.strip().split()
-    
+
     def convert_tokens_to_string(self, tokens):
         return ' '.join(tokens)
-    
+
     def convert_tokens_to_ids(self, tokens):
         # tocheck
         pass

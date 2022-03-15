@@ -64,7 +64,7 @@ def convert_pointwise_example(example,
         q_name = "sentence1"
         t_name = "sentence2"
         l_name = "labels"
-        
+
     query, title = example[q_name], example[t_name]
 
     encoded_inputs = tokenizer(

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Explanation class, with visualization functions.
 """
@@ -25,6 +24,7 @@ import numpy as np
 from sklearn.utils import check_random_state
 
 from LIME.exceptions import LimeError
+
 
 def id_generator(size=15, random_state=None):
     """Helper function to generate random div ids. This is useful for embedding
@@ -59,11 +59,7 @@ class DomainMapper(object):
         """
         return exp
 
-    def visualize_instance_html(self,
-                                exp,
-                                label,
-                                div_name,
-                                exp_object_name,
+    def visualize_instance_html(self, exp, label, div_name, exp_object_name,
                                 **kwargs):
         """Produces html for visualizing the instance.
 
@@ -132,7 +128,8 @@ class Explanation(object):
         try:
             assert self.mode == "classification"
         except AssertionError:
-            raise NotImplementedError('Not supported for regression explanations.')
+            raise NotImplementedError(
+                'Not supported for regression explanations.')
         else:
             ans = self.top_labels if self.top_labels else self.local_exp.keys()
             return list(ans)
@@ -151,7 +148,8 @@ class Explanation(object):
             given by domain_mapper. Weight is a float.
         """
         label_to_use = label if self.mode == "classification" else self.dummy_label
-        ans = self.domain_mapper.map_exp_ids(self.local_exp[label_to_use], **kwargs)
+        ans = self.domain_mapper.map_exp_ids(self.local_exp[label_to_use],
+                                             **kwargs)
         ans = [(x[0], float(x[1])) for x in ans]
         return ans
 
@@ -205,10 +203,13 @@ class Explanation(object):
         This will throw an error if you don't have IPython installed"""
 
         from IPython.core.display import display, HTML
-        display(HTML(self.as_html(labels=labels,
-                                  predict_proba=predict_proba,
-                                  show_predicted_value=show_predicted_value,
-                                  **kwargs)))
+        display(
+            HTML(
+                self.as_html(
+                    labels=labels,
+                    predict_proba=predict_proba,
+                    show_predicted_value=show_predicted_value,
+                    **kwargs)))
 
     def save_to_file(self,
                      file_path,
@@ -225,10 +226,12 @@ class Explanation(object):
 
         """
         file_ = open(file_path, 'w', encoding='utf8')
-        file_.write(self.as_html(labels=labels,
-                                 predict_proba=predict_proba,
-                                 show_predicted_value=show_predicted_value,
-                                 **kwargs))
+        file_.write(
+            self.as_html(
+                labels=labels,
+                predict_proba=predict_proba,
+                show_predicted_value=show_predicted_value,
+                **kwargs))
         file_.close()
 
     def as_html(self,
@@ -260,13 +263,14 @@ class Explanation(object):
             labels = self.available_labels()
 
         this_dir, _ = os.path.split(__file__)
-        bundle = open(os.path.join(this_dir, 'bundle.js'),
-                      encoding="utf8").read()
+        bundle = open(
+            os.path.join(this_dir, 'bundle.js'), encoding="utf8").read()
 
         out = u'''<html>
         <meta http-equiv="content-type" content="text/html; charset=UTF8">
         <head><script>%s </script></head><body>''' % bundle
-        random_id = id_generator(size=15, random_state=check_random_state(self.random_state))
+        random_id = id_generator(
+            size=15, random_state=check_random_state(self.random_state))
         out += u'''
         <div class="lime top_div" id="top_div%s"></div>
         ''' % random_id
@@ -320,11 +324,8 @@ class Explanation(object):
             html_data = self.local_exp[self.dummy_label]
 
         raw_js += self.domain_mapper.visualize_instance_html(
-                html_data,
-                labels[0] if self.mode == "classification" else self.dummy_label,
-                'raw_div',
-                'exp',
-                **kwargs)
+            html_data, labels[0] if self.mode == "classification" else
+            self.dummy_label, 'raw_div', 'exp', **kwargs)
         out += u'''
         <script>
         var top_div = d3.select('#top_div%s').classed('lime top_div', true);
