@@ -111,32 +111,59 @@ seg.help()
 
 * 自定义词典
 
-  快速模式分词请参考[jieba词典载入](https://github.com/fxsjy/jieba#%E8%BD%BD%E5%85%A5%E8%AF%8D%E5%85%B8)。
+  - 快速模式词典载入方式：
 
-  Base模式和精确模式可以参考以下方式使用自定义词典来对分词结果进行干预。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成。
+    用户可以在词典文件每一行表示一个自定义item，后面可添加词频信息
 
-  词典文件`user_dict.txt`示例：
+    词典文件`user_dict.txt`示例：
 
-  ```text
-  平原上的火焰
-  年 末
-  ```
+    ```text
+    新冠肺炎 8
+    国家卫健委
+    ```
 
-  以默认模型为例，"平原上的火焰计划于年末上映"原本的输出结果为：
+    "国家卫健委修订完成了新冠肺炎诊疗方案"原本的输出结果为：
 
-  ```text
-  ['平原', '上', '的', '火焰', '计划', '于', '年末', '上映']
-  ```
+    ```text
+    ['国家', '卫健委', '修订', '完成', '了', '新冠', '肺炎', '诊疗', '方案']
+    ```
 
-  装载自定义词典及输出结果示例：
+    装载自定义词典及输出结果示例：
 
-  ```python
-  from paddlenlp import Taskflow
+    ```python
+    from paddlenlp import Taskflow
 
-  my_seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
-  my_seg("平原上的火焰计划于年末上映")
-  >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
-  ```
+    my_seg = Taskflow("word_segmentation", mode="fast", user_dict="user_dict.txt")
+    my_seg("国家卫健委修订完成了新冠肺炎诊疗方案")
+    >>> ['国家卫健委', '修订', '完成', '了', '新冠肺炎', '诊疗', '方案']
+    ```
+
+  - Base、精确模式词典载入方式：
+
+    词典文件每一行表示一个自定义item。
+
+    词典文件`user_dict.txt`示例：
+
+    ```text
+    新冠肺炎 5
+
+    ```
+
+    以默认模型为例，"平原上的火焰计划于年末上映"原本的输出结果为：
+
+    ```text
+    ['平原', '上', '的', '火焰', '计划', '于', '年末', '上映']
+    ```
+
+    装载自定义词典及输出结果示例：
+
+    ```python
+    from paddlenlp import Taskflow
+
+    my_seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
+    my_seg("平原上的火焰计划于年末上映")
+    >>> ['平原上的火焰', '计划', '于', '年', '末', '上映']
+    ```
 
 #### 可配置参数说明
 
