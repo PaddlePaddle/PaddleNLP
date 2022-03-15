@@ -12,133 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-import paddle
-from paddle.io import DataLoader
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.metric import Accuracy
-import numpy as np
-
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-
-import argparse
 import os
-import sys
-import random
 import time
-import math
-import copy
-import yaml
 from functools import partial
 
-import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.metric import Accuracy
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+import numpy as np
 
 import paddlenlp
-from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-from paddlenlp.transformers import AutoModelForTokenClassification
-from paddlenlp.transformers import AutoModelForQuestionAnswering
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 
-
-class BaseTrainer(object):
-    def create_dataloader(self,
-                          dataset,
-                          mode='train',
-                          batch_size=16,
-                          batchify_fn=None,
-                          trans_fn=None,
-                          batched=False):
-        if trans_fn:
-            dataset = dataset.map(trans_fn, batched=batched)
-
-        shuffle = True if mode == 'train' else False
-        if mode == 'train':
-            batch_sampler = paddle.io.DistributedBatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-        else:
-            batch_sampler = paddle.io.BatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-
-        return paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-
-    def prepare_train_config(self):
-        if self.args.max_steps > 0:
-            self.args.num_training_steps = self.args.max_steps
-            self.args.num_train_epochs = math.ceil(
-                self.args.num_training_steps / len(self.train_dl))
-
-        else:
-            self.args.num_training_steps = len(
-                self.train_dl) * self.args.num_train_epochs
-            self.args.num_train_epochs = self.args.num_train_epochs
-
-        if self.args.num_training_steps // self.args.valid_steps < 20:
-            exp_step = self.args.num_training_steps / 20
-            exp_step = max(int(exp_step - exp_step % 10), 10)
-            logger.info("Set eval step to %d" % exp_step)
-            self.args.valid_steps = exp_step
-
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_proportion
-
-        self.lr_scheduler = LinearDecayWithWarmup(
-            self.args.learning_rate, self.args.num_training_steps, warmup)
-
-        # Generate parameter names needed to perform weight decay.
-        # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in self.model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
-
-        self.optimizer = paddle.optimizer.AdamW(
-            learning_rate=self.lr_scheduler,
-            beta1=0.9,
-            beta2=0.999,
-            epsilon=self.args.adam_epsilon,
-            parameters=self.model.parameters(),
-            weight_decay=self.args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm))
-
-    def print_config(self):
-        logger.info('{:^40}'.format("Configuration Arguments"))
-        logger.info('{:20}:{}'.format("paddle commit id",
-                                      paddle.version.commit))
-        for arg in vars(self.args):
-            logger.info('{:20}:{}'.format(arg, getattr(self.args, arg)))
+from trainer_base import TrainerBase
 
 
-def clue_trans_fn(examples, tokenizer, args):
-    return convert_clue(
-        examples,
-        tokenizer=tokenizer,
-        label_list=args.label_list,
-        max_seq_length=args.max_seq_length)
+def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
+
+    if "text_b" in example.keys():
+        text = example["text_a"]
+        text_pair = example["text_b"]
+    else:
+        text = example["text"]
+        text_pair = None
+
+    encoded_inputs = tokenizer(
+        text=text, text_pair=text_pair, max_seq_len=max_seq_length)
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
+
+    if is_test:
+        return input_ids, token_type_ids
+    label = np.array([example["label"]], dtype="int64")
+    return input_ids, token_type_ids, label
 
 
-def clue_batchify_fn(tokenizer, args):
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if args.label_list else "float32")  # label
-    ): fn(samples)
-
-    return batchify_fn
+def seq_trans_fn(example, tokenizer, args):
+    return convert_example(
+        example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
 
 def convert_clue(example,
@@ -199,6 +112,24 @@ def convert_clue(example,
         return example['input_ids'], example['token_type_ids']
 
 
+def clue_trans_fn(examples, tokenizer, args):
+    return convert_clue(
+        examples,
+        tokenizer=tokenizer,
+        label_list=args.label_list,
+        max_seq_length=args.max_seq_length)
+
+
+def clue_batchify_fn(tokenizer, args):
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        Stack(dtype="int64" if args.label_list else "float32")  # label
+    ): fn(samples)
+
+    return batchify_fn
+
+
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader, mode="dev"):
     """
@@ -228,37 +159,16 @@ def evaluate(model, criterion, metric, data_loader, mode="dev"):
     return accu
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=16,
-                      batched=False,
-                      batchify_fn=None,
-                      trans_fn=None):
-    if trans_fn:
-        dataset = dataset.map(trans_fn, batched=False)
-
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-    else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
-
-
-class CLUE_TRAINING(BaseTrainer):
-    def __init__(self, train_ds, dev_ds, model, tokenizer, args):
+class ClueTrainer(TrainerBase):
+    def __init__(self, train_ds, dev_ds, model, tokenizer, args, *arg,
+                 **kwargs):
         super().__init__()
         self.rank = paddle.distributed.get_rank()
         self.train_ds = train_ds
         self.dev_ds = dev_ds
+        if "test_ds" in kwargs.keys():
+            self.test_ds = kwargs["test_ds"]
+
         self.model = model
         self.tokenizer = tokenizer
         self.args = args
@@ -276,6 +186,8 @@ class CLUE_TRAINING(BaseTrainer):
             self.train_ds, "train", self.args.batch_size, batchify_fn, trans_fn)
         self.dev_dl = self.create_dataloader(
             self.dev_ds, "dev", self.args.batch_size, batchify_fn, trans_fn)
+
+        self.test_dl = None
 
     def eval(self):
         pass
@@ -341,7 +253,12 @@ class CLUE_TRAINING(BaseTrainer):
                     else:
                         dev_acc = -1.0
                     metric.reset()
-                    test_acc = -1
+
+                    if self.test_dl is not None:
+                        test_acc = evaluate(self.model, loss_fct, metric,
+                                            self.test_dl, "test")
+                    else:
+                        test_acc = -1.0
                     metric.reset()
 
                     logger.info("eval done total : %s s" %
@@ -350,10 +267,26 @@ class CLUE_TRAINING(BaseTrainer):
                         best_dev_acc = dev_acc
                         corr_test_acc = test_acc
 
+                    logger.warning(
+                        "best_dev_acc: {:.6f}, corr_test_acc: {:.6f}".format(
+                            best_dev_acc, corr_test_acc))
+
                 if global_step >= self.args.num_training_steps:
-                    logger.info("best_dev_acc: {:.6f}".format(best_dev_acc))
-                    logger.info("corr_test_acc: {:.6f}".format(corr_test_acc))
                     return
 
-        logger.info("best_dev_acc: {:.6f}".format(best_dev_acc))
-        logger.info("corr_test_acc: {:.6f}".format(corr_test_acc))
+        logger.warning("best_dev_acc: {:.6f}, corr_test_acc: {:.6f}".format(
+            best_dev_acc, corr_test_acc))
+
+
+class SeqTrainer(ClueTrainer):
+    def dataloader_inner(self):
+        trans_fn = partial(
+            seq_trans_fn, tokenizer=self.tokenizer, args=self.args)
+        batchify_fn = clue_batchify_fn(self.tokenizer, self.args)
+
+        self.train_dl = self.create_dataloader(
+            self.train_ds, "train", self.args.batch_size, batchify_fn, trans_fn)
+        self.dev_dl = self.create_dataloader(
+            self.dev_ds, "dev", self.args.batch_size, batchify_fn, trans_fn)
+        self.test_dl = self.create_dataloader(
+            self.test_ds, "dev", self.args.batch_size, batchify_fn, trans_fn)

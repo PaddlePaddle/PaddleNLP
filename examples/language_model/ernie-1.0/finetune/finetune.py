@@ -13,12 +13,10 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import random
 import time
-import math
 import copy
 import yaml
 from functools import partial
@@ -27,24 +25,21 @@ import os.path as osp
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.metric import Accuracy
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
 import paddlenlp
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.transformers import AutoModelForTokenClassification
 from paddlenlp.transformers import AutoModelForQuestionAnswering
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
-from sequence_classification import CLUE_TRAINING
-from question_answering import QA_TRAINING
+from sequence_classification import ClueTrainer, SeqTrainer
+from question_answering import MrcTrainer
+from token_classification import NerTrainer
 
 ALL_TASKS = {
     "SequenceClassification": [],
@@ -77,7 +72,6 @@ for task_type in ALL_TASKS.keys():
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # Required parameters
 
     parser.add_argument(
         "--dataset",
@@ -115,7 +109,7 @@ def parse_args():
         help="Batch size per GPU/CPU for training.", )
     group.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=None,
         type=float,
         help="Weight decay if we apply some.")
 
@@ -134,6 +128,12 @@ def parse_args():
         type=int,
         default=200,
         help="Save checkpoint every X updates steps.")
+    group.add_argument(
+        "--minimum_valid_times",
+        type=int,
+        default=None,
+        help="If under valid_steps, the valid time is less then minimum_valid_times, the config of override valid_steps."
+    )
     group.add_argument(
         "--max_steps",
         default=-1,
@@ -257,12 +257,29 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    if 'clue' in args.dataset:
-        trainer = CLUE_TRAINING(all_ds["train"], all_ds["dev"], model,
-                                tokenizer, args)
-    elif "Answering" in config["model"]:
-        trainer = QA_TRAINING(all_ds["train"], all_ds["dev"], model, tokenizer,
-                              args)
+    if "SequenceClassification" in config["model"]:
+        if 'clue' in args.dataset:
+            trainer = ClueTrainer(all_ds["train"], all_ds["dev"], model,
+                                  tokenizer, args)
+        else:
+            trainer = SeqTrainer(
+                all_ds["train"],
+                all_ds["dev"],
+                model,
+                tokenizer,
+                args,
+                test_ds=all_ds["test"])
+    elif "QuestionAnswering" in config["model"]:
+        trainer = MrcTrainer(all_ds["train"], all_ds["dev"], model, tokenizer,
+                             args)
+    elif 'TokenClassification' in config["model"]:
+        trainer = NerTrainer(
+            all_ds["train"],
+            all_ds["dev"],
+            model,
+            tokenizer,
+            args,
+            test_ds=all_ds["test"])
 
     trainer.train()
     trainer.eval()

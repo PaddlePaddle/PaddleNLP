@@ -22,7 +22,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
-from sequence_classification import BaseTrainer
+from trainer_base import TrainerBase
 from paddlenlp.utils.log import logger
 
 
@@ -188,7 +188,7 @@ def prepare_validation_features(examples, tokenizer, args):
     return tokenized_examples
 
 
-class QA_TRAINING(BaseTrainer):
+class MrcTrainer(TrainerBase):
     def __init__(self, train_ds, dev_ds, model, tokenizer, args):
         super().__init__()
         self.rank = paddle.distributed.get_rank()
@@ -256,6 +256,9 @@ class QA_TRAINING(BaseTrainer):
                 self.optimizer.step()
                 self.lr_scheduler.step()
                 self.optimizer.clear_grad()
+
+                if global_step % self.args.valid_steps == 0:
+                    self.eval()
 
                 if global_step == self.args.num_training_steps:
                     break
