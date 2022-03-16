@@ -26,7 +26,6 @@ from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
 from paddle.utils.cpp_extension.cpp_extension import (
     CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
-import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 
@@ -103,7 +102,18 @@ class CMakeExtension(Extension):
             stderr=stdout)
 
     def get_target_filename(self):
+        """
+        The file names of libraries. Currently only support one library for
+        one extension.
+        """
         raise NotImplementedError
+
+    def get_output_filename(self):
+        """
+        The file names of outputs, which mostly is the same with
+        `get_target_filename`.
+        """
+        return self.get_target_filename()
 
 
 class FasterTransformerExtension(CMakeExtension):
@@ -157,9 +167,14 @@ class FasterTransformerExtension(CMakeExtension):
     def get_target_filename(self):
         # CMake file has fixed the name of lib, maybe we can copy it as the name
         # returned by `BuildExtension.get_ext_filename` after build.
-        # Use the file to indicate whether the lib supports model parallel.
         # TODO(guosheng): Maybe we should use a separated lib for model parallel
         # to make no effect on performance of models without parallel.
+        return "libdecoding_op.so"
+
+    def get_output_filename(self):
+        # CMake file has fixed the name of lib, maybe we can copy it as the name
+        # returned by `BuildExtension.get_ext_filename` after build.
+        # Use the file to indicate whether the lib supports model parallel.
         return ["libdecoding_op.so", "model_parallel.flag"
                 ] if self.need_parallel else "libdecoding_op.so"
 
@@ -254,19 +269,21 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # Maybe move this to CMakeExtension later.
         # TODO(guosheng): flags/args changes may also trigger build, and maybe
         # need version manager like `PaddleBuildExtension`.
-        ext_filename = extension.get_target_filename()
-        if isinstance(ext_filename, str):
-            ext_filename = [ext_filename]
-        ext_filepath = [os.path.join(build_base_dir, f) for f in ext_filename]
+        out_filename = extension.get_output_filename()
+        if isinstance(out_filename, str):
+            out_filename = [out_filename]
+        out_filepath = [os.path.join(build_base_dir, f) for f in out_filename]
+        lib_filename = extension.get_target_filename()
+        lib_filepath = os.path.join(build_base_dir, lib_filename)
         if not force:
             ext_sources = extension.sources
             if all(
                     os.path.exists(f) and
                     not newer_group(ext_sources, f, 'newer')
-                    for f in ext_filepath):
+                    for f in out_filepath):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
-                ops = load_op_meta_info_and_register_op(ext_filepath)
+                ops = load_op_meta_info_and_register_op(lib_filepath)
                 LOADED_EXT[name] = ops
                 return LOADED_EXT[name]
 
@@ -276,8 +293,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     _jit_compile(file_path, verbose)
     if isinstance(extension, CMakeExtension):
         # Load a shared library (if exists) only to register op.
-        if os.path.exists(ext_filepath):
-            ops = load_op_meta_info_and_register_op(ext_filepath)
+        if os.path.exists(lib_filepath):
+            ops = load_op_meta_info_and_register_op(lib_filepath)
             LOADED_EXT[name] = ops
             return LOADED_EXT[name]
     else:
