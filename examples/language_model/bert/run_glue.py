@@ -27,7 +27,7 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
-from paddlenlp.datasets import load_dataset
+from datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
@@ -42,13 +42,25 @@ logger = logging.getLogger(__name__)
 
 METRIC_CLASSES = {
     "cola": Mcc,
-    "sst-2": Accuracy,
+    "sst2": Accuracy,
     "mrpc": AccuracyAndF1,
-    "sts-b": PearsonAndSpearman,
+    "stsb": PearsonAndSpearman,
     "qqp": AccuracyAndF1,
     "mnli": Accuracy,
     "qnli": Accuracy,
     "rte": Accuracy,
+}
+
+task_to_keys = {
+    "cola": ("sentence", None),
+    "mnli": ("premise", "hypothesis"),
+    "mrpc": ("sentence1", "sentence2"),
+    "qnli": ("question", "sentence"),
+    "qqp": ("question1", "question2"),
+    "rte": ("sentence1", "sentence2"),
+    "sst2": ("sentence", None),
+    "stsb": ("sentence1", "sentence2"),
+    "wnli": ("sentence1", "sentence2"),
 }
 
 MODEL_CLASSES = {
@@ -218,33 +230,6 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.train()
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a glue example into necessary features"""
-    if not is_test:
-        # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
-        # Get the label
-        label = example['labels']
-        label = np.array([label], dtype=label_dtype)
-    # Convert raw text to feature
-    if (int(is_test) + len(example)) == 2:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
-    else:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
-
-    if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
-
-
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -253,26 +238,44 @@ def do_train(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
+
+    sentence1_key, sentence2_key = task_to_keys[args.task_name]
+
     metric_class = METRIC_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_ds = load_dataset('glue', args.task_name, splits="train")
+    train_ds = load_dataset('glue', args.task_name, split="train")
+    columns = train_ds.column_names
+    is_regression = args.task_name == "stsb"
+    label_list = None
+    if not is_regression:
+        label_list = train_ds.features["label"].names
+        num_classes = len(label_list)
+    else:
+        num_classes = 1
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
-    train_ds = train_ds.map(trans_func, lazy=True)
+    def preprocess_function(examples):
+        # Tokenize the texts
+        texts = ((examples[sentence1_key], ) if sentence2_key is None else
+                 (examples[sentence1_key], examples[sentence2_key]))
+        result = tokenizer(*texts, max_seq_len=args.max_seq_length)
+        if "label" in examples:
+            # In all cases, rename the column to labels because the model will expect that.
+            result["labels"] = examples["label"]
+        return result
+
+    train_ds = train_ds.map(preprocess_function,
+                            batched=True,
+                            remove_columns=columns)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if train_ds.label_list else "float32")  # label
-    ): fn(samples)
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        'labels': Stack(dtype="int64" if label_list else "float32")  # label
+    }): fn(samples)
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
@@ -281,10 +284,16 @@ def do_train(args):
         return_list=True)
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
-            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
+            'glue',
+            args.task_name,
+            split=["validation_matched", "validation_mismatched"])
 
-        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
-        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
+        dev_ds_matched = dev_ds_matched.map(preprocess_function,
+                                            batched=True,
+                                            remove_columns=columns)
+        dev_ds_mismatched = dev_ds_mismatched.map(preprocess_function,
+                                                  batched=True,
+                                                  remove_columns=columns)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
             dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
@@ -302,8 +311,10 @@ def do_train(args):
             num_workers=0,
             return_list=True)
     else:
-        dev_ds = load_dataset('glue', args.task_name, splits='dev')
-        dev_ds = dev_ds.map(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, split='validation')
+        dev_ds = dev_ds.map(preprocess_function,
+                            batched=True,
+                            remove_columns=columns)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
@@ -313,7 +324,6 @@ def do_train(args):
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
@@ -342,7 +352,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params)
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss(
-    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
+    ) if not is_regression else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
     if args.use_amp:
