@@ -1230,7 +1230,10 @@ class InferGptDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer",
+                verbose=True,
+                need_parallel=not get_ft_para_conf().no_para)
 
         super(InferGptDecoding, self).__init__()
 

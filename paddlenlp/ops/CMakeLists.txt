@@ -15,9 +15,6 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
-find_package(MPI REQUIRED)
-find_package(NCCL REQUIRED)
-
 
 INCLUDE(ExternalProject)
 
@@ -36,6 +33,29 @@ option(WITH_ENCODER     "Compile with Transformer Encoder"                      
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 option(WITH_BART        "Compile with BART"                                         ON)
 option(WITH_MBART       "Compile with MBART"                                        ON)
+option(WITH_PARALLEL    "Compile with model parallel for GPT"                       OFF)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+# https://cmake.org/cmake/help/latest/module/FindMPI.html#variables-for-locating-mpi
+find_package(MPI)
+find_package(NCCL)
+
+set(para_file ${CMAKE_CURRENT_BINARY_DIR}/lib/model_parallel.flag)
+if(MPI_FOUND AND NCCL_FOUND)
+  set(WITH_PARALLEL ON)
+  # support model parallel
+  add_definitions(-DBUILD_GPT)
+  # Use a file to interact with python, and it indicates whether the lib is
+  # parallel support.
+  file(TOUCH para_file)
+else()
+  file(REMOVE para_file)
+  if(WITH_PARALLEL)
+    message(FATAL_ERROR "Model parallel is not supported for FasterGeneration since can not found MPI or NCCL.")
+  else()
+    message(NOTICE "Model parallel is not supported for FasterGeneration since can not found MPI or NCCL.")
+  endif()
+endif()
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -238,7 +258,6 @@ set(COMMON_LIB_DIRS
 set(THIRD_PATH "third-party")
 set(THIRD_PARTY_NAME "fastertransformer")
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(external/boost)
 
 set(OPS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -351,7 +370,7 @@ ExternalProject_Add(
   UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=ON
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=${WITH_PARALLEL}
 )
 # -DBUILD_GPT=${WITH_GPT} 
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)

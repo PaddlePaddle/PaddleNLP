@@ -107,7 +107,7 @@ class CMakeExtension(Extension):
 
 
 class FasterTransformerExtension(CMakeExtension):
-    def __init__(self, name, source_dir=None):
+    def __init__(self, name, source_dir=None, need_parallel=False):
         super(FasterTransformerExtension, self).__init__(name, source_dir)
         self.sources = _get_files(
             os.path.
@@ -117,6 +117,10 @@ class FasterTransformerExtension(CMakeExtension):
         # Env variable may not work as expected, since jit compile by `load`
         # would not re-built if source code is not update.
         # self.sm = os.environ.get("PPNLP_GENERATE_CODE", None)
+        # Whether or not to use model parallel. Note that since the building use
+        # a new process, we shoud find a way to let it know whether to use model
+        # parallel.
+        self.need_parallel = need_parallel
 
     def build_with_command(self, ext_builder):
         if CUDA_HOME is None:  # GPU only
@@ -133,9 +137,8 @@ class FasterTransformerExtension(CMakeExtension):
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
         self.cmake_args += [f"-DWITH_GPT=ON"]
-        # If use model parallel, 
-        no_para = ft_decoding.get_ft_para_conf().no_para
-        # self.cmake_args += [f"-DWITH_GPT=ON"]
+        if self.need_parallel:
+            self.cmake_args += [f"-DWITH_PARALLEL=ON"]
         try:
             super(FasterTransformerExtension,
                   self).build_with_command(ext_builder)
@@ -154,11 +157,11 @@ class FasterTransformerExtension(CMakeExtension):
     def get_target_filename(self):
         # CMake file has fixed the name of lib, maybe we can copy it as the name
         # returned by `BuildExtension.get_ext_filename` after build.
-        return "libdecoding_op.so"
-
-    @staticmethod
-    def is_para_available(self):
-        pass
+        # Use the file to indicate whether the lib supports model parallel.
+        # TODO(guosheng): Maybe we should use a separated lib for model parallel
+        # to make no effect on performance of models without parallel.
+        return ["libdecoding_op.so", "model_parallel.flag"
+                ] if self.need_parallel else "libdecoding_op.so"
 
 
 class BuildExtension(PaddleBuildExtension):
@@ -252,11 +255,15 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # TODO(guosheng): flags/args changes may also trigger build, and maybe
         # need version manager like `PaddleBuildExtension`.
         ext_filename = extension.get_target_filename()
-        ext_filepath = os.path.join(build_base_dir, ext_filename)
+        if isinstance(ext_filename, str):
+            ext_filename = [ext_filename]
+        ext_filepath = [os.path.join(build_base_dir, f) for f in ext_filename]
         if not force:
             ext_sources = extension.sources
-            if os.path.exists(ext_filepath) and not newer_group(
-                    ext_sources, ext_filepath, 'newer'):
+            if all(
+                    os.path.exists(f) and
+                    not newer_group(ext_sources, f, 'newer')
+                    for f in ext_filepath):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
                 ops = load_op_meta_info_and_register_op(ext_filepath)
