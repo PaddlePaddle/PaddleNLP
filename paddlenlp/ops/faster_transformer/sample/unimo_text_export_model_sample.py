@@ -19,8 +19,8 @@ import paddle
 
 from pprint import pprint
 
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-from paddlenlp.ops import FasterUnifiedTransformer
+from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
+from paddlenlp.ops import FasterUNIMOText
 
 from paddlenlp.utils.log import logger
 
@@ -29,9 +29,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_name_or_path",
-        default="plato-xl",
+        default="unimo-text-1.0-lcsts-new",
         type=str,
-        help="The model name to specify the PLATO/UnifiedTransformer to use. ")
+        help="The model name to specify the UNIMOText to use. ")
     parser.add_argument(
         "--inference_model_dir",
         default="./infer_model/",
@@ -95,18 +95,18 @@ def do_predict(args):
     place = "gpu"
     place = paddle.set_device(place)
 
-    model_name = 'plato-xl'
-    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
-    tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
+    model_name = 'unimo-text-1.0-lcsts-new'
+    model = UNIMOLMHeadModel.from_pretrained(model_name)
+    tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
-    plato = FasterUnifiedTransformer(
+    unimo_text = FasterUNIMOText(
         model=model, use_fp16_decoding=args.use_fp16_decoding)
     # Set evaluate mode
-    plato.eval()
+    unimo_text.eval()
 
-    # Convert dygraph model to static graph model 
-    plato = paddle.jit.to_static(
-        plato,
+    # Convert dygraph model to static graph model
+    unimo_text = paddle.jit.to_static(
+        unimo_text,
         input_spec=[
             # input_ids
             paddle.static.InputSpec(
@@ -120,29 +120,25 @@ def do_predict(args):
             # seq_len
             paddle.static.InputSpec(
                 shape=[None], dtype="int32"),
-            # role_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
-            # position_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
             args.max_out_len,
             args.min_out_len,
             args.topk,
             args.topp,
+            args.num_beams,  # num_beams. Used for beam_search. 
             args.decoding_strategy,
             tokenizer.cls_token_id,  # cls/bos
-            tokenizer.sep_token_id,  # sep/eos
+            tokenizer.mask_token_id,  # mask/eos
             tokenizer.pad_token_id,  # pad
-            args.num_beams,  # num_beams. Used for beam_search. 
             args.diversity_rate,  # diversity rate. Used for beam search. 
             args.temperature,
             args.num_return_sequences,
         ])
 
     # Save converted static graph model
-    paddle.jit.save(plato, os.path.join(args.inference_model_dir, "plato"))
-    logger.info("PLATO has been saved to {}.".format(args.inference_model_dir))
+    paddle.jit.save(unimo_text,
+                    os.path.join(args.inference_model_dir, "unimo_text"))
+    logger.info("UNIMOText has been saved to {}.".format(
+        args.inference_model_dir))
 
 
 if __name__ == "__main__":
