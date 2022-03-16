@@ -15,10 +15,9 @@ from collections import defaultdict
 import re
 
 from paddlenlp import Taskflow
-import jieba
 import numpy as np
 
-word_segmenter = Taskflow("word_segmentation")
+word_segmenter = Taskflow("word_segmentation", mode="fast")
 
 
 def convert_example(example, tokenizer, is_test=False):
