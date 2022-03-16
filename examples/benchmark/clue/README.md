@@ -3,12 +3,30 @@
 [CLUE](https://www.cluebenchmarks.com/)自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。
 是目前应用最广泛的中文语言测评指标之一，被包括阿里巴巴达摩院、腾讯 AI 实验室、华为诺亚方舟实验室在内的 20 多家国内语言实验室所采纳。学术引用 100+，github star 超 6000+。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)
 
-本项目是 CLUE 评测任务 在 Paddle 2.2.2 上的开源实现。
+本项目是 CLUE 评测任务 在 PaddlePaddle 2.0 上的开源实现。
+
+## 整体结果
+
+使用ERNIE 3.0 Base 和 RoBERTa-wwm-ext-large 进行 Fine-tuning，在 CLUE 的各验证集上有如下结果：
+
+| Model                 | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
+| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
+| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
+| ERNIE 3.0 Base        | 75.86   | 58.92   | 61.18   | 83.35   | 79.66   | 86.51       | 82.73   | 89.48    |         |         |
+| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
+
+**NOTE：**
+
+1.上表所有模型的精度测试均是基于下方超参数范围进行的 Grid Search 超参寻优。在每个配置下训练时，每隔 100 个 steps 在验证集上评估一次，取验证集上最佳准确率作为当前超参数配置下的准确率；
+- batch sizes: 16, 32, 64;
+- learning rates: 1e-5, 2e-5, 3e-5, 5e-5
+
+其中单独为 CLUEWSC2020 任务添加了 batch_size = 8 的实验，
 
 ## 快速开始
 
 ### 启动 CLUE 任务
-以 CLUE/TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
+以 CLUE 的 TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
 
 #### 单卡训练
 ```shell
@@ -95,11 +113,3 @@ eval loss: 2.326450, acc: 0.26, eval done total : 9.412081480026245 s
 global step 300/10008, epoch: 0, batch: 299, rank_id: 0, loss: 1.847109, lr: 0.0000090000, speed: 5.2913 step/s
 eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
 ```
-
-使用各种预训练模型进行 Fine-tuning，在 CLUE 的各验证集上有如下结果：
-
-| CLUE Score            | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
-| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
-| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
-| ERNIE 3.0 Base        | 75.49   | 58.73   | 60.25   | 83.29   | 79.86   | 86.84       | 82.40   | 89.48    |         |         |
-| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
