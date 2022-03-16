@@ -379,6 +379,62 @@ void apply_min_length_penalty_kernelLauncher(T* log_probs,
                                                                   min_penalty,
                                                                   end_id);
   }
+  // TODO Add half2 implementation
+  template <typename T>
+  __global__ void embedding_position_lookups_right_pad_kernel(T* from_tensor,
+                                                    const T* embedding_table,
+                                                    const T* pos_table,
+                                                    const int* word_ids,
+                                                    const int local_batch_size,
+                                                    const int batch_size,
+                                                    const int hidden_units,
+                                                    int step,
+                                                    int ite,
+                                                    int max_input_len,
+                                                    const int* start_lengths)
+  {
+      int timestep = step - 1;
+      int len_padding = max_input_len - start_lengths[local_batch_size * ite + blockIdx.x];
+      int idx_word_id = (step == max_input_len) ? timestep - len_padding : timestep;
+      int idx_pos_table = timestep - len_padding;
+      int *word_ids_buf = (int*)word_ids + idx_word_id * batch_size + local_batch_size * ite;
+
+      for(int index = threadIdx.x; index < hidden_units; index += blockDim.x)
+      {
+          from_tensor[blockIdx.x * hidden_units + index] = embedding_table[word_ids_buf[blockIdx.x] * hidden_units + index]
+            + pos_table[idx_pos_table * hidden_units + index];
+      }
+  }
+
+
+  template <typename T>
+  void embedding_position_lookups_right_pad_kernel_launcher(T* from_tensor,
+                                                  const T* embedding_table, 
+                                                  const T* pos_table, 
+                                                  const int* word_ids,
+                                                  const int local_batch_size,
+                                                  const int batch_size,
+                                                  const int hidden_units, 
+                                                  int step, 
+                                                  int ite,
+                                                  int max_input_len,
+                                                  const int* start_lengths,
+                                                  cudaStream_t stream)
+  {
+      dim3 grid(min(local_batch_size, 65536));
+      dim3 block(min(hidden_units, 1024));
+      embedding_position_lookups_right_pad_kernel<T><<<grid, block, 0, stream>>>(from_tensor,
+                                                                       embedding_table,
+                                                                       pos_table,
+                                                                       word_ids,
+                                                                       local_batch_size,
+                                                                       batch_size,
+                                                                       hidden_units,
+                                                                       step, 
+                                                                       ite,
+                                                                       max_input_len,
+                                                                       start_lengths);
+  }
 
 template void init_kernelLauncher_v2(bool* finished,
                                      bool* alive_finished,
@@ -528,5 +584,34 @@ template void apply_min_length_penalty_kernelLauncher(
     cudaStream_t stream,
     const bool min_penalty,
     const int end_id);
+
+  // fix gpt&ernie3 batch_inputs bug
+  template 
+  void embedding_position_lookups_right_pad_kernel_launcher(float* from_tensor,
+                                                  const float* embedding_table,
+                                                  const float* pos_table,
+                                                  const int* word_ids,
+                                                  const int local_batch_size,
+                                                  const int batch_size,
+                                                  const int hidden_units,
+                                                  int step,
+                                                  int ite,
+                                                  int max_input_len,
+                                                  const int* start_lengths,
+                                                  cudaStream_t stream);
+
+  template 
+  void embedding_position_lookups_right_pad_kernel_launcher(half* from_tensor,
+                                                  const half* embedding_table,
+                                                  const half* pos_table,
+                                                  const int* word_ids,
+                                                  const int local_batch_size,
+                                                  const int batch_size,
+                                                  const int hidden_units,
+                                                  int step,
+                                                  int ite,
+                                                  int max_input_len,
+                                                  const int* start_lengths,
+                                                  cudaStream_t stream);
 
 }  // end of name space fastertransformer

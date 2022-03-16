@@ -736,7 +736,7 @@ public:
                 if(l_parallel_param_.rank == 0)
                 {
                     PUSH_RANGE("Before Transformer/Embedding")
-                    embedding_position_lookups_kernel_launcher(from_tensor_[0],
+                    embedding_position_lookups_right_pad_kernel_launcher(from_tensor_[0],
                                                             decoding_params.embedding_table,
                                                             decoding_params.position_encoding_table,
                                                             decoding_params.output_ids,

@@ -150,4 +150,18 @@ void apply_min_length_penalty_kernelLauncher(T* log_probs,
                                       const bool min_penalty,
                                       const int end_id);
 
+template <typename T>
+void embedding_position_lookups_right_pad_kernel_launcher(T* from_tensor,
+                                                const T* embedding_table, 
+                                                const T* pos_table, 
+                                                const int* word_ids,
+                                                const int local_batch_size,
+                                                const int batch_size,
+                                                const int hidden_units, 
+                                                int step, 
+                                                int ite,
+                                                int max_input_len,
+                                                const int* start_lengths,
+                                                cudaStream_t stream);
+
 }  // namespace fastertransformer
