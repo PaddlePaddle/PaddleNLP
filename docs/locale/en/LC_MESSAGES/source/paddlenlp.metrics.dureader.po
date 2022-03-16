@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-16 16:04+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,39 +17,39 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.metrics.dureader.rst:2
+#: ../source/paddlenlp.metrics.dureader.rst:2
 msgid "dureader"
 msgstr ""
 
-#: of paddlenlp.metrics.dureader:1
-msgid "Official evaluation script for SQuAD version 2.0."
-msgstr ""
+#~ msgid "Official evaluation script for SQuAD version 2.0."
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader:3
-msgid ""
-"In addition to basic functionality, we also compute additional statistics"
-" and plot precision-recall curves if an additional na_prob.json file is "
-"provided. This file is expected to map question ID's to the model's "
-"predicted probability that a question is unanswerable."
-msgstr ""
+#~ msgid ""
+#~ "In addition to basic functionality, we"
+#~ " also compute additional statistics and "
+#~ "plot precision-recall curves if an "
+#~ "additional na_prob.json file is provided. "
+#~ "This file is expected to map "
+#~ "question ID's to the model's predicted"
+#~ " probability that a question is "
+#~ "unanswerable."
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader.compute_predictions:1
-msgid "Write final predictions to the json file and log-odds of null if needed."
-msgstr ""
+#~ msgid ""
+#~ "Write final predictions to the json "
+#~ "file and log-odds of null if "
+#~ "needed."
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader.get_final_text:1
-msgid "Project the tokenized prediction back to the original text."
-msgstr ""
+#~ msgid "Project the tokenized prediction back to the original text."
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader.normalize:1
-msgid "Normalize strings to space joined chars. :param s: a list of strings."
-msgstr ""
+#~ msgid "Normalize strings to space joined chars. :param s: a list of strings."
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader.normalize
-msgid "返回"
-msgstr ""
+#~ msgid "返回"
+#~ msgstr ""
 
-#: of paddlenlp.metrics.dureader.normalize:4
-msgid "A list of normalized strings."
-msgstr ""
+#~ msgid "A list of normalized strings."
+#~ msgstr ""
 
