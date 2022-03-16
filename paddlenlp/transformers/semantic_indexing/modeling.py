@@ -18,12 +18,12 @@ import paddle.nn.functional as F
 
 from ..ernie.modeling import ErniePretrainedModel
 
-__all__ = ['DualEncoder']
+__all__ = ['ErnieDualEncoder']
 
 
-class ErnieForSemanticIndexing(ErniePretrainedModel):
+class ErnieEncoder(ErniePretrainedModel):
     def __init__(self, ernie):
-        super(ErnieForSemanticIndexing, self).__init__()
+        super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.apply(self.init_weights)
 
@@ -48,19 +48,19 @@ class ErnieForSemanticIndexing(ErniePretrainedModel):
         return pooled_output
 
 
-class DualEncoder(nn.Layer):
+class ErnieDualEncoder(nn.Layer):
     """
-    This class encapsulates two ERNIE matching models into one model, so query
+    This class encapsulates two ErnieEncoder models into one model, so query
     embedding and title embedding could be obtained using one model. And this
-    class allows two ERNIE matching models to be trained at the same time.
+    class allows two ErnieEncoder models to be trained at the same time.
 
     Example:
 
         .. code-block::
 
-            from paddlenlp.transformers import ErnieMatchingModel, DualErnieForMatching
+            from paddlenlp.transformers import ErnieDualEncoder
         
-            model = DualErnieForMatching("ernie-base-matching-query", "ernie-base-matching-title", output_emb_size=512)
+            model = ErnieDualEncoder("ernie-base-matching-query", "ernie-base-matching-title", output_emb_size=512)
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -83,12 +83,12 @@ class DualEncoder(nn.Layer):
 
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
-        self.query_ernie = ErnieForSemanticIndexing.from_pretrained(
+        self.query_ernie = ErnieEncoder.from_pretrained(
             query_model_name_or_path)
         if share_parameters:
             self.title_ernie = self.query_ernie
         elif title_model_name_or_path is not None:
-            self.title_ernie = ErnieForSemanticIndexing.from_pretrained(
+            self.title_ernie = ErnieEncoder.from_pretrained(
                 title_model_name_or_path)
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
