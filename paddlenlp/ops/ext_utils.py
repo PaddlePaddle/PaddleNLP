@@ -28,6 +28,7 @@ from paddle.utils.cpp_extension.cpp_extension import (
     CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.file_lock import decorate as file_lock
 
 if CUDA_HOME and not os.path.exists(CUDA_HOME):
     # CUDA_HOME is only None for Windows CPU version in paddle `find_cuda_home`.
@@ -240,6 +241,7 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         f.write(content)
 
 
+@file_lock(os.path.join(PPNLP_HOME, "load_ext.lock"))
 def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     # TODO(guosheng): Need better way to resolve unsupported such as CPU. Currently,
     # raise NotImplementedError and skip `_jit_compile`. Otherwise, `_jit_compile`
