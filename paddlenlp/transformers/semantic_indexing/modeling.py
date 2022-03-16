@@ -18,117 +18,19 @@ import paddle.nn.functional as F
 
 from ..ernie.modeling import ErniePretrainedModel
 
-__all__ = [
-    'ErnieSemanticIndexingPretrainedModel', 'ErnieForRespresent', 'DualEncoder'
-]
+__all__ = ['DualEncoder']
 
 
-class ErnieSemanticIndexingPretrainedModel(ErniePretrainedModel):
-    """
-    A class for pretrained ERNIE models for matching. It provides ERNIE related
-    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
-    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
-    loading pretrained models. 
-
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for
-    more details.
-    """
-
-    pretrained_init_configuration = {
-        "ernie-base-cn-query": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 513,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 18000,
-            "pad_token_id": 0,
-        },
-        "ernie-base-cn-title": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 513,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 18000,
-            "pad_token_id": 0,
-        },
-        "ernie-base-en-query": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 4,
-            "vocab_size": 30522,
-            "pad_token_id": 0,
-        },
-        "ernie-base-en-title": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 4,
-            "vocab_size": 30522,
-            "pad_token_id": 0,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ernie-base-cn-query":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query.pdparams",
-            "ernie-base-cn-title":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title.pdparams",
-            "ernie-base-en-query":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query.pdparams",
-            "ernie-base-en-title":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title.pdparams",
-        }
-    }
+class ErnieForSemanticIndexing(ErniePretrainedModel):
+    def __init__(self, ernie):
+        super(ErnieForSemanticIndexing, self).__init__()
+        self.ernie = ernie  # allow ernie to be config
+        self.apply(self.init_weights)
 
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
-
-
-class ErnieForRespresent(ErnieSemanticIndexingPretrainedModel):
-    """
-    Example:
-
-        .. code-block::
-
-            from paddlenlp.transformers import ErnieMatchingModel
-
-            query_model = ErnieMatchingModel.from_pretrained("ernie-base-cn-query")
-            title_model = ErnieMatchingModel.from_pretrained("ernie-base-cn-title")
-        
-            inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-            inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-    
-            query_embedding = query_model(**inputs)
-            title_embedding = title_model(**inputs)
-    """
-
-    def __init__(self, ernie):
-        super(ErnieForRespresent, self).__init__()
-        self.ernie = ernie  # allow ernie to be config
-        self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
@@ -158,10 +60,7 @@ class DualEncoder(nn.Layer):
 
             from paddlenlp.transformers import ErnieMatchingModel, DualErnieForMatching
         
-            query_model = ErnieMatchingModel.from_pretrained("ernie-base-matching-query")
-            title_model = ErnieMatchingModel.from_pretrained("ernie-base-matching-title")
-        
-            model = DualErnieForMatching(query_model, title_model, output_emb_size=512)
+            model = DualErnieForMatching("ernie-base-matching-query", "ernie-base-matching-title", output_emb_size=512)
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -175,14 +74,22 @@ class DualEncoder(nn.Layer):
     """
 
     def __init__(self,
-                 query_pretrained_model,
-                 title_pretrained_model,
+                 query_model_name_or_path,
+                 title_model_name_or_path=None,
+                 share_parameters=False,
                  dropout=None,
                  output_emb_size=None,
                  use_cross_batch=False):
+
         super().__init__()
-        self.query_ernie = query_pretrained_model
-        self.title_ernie = title_pretrained_model
+        self.query_ernie, self.title_ernie = None, None
+        self.query_ernie = ErnieForSemanticIndexing.from_pretrained(
+            query_model_name_or_path)
+        if share_parameters:
+            self.title_ernie = self.query_ernie
+        elif title_model_name_or_path is not None:
+            self.title_ernie = ErnieForSemanticIndexing.from_pretrained(
+                title_model_name_or_path)
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
     def get_semantic_embedding(self, data_loader):
@@ -204,6 +111,8 @@ class DualEncoder(nn.Layer):
                              position_ids=None,
                              attention_mask=None,
                              is_query=True):
+        assert (is_query and self.query_ernie is not None) or (not is_query and self.title_ernie), \
+            "Please check whether your parameter for `is_query` are consistent with DualEncoder initialization."
         if is_query:
             pooled_embedding = self.query_ernie(input_ids, token_type_ids,
                                                 position_ids, attention_mask)
