@@ -19,7 +19,7 @@ from pprint import pprint
 import paddle
 import paddle.inference as paddle_infer
 
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.ops.ext_utils import load
 
 
@@ -30,17 +30,7 @@ def setup_args():
         "--inference_model_dir",
         default="./infer_model/",
         type=str,
-        help="Path to save inference model of PLATO. ")
-    parser.add_argument(
-        "--use_role",
-        action="store_true",
-        help="Whether to use role embeddings. ")
-    parser.add_argument(
-        "--position_style",
-        default="relative",
-        choices=["continuous", "relative"],
-        type=str,
-        help="The type for positional embedding. Default is continuous. ")
+        help="Path to save inference model of UNIMOText. ")
 
     args = parser.parse_args()
 
@@ -51,7 +41,7 @@ def postprocess_response(token_ids, tokenizer):
     """Post-process the decoded sequence. Truncate from the first <eos>."""
     eos_pos = len(token_ids)
     for i, tok_id in enumerate(token_ids):
-        if tok_id == tokenizer.sep_token_id:
+        if tok_id == tokenizer.mask_token_id:
             eos_pos = i
             break
     token_ids = token_ids[:eos_pos]
@@ -61,27 +51,23 @@ def postprocess_response(token_ids, tokenizer):
 
 
 def infer(args):
-    model_name = 'plato-xl'
-    tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
+    model_name = 'unimo-text-1.0-lcsts-new'
+    tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
-    context = [
-        "Hi , Becky , what's up ?",
-        "Not much , except that my mother-in-law is driving me up the wall .",
-        "What's the problem ?"
-    ]
+    inputs = "深度学习是人工智能的核心技术领域。百度飞桨作为中国首个自主研发、功能丰富、开源开放的产业级深度学习平台,将从多层次技术产品、产业AI人才培养和强大的生态资源支持三方面全面护航企业实现快速AI转型升级。"
 
-    data = tokenizer.dialogue_encode(
-        history=context,
-        add_start_token_as_response=True,
+    data = tokenizer.gen_encode(
+        inputs,
+        add_start_token_for_decoding=True,
         return_length=True,
-        return_role_ids=args.use_role,
-        position_style=args.position_style)
+        is_split_into_words=False)
 
     # Load FasterTransformer lib. 
     load("FasterTransformer", verbose=True)
 
-    config = paddle_infer.Config(args.inference_model_dir + "plato.pdmodel",
-                                 args.inference_model_dir + "plato.pdiparams")
+    config = paddle_infer.Config(
+        args.inference_model_dir + "unimo_text.pdmodel",
+        args.inference_model_dir + "unimo_text.pdiparams")
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
     predictor = paddle_infer.create_predictor(config)
@@ -109,7 +95,7 @@ def infer(args):
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
 
     for sample in output[0].transpose([1, 0]).tolist():
-        print(" ".join(postprocess_response(sample, tokenizer)))
+        print("".join(postprocess_response(sample, tokenizer)))
 
 
 if __name__ == "__main__":
