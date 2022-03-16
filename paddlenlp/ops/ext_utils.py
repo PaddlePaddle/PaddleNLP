@@ -216,8 +216,8 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         }})""").lstrip()
     kwargs_str = ""
     for key, value in kwargs.items():
-        kwargs_str += key + "=" + (f"'{value}'"
-                                   if isinstance(value, str) else value) + ","
+        kwargs_str += key + "=" + (f"'{value}'" if isinstance(value, str) else
+                                   str(value)) + ","
     content = template.format(
         name=name, kwargs_str=kwargs_str, build_dir=build_dir)
 
