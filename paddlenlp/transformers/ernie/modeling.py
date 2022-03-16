@@ -196,6 +196,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
+            "use_task_id": True,
             "task_type_vocab_size": 3,
             "vocab_size": 40000,
             "pad_token_id": 0,
