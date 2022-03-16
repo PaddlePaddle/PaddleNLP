@@ -7,7 +7,7 @@ NLP可解释评估
     3. 提供模型较全面的评估报告，含模型本身准确率等效果、以及在3个可解释评测指标上的结果
 
 <p align="center">
-<img src="model_interpretation/imgs/structure.png" /> <br>
+<img src="imgs/structure.png" /> <br>
 </p>
 
 可解释评估体系
@@ -21,7 +21,7 @@ NLP可解释评估
 #### 样例数据（来自中文情感分析任务）：
 
 <p align="center">
-<img src="model_interpretation/imgs/example1.png" /> <br>
+<img src="imgs/example1.png" /> <br>
 </p>
 
 #### 数据规模
@@ -72,28 +72,28 @@ NLP可解释评估
 __合理性__：评估模型预测依赖的证据与人工标注证据的拟合度，我们这里使用macro-F1作为评估指标，其中模型预测依赖证据可以由本模块提供的证据分析方法（位于/model_interpretation/task/目录下）给出。<br>
 
 <p align="center">
-<img src="model_interpretation/imgs/equation1.png" /> <br>
+<img src="imgs/equation1.png" /> <br>
 </p>
 其中S<sub>i</sub><sup>p</sup>和S<sub>i</sub><sup>g</sup>分别代表针对第i条输入模型预测证据和人工标注证据，N代表数据集中数据的数量<br>
 
 __一致性__：评估(原始输入，对应扰动输入)对中词重要度排序的一致性。证据分析方法对输入中每个词赋予一个重要度，基于该重要度对输入中所有词进行排序。我们使用搜索排序中的MAP（mean average precision）指标来计算两个排序的一致性。这里给出了MAP的两种计算方式，分别见以下两个公式：<br>
 公式一（正在使用）：<br>
 <p align="center">
-<img src="model_interpretation/imgs/equation5.png" /> <br>
+<img src="imgs/equation5.png" /> <br>
 </p>
 公式二：<br>
 <p align="center">
-<img src="model_interpretation/imgs/equation2.png" /> <br>
+<img src="imgs/equation2.png" /> <br>
 </p>
 其中X<sup>o</sup>和X<sup>d</sup>分别代表原始输入和扰动输入的词重要度排序序列。|X<sup>d</sup>|代表X<sup>d</sup>中词的个数，X<sup>o</sup><sub>1:j</sub>表示X<sup>o</sup>中前j最重要的词。函数G(x, Y)检查词x是否存在于列表Y中，如果存在则G(x, Y)=1。MAP越高表示两个序列排序一致性越高<br>
 
 __忠诚性__：评估模型给出的证据的忠诚性，即模型是否真的基于给出的证据进行预测的。这里从充分性和完备性两个角度进行评估。充分性，即模型给出的证据是否包含了预测需要的全部信息（即y<sub>r<sub>i</sub></sub> = y<sub>x<sub>i</sub></sub>，其中r<sub>i</sub>表示输入x<sub>i</sub>的证据，y<sub>x</sub>表示模型对输入x的预测结果）；完备性，即模型对输入x的预测结果（即y<sub>x<sub>i</sub>\r<sub>i</sub></sub> ≠ y<sub>x<sub>i</sub></sub>，其中x<sub>i</sub>\r<sub>i</sub>表示从输入x<sub>i</sub>中去除证据r<sub>i</sub>）。基于这两个维度，我们提出了一个新的指标New-P，计算方式如下：<br>
 
 <p align="center">
-<img src="model_interpretation/imgs/equation3.png" /> <br>
+<img src="imgs/equation3.png" /> <br>
 </p>
 <p align="center">
-<img src="model_interpretation/imgs/equation4.png" /> <br>
+<img src="imgs/equation4.png" /> <br>
 </p>
 
 ### 证据抽取方法
@@ -114,7 +114,7 @@ Linear-based（[Ribeiro et al.. 2016](https://arxiv.org/pdf/1602.04938.pdf)）�
 
 ### 三个任务的被评估模型
 为验证模型复杂度、参数规模对可解释的影响，针对每个任务，我们分别提供了基于LSTM（简单结构）的模型、及Transformer-based预训练模型（复杂结构），其中，对于预训练模型，提供了base版本和large版本。<br>
-模型代码位置：/model_interpretation/task/{task}/，({task}可取值为["senti","similarity","MRC"]，其中senti代表情感分析，similarity代表相似度计算，MRC代表阅读理解)<br>
+模型代码位置：/model_interpretation/task/{task}/，({task}可取值为["senti","similarity","mrc"]，其中senti代表情感分析，similarity代表相似度计算，mrc代表阅读理解)<br>
 模型运行及依赖环境请参考下方的“平台使用”。
 
 
@@ -205,14 +205,14 @@ pip3 install paddlepaddle-gpu
       model_interpretation/task/{task}/run_inter_all.sh (生成所有结果)
       model_interpretation/task/{task}/run_inter.sh (生成单个配置的结果，配置可以选择不同的评估模型，以及不同的证据抽取方法、语言)
 
-(注：{task}可取值为["senti","similarity","MRC"]，其中senti代表情感分析，similarity代表相似度计算，MRC代表阅读理解)
+(注：{task}可取值为["senti","similarity","mrc"]，其中senti代表情感分析，similarity代表相似度计算，mrc代表阅读理解)
 ### 可解释评估：
 #### 合理性（plausibility）：
     model_interpretation/evaluation/plausibility/run_f1.sh
 #### 一致性（consistency）：
-    model_interpretation/evaluation/consistency/run_MAP.sh
+    model_interpretation/evaluation/consistency/run_map.sh
 #### 忠诚性（faithfulness）：
-    model_interpretation/evaluation/faithfulness/run_NewP.sh
+    model_interpretation/evaluation/faithfulness/run_newp.sh
 
 ### 评估报告
 中文情感分析评估报告样例：
@@ -249,31 +249,3 @@ pip3 install paddlepaddle-gpu
       <td>26.8</td>
    </tr>
 </table>
-
-[//]:测试
-[//]:---
-[//]:如何执行自动化测试
-
-[//]:如何贡献
-[//]:---
-[//]:贡献patch流程及质量要求
-
-[//]:版本信息
-[//]:---
-[//]:本项目的各版本信息和变更历史可以在[这里][changelog]查看。
-
-[//]:维护者
-[//]:---
-[//]: owners
-[//]: shenyaozong(shenyaozong@baidu.com)
-
-[//]: committers
-[//]: shenyaozong(shenyaozong@baidu.com)
-
-
-讨论
----
-百度Hi交流群：群号
-
-
-[changelog]: http://icode.baidu.com/repos/baidu/nlp/Model-Interpretation/blob/master:CHANGELOG.md
