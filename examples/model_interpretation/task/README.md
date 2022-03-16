@@ -1,19 +1,20 @@
-### »ùÏßÄ£ĞÍÔ¤²â
-#### Çé¸Ğ·ÖÎö£º
-    Ô¤²â£ºmodel_interpretation/rationale_extraction/sentiment_pred.py
-    ²ÎÊıÉèÖÃ²Î¿¼£ºmodel_interpretation/rationale_extraction/run_2_pred_senti_per.sh £¨²ÎÊıÉæ¼°Ä£ĞÍ¡¢ÎÄ¼şµÈÂ·¾¶£¬ÒÔ¼°ÓïÑÔµÄ£¬Çë¸ù¾İÊµ¼ÊÇé¿ö½øĞĞĞŞ¸Ä£©
-#### ÎÄ±¾ÏàËÆ¶È£º
-    Ô¤²â£ºmodel_interpretation/rationale_extraction/similarity_pred.py
-    ²ÎÊıÉèÖÃ²Î¿¼£ºmodel_interpretation/rationale_extraction/run_2_pred_similarity_per.sh£¨²ÎÊıÉæ¼°Ä£ĞÍ¡¢ÎÄ¼şµÈÂ·¾¶£¬ÒÔ¼°ÓïÑÔµÄ£¬Çë¸ù¾İÊµ¼ÊÇé¿ö½øĞĞĞŞ¸Ä£©
-#### ÔÄ¶ÁÀí½â£º
-    Ô¤²â£ºmodel_interpretation/rationale_extraction/mrc_pred.py
-    ²ÎÊıÉèÖÃ²Î¿¼£ºmodel_interpretation/rationale_extraction/run_2_pred_mrc_per.sh£¨²ÎÊıÉæ¼°Ä£ĞÍ¡¢ÎÄ¼şµÈÂ·¾¶£¬ÒÔ¼°ÓïÑÔµÄ£¬Çë¸ù¾İÊµ¼ÊÇé¿ö½øĞĞĞŞ¸Ä£©
-### Èı¸öÈÎÎñµÄ»ùÏßÄ£ĞÍÑµÁ·
-#### Çé¸Ğ·ÖÎö
-    RoBERTa£ºmodel_interpretation/task/senti/pretrained_models/run_train.sh
-    LSTM£ºmodel_interpretation/task/senti/rnn/lstm_train.sh
-#### ÎÄ±¾ÏàËÆ¶È
-    RoBERTa£ºmodel_interpretation/task/similarity/pretrained_models/run_train_pointwise.sh
-    LSTM£ºmodel_interpretation/task/similarity/simnet/lstm_train.sh
-#### ÔÄ¶ÁÀí½â
-    RoBERTa£ºmodel_interpretation/task/MRC/run_train_rc.sh
+### åŸºçº¿æ¨¡å‹é¢„æµ‹
+#### æƒ…æ„Ÿåˆ†æï¼š
+    é¢„æµ‹ï¼šmodel_interpretation/rationale_extraction/sentiment_pred.py
+    å‚æ•°è®¾ç½®å‚è€ƒï¼šmodel_interpretation/rationale_extraction/run_2_pred_senti_per.sh ï¼ˆå‚æ•°æ¶‰åŠæ¨¡å‹ã€æ–‡ä»¶ç­‰è·¯å¾„ï¼Œä»¥åŠè¯­è¨€çš„ï¼Œè¯·æ ¹æ®å®é™…æƒ…å†µè¿›è¡Œä¿®æ”¹ï¼‰
+#### æ–‡æœ¬ç›¸ä¼¼åº¦ï¼š
+    é¢„æµ‹ï¼šmodel_interpretation/rationale_extraction/similarity_pred.py
+    å‚æ•°è®¾ç½®å‚è€ƒï¼šmodel_interpretation/rationale_extraction/run_2_pred_similarity_per.shï¼ˆå‚æ•°æ¶‰åŠæ¨¡å‹ã€æ–‡ä»¶ç­‰è·¯å¾„ï¼Œä»¥åŠè¯­è¨€çš„ï¼Œè¯·æ ¹æ®å®é™…æƒ…å†µè¿›è¡Œä¿®æ”¹ï¼‰
+#### é˜…è¯»ç†è§£ï¼š
+    é¢„æµ‹ï¼šmodel_interpretation/rationale_extraction/mrc_pred.py
+    å‚æ•°è®¾ç½®å‚è€ƒï¼šmodel_interpretation/rationale_extraction/run_2_pred_mrc_per.shï¼ˆå‚æ•°æ¶‰åŠæ¨¡å‹ã€æ–‡ä»¶ç­‰è·¯å¾„ï¼Œä»¥åŠè¯­è¨€çš„ï¼Œè¯·æ ¹æ®å®é™…æƒ…å†µè¿›è¡Œä¿®æ”¹ï¼‰
+### ä¸‰ä¸ªä»»åŠ¡çš„åŸºçº¿æ¨¡å‹è®­ç»ƒ
+#### æƒ…æ„Ÿåˆ†æ
+    RoBERTaï¼šmodel_interpretation/task/senti/pretrained_models/run_train.sh
+    LSTMï¼šmodel_interpretation/task/senti/rnn/lstm_train.sh
+#### æ–‡æœ¬ç›¸ä¼¼åº¦
+    RoBERTaï¼šmodel_interpretation/task/similarity/pretrained_models/run_train_pointwise.sh
+    LSTMï¼šmodel_interpretation/task/similarity/simnet/lstm_train.sh
+#### é˜…è¯»ç†è§£
+    RoBERTaï¼šmodel_interpretation/task/MRC/run_train_rc.sh
+
