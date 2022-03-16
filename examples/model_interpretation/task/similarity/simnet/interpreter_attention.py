@@ -37,12 +37,7 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def interpret(model,
-                data,
-                label_map,
-                batch_size=1,
-                pad_token_id=0,
-                vocab=None):
+def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
     """
     Predicts the data labels.
 

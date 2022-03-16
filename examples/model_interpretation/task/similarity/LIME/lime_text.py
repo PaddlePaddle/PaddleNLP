@@ -633,14 +633,14 @@ class LimeTextExplainer(object):
         epoch_num = math.ceil(len(perturb_text) / batch)
         for idx in range(epoch_num):
             if if_lstm:
-                query_list_tensor = paddle.to_tensor(query_list[idx * batch:(idx + 1)
-                                                           * batch])
-                title_list_tensor = paddle.to_tensor(title_list[idx * batch:(idx + 1)
-                                                           * batch])
-                query_len_list_tensor = paddle.to_tensor(query_len_list[idx * batch:(
+                query_list_tensor = paddle.to_tensor(query_list[idx * batch:(
                     idx + 1) * batch])
-                title_len_list_tensor = paddle.to_tensor(title_len_list[idx * batch:(
+                title_list_tensor = paddle.to_tensor(title_list[idx * batch:(
                     idx + 1) * batch])
+                query_len_list_tensor = paddle.to_tensor(query_len_list[
+                    idx * batch:(idx + 1) * batch])
+                title_len_list_tensor = paddle.to_tensor(title_len_list[
+                    idx * batch:(idx + 1) * batch])
                 label = classifier_fn(
                     query_list_tensor, title_list_tensor, query_len_list_tensor,
                     title_len_list_tensor)[0]  # label: Tensor[num_samples, 2]
