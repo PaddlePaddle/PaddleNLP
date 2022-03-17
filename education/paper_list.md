@@ -90,7 +90,7 @@ https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/be
 
 简介：ALBERT为了解决模型参数量大以及训练时间过长的问题。ALBERT最小的参数只有十几兆, 效果只比BERT低1-2个点。模型有三个创新点：一是将embedding的参数进行了因式分解，二是跨层的参数共享，三是抛弃了原来的NSP任务，使用SOP任务。
 
-代码链接：[https://github.com/google-research/ALBERT.](https://github.com/google-research/ALBERT.)
+代码链接：[https://github.com/google-research/ALBERT.](https://github.com/google-research/ALBERT)
 
 PaddleNLP代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/albert](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/albert)
 
