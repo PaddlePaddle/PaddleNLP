@@ -124,7 +124,7 @@ eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 
 对于 CLUE 分类任务，可以直接使用本项目中提供的脚本 `classification/predict_clue_classifier.py` 对单个任务进行预测，并将分类结果输出到文件。
 
-以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，用户可以运行如下脚本在测试集上对结果进行预测，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
+以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，用户可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
 
 ```
 cd classification
@@ -138,4 +138,4 @@ python predict_clue_classifier.py \
     --output_dir ${OUTPUT_DIR} \
 ```
 
-对于 CLUE 每个任务上的模型，用户需要运行以上脚本得到测试集上的结果，再把多个结果文件进行压缩，并把压缩包提交至 CLUE 官网进行评测。
+对于 CLUE 每个任务上的模型，用户需要运行以上脚本得到每个模型在相应测试集上的结果，再把多个结果文件进行压缩，最后把压缩包提交至 CLUE 官网进行评测。
