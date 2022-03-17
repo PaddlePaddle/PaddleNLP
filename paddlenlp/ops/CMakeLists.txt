@@ -47,9 +47,9 @@ if(MPI_FOUND AND NCCL_FOUND)
   add_definitions(-DBUILD_GPT)
   # Use a file to interact with python, and it indicates whether the lib is
   # parallel support.
-  file(TOUCH para_file)
+  file(TOUCH ${para_file})
 else()
-  file(REMOVE para_file)
+  file(REMOVE ${para_file})
   if(WITH_PARALLEL)
     message(FATAL_ERROR "Model parallel is not supported for FasterGeneration since can not found MPI or NCCL.")
   else()
