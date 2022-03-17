@@ -78,11 +78,11 @@ class ErnieDualEncoder(nn.Layer):
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
-                 output_emb_size=None,
                  use_cross_batch=False):
 
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
+        self.use_cross_batch = use_cross_batch
         self.query_ernie = ErnieEncoder.from_pretrained(
             query_model_name_or_path)
         if share_parameters:
