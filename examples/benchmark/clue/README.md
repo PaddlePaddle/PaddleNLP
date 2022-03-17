@@ -39,6 +39,7 @@ export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
+cd classification
 python -u ./run_clue_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
@@ -71,6 +72,7 @@ export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
+cd classification
 python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
@@ -121,11 +123,13 @@ eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
 ```
 OUTPUT_DIR=output
 mdkir ${OUTPUT_DIR}
+cd classification
 python predict_clue_classifier.py \
     --model_type ernie \
     --task_name TNEWS \
     --model_name_or_path ${TNEWS_MODEL}  \
     --output_dir ${OUTPUT_DIR} \
+```
 
 将要提交榜单所需要的每个任务都运行一次，得到预测结果，进入输出目录，对各任务上的结果进行压缩，最后可以将压缩包提交至 CLUE官网。
 
