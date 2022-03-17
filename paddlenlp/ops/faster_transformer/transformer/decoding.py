@@ -1231,7 +1231,8 @@ class InferGptDecoding(nn.Layer):
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
             load(
-                "FasterTransformer",
+                "FasterTransformer"
+                if get_ft_para_conf().no_para else "FasterTransformerParallel",
                 verbose=True,
                 need_parallel=not get_ft_para_conf().no_para)
 

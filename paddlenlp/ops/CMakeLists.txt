@@ -36,25 +36,11 @@ option(WITH_MBART       "Compile with MBART"                                    
 option(WITH_PARALLEL    "Compile with model parallel for GPT"                       OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-# https://cmake.org/cmake/help/latest/module/FindMPI.html#variables-for-locating-mpi
-find_package(MPI)
-find_package(NCCL)
-
-set(para_file ${CMAKE_CURRENT_BINARY_DIR}/lib/model_parallel.flag)
-if(MPI_FOUND AND NCCL_FOUND)
-  set(WITH_PARALLEL ON)
-  # support model parallel
+if(WITH_PARALLEL)
+  # https://cmake.org/cmake/help/latest/module/FindMPI.html#variables-for-locating-mpi
+  find_package(MPI REQUIRED)
+  find_package(NCCL REQUIRED)
   add_definitions(-DBUILD_GPT)
-  # Use a file to interact with python, and it indicates whether the lib is
-  # parallel support.
-  file(TOUCH ${para_file})
-else()
-  file(REMOVE ${para_file})
-  if(WITH_PARALLEL)
-    message(FATAL_ERROR "Model parallel is not supported for FasterGeneration since can not found MPI or NCCL.")
-  else()
-    message(NOTICE "Model parallel is not supported for FasterGeneration since can not found MPI or NCCL.")
-  endif()
 endif()
 
 if(NOT WITH_GPU)

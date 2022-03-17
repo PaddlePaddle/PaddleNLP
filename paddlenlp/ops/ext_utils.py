@@ -168,16 +168,10 @@ class FasterTransformerExtension(CMakeExtension):
     def get_target_filename(self):
         # CMake file has fixed the name of lib, maybe we can copy it as the name
         # returned by `BuildExtension.get_ext_filename` after build.
-        # TODO(guosheng): Maybe we should use a separated lib for model parallel
-        # to make no effect on performance of models without parallel.
         return "libdecoding_op.so"
 
     def get_output_filename(self):
-        # CMake file has fixed the name of lib, maybe we can copy it as the name
-        # returned by `BuildExtension.get_ext_filename` after build.
-        # Use the file to indicate whether the lib supports model parallel.
-        return ["libdecoding_op.so", "model_parallel.flag"
-                ] if self.need_parallel else "libdecoding_op.so"
+        return "libdecoding_op.so"
 
 
 class BuildExtension(PaddleBuildExtension):
@@ -202,7 +196,13 @@ class BuildExtension(PaddleBuildExtension):
         self.extensions = custom_exts + no_custom_exts
 
 
-EXTENSIONS = {"FasterTransformer": FasterTransformerExtension}
+EXTENSIONS = {
+    "FasterTransformer": FasterTransformerExtension,
+    # NOTE: Since model parallel code is supported by definitions, to avoid
+    # performance degrading on non-parallel mode, we use a separated lib for
+    # model parallel.
+    "FasterTransformerParallel": FasterTransformerExtension
+}
 
 
 def get_extension_maker(name):
@@ -252,6 +252,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                        name)
         raise NotImplementedError
     if name in LOADED_EXT.keys():
+        # TODO(guosheng): Maybe the key should combined with kwargs since the
+        # extension object is created using them.
         return LOADED_EXT[name]
     if build_dir is None:
         # Maybe under package dir is better to avoid cmake source path conflict
@@ -290,7 +292,7 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                 return LOADED_EXT[name]
 
     # write setup file and jit compile
-    file_path = os.path.join(build_dir, "{}_setup.py".format(name))
+    file_path = os.path.join(build_dir, name, "{}_setup.py".format(name))
     _write_setup_file(name, file_path, build_base_dir, **kwargs)
     _jit_compile(file_path, verbose)
     if isinstance(extension, CMakeExtension):
