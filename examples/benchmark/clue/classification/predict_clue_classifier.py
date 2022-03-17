@@ -31,6 +31,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 
@@ -49,6 +50,7 @@ METRIC_CLASSES = {
 }
 
 MODEL_CLASSES = {
+    "bert": (BertForSequenceClassification, BertTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
     "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
 }
@@ -140,7 +142,6 @@ def convert_example(example,
             'target']['span1_text'], example['target']['span2_text'], example[
                 'target']['span1_index'], example['target']['span2_index']
         text_list = list(text)
-        # print(text)
         assert text[pronoun_idx:(pronoun_idx + len(pronoun)
                                  )] == pronoun, "pronoun: {}".format(pronoun)
         assert text[query_idx:(query_idx + len(query)
@@ -185,7 +186,6 @@ def do_test(args):
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        # Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
 
     test_ds = test_ds.map(trans_func, lazy=True)
