@@ -25,7 +25,7 @@
 
 ## 一键复现模型效果
 
-这一小节以TNEWS任务为例为用户展示如何一键复现本文的评测结果。
+这一小节以 TNEWS 任务为例为用户展示如何一键复现本文的评测结果。
 
 ### 启动 CLUE 任务
 以 CLUE 的 TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
@@ -122,7 +122,7 @@ eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 
 ## 参加 CLUE 竞赛
 
-对于 CLUE 分类任务，用户可以直接使用本项目中提供的脚本 `classification/predict_clue_classifier.py` 对单个任务进行预测，并将分类结果输出分类到文件。
+对于 CLUE 分类任务，用户可以直接使用本项目中提供的脚本 `classification/predict_clue_classifier.py` 对单个任务进行预测，并将分类结果输出到文件。
 
 以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，用户可以运行如下脚本在测试集上对结果进行预测，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
 
