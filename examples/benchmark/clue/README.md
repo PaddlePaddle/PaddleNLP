@@ -1,6 +1,6 @@
 # CLUE Benchmark
 
-[CLUE](https://www.cluebenchmarks.com/)自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)
+[CLUE](https://www.cluebenchmarks.com/)自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)。
 
 本项目基于 PaddlePaddle 在 CLUE 数据集上对领先的开源预训练模型模型进行了充分评测，为开发者在预训练模型选择上提供参考，同时开发者基于本项目可以轻松一键复现模型效果，也可以参加 CLUE 竞赛取得好成绩。
 
@@ -8,11 +8,12 @@
 
 使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
 
-| Model                 | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     |
-| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- |
-| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc |
-| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |
+| Model                 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   |
+| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- |
+| RoBERTa-wwm-ext-large | 76.20 | 59.50 | 62.10   | 84.02 | 79.15 | 90.79       | 82.03 |
 
+
+其中 AFQMC、TNEWS、 IFLYTEK、CMNLI、OCNLI、CLUEWSC2020 和 CSL 任务使用的评估指标均是 Accuracy。
 
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优，训练每间隔 100 steps 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
@@ -92,9 +93,8 @@ python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
 
 ```
 其中参数释义如下：
-- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie-1.0、ernie-tiny 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
-- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含 paddle 预训练模型 model_state.pdparams。
-如果使用PaddleNLP提供的预训练模型，可以选择 `model_type` 在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的英文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如 model_type 配置的是 bert，则 model_name_or_path 只能选择 bert 相关的模型。另，clue 任务应选择中文预训练权重。
+- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie、bert 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
+- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型，可以选择 `model_type` 在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的中文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如 model_type 配置的是 ernie，则 model_name_or_path 只能选择 ernie 相关的模型。另，clue 任务应选择中文预训练权重。
 
 - `task_name` 表示 Fine-tuning 的任务，当前支持 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
