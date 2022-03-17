@@ -60,7 +60,7 @@ class ErnieDualEncoder(nn.Layer):
 
             from paddlenlp.transformers import ErnieDualEncoder
         
-            model = ErnieDualEncoder("ernie-base-matching-query", "ernie-base-matching-title", output_emb_size=512)
+            model = ErnieDualEncoder("ernie-base-cn-query-encoder", "ernie-base-cn-title-encoder")
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
