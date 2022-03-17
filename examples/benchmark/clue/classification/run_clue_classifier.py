@@ -35,10 +35,6 @@ from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
-
 METRIC_CLASSES = {
     "afqmc": Accuracy,
     "tnews": Accuracy,
