@@ -186,7 +186,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
-        "ernie-base-cn-query": {
+        "ernie-base-cn-query-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
@@ -199,7 +199,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
         },
-        "ernie-base-cn-title": {
+        "ernie-base-cn-title-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
@@ -212,7 +212,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
         },
-        "ernie-base-en-query": {
+        "ernie-base-en-query-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -225,7 +225,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
-        "ernie-base-en-title": {
+        "ernie-base-en-title-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -252,14 +252,14 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
-            "ernie-base-cn-query":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query.pdparams",
-            "ernie-base-cn-title":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title.pdparams",
-            "ernie-base-en-query":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query.pdparams",
-            "ernie-base-en-title":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title.pdparams",
+            "ernie-base-cn-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query_encoder.pdparams",
+            "ernie-base-cn-title-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title_encoder.pdparams",
+            "ernie-base-en-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query_encoder.pdparams",
+            "ernie-base-en-title-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title_encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
