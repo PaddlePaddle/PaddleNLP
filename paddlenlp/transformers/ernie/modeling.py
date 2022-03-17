@@ -186,6 +186,58 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "ernie-base-cn-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "ernie-base-cn-title-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "ernie-base-en-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "ernie-base-en-title-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -200,6 +252,14 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+            "ernie-base-cn-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query_encoder.pdparams",
+            "ernie-base-cn-title-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title_encoder.pdparams",
+            "ernie-base-en-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query_encoder.pdparams",
+            "ernie-base-en-title-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title_encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
