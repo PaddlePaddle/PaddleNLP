@@ -26,7 +26,7 @@ from paddle.metric import Accuracy
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ElectraForSequenceClassification, LinearDecayWithWarmup
+from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer, LinearDecayWithWarmup
 from paddlenlp.metrics import MultiLabelsMetric, AccuracyAndF1
 from paddlenlp.ops.optimizer import ExponentialMovingAverage
 
@@ -117,16 +117,15 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        'cblue', args.dataset, splits=['train', 'dev', 'test'])
+    train_ds, dev_ds = load_dataset(
+        'cblue', args.dataset, splits=['train', 'dev'])
 
     model = ElectraForSequenceClassification.from_pretrained(
         'ehealth-chinese',
         num_classes=len(train_ds.label_list),
         activation='tanh',
         layer_norm_eps=1e-5)
-    tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained(
-        'ehealth-chinese')
+    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
 
     trans_func = partial(
         convert_example,

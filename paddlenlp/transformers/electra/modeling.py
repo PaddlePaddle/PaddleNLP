@@ -16,6 +16,8 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.nn import TransformerEncoderLayer, TransformerEncoder
+from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
 
@@ -57,6 +59,97 @@ ACT2FN = {
     "linear": linear_act,
     "swish": swish,
 }
+
+
+class TransformerEncoderLayerPro(TransformerEncoderLayer):
+    def __init__(self,
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout=0.1,
+                 activation="relu",
+                 attn_dropout=None,
+                 act_dropout=None,
+                 normalize_before=False,
+                 weight_attr=None,
+                 bias_attr=None):
+        super(TransformerEncoderLayerPro, self).__init__(
+            d_model, nhead, dim_feedforward, dropout, activation, attn_dropout,
+            act_dropout, normalize_before, weight_attr, bias_attr)
+
+    def forward(self, src, src_mask=None, cache=None, output_attentions=False):
+        self.self_attn.need_weights = output_attentions
+        src_mask = _convert_attention_mask(src_mask, src.dtype)
+        attentions = None
+
+        residual = src
+        if self.normalize_before:
+            src = self.norm1(src)
+        if cache is None:
+            src = self.self_attn(src, src, src, src_mask)
+            if output_attentions:
+                src, attentions = src
+        else:
+            output = self.self_attn(src, src, src, src_mask, cache)
+            if output_attentions:
+                src, attentions, incremental_cache = output
+            else:
+                src, incremental_cache = output
+
+        src = residual + self.dropout1(src)
+        if not self.normalize_before:
+            src = self.norm1(src)
+
+        residual = src
+        if self.normalize_before:
+            src = self.norm2(src)
+        src = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = residual + self.dropout2(src)
+        if not self.normalize_before:
+            src = self.norm2(src)
+        if output_attentions:
+            src = (src, attentions)
+        return src if cache is None else (src, incremental_cache)
+
+
+class TransformerEncoderPro(TransformerEncoder):
+    def __init__(self, encoder_layer, num_layers, norm=None):
+        super(TransformerEncoderPro, self).__init__(encoder_layer, num_layers,
+                                                    norm)
+
+    def forward(self,
+                src,
+                src_mask=None,
+                cache=None,
+                output_attentions=False,
+                output_hidden_states=False):
+        src_mask = _convert_attention_mask(src_mask, src.dtype)
+
+        output = src
+        new_caches = []
+        all_attentions = []
+        all_hidden_states = []
+        for i, mod in enumerate(self.layers):
+            if cache is None:
+                output = mod(output, src_mask=src_mask)
+            else:
+                output, new_cache = mod(output,
+                                        src_mask=src_mask,
+                                        cache=cache[i])
+                new_caches.append(new_cache)
+            if output_attentions:
+                all_attentions.append(output[1])
+                output = output[0]
+            if output_hidden_states:
+                all_hidden_states.append(output)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        if output_attentions or output_hidden_states:
+            output = (output, all_attentions, all_hidden_states)
+
+        return output if cache is None else (output, new_caches)
 
 
 class ElectraEmbeddings(nn.Layer):
@@ -389,7 +482,7 @@ class ElectraModel(ElectraPretrainedModel):
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
 
-        encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = TransformerEncoderLayerPro(
             hidden_size,
             num_attention_heads,
             intermediate_size,
@@ -397,7 +490,7 @@ class ElectraModel(ElectraPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = TransformerEncoderPro(encoder_layer, num_hidden_layers)
 
         self.init_weights()
 
@@ -411,7 +504,9 @@ class ElectraModel(ElectraPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_attentions=False,
+                output_hidden_states=False):
         r'''
         The ElectraModel forward method, overrides the `__call__()` special method.
 
@@ -480,7 +575,11 @@ class ElectraModel(ElectraPretrainedModel):
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
+        encoder_outputs = self.encoder(
+            embedding_output,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states)
 
         return encoder_outputs
 
