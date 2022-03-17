@@ -8,11 +8,11 @@
 
 使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
 
-| Model                 | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
-| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
-| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
-| ERNIE 3.0 Base        | 75.86   | 58.92   | 61.18   | 83.35   | 79.66   | 86.51       | 82.73   | 89.48    |         |         |
-| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
+| Model                 | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     |
+| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- |
+| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc |
+| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |
+
 
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优，训练每间隔 100 steps 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
