@@ -122,7 +122,7 @@ class CBLUE(DatasetBuilder):
                     '8ac74722e9448fdc76132206582b9a06', ['text']
                 ]
             },
-            'labels': '53_schema.json'
+            'labels': '53_schemas.json'
         },
         'CHIP-CDN': {
             'url':
@@ -280,12 +280,63 @@ class CBLUE(DatasetBuilder):
                               builder_config['md5'])
         return fullname
 
+    def _search_entity_index(self, tokens, entity_tokens, skip_idx=None):
+        ent_len = len(entity_tokens)
+        for idx in range(len(tokens) - ent_len + 1):
+            if tokens[idx:idx + ent_len] == entity_tokens:
+                if skip_idx is None:
+                    return idx
+                elif idx < skip_idx or idx >= skip_idx + ent_len:
+                    return idx
+        return None
+
+    def _search_spo_index(self, tokens, subjects, objects):
+        tokens = tokens.lower()
+        subjects = subjects.lower()
+        objects = objects.lower()
+        if len(subjects) > len(objects):
+            sub_idx = self._search_entity_index(tokens, subjects)
+            obj_idx = self._search_entity_index(tokens, objects, sub_idx)
+        else:
+            obj_idx = self._search_entity_index(tokens, objects)
+            sub_idx = self._search_entity_index(tokens, subjects, obj_idx)
+        return sub_idx, obj_idx
+
     def _read(self, filename, split):
         _, _, input_keys = self.BUILDER_CONFIGS[self.name]['splits'][split]
         with open(filename, 'r', encoding='utf-8') as f:
             if self.name == 'CMeIE':
-                data_list = json.load(f, encoding='utf-8')
-                pass
+                for line in f.readlines():
+                    data = json.loads(line, encoding='urf-8')
+                    labels = self.get_labels()
+                    label_map = dict([(x, i) for i, x in enumerate(labels)])
+                    data_list = data.get('spo_list', [])
+                    ent_list, spo_list = [], []
+                    ent_label, spo_label = [], []
+                    for spo in data_list:
+                        sub, obj = spo['subject'], spo['object']['@value']
+                        rel = spo['predicate']
+                        ent_list.append(sub)
+                        ent_list.append(obj)
+                        spo_list.append((sub, rel, obj))
+                        sub_idx, obj_idx = self._search_spo_index(data['text'],
+                                                                  sub, obj)
+                        if sub_idx is not None and obj_idx is not None:
+                            ent_label.append((sub_idx, sub_idx + len(sub) - 1))
+                            ent_label.append((obj_idx, obj_idx + len(obj) - 1))
+                            spo_label.append((sub_idx, obj_idx, label_map[rel]))
+
+                        if sub_idx is None or obj_idx is None:
+                            print('Error: Can not find entities in tokens.')
+                            print('Tokens:', data['text'])
+                            print('Entities":', sub, obj)
+
+                        data['ent_list'] = ent_list
+                        data['spo_list'] = spo_list
+                        data['ent_label'] = ent_label
+                        data['spo_label'] = spo_label
+
+                        yield data
             elif self.name == 'CMeEE':
                 data_list = json.load(f, encoding='utf-8')
                 for data in data_list:
@@ -299,7 +350,7 @@ class CBLUE(DatasetBuilder):
                             etype = entity['type']
                             ltype = int(etype == 'sym')
                             if start_idx == end_idx:
-                                labels[ltype][end_idx] = 'S-' + etype
+                                labels[ltype][start_idx] = 'S-' + etype
                             else:
                                 labels[ltype][start_idx] = 'B-' + etype
                                 labels[ltype][end_idx] = 'E-' + etype
@@ -346,10 +397,10 @@ class CBLUE(DatasetBuilder):
             labels = pd.read_excel(os.path.join(label_dir, labels))
             return sorted(labels['Label Name'].values)
         elif self.name == 'CMeIE':
-            labels = []
+            label_list = set()
             with open(os.path.join(label_dir, labels), 'r') as f:
                 for line in f.readlines():
-                    labels.append(json.loads(line))
-            return sorted(labels)
+                    label_list.add(json.loads(line)['predicate'])
+            return sorted(list(label_list))
         else:
             return self.BUILDER_CONFIGS[self.name]['labels']
