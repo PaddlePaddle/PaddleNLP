@@ -27,6 +27,7 @@ from paddle.nn import Layer
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
@@ -381,6 +382,9 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
+        # For model parallel if FasterGeneration
+        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(
+            model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model

@@ -160,6 +160,8 @@ class FasterTransformerExtension(CMakeExtension):
             ext_builder.copy_tree(
                 os.path.join(ext_builder.build_temp, "lib"),
                 ext_builder.build_lib)
+            # NOTE: 
+            # os.remove(ext_builder.build_temp)
         except Exception as e:
             logger.warning(
                 "FasterTransformer is not available due to build errors.")

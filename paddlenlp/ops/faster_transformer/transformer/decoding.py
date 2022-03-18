@@ -14,6 +14,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 import os
+from importlib_metadata import functools
 import numpy as np
 from functools import partial
 
@@ -27,6 +28,7 @@ import paddle
 import paddlenlp
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.utils.log import logger
+from paddlenlp.transformers.utils import fn_args_to_dict
 
 
 def infer_transformer_decoding(
@@ -602,6 +604,67 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
         if restore_data else None)
 
 
+def _convert_qkv(q_proj,
+                 k_proj,
+                 v_proj,
+                 attr="weight",
+                 use_numpy=True,
+                 del_param=False,
+                 dummy_tensor=None):
+    ft_para_conf = get_ft_para_conf()
+    # TODO(guosheng): maybe static graph need this
+    # p = faster_model.create_parameter(
+    #     shape=[q.shape[0], q.shape[1] + k.shape[1] + v.shape[1]],
+    #     dtype=q.dtype,
+    #     is_bias=is_bias)
+    q = getattr(q_proj, attr)
+    k = getattr(k_proj, attr)
+    v = getattr(v_proj, attr)
+    if use_numpy:
+        q = q.numpy()
+        if del_param:
+            if attr == "weight":
+                del q_proj.weight
+            else:
+                del q_proj.bias
+        k = k.numpy()
+        if del_param:
+            if attr == "weight":
+                del k_proj.weight
+            else:
+                del k_proj.bias
+        v = v.numpy()
+        if del_param:
+            if attr == "weight":
+                del v_proj.weight
+            else:
+                del v_proj.bias
+    else:
+        if del_param:
+            for i in [q_proj, k_proj, v_proj]:
+                if attr == "weight":
+                    del i.weight
+                else:
+                    del i.bias
+    q = ft_para_conf.slice_weight(q, 1)
+    k = ft_para_conf.slice_weight(k, 1)
+    v = ft_para_conf.slice_weight(v, 1)
+    if del_param:
+        # NOTE: dygraph_to_static/convert_call_func.py would log the converted
+        # function. For linear layer, if we delete the params, log would fail.
+        # And the log requires weight to be a 2D tensor.
+        # NOTE: Assignment to parameter 'weight' should be of type
+        # Parameter or None, thus delete before in case of tensor.
+        setattr(q_proj, attr, dummy_tensor)
+        setattr(k_proj, attr, dummy_tensor)
+        setattr(v_proj, attr, dummy_tensor)
+    if use_numpy:
+        p = paddle.to_tensor(np.concatenate([q, k, v], axis=-1))
+    else:
+        p = paddle.concat([q, k, v], axis=-1)
+    return p
+
+
 def convert_params(faster_model,
                    model,
                    fuse_qkv=1,
@@ -660,6 +723,8 @@ def convert_params(faster_model,
                 # NOTE: Assignment to parameter 'weight' should be of type
                 # Parameter or None, thus delete first in case of param is
                 # a tensor.
+                # TODO(guosheng): make slice_weight use `output_param=True`
+                # and remove delattr.
                 delattr(layer, attr)
                 setattr(layer, attr, param)
             else:
@@ -682,66 +747,6 @@ def convert_params(faster_model,
             return super().append(param)
 
     params = defaultdict(_list)
-
-    def _concat_param(q_proj,
-                      k_proj,
-                      v_proj,
-                      attr="weight",
-                      use_numpy=True,
-                      del_param=False,
-                      dummy_tensor=None):
-        # TODO(guosheng): maybe static graph need this
-        # p = faster_model.create_parameter(
-        #     shape=[q.shape[0], q.shape[1] + k.shape[1] + v.shape[1]],
-        #     dtype=q.dtype,
-        #     is_bias=is_bias)
-        q = getattr(q_proj, attr)
-        k = getattr(k_proj, attr)
-        v = getattr(v_proj, attr)
-        if use_numpy:
-            q = q.numpy()
-            if del_param:
-                if attr == "weight":
-                    del q_proj.weight
-                else:
-                    del q_proj.bias
-            k = k.numpy()
-            if del_param:
-                if attr == "weight":
-                    del k_proj.weight
-                else:
-                    del k_proj.bias
-            v = v.numpy()
-            if del_param:
-                if attr == "weight":
-                    del v_proj.weight
-                else:
-                    del v_proj.bias
-            q = ft_para_conf.slice_weight(q, 1)
-            k = ft_para_conf.slice_weight(k, 1)
-            v = ft_para_conf.slice_weight(v, 1)
-            p = paddle.to_tensor(np.concatenate([q, k, v], axis=-1))
-        else:
-            q = ft_para_conf.slice_weight(q, 1)
-            k = ft_para_conf.slice_weight(k, 1)
-            v = ft_para_conf.slice_weight(v, 1)
-            p = paddle.concat([q, k, v], axis=-1)
-            if del_param:
-                for i in [q_proj, k_proj, v_proj]:
-                    if attr == "weight":
-                        del i.weight
-                    else:
-                        del i.bias
-        if del_param:
-            # NOTE: dygraph_to_static/convert_call_func.py would log the converted
-            # function. For linear layer, if we delete the params, log would fail.
-            # And the log requires weight to be a 2D tensor.
-            # NOTE: Assignment to parameter 'weight' should be of type
-            # Parameter or None, thus delete before in case of tensor.
-            setattr(q_proj, attr, dummy_tensor)
-            setattr(k_proj, attr, dummy_tensor)
-            setattr(v_proj, attr, dummy_tensor)
-        return p
 
     def _convert(module):
         if isinstance(
@@ -775,7 +780,7 @@ def convert_params(faster_model,
                     # requires that on linear weight. While size 0 seems all
                     # right in jit.to_static/jit.save.
                     dummy_tensor = paddle.zeros([1, 1])
-                    w = _concat_param(
+                    w = _convert_qkv(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
@@ -783,7 +788,7 @@ def convert_params(faster_model,
                         use_numpy=fuse_qkv == 2,
                         del_param=fuse_qkv == 2,
                         dummy_tensor=dummy_tensor)
-                    b = _concat_param(
+                    b = _convert_qkv(
                         layer.self_attn.q_proj,
                         layer.self_attn.k_proj,
                         layer.self_attn.v_proj,
@@ -1177,21 +1182,56 @@ class FTParaConf(object):
         return (i >= layers_per_device * self.layer_para_rank
                 ) and i < layers_per_device * (self.layer_para_rank + 1)
 
-    def slice_weight(self, weight, axis):
+    def slice_weight(self, weight, axis, phase=1, out_param=False):
+        # weight can be parameter/tensor/ndarray
         if self.no_para: return weight
         # Take into account model only including partial weights.
-        if self.is_partial_model: return weight
+        if self.is_partial_model:
+            if phase == 1:
+                # 0 for init
+                # 1 for convert param to FT
+                return weight
         if len(weight.shape) == 1: axis = 0
         local_size = weight.shape[axis] // self.tensor_para_size
         start_offset = self.tensor_para_rank * local_size
         end_offset = start_offset + local_size
         if len(weight.shape) == 1:
-            return weight[start_offset:end_offset]
-        return weight[:, start_offset:end_offset] if axis == 1 else weight[
-            start_offset:end_offset, :]
+            w_slice = weight[start_offset:end_offset]
+        else:
+            w_slice = weight[:, start_offset:
+                             end_offset] if axis == 1 else weight[start_offset:
+                                                                  end_offset, :]
+        if out_param:
+            # Assume weight is also a Parameter.
+            w = type(weight)(shape=w_slice.shape,
+                             dtype=weight.dtype,
+                             is_bias=len(weight.shape) == 1)
+            # NOTE: `VarBase.set_value` would use `w.numpy()` while w is not
+            # initialized and can not be used directly.
+            # TODO(guosheng): If `w.place `can be used here, use `w.place` to
+            # avoid w.place and _current_expected_place are different.
+            w.value().get_tensor().set(
+                w_slice, paddle.fluid.framework._current_expected_place())
+            return w
+        else:
+            return w_slice
 
     def set_partial_model(self, is_partial_model):
         self.is_partial_model = is_partial_model
+
+    def fit_partial_model(self, model, state_to_load):
+        if self.no_para or not self.is_partial_model: return state_to_load
+
+        def fit_param(p, v):
+            if p.shape[0] != v.shape[0]:
+                return _ft_para_conf.slice_weight(v, axis=0, phase=0)
+            if len(p.shape) == 2 and p.shape[1] != v.shape[1]:
+                return _ft_para_conf.slice_weight(v, axis=1, phase=0)
+            return v
+
+        for k, v in model.state_dict().items():
+            state_to_load[k] = fit_param(v, state_to_load[k])
+        return state_to_load
 
 
 # TODO(guosheng): Maybe use context-manager to allow multiple models.
@@ -1209,12 +1249,51 @@ def enable_ft_para(tensor_para_size=1,
     global _ft_para_conf
     _ft_para_conf = FTParaConf(tensor_para_size, layer_para_size,
                                layer_para_batch_size)
+    if _ft_para_conf.no_para: return
 
-    # def _init(self):
-    #     pass
-    # lazy init
-    # nn.TransformerEncoder.__init__ = None
-    # paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__ = None
+    def reset_param(layer, attr, axis):
+        param = getattr(layer, attr)
+        # NOTE: Assignment to parameter 'weight' should be of type Parameter or
+        # None. Additionaly, we cannot delattr and setattr which would remove
+        # the param from layer._parameters and state_dict.
+        param = _ft_para_conf.slice_weight(param, axis, phase=0, out_param=True)
+        setattr(layer, attr, param)
+
+    def layer_init_wrapper(func):
+        @functools.wraps(func)
+        def _impl(self, *args, **kwargs):
+            func(self, *args, **kwargs)
+            # Reset parameters with corresponding slice.
+            for x, attr in [(m, n)
+                            for m in ("q", "k", "v")
+                            for n in ("weight", "bias")]:
+                reset_param(getattr(self.self_attn, x + "_proj"), attr, 1)
+            reset_param(self.self_attn.out_proj, "weight", 0)
+            reset_param(self.linear1, "weight", 1)
+            reset_param(self.linear1, "bias", 1)
+            reset_param(self.linear2, "weight", 0)
+
+        return _impl
+
+    def block_init_wrapper(func):
+        @functools.wraps(func)
+        def _impl(self, *args, **kwargs):
+            init_dict = fn_args_to_dict(func, *((self, ) + args), **kwargs)
+            d_model = init_dict["d_model"]
+            nhead = init_dict["nhead"]
+            dim_feedforward = init_dict["dim_feedforward"]
+            func(self, *args, **kwargs)
+
+        return _impl
+
+    layer_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__
+    paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__ = layer_init_wrapper(
+        layer_init_fn)
+    _ft_para_conf.set_partial_model(True)
+    # Transformer block in GPT is not created in TransformerDecoder.
+    # block_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__
+    # paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__ = block_init_wrapper(
+    #     block_init_fn)
     # yield
 
 
