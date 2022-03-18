@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
 __all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
 
@@ -318,3 +319,107 @@ class Dict(object):
             else:
                 ret.append(result)
         return tuple(ret)
+
+
+'''
+class DefaultDataCollator(DataCollatorMixin):
+    return_tensors: str = "pt"
+
+    def __call__(self, features: List[Dict[str, Any]], return_tensors=None) -> Dict[str, Any]:
+        if return_tensors is None:
+            return_tensors = self.return_tensors
+        return default_data_collator(features, return_tensors)
+'''
+
+
+def default_data_collator(data):
+
+    if not isinstance(features[0], dict):
+        features = [vars(f) for f in features]
+    first = features[0]
+    batch = {}
+
+    # Special handling for labels.
+    # Ensure that tensor is created with the correct type
+    # (it should be automatically the case, but let's make sure of it.)
+    if "label" in first and first["label"] is not None:
+        label = first["label"].item() if isinstance(
+            first["label"], paddle.Tensor) else first["label"]
+        dtype = torch.long if isinstance(label, int) else torch.float
+        batch["labels"] = torch.tensor(
+            [f["label"] for f in features], dtype=dtype)
+    elif "label_ids" in first and first["label_ids"] is not None:
+        if isinstance(first["label_ids"], torch.Tensor):
+            batch["labels"] = torch.stack([f["label_ids"] for f in features])
+        else:
+            dtype = torch.long if type(first["label_ids"][
+                0]) is int else torch.float
+            batch["labels"] = torch.tensor(
+                [f["label_ids"] for f in features], dtype=dtype)
+
+    # Handling of all other possible keys.
+    # Again, we will use the first element to figure out which key/values are not None for this model.
+    for k, v in first.items():
+        if k not in ("label", "label_ids") and v is not None and not isinstance(
+                v, str):
+            if isinstance(v, torch.Tensor):
+                batch[k] = torch.stack([f[k] for f in features])
+            else:
+                batch[k] = torch.tensor([f[k] for f in features])
+
+    return batch
+
+
+class DataCollatorWithPadding:
+    """
+    Data collator that will dynamically pad the inputs received.
+
+    Args:
+        tokenizer (:class:`~transformers.PreTrainedTokenizer` or :class:`~transformers.PreTrainedTokenizerFast`):
+            The tokenizer used for encoding the data.
+        padding (:obj:`bool`, :obj:`str` or :class:`~transformers.file_utils.PaddingStrategy`, `optional`, defaults to :obj:`True`):
+            Select a strategy to pad the returned sequences (according to the model's padding side and padding index)
+            among:
+
+            * :obj:`True` or :obj:`'longest'`: Pad to the longest sequence in the batch (or no padding if only a single
+              sequence if provided).
+            * :obj:`'max_length'`: Pad to a maximum length specified with the argument :obj:`max_length` or to the
+              maximum acceptable input length for the model if that argument is not provided.
+            * :obj:`False` or :obj:`'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of
+              different lengths).
+        max_length (:obj:`int`, `optional`):
+            Maximum length of the returned list and optionally padding length (see above).
+        pad_to_multiple_of (:obj:`int`, `optional`):
+            If set will pad the sequence to a multiple of the provided value.
+
+            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
+            7.5 (Volta).
+    """
+
+    tokenizer: PreTrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+    return_tensors: str = "pt"
+
+    def __call__(self, data):
+        first = data[0]
+        assert isinstance(first, dict), 'Input pattern not understood. The input of collatot must be a dict with key of input column name and value of data ' \
+                                   'Received input type:' % (type(first))
+        batch = {}
+        if "label" in first and first["label"] is not None:
+            label = first["label"]
+            dtype = 'int64' if isinstance(label, int) else 'float32'
+            batch["labels"] = Stack(dtype=dtype)([d["label"] for d in data])
+        elif "label_ids" in first and first["label_ids"] is not None:
+            dtype = 'int64' if type(first["label_ids"][0]) is int else 'float32'
+            batch["labels"] = Stack(dtype=dtype)([d["label_ids"] for d in data])
+
+        for k, v in first.items():
+            if k not in ("label", "label_ids"
+                         ) and v is not None and not isinstance(v, str):
+                batch[k] = Pad(axis=0,
+                               pad_val=self.tokenizer.pad_token_type_id,
+                               dtype=dtype)([d[k] for d in data])
+
+        return batch
