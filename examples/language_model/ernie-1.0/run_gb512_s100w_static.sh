@@ -11,7 +11,6 @@ rm -rf main_sharding*
 task_name="ernie-1.0-dp8-gb512"
 rm -rf output/$task_name/log
 
-
 PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name/log" \
@@ -30,18 +29,16 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
-    --max_steps 2000000 \
+    --max_steps 1000000 \
     --save_steps 50000 \
     --checkpoint_steps 5000 \
-    --decay_steps 1980000 \
-    --weight_decay 0.01 \
-    --warmup_rate 0.005 \
+    --decay_steps 990000 \
+    --weight_decay 0.01\
+    --warmup_rate 0.01 \
     --grad_clip 1.0 \
-    --logging_freq 20\
     --num_workers 2 \
+    --logging_freq 20\
     --eval_freq 1000 \
-    --device "gpu"\
-
-# --check_accuracy true\
+    --device "gpu"
 
 # NOTE: please set use_sharding=True for sharding_degree > 1
