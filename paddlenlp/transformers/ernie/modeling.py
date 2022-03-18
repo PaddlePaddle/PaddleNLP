@@ -199,7 +199,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
         },
-        "ernie-base-cn-title-encoder": {
+        "ernie-base-cn-para-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
@@ -253,13 +253,13 @@ class ErniePretrainedModel(PretrainedModel):
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
             "ernie-base-cn-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_query_encoder.pdparams",
-            "ernie-base-cn-title-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_cn_title_encoder.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-cn-query-encoder.pdparams",
+            "ernie-base-cn-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-cn-para-encoder.pdparams",
             "ernie-base-en-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query_encoder.pdparams",
-            "ernie-base-en-title-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_title_encoder.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-en-query-encoder.pdparams",
+            "ernie-base-en-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base_en-para-encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
