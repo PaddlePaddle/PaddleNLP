@@ -386,7 +386,7 @@ class ElectraPretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = getattr(self, 'layer_norm_eps', 1e-12)
+            layer._epsilon = getattr(self, "layer_norm_eps", 1e-12)
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 

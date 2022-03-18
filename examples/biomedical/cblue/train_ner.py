@@ -29,8 +29,6 @@ parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight dec
 parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion over the training process.')
 parser.add_argument('--use_amp', default=False, type=bool, help='Enable mixed precision training.')
 parser.add_argument('--epochs', default=1, type=int, help='Total number of training epochs.')
-parser.add_argument('--eval_mention', default=True, type=bool, help='.')
-parser.add_argument('--update_tokenizer', default=True, type=bool, help='Update the word tokenizer during training.')
 parser.add_argument('--seed', default=1000, type=int, help='Random seed.')
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
 
@@ -105,7 +103,7 @@ def do_train():
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
         'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),
         'position_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'mask': Pad(axis=0, pad_val=0, dtype='float32'),
+        'attention_mask': Pad(axis=0, pad_val=0, dtype='float32'),
         'label_oth': Pad(axis=0, pad_val=pad_label_id[0], dtype='int64'),
         'label_sym': Pad(axis=0, pad_val=pad_label_id[1], dtype='int64')
     }): fn(samples)
@@ -164,8 +162,6 @@ def do_train():
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
-                att_mask = paddle.unsqueeze(masks, axis=2)
-                att_mask = paddle.matmul(att_mask, att_mask, transpose_y=True)
                 logits = model(input_ids, token_type_ids, position_ids, masks)
 
                 loss_oth = criterion(logits[0], paddle.unsqueeze(label_oth, 2))
