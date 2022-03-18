@@ -1,4 +1,6 @@
+# coding=utf-8
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The TensorFlow Datasets Authors and the HuggingFace Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,74 +14,123 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
+# Lint as: python3
+
 import json
 import os
 
-from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
+import datasets
+from datasets.tasks import QuestionAnsweringExtractive
 
-__all__ = ['DuReaderRobust']
+logger = datasets.logging.get_logger(__name__)
+
+_DESCRIPTION = """\
+DureaderRobust is a chinese reading comprehension \
+dataset, designed to evaluate the MRC models from \
+three aspects: over-sensitivity, over-stability \
+and generalization.
+"""
+
+_URL = "https://bj.bcebos.com/paddlenlp/datasets/dureader_robust-data.tar.gz"
 
 
-class DuReaderRobust(DatasetBuilder):
-    '''
-    The machine reading comprehension dataset (i.e. DuReader robust) is designed
-    to measure the robustness of a reading comprehension model, including the
-    over-sensitivity, over-stability and generalization ability of the model.
-    '''
+class DureaderRobustConfig(datasets.BuilderConfig):
+    """BuilderConfig for DureaderRobust."""
 
-    URL = 'https://bj.bcebos.com/paddlenlp/datasets/dureader_robust-data.tar.gz'
-    MD5 = '82f3d191a115ec17808856866787606e'
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    SPLITS = {
-        'train': META_INFO(
-            os.path.join('dureader_robust-data', 'train.json'),
-            '800a3dcb742f9fdf9b11e0a83433d4be'),
-        'dev': META_INFO(
-            os.path.join('dureader_robust-data', 'dev.json'),
-            'ae73cec081eaa28a735204c4898a2222'),
-        'test': META_INFO(
-            os.path.join('dureader_robust-data', 'test.json'),
-            'e0e8aa5c7b6d11b6fc3935e29fc7746f')
-    }
+    def __init__(self, **kwargs):
+        """BuilderConfig for DureaderRobust.
 
-    def _get_data(self, mode, **kwargs):
-        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash = self.SPLITS[mode]
-        fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root, self.MD5)
+        Args:
+          **kwargs: keyword arguments forwarded to super.
+        """
+        super(DureaderRobustConfig, self).__init__(**kwargs)
 
-        return fullname
 
-    def _read(self, filename, *args):
-        with open(filename, "r", encoding="utf8") as f:
-            input_data = json.load(f)["data"]
-        for entry in input_data:
-            title = entry.get("title", "").strip()
-            for paragraph in entry["paragraphs"]:
-                context = paragraph["context"].strip()
-                for qa in paragraph["qas"]:
-                    qas_id = qa["id"]
-                    question = qa["question"].strip()
-                    answer_starts = [
-                        answer["answer_start"]
-                        for answer in qa.get("answers", [])
-                    ]
-                    answers = [
-                        answer["text"].strip()
-                        for answer in qa.get("answers", [])
-                    ]
+class DureaderRobust(datasets.GeneratorBasedBuilder):
+    BUILDER_CONFIGS = [
+        DureaderRobustConfig(
+            name="plain_text",
+            version=datasets.Version("1.0.0", ""),
+            description="Plain text", ),
+    ]
 
-                    yield {
-                        'id': qas_id,
-                        'title': title,
-                        'context': context,
-                        'question': question,
-                        'answers': answers,
-                        'answer_starts': answer_starts
-                    }
+    def _info(self):
+        return datasets.DatasetInfo(
+            description=_DESCRIPTION,
+            features=datasets.Features({
+                "id": datasets.Value("string"),
+                "title": datasets.Value("string"),
+                "context": datasets.Value("string"),
+                "question": datasets.Value("string"),
+                "answers": datasets.features.Sequence({
+                    "text": datasets.Value("string"),
+                    "answer_start": datasets.Value("int32"),
+                }),
+            }),
+            # No default supervised_keys (as we have to pass both question
+            # and context as input).
+            supervised_keys=None,
+            homepage="https://arxiv.org/abs/2004.11142",
+            task_templates=[
+                QuestionAnsweringExtractive(
+                    question_column="question",
+                    context_column="context",
+                    answers_column="answers")
+            ], )
+
+    def _split_generators(self, dl_manager):
+        dl_dir = dl_manager.download_and_extract(_URL)
+
+        return [
+            datasets.SplitGenerator(
+                name=datasets.Split.TRAIN,
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, 'dureader_robust-data',
+                                             'train.json')
+                }),
+            datasets.SplitGenerator(
+                name=datasets.Split.VALIDATION,
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, 'dureader_robust-data',
+                                             'dev.json')
+                }),
+            datasets.SplitGenerator(
+                name=datasets.Split.TEST,
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, 'dureader_robust-data',
+                                             'test.json')
+                }),
+        ]
+
+    def _generate_examples(self, filepath):
+        """This function returns the examples in the raw (text) form."""
+        logger.info("generating examples from = %s", filepath)
+        key = 0
+        with open(filepath, encoding="utf-8") as f:
+            durobust = json.load(f)
+            for article in durobust["data"]:
+                title = article.get("title", "")
+                for paragraph in article["paragraphs"]:
+                    context = paragraph[
+                        "context"]  # do not strip leading blank spaces GH-2585
+                    for qa in paragraph["qas"]:
+                        answer_starts = [
+                            answer["answer_start"]
+                            for answer in qa.get("answers", '')
+                        ]
+                        answers = [
+                            answer["text"] for answer in qa.get("answers", '')
+                        ]
+                        # Features currently used are "context", "question", and "answers".
+                        # Others are extracted here for the ease of future expansions.
+                        yield key, {
+                            "title": title,
+                            "context": context,
+                            "question": qa["question"],
+                            "id": qa["id"],
+                            "answers": {
+                                "answer_start": answer_starts,
+                                "text": answers,
+                            },
+                        }
+                        key += 1

@@ -43,7 +43,8 @@ class RobertaEmbeddings(nn.Layer):
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
                  type_vocab_size=16,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 cls_token_id=101):
         super(RobertaEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size, hidden_size, padding_idx=pad_token_id)
@@ -53,14 +54,14 @@ class RobertaEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.padding_idx = pad_token_id
-
+        self.cls_token_id = cls_token_id
+        
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
-            cls_token_id = input_ids[0][0]
-            if cls_token_id == 0:  # postion_ids for RobertaBPETokenizer
+            if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
                 position_ids = seq_length - ones
@@ -264,14 +265,15 @@ class RobertaModel(RobertaPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 layer_norm_eps=1e-12):
+                 layer_norm_eps=1e-12,
+                 cls_token_id=101):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.embeddings = RobertaEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id)
+            max_position_embeddings, type_vocab_size, pad_token_id, cls_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,

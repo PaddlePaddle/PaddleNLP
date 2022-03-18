@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import os
-import numpy as np
-from attrdict import AttrDict
 import argparse
-import time
 
 import paddle
 
-import yaml
 from pprint import pprint
 
-from paddlenlp.ops import FasterGPT
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.ops import FasterUnifiedTransformer
 
@@ -37,8 +31,7 @@ def parse_args():
         "--model_name_or_path",
         default="plato-xl",
         type=str,
-        help="The model name to specify the gpt to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt-cpm-large-cn']. "
-    )
+        help="The model name to specify the PLATO/UnifiedTransformer to use. ")
     parser.add_argument(
         "--inference_model_dir",
         default="./infer_model/",
@@ -149,7 +142,7 @@ def do_predict(args):
 
     # Save converted static graph model
     paddle.jit.save(plato, os.path.join(args.inference_model_dir, "plato"))
-    logger.info("PLATO has been saved to {}".format(args.inference_model_dir))
+    logger.info("PLATO has been saved to {}.".format(args.inference_model_dir))
 
 
 if __name__ == "__main__":
