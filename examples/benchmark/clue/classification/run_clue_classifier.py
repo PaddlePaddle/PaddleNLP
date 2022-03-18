@@ -30,11 +30,10 @@ from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import LinearDecayWithWarmup, ErnieForSequenceClassification, ErnieTokenizer
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
+from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -46,7 +45,11 @@ METRIC_CLASSES = {
     "csl": Accuracy,
 }
 
-MODEL_CLASSES = {"ernie": (ErnieForSequenceClassification, ErnieTokenizer), }
+MODEL_CLASSES = {
+    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "bert": (BertForSequenceClassification, BertTokenizer),
+    "roberta": (RobertaForSequenceClassification, RobertaTokenizer)
+}
 
 
 def parse_args():

@@ -1,6 +1,6 @@
 # CLUE Benchmark
 
-[CLUE](https://www.cluebenchmarks.com/)自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)
+[CLUE](https://www.cluebenchmarks.com/) 自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之一。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)。
 
 本项目基于 PaddlePaddle 在 CLUE 数据集上对领先的开源预训练模型模型进行了充分评测，为开发者在预训练模型选择上提供参考，同时开发者基于本项目可以轻松一键复现模型效果，也可以参加 CLUE 竞赛取得好成绩。
 
@@ -8,23 +8,24 @@
 
 使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
 
-| Model                 | AFMQC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C3      |
-| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------- |
-| Metric                | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc | dev/Acc     | dev/Acc | dev/F1   | dev/Acc | dev/Acc |
-| ERNIE 3.0 Base        | 75.86   | 58.92   | 61.18   | 83.35   | 79.66   | 86.51       | 82.73   | 89.48    |         |         |
-| RoBERTa-wwm-ext-large | 76.20   | 59.50   | 62.10   | 84.02   | 79.15   | 90.79       | 82.03   |          |         |         |
+| Model                 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   |
+| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- |
+| RoBERTa-wwm-ext-large | 76.20 | 59.50 | 62.10   | 84.02 | 79.15 | 90.79       | 82.03 |
+
+
+其中 AFQMC、TNEWS、 IFLYTEK、CMNLI、OCNLI、CLUEWSC2020 和 CSL 任务使用的评估指标均是 Accuracy。
 
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优，训练每间隔 100 steps 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
 
-2. Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5
+2. Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5;
 
-3. 因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
+3. 因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，对CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
 
 
 ## 一键复现模型效果
 
-这一小节以TNEWS任务为例为用户展示如何一键复现本文的评测结果。
+这一小节以 TNEWS 任务为例展示如何一键复现本文的评测结果。
 
 ### 启动 CLUE 任务
 以 CLUE 的 TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
@@ -34,11 +35,12 @@
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=TNEWS
 export LR=3e-5
-export BS=32
+export BS=16
 export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
+cd classification
 python -u ./run_clue_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
@@ -71,6 +73,7 @@ export EPOCH=6
 export MAX_SEQ_LEN=128
 export MODEL_PATH=ernie-3.0-base
 
+cd classification
 python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
     --model_type ernie  \
     --model_name_or_path ${MODEL_PATH} \
@@ -90,11 +93,10 @@ python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
 
 ```
 其中参数释义如下：
-- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie-1.0、ernie-tiny 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
-- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含 paddle 预训练模型 model_state.pdparams。
-如果使用PaddleNLP提供的预训练模型，可以选择 `model_type` 在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的英文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如 model_type 配置的是 bert，则 model_name_or_path 只能选择 bert 相关的模型。另，clue 任务应选择中文预训练权重。
+- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie、bert 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
+- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型，可以选择 `model_type` 在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的中文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如 model_type 配置的是 ernie，则 model_name_or_path 只能选择 ernie 相关的模型。另，clue 任务应选择中文预训练权重。
 
-- `task_name` 表示 Fine-tuning 的任务，当前支持 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL。
+- `task_name` 表示 Fine-tuning 的任务，当前支持 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL、CLUEWSC2020。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于 learning rate scheduler 产生的值相乘作为当前学习率。
@@ -104,32 +106,35 @@ python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu' 表示使用GPU, 'xpu' 表示使用百度昆仑卡, 'cpu' 表示使用 CPU。
 
-Fine-tuning过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
+Fine-tuning 过程将按照 `logging_steps` 和 `save_steps` 的设置打印出如下日志：
 
 ```
-global step 100/10008, epoch: 0, batch: 99, rank_id: 0, loss: 2.719922, lr: 0.0000030000, speed: 12.0090 step/s
-eval loss: 2.762143, acc: 0.0532, eval done total : 9.460448503494263 s
-global step 200/10008, epoch: 0, batch: 199, rank_id: 0, loss: 2.536534, lr: 0.0000060000, speed: 5.6834 step/s
-eval loss: 2.326450, acc: 0.26, eval done total : 9.412081480026245 s
-global step 300/10008, epoch: 0, batch: 299, rank_id: 0, loss: 1.847109, lr: 0.0000090000, speed: 5.2913 step/s
-eval loss: 1.447455, acc: 0.471, eval done total : 9.519582033157349 s
+global step 100/20010, epoch: 0, batch: 99, rank_id: 0, loss: 2.734340, lr: 0.0000014993, speed: 8.7969 step/s
+eval loss: 2.720359, acc: 0.0827, eval done total : 25.712125062942505 s
+global step 200/20010, epoch: 0, batch: 199, rank_id: 0, loss: 2.608563, lr: 0.0000029985, speed: 2.5921 step/s
+eval loss: 2.652753, acc: 0.0945, eval done total : 25.64827537536621 s
+global step 300/20010, epoch: 0, batch: 299, rank_id: 0, loss: 2.555283, lr: 0.0000044978, speed: 2.6032 step/s
+eval loss: 2.572999, acc: 0.112, eval done total : 25.67190170288086 s
+global step 400/20010, epoch: 0, batch: 399, rank_id: 0, loss: 2.631579, lr: 0.0000059970, speed: 2.6238 step/s
+eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
 
 ## 参加 CLUE 竞赛
 
-可以直接使用，还是以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，可运行如下脚本使用测试集对结果进行预测，并将结果写入目录 `${OUTPUT_DIR}`：
+对于 CLUE 分类任务，可以直接使用本项目中提供的脚本 `classification/predict_clue_classifier.py` 对单个任务进行预测，并将分类结果输出到文件。
+
+以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
+
 ```
-OUTPUT_DIR=output
-mdkir ${OUTPUT_DIR}
+cd classification
+OUTPUT_DIR=results
+mkdir ${OUTPUT_DIR}
+
 python predict_clue_classifier.py \
     --model_type ernie \
     --task_name TNEWS \
     --model_name_or_path ${TNEWS_MODEL}  \
     --output_dir ${OUTPUT_DIR} \
-
-将要提交榜单所需要的每个任务都运行一次，得到预测结果，进入输出目录，对各任务上的结果进行压缩，最后可以将压缩包提交至 CLUE官网。
-
 ```
-cd ${OUTPUT_DIR}
-zip submit.zip *
-```
+
+对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至CLUE官网进行评测。
