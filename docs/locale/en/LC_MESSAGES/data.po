@@ -1,0 +1,125 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../data.md:1
+msgid "PaddleNLP Data API"
+msgstr ""
+
+#: ../data.md:3
+msgid "该模块提供了在NLP任务中构建有效的数据处理Pipeline的常用API。"
+msgstr ""
+
+#: ../data.md:5
+msgid "APIl列表"
+msgstr ""
+
+#: ../data.md:46
+msgid "API使用方法"
+msgstr ""
+
+#: ../data.md:48
+msgid "以上API都是用来辅助构建DataLoader，DataLoader比较重要的三个初始化参数是dataset、batch_sampler和collate_fn。"
+msgstr ""
+
+#: ../data.md:50
+msgid "paddlenlp.data.Vocab和paddlenlp.data.JiebaTokenizer用在构建dataset时处理文本token到ID的映射。"
+msgstr ""
+
+#: ../data.md:52
+msgid "paddlenlp.data.SamplerHelper用于构建可迭代的batch_sampler。"
+msgstr ""
+
+#: ../data.md:54
+msgid ""
+"paddlenlp.data.Stack、paddlenlp.data.Pad、paddlenlp.data.Tuple和paddlenlp.data"
+".Dict用于构建生成mini-batch的collate_fn函数。"
+msgstr ""
+
+#: ../data.md:56
+msgid "数据预处理"
+msgstr ""
+
+#: ../data.md:58
+msgid "paddlenlp.data.Vocab"
+msgstr ""
+
+#: ../data.md:60
+msgid "paddlenlp.data.Vocab词表类，集合了一系列文本token与ids之间映射的一系列方法，支持从文件、字典、json等一系方式构建词表。"
+msgstr ""
+
+#: ../data.md:78
+msgid "paddlenlp.data.JiebaTokenizer"
+msgstr ""
+
+#: ../data.md:80
+msgid "paddlenlp.data.JiebaTokenizer初始化需传入paddlenlp.data.Vocab类，包含cut分词方法和将句子明文转换为ids的encode方法。"
+msgstr ""
+
+#: ../data.md:97
+msgid "构建Sampler"
+msgstr ""
+
+#: ../data.md:99
+msgid "paddlenlp.data.SamplerHelper"
+msgstr ""
+
+#: ../data.md:101
+msgid "paddlenlp.data.SamplerHelper的作用是构建用于DataLoader的可迭代采样器，它包含shuffle、sort、batch、shard等一系列方法，方便用户灵活使用。"
+msgstr ""
+
+#: ../data.md:139
+msgid "构建collate_fn"
+msgstr ""
+
+#: ../data.md:141
+msgid "paddlenlp.data.Stack"
+msgstr ""
+
+#: ../data.md:143
+msgid "paddlenlp.data.Stack用来组建batch，其输入必须具有相同的shape，输出便是这些输入的堆叠组成的batch数据。"
+msgstr ""
+
+#: ../data.md:158
+msgid "paddlenlp.data.Pad"
+msgstr ""
+
+#: ../data.md:160
+msgid "paddlenlp.data.Pad用来组建batch，它的输入长度不同，它首先会将输入数据全部padding到最大长度，然后再堆叠组成batch数据输出。"
+msgstr ""
+
+#: ../data.md:175
+msgid "paddlenlp.data.Tuple"
+msgstr ""
+
+#: ../data.md:177
+msgid "paddlenlp.data.Tuple会将多个组batch的函数包装在一起，组成tuple。"
+msgstr ""
+
+#: ../data.md:197
+msgid "paddlenlp.data.Dict"
+msgstr ""
+
+#: ../data.md:199
+msgid "paddlenlp.data.Dict会将多个组batch的函数包装在一起，组成dict。"
+msgstr ""
+
+#: ../data.md:219
+msgid "综合示例"
+msgstr ""
+

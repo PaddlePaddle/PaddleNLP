@@ -1,0 +1,761 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.transformer.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.position_encoding_init:1
+msgid ""
+"Generates the initial values for the sinusoidal position encoding table. "
+"This method follows the implementation in tensor2tensor, but is slightly "
+"different from the description in \"Attention Is All You Need\"."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerModel
+#: paddlenlp.transformers.transformer.modeling.TransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.position_encoding_init
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.position_encoding_init:5
+msgid ""
+"The largest position for sequences, that is, the maximum length of source"
+" or target sequences."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.position_encoding_init:8
+msgid "The size of positional embedding vector."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.position_encoding_init:10
+msgid "The output `numpy.array`'s data type. Defaults to \"float32\"."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.position_encoding_init
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.position_encoding_init:13
+msgid ""
+"The embedding table of sinusoidal position encoding with shape "
+"`[n_position, d_pos_vec]`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward
+#: paddlenlp.transformers.transformer.modeling.TransformerModel.forward
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
+#: paddlenlp.transformers.transformer.modeling.position_encoding_init
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:30
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward:18
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward:13
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:18
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:40
+#: paddlenlp.transformers.transformer.modeling.TransformerModel.forward:19
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:14
+#: paddlenlp.transformers.transformer.modeling.position_encoding_init:18
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:1
+#: paddlenlp.transformers.transformer.modeling.PositionalEmbedding:1
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:1
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:1
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:1
+msgid "Word Embedding layer of Transformer."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:3
+msgid ""
+"This layer automatically constructs a 2D embedding matrix based on the "
+"input the size of vocabulary (`vocab_size`) and the size of each "
+"embedding vector (`emb_dim`). This layer lookups embeddings vector of ids"
+" provided by input `word`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:8
+msgid ""
+"After the embedding, those weights are multiplied by `sqrt(d_model)` "
+"which is `sqrt(emb_dim)` in the interface."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:11
+msgid "Out = embedding(word) * sqrt(emb\\_dim)"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:15
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding:17
+msgid "Dimensionality of each embedding vector."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:31
+#: paddlenlp.transformers.transformer.modeling.WordEmbedding:19
+msgid "The start token id and also is used as padding id. Defaults to 0."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:1
+msgid "Computes word embedding."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:3
+msgid ""
+"The input ids which indicates the sequences' words with shape "
+"`[batch_size, sequence_length]` whose data type can be int or int64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:8
+msgid ""
+"The (scaled) embedding tensor of shape `(batch_size, sequence_length, "
+"emb_dim)` whose data type can be float32 or float64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding:1
+msgid ""
+"This layer produces sinusoidal positional embeddings of any length. While"
+" in `forward()` method, this layer lookups embeddings vector of ids "
+"provided by input `pos`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding:5
+msgid "The size of each embedding vector."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding:7
+msgid "The maximum length of sequences."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward:1
+msgid "Computes positional embedding."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward:3
+msgid ""
+"The input position ids with shape `[batch_size, sequence_length]` whose "
+"data type can be int or int64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding.forward:7
+msgid ""
+"The positional embedding tensor of shape `(batch_size, sequence_length, "
+"emb_dim)` whose data type can be float32 or float64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:1
+msgid ""
+"Computes the cross entropy loss for given input with or without label "
+"smoothing."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:3
+msgid ""
+"The weight used to mix up the original ground-truth distribution and the "
+"fixed distribution. Defaults to None. If given, label smoothing will be "
+"applied on `label`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:7
+msgid "The token id used to pad variant sequence. Defaults to 0."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:1
+msgid "Computes cross entropy loss with or without label smoothing."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:3
+msgid ""
+"The predict results of `TransformerModel` with shape `[batch_size, "
+"sequence_length, vocab_size]` whose data type can be float32 or float64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:7
+msgid ""
+"The label for correspoding results with shape `[batch_size, "
+"sequence_length, 1]`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:11
+msgid ""
+"A tuple with items: (`sum_cost`, `avg_cost`, `token_num`).  With the "
+"corresponding fields:  - `sum_cost` (Tensor):     The sum of loss of "
+"current batch whose data type can be float32, float64. - `avg_cost` "
+"(Tensor):     The average loss of current batch whose data type can be "
+"float32, float64.     The relation between `sum_cost` and `avg_cost` can "
+"be described as:      .. math::          avg\\_cost = sum\\_cost / "
+"token\\_num  - `token_num` (Tensor):     The number of tokens of current "
+"batch. Its data type can be float32, float64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:11
+msgid "A tuple with items: (`sum_cost`, `avg_cost`, `token_num`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:13
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:28
+msgid "With the corresponding fields:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:15
+msgid "`sum_cost` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:16
+msgid "The sum of loss of current batch whose data type can be float32, float64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:23
+msgid "`avg_cost` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:18
+msgid ""
+"The average loss of current batch whose data type can be float32, "
+"float64. The relation between `sum_cost` and `avg_cost` can be described "
+"as:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:21
+msgid "avg\\_cost = sum\\_cost / token\\_num"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:25
+msgid "`token_num` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:26
+msgid ""
+"The number of tokens of current batch. Its data type can be float32, "
+"float64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:1
+msgid ""
+"This layer wraps a Transformer decoder combined with embedding layer and "
+"output layer to produce logits from ids and position."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:4
+msgid ""
+"Can be a `paddle.nn.TransformerDecoder` instance. Or a wrapper that "
+"includes an embedding layer accepting ids and positions and includes an "
+"output layer transforming decoder output to logits."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:8
+msgid ""
+"Can be a `WordEmbedding` instance or a callable that accepts ids as "
+"arguments and return embeddings. It can be None if `decoder` includes a "
+"embedding layer. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:12
+msgid ""
+"Can be a `PositionalEmbedding` instance or a callable that accepts "
+"position as arguments and return embeddings. It can be None if `decoder` "
+"includes a positional embedding layer. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:16
+msgid ""
+"Can be a `paddle.nn.Linear` instance or a callable to transform decoder "
+"output to logits."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:19
+msgid ""
+"The dropout rate for the results of `word_embedding` and `pos_embedding`."
+" Defaults to 0.1."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:1
+msgid "Produces logits."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:3
+msgid ""
+"A tuple/list includes target ids and positions. If `word_embedding` is "
+"None, then it should be a Tensor which means the input for decoder."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:6
+msgid ""
+"It is a list and each element of the list is an instance of "
+"`paddle.nn.MultiheadAttention.Cache` for corresponding decoder layer. It "
+"can be produced by `paddle.nn.TransformerDecoder.gen_cache`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:10
+msgid ""
+"It is a list and each element of the list is an instance of "
+"`paddle.nn.MultiheadAttention.StaticCache` for corresponding decoder "
+"layer. It can be produced by `paddle.nn.TransformerDecoder.gen_cache`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:14
+msgid ""
+"A tensor used in self attention to prevents attention to some unwanted "
+"positions, usually the subsequent positions. It is a tensor with shape "
+"broadcasted to `[batch_size, n_head, target_length, target_length]`, "
+"where the unwanted positions have `-INF` values and the others have 0 "
+"values. The data type should be float32 or float64. It can be None when "
+"nothing wanted or needed to be prevented attention to."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:21
+msgid ""
+"The output of Transformer encoder. It is a tensor with shape "
+"`[batch_size, source_length, d_model]` and its data type can be float32 "
+"or float64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:26
+msgid ""
+"A tuple with items: `(outputs, new_states)`  With the corresponding "
+"fields:  - `outputs` (Tensor):     A float32 or float64 3D tensor "
+"representing logits shaped     `[batch_size, sequence_length, "
+"vocab_size]`. - `new_states` (Tensor):     This output has the same "
+"structure and data type with `states`     while the length is one larger "
+"since concatanating the     intermediate results of current step."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:26
+msgid "A tuple with items: `(outputs, new_states)`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:31
+msgid "`outputs` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:31
+msgid ""
+"A float32 or float64 3D tensor representing logits shaped `[batch_size, "
+"sequence_length, vocab_size]`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:35
+msgid "`new_states` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell.forward:34
+msgid ""
+"This output has the same structure and data type with `states` while the "
+"length is one larger since concatanating the intermediate results of "
+"current step."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
+msgid "基类：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
+msgid ""
+"This layer is a subclass of `BeamSearchDecoder` to make beam search adapt"
+" to Transformer decoder."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:4
+msgid "An instance of `TransformerDecoderCell`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:6
+msgid "The start token id."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:8
+msgid "The end token id."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:10
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:10
+msgid "The beam width used in beam search."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:12
+msgid "Indicate which dimension of states is variant."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:1
+msgid ""
+"Tiles the batch dimension of a tensor. Specifically, this function takes "
+"a tensor t shaped `[batch_size, s0, s1, ...]` composed of minibatch "
+"entries `t[0], ..., t[batch_size - 1]` and tiles it to have a shape "
+"`[batch_size * beam_size, s0, s1, ...]` composed of minibatch entries "
+"`t[0], t[0], ..., t[1], t[1], ...` where each minibatch entry is repeated"
+" `beam_size` times."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:8
+msgid "A list of tensor with shape `[batch_size, ...]`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:13
+msgid ""
+"A tensor with shape `[batch_size * beam_size, ...]`, whose data type is "
+"same as `t`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:1
+msgid ""
+"Perform a beam search decoding step, which uses cell to get "
+"probabilities, and follows a beam search step to calculate scores and "
+"select candidate token ids."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:4
+msgid ""
+"An `int64` tensor with shape `[1]` provided by the caller, representing "
+"the current time step number of decoding."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:7
+msgid ""
+"A tensor variable. It is same as `initial_inputs` returned by "
+"`initialize()` for the first decoding step and `next_inputs` returned by "
+"`step()` for the others."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:11
+msgid ""
+"A structure of tensor variables. It is same as the `initial_cell_states` "
+"returned by `initialize()` for the first decoding step and `next_states` "
+"returned by `step()` for the others."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:16
+msgid "Additional keyword arguments, provided by the caller `dynamic_decode`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:19
+msgid ""
+"Returns tuple (``beam_search_output, beam_search_state, next_inputs, "
+"finished``). `beam_search_state` and `next_inputs` have the same "
+"structure, shape and data type as the input arguments states and inputs "
+"separately. `beam_search_output` is a namedtuple(including scores, "
+"predicted_ids, parent_ids as fields) of tensor variables, where `scores, "
+"predicted_ids, parent_ids` all has a tensor value shaped [batch_size, "
+"beam_size] with data type float32, int64, int64. `finished` is a bool "
+"tensor with shape [batch_size, beam_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel:1
+msgid "The Transformer model."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel:3
+msgid ""
+"This model is a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:3
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:7
+msgid "The size of source vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:5
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:9
+msgid "The size of target vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:7
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:11
+msgid "The maximum length of input sequences."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:9
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:13
+msgid "The number of sub-layers to be stacked in the encoder."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:11
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:15
+msgid "The number of sub-layers to be stacked in the decoder."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:13
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:17
+msgid "The number of head used in multi-head attention."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:15
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:19
+msgid ""
+"The dimension for word embeddings, which is also the last dimension of "
+"the input and output of multi-head attention, position-wise feed-forward "
+"networks, encoder and decoder."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:19
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:23
+msgid "Size of the hidden layer in position-wise feed-forward networks."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:21
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:25
+msgid "Dropout rates. Used for pre-process, activation and inside attention."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:23
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:27
+msgid "Whether to use weight sharing."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:25
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:29
+msgid ""
+"The dropout probability used in MHA to drop some attention target. If "
+"None, use the value of dropout. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel:32
+msgid ""
+"The dropout probability used after FFN activation. If None, use the value"
+" of dropout. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel:35
+msgid "The start token id and also be used as padding id. Defaults to 0."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:33
+#: paddlenlp.transformers.transformer.modeling.TransformerModel:37
+msgid "The end token id. Defaults to 1."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel.forward:1
+msgid ""
+"The Transformer forward methods. The input are source/target sequences, "
+"and returns logits."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel.forward:4
+msgid ""
+"The ids of source sequences words. It is a tensor with shape "
+"`[batch_size, source_sequence_length]` and its data type can be int or "
+"int64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel.forward:8
+msgid ""
+"The ids of target sequences words. It is a tensor with shape "
+"`[batch_size, target_sequence_length]` and its data type can be int or "
+"int64."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.TransformerModel.forward:13
+msgid ""
+"Output tensor of the final layer of the model whose data type can be "
+"float32 or float64 with shape `[batch_size, sequence_length, "
+"vocab_size]`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:1
+msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:1
+msgid "The Transformer model for auto-regressive generation."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:28
+msgid ""
+"The dropout probability used after FFN activition. If None, use the value"
+" of dropout. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:35
+msgid "The beam width for beam search. Defaults to 4."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:37
+msgid "The maximum output length. Defaults to 256."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:39
+msgid ""
+"Indicate the data layout of predicted Tensor. If `False`, the data layout"
+" would be batch major with shape `[batch_size, seq_len, beam_size]`. If  "
+"`True`, the data layout would be time major with shape `[seq_len, "
+"batch_size, beam_size]`. Default to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:45
+msgid ""
+"Specify beam search version. It should be in one of [`v1`, `v2`]. If "
+"`v2`, need to set `alpha`(default to 0.6) for length penalty. Default to "
+"`v1`."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:49
+msgid ""
+"The key word arguments can be `rel_len` and `alpha`:  - `rel_len(bool, "
+"optional)`: Indicating whether `max_out_len` in is the length relative to"
+" that of source text. Only works in `v2` temporarily. It is suggest to "
+"set a small `max_out_len` and use `rel_len=True`. Default to False if not"
+" set.  - `alpha(float, optional)`: The power number in length penalty "
+"calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_. "
+"Only works in `v2` temporarily. Default to 0.6 if not set."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:49
+msgid "The key word arguments can be `rel_len` and `alpha`:"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:51
+msgid "`rel_len(bool, optional)`: Indicating whether `max_out_len` in"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:52
+msgid ""
+"is the length relative to that of source text. Only works in `v2` "
+"temporarily. It is suggest to set a small `max_out_len` and use "
+"`rel_len=True`. Default to False if not set."
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:56
+msgid "`alpha(float, optional)`: The power number in length penalty"
+msgstr ""
+
+#: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:57
+msgid ""
+"calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_. "
+"Only works in `v2` temporarily. Default to 0.6 if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward:1
+msgid "The Transformer forward method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward:3
+msgid ""
+"The ids of source sequence words. It is a tensor with shape `[batch_size,"
+" source_sequence_length]` and its data type can be int or int64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward:7
+msgid ""
+"The ids of target sequence words. Normally, it should NOT be given. If "
+"it's given, force decoding with previous output token will be trigger. "
+"Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward:12
+msgid ""
+"An int64 tensor shaped indicating the predicted ids. Its shape is "
+"`[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]` "
+"according to `output_time_major`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.transformer.modeling.InferTransformerModel.beam_search_v2:1
+msgid ""
+"Beam search with the alive and finished two queues, both have a beam size"
+" capicity separately. It includes `grow_topk` `grow_alive` `grow_finish` "
+"as steps. 1. `grow_topk` selects the top `2*beam_size` candidates to "
+"avoid all getting EOS. 2. `grow_alive` selects the top `beam_size` non-"
+"EOS candidates as the inputs of next decoding step. 3. `grow_finish` "
+"compares the already finished candidates in the finished queue and newly "
+"added finished candidates from `grow_topk`, and selects the top "
+"`beam_size` finished candidates."
+msgstr ""
+

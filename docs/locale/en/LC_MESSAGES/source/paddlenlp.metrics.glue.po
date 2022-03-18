@@ -1,0 +1,459 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.metrics.glue.rst:2
+msgid "glue"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:1 paddlenlp.metrics.glue.Mcc:1
+#: paddlenlp.metrics.glue.MultiLabelsMetric:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman:1
+msgid "基类：:class:`paddle.metric.metrics.Metric`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:1
+msgid ""
+"This class encapsulates Accuracy, Precision, Recall and F1 metric logic, "
+"and `accumulate` function returns accuracy, precision, recall and f1. The"
+" overview of all metrics could be seen at the document of `paddle.metric "
+"<https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html>`_"
+" for details."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1
+#: paddlenlp.metrics.glue.AccuracyAndF1.compute
+#: paddlenlp.metrics.glue.AccuracyAndF1.update paddlenlp.metrics.glue.Mcc
+#: paddlenlp.metrics.glue.Mcc.compute paddlenlp.metrics.glue.Mcc.update
+#: paddlenlp.metrics.glue.MultiLabelsMetric
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate
+#: paddlenlp.metrics.glue.MultiLabelsMetric.compute
+#: paddlenlp.metrics.glue.MultiLabelsMetric.update
+#: paddlenlp.metrics.glue.PearsonAndSpearman
+#: paddlenlp.metrics.glue.PearsonAndSpearman.update
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:7
+msgid ""
+"Number of top elements to look at for computing accuracy. Defaults to "
+"(1,)."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:10
+msgid "The positive label for calculating precision and recall. Defaults to 1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:14
+msgid "String name of the metric instance. Defaults to 'acc_and_f1'."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:18 paddlenlp.metrics.glue.Mcc:7
+#: paddlenlp.metrics.glue.MultiLabelsMetric:11
+#: paddlenlp.metrics.glue.PearsonAndSpearman:9
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:1
+#: paddlenlp.metrics.glue.MultiLabelsMetric.compute:1
+msgid ""
+"Accepts network's output and the labels, and calculates the top-k "
+"(maximum value in topk) indices for accuracy."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:4
+msgid ""
+"Predicted tensor, and its dtype is float32 or float64, and has a shape of"
+" [batch_size, num_classes]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:7
+msgid ""
+"The ground truth tensor, and its dtype is is int64, and has a shape of "
+"[batch_size, 1] or [batch_size, num_classes] in one hot representation."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate
+#: paddlenlp.metrics.glue.AccuracyAndF1.compute
+#: paddlenlp.metrics.glue.AccuracyAndF1.name
+#: paddlenlp.metrics.glue.Mcc.accumulate paddlenlp.metrics.glue.Mcc.compute
+#: paddlenlp.metrics.glue.Mcc.name
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate
+#: paddlenlp.metrics.glue.MultiLabelsMetric.compute
+#: paddlenlp.metrics.glue.MultiLabelsMetric.name
+#: paddlenlp.metrics.glue.PearsonAndSpearman.accumulate
+#: paddlenlp.metrics.glue.PearsonAndSpearman.name
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:12
+msgid ""
+"Correct mask, each element indicates whether the prediction equals to the"
+" label. Its' a tensor with a data type of float32 and has a shape of "
+"[batch_size, topk]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate
+#: paddlenlp.metrics.glue.AccuracyAndF1.compute
+#: paddlenlp.metrics.glue.AccuracyAndF1.name
+#: paddlenlp.metrics.glue.Mcc.accumulate paddlenlp.metrics.glue.Mcc.compute
+#: paddlenlp.metrics.glue.Mcc.name
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate
+#: paddlenlp.metrics.glue.MultiLabelsMetric.compute
+#: paddlenlp.metrics.glue.MultiLabelsMetric.name
+#: paddlenlp.metrics.glue.PearsonAndSpearman.accumulate
+#: paddlenlp.metrics.glue.PearsonAndSpearman.name
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.update:1
+#: paddlenlp.metrics.glue.MultiLabelsMetric.update:1
+msgid ""
+"Updates the metrics states (accuracy, precision and recall), in order to "
+"calculate accumulated accuracy, precision and recall of all instances."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.update:4
+msgid ""
+"Correct mask for calculating accuracy, and it's a tensor with shape "
+"[batch_size, topk] and has a dtype of float32."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:1
+#: paddlenlp.metrics.glue.Mcc.accumulate:1
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:1
+msgid "Calculates and returns the accumulated metric."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:3
+msgid ""
+"The accumulated metric. A tuple of shape (acc, precision, recall, f1, "
+"average_of_acc_and_f1)  With the fields:  - `acc` (numpy.float64):     "
+"The accumulated accuracy. - `precision` (numpy.float64):     The "
+"accumulated precision. - `recall` (numpy.float64):     The accumulated "
+"recall. - `f1` (numpy.float64):     The accumulated f1. - "
+"`average_of_acc_and_f1` (numpy.float64):     The average of accumulated "
+"accuracy and f1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:3
+msgid ""
+"The accumulated metric. A tuple of shape (acc, precision, recall, f1, "
+"average_of_acc_and_f1)"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:6
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:27
+#: paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:6
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:8
+msgid "`acc` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:9
+msgid "The accumulated accuracy."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:10
+msgid "`precision` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:11
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:30
+msgid "The accumulated precision."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:12
+msgid "`recall` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:13
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:32
+msgid "The accumulated recall."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:14
+msgid "`f1` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:15
+#: paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:34
+msgid "The accumulated f1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:16
+msgid "`average_of_acc_and_f1` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:17
+msgid "The average of accumulated accuracy and f1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.reset:1
+#: paddlenlp.metrics.glue.Mcc.reset:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.reset:1
+msgid "Resets all metric states."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.name:1
+#: paddlenlp.metrics.glue.Mcc.name:1
+#: paddlenlp.metrics.glue.MultiLabelsMetric.name:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.name:1
+msgid "Returns name of the metric instance."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.name:3
+#: paddlenlp.metrics.glue.Mcc.name:3
+#: paddlenlp.metrics.glue.MultiLabelsMetric.name:3
+#: paddlenlp.metrics.glue.PearsonAndSpearman.name:3
+msgid "The name of the metric instance."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc:1
+msgid ""
+"This class calculates `Matthews correlation coefficient "
+"<https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>`_ ."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc:3
+msgid "String name of the metric instance. Defaults to 'mcc'."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.compute:1
+msgid ""
+"Processes the pred tensor, and returns the indices of the maximum of each"
+" sample."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.compute:4
+msgid ""
+"The predicted value is a Tensor with dtype float32 or float64. Shape is "
+"[batch_size, 1]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.compute:7
+msgid ""
+"The ground truth value is Tensor with dtype int64, and its shape is "
+"[batch_size, 1]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.compute:11
+msgid ""
+"A tuple of preds and label. Each shape is [batch_size, 1], with dtype "
+"float32 or float64."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.update:1
+msgid ""
+"Calculates states, i.e. the number of true positive, false positive, true"
+" negative and false negative samples."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.update:4
+msgid ""
+"Tuple of predicted value and the ground truth label, with dtype float32 "
+"or float64. Each shape is [batch_size, 1]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc.accumulate:3
+msgid ""
+"Returns the accumulated metric, a tuple of shape (mcc,), `mcc` is the "
+"accumulated mcc and its data type is float64."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman:1
+#, python-format
+msgid ""
+"The class calculates `Pearson correlation coefficient "
+"<https://en.wikipedia.org/wiki/Pearson_correlation_coefficient>`_ and "
+"`Spearman's rank correlation coefficient "
+"<https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient>`_"
+" ."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman:5
+msgid "String name of the metric instance. Defaults to 'pearson_and_spearman'."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.update:1
+msgid ""
+"Ensures the type of preds and labels is numpy.ndarray and reshapes them "
+"into [-1, 1]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.update:4
+msgid ""
+"Tuple or list of predicted value and the ground truth label. Its data "
+"type should be float32 or float64 and its shape is [batch_size, d0, ..., "
+"dN]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:3
+msgid ""
+"Returns the accumulated metric, a tuple of (pearson, spearman, "
+"the_average_of_pearson_and_spearman).  With the fields:  - `pearson` "
+"(numpy.float64):     The accumulated pearson.  - `spearman` "
+"(numpy.float64):     The accumulated spearman.  - "
+"`the_average_of_pearson_and_spearman` (numpy.float64):     The average of"
+" accumulated pearson and spearman correlation     coefficient."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:3
+msgid ""
+"Returns the accumulated metric, a tuple of (pearson, spearman, "
+"the_average_of_pearson_and_spearman)."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:9
+msgid "`pearson` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:9
+msgid "The accumulated pearson."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:12
+msgid "`spearman` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:12
+msgid "The accumulated spearman."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:15
+msgid "`the_average_of_pearson_and_spearman` (numpy.float64):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:15
+msgid "The average of accumulated pearson and spearman correlation coefficient."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric:1
+msgid ""
+"This class encapsulates Accuracy, Precision, Recall and F1 metric logic "
+"in multi-labels setting (also the binary setting). Some codes are taken "
+"and modified from sklearn.metrics ."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric:5
+msgid "The total number of labels which is usually the number of classes"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric:7
+msgid "String name of the metric instance. Defaults to 'multi_labels_metric'."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric:43
+msgid ""
+"Note: When zero_division is encountered (details as followed), the "
+"corresponding metrics will be set to 0.0"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric:40
+msgid ""
+"precision is zero_division if there are no positive predictions recall is"
+" zero_division if there are no positive labels fscore is zero_division if"
+" all labels AND predictions are negative"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.update:4
+msgid "the tuple returned from `compute` function"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:9
+msgid "Only report results for the class specified by pos_label."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:10
+msgid ""
+"Calculate metrics globally by counting the total true positives, false "
+"negatives and false positives."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:12
+msgid ""
+"Calculate metrics for each label, and find their unweighted mean. This "
+"does not take label imbalance into account."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:14
+msgid ""
+"Calculate metrics for each label, and find their average weighted by "
+"support (the number of true instances for each label). This alters "
+"`macro` to account for label imbalance; it can result in an F-score that "
+"is not between precision and recall."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:18
+msgid ""
+"The positive label for calculating precision and recall in binary "
+"settings. Noted: Only when `average='binary'`, this arguments will be "
+"used. Otherwise, it will be ignored. Defaults to 1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:24
+msgid ""
+"The accumulated metric. A tuple of shape (precision, recall, f1)     With"
+" the fields:      - `precision` (numpy.float64 or numpy.ndarray if "
+"average=None):         The accumulated precision.     - `recall` "
+"(numpy.float64 or numpy.ndarray if average=None):         The accumulated"
+" recall.     - `f1` (numpy.float64 or numpy.ndarray if average=None):"
+"         The accumulated f1."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:33
+msgid "The accumulated metric. A tuple of shape (precision, recall, f1)"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:29
+msgid "`precision` (numpy.float64 or numpy.ndarray if average=None):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:31
+msgid "`recall` (numpy.float64 or numpy.ndarray if average=None):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.accumulate:33
+msgid "`f1` (numpy.float64 or numpy.ndarray if average=None):"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.compute:4
+msgid ""
+"Predicted tensor, and its dtype is float32 or float64, and has a shape of"
+" [batch_size, *, num_labels]."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.compute:7
+msgid ""
+"The ground truth tensor, and its dtype is is int64, and has a shape of "
+"[batch_size, *] or [batch_size, *, num_labels] in one hot representation."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.compute:12
+msgid ""
+"it contains two Tensor of shape [*, 1]. The tuple should be passed to "
+"`update` function."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.MultiLabelsMetric.reset:1
+msgid "Reset states and result"
+msgstr ""
+

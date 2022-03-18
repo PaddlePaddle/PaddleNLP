@@ -1,0 +1,178 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../get_started/quick_start.rst:3
+msgid "10分钟完成高精度中文情感分析"
+msgstr ""
+
+#: ../get_started/quick_start.rst:6
+msgid "1. 安装PaddleNLP"
+msgstr ""
+
+#: ../get_started/quick_start.rst:8
+msgid "安装相关过程和问题可以参考PaddleNLP的 安装文档_。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:18
+msgid "2. 一键加载预训练模型"
+msgstr ""
+
+#: ../get_started/quick_start.rst:20
+msgid ""
+"情感分析本质是一个文本分类任务。PaddleNLP内置了ERNIE、BERT、RoBERTa、Electra等丰富的预训练模型"
+"，并且内置了各种预训练模型对于不同下游任务的Fine-"
+"tune网络。用户可以使用PaddleNLP提供的模型，完成问答、序列分类、token分类等任务。查阅 预训练模型_ "
+"了解更多。这里以ERNIE模型为例，介绍如何将预训练模型Fine-tune完成文本分类任务。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:24
+msgid "加载预训练模型ERNIE"
+msgstr ""
+
+#: ../get_started/quick_start.rst:31
+msgid "加载预训练模型ERNIE用于文本分类任务的Fine-tune网络，只需指定想要使用的模型名称和文本分类的类别数即可完成网络定义。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:39
+msgid "3. 调用Tokenizer进行数据处理"
+msgstr ""
+
+#: ../get_started/quick_start.rst:41
+msgid "Tokenizer用于将原始输入文本转化成模型可以接受的输入数据形式。PaddleNLP对于各种预训练模型已经内置了相应的Tokenizer，指定想要使用的模型名字即可加载。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:47
+msgid ""
+"Transformer类预训练模型所需的数据处理步骤通常包括将原始输入文本切分token；将token映射为对应的token "
+"id；拼接上预训练模型对应的特殊token "
+"，如[CLS]、[SEP]；最后转化为框架所需的数据格式。为了方便使用，PaddleNLP提供了高阶API，一键即可返回模型所需数据格式。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:49
+msgid "一行代码完成切分token，映射token ID以及拼接特殊token:"
+msgstr ""
+
+#: ../get_started/quick_start.rst:55
+msgid "转化成paddle框架数据格式:"
+msgstr ""
+
+#: ../get_started/quick_start.rst:68
+msgid "input_ids: 表示输入文本的token ID。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:70
+msgid "token_type_ids: 表示对应的token属于输入的第一个句子还是第二个句子。（Transformer类预训练模型支持单句以及句对输入。）"
+msgstr ""
+
+#: ../get_started/quick_start.rst:72
+msgid "此时即可输入ERNIE模型中得到相应输出。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:81
+msgid "可以看出，ERNIE模型输出有2个tensor。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:83
+msgid ""
+"sequence_output是对应每个输入token的语义特征表示，shape为(1, num_tokens, "
+"hidden_size)。其一般用于序列标注、问答等任务。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:85
+msgid "pooled_output是对应整个句子的语义特征表示，shape为(1, hidden_size)。其一般用于文本分类、信息检索等任务。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:88
+msgid "4. 加载数据集"
+msgstr ""
+
+#: ../get_started/quick_start.rst:89
+msgid "PaddleNLP内置了适用于阅读理解、文本分类、序列标注、机器翻译等下游任务的多个数据集，这里我们使用公开中文情感分析数据集ChnSenticorp，包含7000多条正负向酒店评论数据。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:91
+msgid "一键加载PaddleNLP内置数据集："
+msgstr ""
+
+#: ../get_started/quick_start.rst:98
+msgid "获取分类数据标签："
+msgstr ""
+
+#: ../get_started/quick_start.rst:106
+msgid "展示一些数据："
+msgstr ""
+
+#: ../get_started/quick_start.rst:122
+msgid "5. 模型训练与评估"
+msgstr ""
+
+#: ../get_started/quick_start.rst:123
+msgid ""
+"数据读入时使用 :func:`paddle.io.DataLoader` "
+"接口多线程异步加载数据，然后设置适用于ERNIE这类Transformer模型的动态学习率和损失函数、优化算法、评价指标等。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:125
+msgid "模型训练的过程通常按照以下步骤："
+msgstr ""
+
+#: ../get_started/quick_start.rst:127
+msgid "从dataloader中取出一个batch data。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:128
+msgid "将batch data喂给model，做前向计算。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:129
+msgid "将前向计算结果传给损失函数，计算loss。将前向计算结果传给评价方法，计算评价指标。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:130
+msgid "loss反向回传，更新梯度。重复以上步骤。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:131
+msgid "每训练一个epoch时，程序将会评估一次，评估当前模型训练的效果。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:133
+msgid "本示例同步在AIStudio上，可直接 在线体验模型训练_。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:137
+msgid "最后，保存训练好的模型用于预测。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:140
+msgid "6. 模型预测"
+msgstr ""
+
+#: ../get_started/quick_start.rst:141
+msgid "保存训练模型，定义预测函数 :func:`predict` ，即可开始预测文本情感倾向。"
+msgstr ""
+
+#: ../get_started/quick_start.rst:143
+msgid "以自定义预测数据和数据标签为示例："
+msgstr ""
+
+#: ../get_started/quick_start.rst:154
+msgid "得到预测结果："
+msgstr ""
+

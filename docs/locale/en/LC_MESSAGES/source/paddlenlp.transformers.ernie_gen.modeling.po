@@ -1,0 +1,168 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie_gen.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieGenPretrainedModel:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieGenPretrainedModel:1
+msgid ""
+"An abstract class for pretrained ErnieGen models. It provides ErnieGen "
+"related `model_config_file`, `pretrained_init_configuration`, "
+"`resource_files_names`, `pretrained_resource_files_map`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gen.modeling.ErnieGenPretrainedModel.save_pretrained:1
+msgid ""
+"Save model configuration and related resources (model state) to files "
+"under `save_directory`. :param save_directory: Directory to save files "
+"into. :type save_directory: str"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
+msgid "基类：:class:`paddlenlp.transformers.ernie_gen.modeling.ErnieModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
+msgid "Ernie Model for sequence to sequence generation."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.ernie.modeling.ErnieModel`. Refer to the "
+"superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:1
+msgid ""
+"The ground truth target sequence id (hard label) or distribution (soft "
+"label). It's data type should be `int64` and has a shape of [batch_size, "
+"sequence_length] or [batch_size, sequence_length, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:5
+msgid ""
+"Index of tgt_labels in `src_ids`. It's data type should be `int64` and "
+"has a shape of [n_targets, 2])."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:8
+msgid ""
+"Whether the model will output the logits or only encode the inputs. If "
+"`encode_only` is `True`, `loss` and `logits_2d` will not be returned."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:12
+msgid ""
+"Returns tuple (`None`, `None`, `info`) if `encode_only` is `True`, "
+"returns (`output_ids`, `logits`, `info`) if `tgt_labels` or `tgt_pos` is "
+"`None`, else, returns (`loss`, `logits_2d`, `info`).  With the fields:  -"
+" `info`(dict):      Middle level info, includes all hidden stats and k/v "
+"caches.  - `output_ids`(Tensor):     The output index. Its data type "
+"should be float32 and its shape is [batch_size].     If `encode_only`, "
+"returns None.  - `logits`(Tensor):     Logits for every targets.     Its "
+"data type should be float32 and its shape is [batch_size, "
+"sequence_length].     If `encode_only`, returns None.  - `loss`(Tensor):"
+"     Cross entropy loss mean over every target label.     If "
+"`encode_only`, returns None.  - `logits_2d`(Tensor):     Logits for every"
+" targets if `tgt_labels` or `tgt_pos` is not `None` .     Its data type "
+"should be float32 and its shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:12
+msgid ""
+"Returns tuple (`None`, `None`, `info`) if `encode_only` is `True`, "
+"returns (`output_ids`, `logits`, `info`) if `tgt_labels` or `tgt_pos` is "
+"`None`, else, returns (`loss`, `logits_2d`, `info`)."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:16
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:19
+msgid "`info`(dict):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:19
+msgid "Middle level info, includes all hidden stats and k/v caches."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:23
+msgid "`output_ids`(Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:22
+msgid ""
+"The output index. Its data type should be float32 and its shape is "
+"[batch_size]. If `encode_only`, returns None."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:28
+msgid "`logits`(Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:26
+msgid ""
+"Logits for every targets. Its data type should be float32 and its shape "
+"is [batch_size, sequence_length]. If `encode_only`, returns None."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:32
+msgid "`loss`(Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:31
+msgid ""
+"Cross entropy loss mean over every target label. If `encode_only`, "
+"returns None."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:35
+msgid "`logits_2d`(Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:35
+msgid ""
+"Logits for every targets if `tgt_labels` or `tgt_pos` is not `None` . Its"
+" data type should be float32 and its shape is [batch_size, "
+"sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
+msgid "返回类型"
+msgstr ""
+

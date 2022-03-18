@@ -1,0 +1,219 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.data.collate.rst:2
+msgid "collate"
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:1 paddlenlp.data.collate.Pad:1
+#: paddlenlp.data.collate.Stack:1 paddlenlp.data.collate.Tuple:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack:1
+msgid ""
+"Stacks the input data samples to construct the batch. The N input samples"
+" must have the same shape/length and will be stacked to construct a "
+"batch."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict paddlenlp.data.collate.Dict.__call__
+#: paddlenlp.data.collate.Pad paddlenlp.data.collate.Pad.__call__
+#: paddlenlp.data.collate.Stack paddlenlp.data.collate.Stack.__call__
+#: paddlenlp.data.collate.Tuple paddlenlp.data.collate.Tuple.__call__
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack:4
+msgid ""
+"The axis in the result data along which the input data are stacked. "
+"Default: 0."
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack:7
+msgid ""
+"The value type of the output. If it is set to None, the type of input "
+"data is used. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack.__call__:1
+msgid "Batchifies the input data by stacking."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad.__call__:6
+#: paddlenlp.data.collate.Stack.__call__:3
+msgid ""
+"The input data samples. It is a list. Each element is a numpy.ndarray or "
+"list."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__ paddlenlp.data.collate.Pad.__call__
+#: paddlenlp.data.collate.Stack.__call__ paddlenlp.data.collate.Tuple.__call__
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack.__call__:7
+msgid "Stacked batch data."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__ paddlenlp.data.collate.Pad.__call__
+#: paddlenlp.data.collate.Stack.__call__ paddlenlp.data.collate.Tuple.__call__
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__:14
+#: paddlenlp.data.collate.Pad.__call__:18
+#: paddlenlp.data.collate.Stack.__call__:11
+#: paddlenlp.data.collate.Tuple.__call__:14
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:1
+msgid "Pads the input data samples to the largest length at `axis`."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:3
+msgid "The padding value. Default: 0."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:5
+msgid ""
+"The axis to pad the arrays. The arrays will be padded to the largest "
+"length at `axis`. For example, assume the input arrays have shape (10, 8,"
+" 5), (6, 8, 5), (3, 8, 5) and the axis is 0. Each input will be padded "
+"into (10, 8, 5) and then stacked to form the final output, which has "
+"shape (3, 10, 8, 5). Default: 0."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:12
+msgid ""
+"If it is bool, indicate whether to return the valid length in the output,"
+" and the data type of returned length is int32 if True. If it is "
+"numpy.dtype, indicate the data type of returned length. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:17
+msgid ""
+"The value type of the output. If it is set to None, the input data type "
+"is used. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:20
+msgid ""
+"Whether the padding direction is right-side. If True, it indicates we pad"
+" to the right side, while False indicates we pad to the left side. "
+"Default: True."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad.__call__:1
+msgid ""
+"Batchifies the input data by padding. The input will be padded to the "
+"largest dimension at `axis` and then stacked to form the final output. In"
+" addition, the function will output the original dimensions at the `axis`"
+" if `ret_length` is not None or False."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad.__call__:10
+msgid ""
+"If `ret_length` is False, it is a numpy.ndarray representing the padded "
+"batch data and the shape is (N, …). Otherwise, it is a tuple, besides the"
+" padded batch data, the tuple also includes a numpy.ndarray representing "
+"original length at `axis` of all input samples, which shaped `(N,)`."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:1 paddlenlp.data.collate.Tuple:1
+msgid ""
+"Wraps multiple batchify functions together. The input functions will be "
+"applied to the corresponding input fields."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:4
+msgid ""
+"Each sample should be a list or tuple containing multiple fields. The "
+"i'th batchify function stored in Tuple will be applied on the i'th field."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:7
+msgid ""
+"For example, when data sample is (nd_data, label), you can wrap two "
+"batchify functions using `Tuple(DataBatchify, LabelBatchify)` to batchify"
+" nd_data and label correspondingly."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:11
+msgid ""
+"The batchify functions to wrap. It is a callable function or a list/tuple"
+" of callable functions."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:14
+msgid "The additional batchify functions to wrap."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple.__call__:1
+msgid ""
+"Batchifies data samples by applying each function on the corresponding "
+"data field, and each data field is produced by stacking the field data of"
+" samples."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple.__call__:5
+msgid ""
+"The samples to batchfy. Each sample in list/tuple should contain `N` "
+"fields."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__:9
+#: paddlenlp.data.collate.Tuple.__call__:9
+msgid "A tuple composed of results from all including batchifying functions."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:4
+msgid ""
+"Each sample should be a dict containing multiple fields. Each batchify "
+"function with key stored in `Dict` will be applied on the field which has"
+" the same key."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:8
+msgid ""
+"For example, when data sample is {'tokens': tokens, 'labels': labels}, "
+"you can wrap two batchify functions using `Dict({'tokens': DataBatchify, "
+"'labels': LabelBatchify})` to batchify tokens and labels correspondingly."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:13
+msgid ""
+"The batchify functions to wrap. It is a dict, which values is callable "
+"functions."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__:1
+msgid ""
+"Batchifies data samples by applying each function on the corresponding "
+"data field, and each data field is produced by stacking the field data "
+"with the same key as batchify functions of all samples."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict.__call__:5
+msgid ""
+"The samples to batchfy. Each sample in list/tuple is a dict with `N` key-"
+"values."
+msgstr ""
+

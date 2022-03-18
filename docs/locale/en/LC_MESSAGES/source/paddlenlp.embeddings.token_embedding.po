@@ -1,0 +1,200 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.embeddings.token_embedding.rst:2
+msgid "token\\_embedding"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.list_embedding_name:1
+msgid "Lists all names of pretrained embedding models paddlenlp provides."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
+msgid "基类：:class:`paddle.nn.layer.common.Embedding`"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
+msgid ""
+"A `TokenEmbedding` can load pre-trained embedding model which paddlenlp "
+"provides by specifying embedding name. Furthermore, a `TokenEmbedding` "
+"can load extended vocabulary by specifying extended_vocab_path."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:5
+msgid ""
+"The pre-trained embedding model name. Use "
+"`paddlenlp.embeddings.list_embedding_name()` to list the names of all "
+"embedding models that we provide. Defaults to "
+"`w2v.baidu_encyclopedia.target.word-word.dim300`."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:9
+msgid "Specifies unknown token. Defaults to `[UNK]`."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:12
+msgid ""
+"To initialize the vector of unknown token. If it's none, use normal "
+"distribution to initialize the vector of unknown token. Defaults to "
+"`None`."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:16
+msgid "The file path of extended vocabulary. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:19
+msgid "Whether the weight of embedding can be trained. Defaults to True."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:22
+msgid ""
+"Whether to keep the extended vocabulary only, will be effective only if "
+"provides extended_vocab_path. Defaults to False."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:1
+msgid "Whether or not to set the weights of token embedding to be trainable."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:3
+msgid ""
+"The weights can be trained if trainable is set to True, or the weights "
+"are fixed if trainable is False."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:1
+msgid "Gets the vectors of specifying words."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:3
+msgid "The words which need to be searched."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:6
+msgid "The vectors of specifying words."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:7
+msgid "`numpy.array`"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:13
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:14
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:10
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search:10
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:1
+msgid "Gets the index of specifying word by searching word_to_idx dict."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:3
+msgid "The input token word which we want to get the token index converted from."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:6
+msgid "The index of specifying word."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:7
+msgid "`int`"
+msgstr ""
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:1
+msgid "Gets the index list of specifying words by searching word_to_idx dict."
+msgstr ""
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:3
+msgid ""
+"The input token words which we want to get the token indices converted "
+"from."
+msgstr ""
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:6
+msgid "The indexes list of specifying words."
+msgstr ""
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:7
+msgid "`list`"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:1
+msgid ""
+"Calculates the dot product of 2 words. Dot product or scalar product is "
+"an algebraic operation that takes two equal-length sequences of numbers "
+"(usually coordinate vectors), and returns a single number."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:4
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:5
+msgid "The first word string."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:6
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:7
+msgid "The second word string."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:10
+msgid "The dot product of 2 words."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:1
+msgid ""
+"Calculates the cosine similarity of 2 word vectors. Cosine similarity is "
+"the cosine of the angle between two n-dimensional vectors in an "
+"n-dimensional space."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:9
+msgid "The cosine similarity of 2 words."
+msgstr ""
+

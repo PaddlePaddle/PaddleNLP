@@ -1,0 +1,421 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:1
+msgid ""
+"Constructs an ERNIE tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:5
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.save_resources
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:9
+msgid ""
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:23
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:12
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:26
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:15
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:30
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:19
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:33
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:22
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:36
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:25
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:39
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:28
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:5
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:45
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer:34
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string:12
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.vocab_size:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.vocab_size:1
+msgid "Return the size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.vocab_size
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.vocab_size
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.vocab_size:3
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.vocab_size
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.vocab_size
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string:5
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string:8
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.convert_tokens_to_string:8
+msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add:5
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add:5
+msgid ""
+"This encodes inputs and checks the number of added tokens, and is "
+"therefore not efficient. Do not put this inside your training loop."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add:8
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add:8
+msgid ""
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.num_special_tokens_to_add:12
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.num_special_tokens_to_add:12
+msgid "Number of tokens added to sequences"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:4
+msgid "An Ernie sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      ``[CLS] X [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:7
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:9
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:9
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:11
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:13
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask:6
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:11
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:13
+msgid "Optional second list of IDs for sequence pairs. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:15
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_inputs_with_special_tokens:15
+msgid "List of input_id with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:1
+msgid ""
+"Build offset map from a pair of offset map by concatenating and adding "
+"offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:3
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:3
+msgid "An ERNIE offset_mapping has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:5
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:5
+msgid "single sequence:      ``(0,0) X (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:6
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "pair of sequences:        ``(0,0) A (0,0) B (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:8
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:8
+msgid "List of char offsets to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:10
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:10
+msgid ""
+"Optional second list of wordpiece offsets for offset mapping pairs. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.build_offset_mapping_with_special_tokens:14
+msgid ""
+"A list of wordpiece offsets with the appropriate offsets of special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:1
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Create a mask from the two sequences passed to be used in a sequence-pair"
+" classification task."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:3
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:3
+msgid "A ERNIE sequence pair mask has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:9
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:9
+msgid ""
+"If `token_ids_1` is `None`, this method only returns the first portion of"
+" the mask (0s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:11
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:11
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.create_token_type_ids_from_sequences:17
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer.create_token_type_ids_from_sequences:17
+msgid "List of token_type_id according to the given sequence(s)."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:1
+msgid ""
+"Constructs a ErnieTiny tokenizer. It uses the `dict.wordseg.pickle` cut "
+"the text to words, and use the `sentencepiece` tools to cut the words to "
+"sub-words."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:17
+msgid "The file path of the vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:19
+msgid "The file path of sentencepiece model."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer:21
+msgid ""
+"The file path of word vocabulary, which is used to do chinese word "
+"segmentation."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) to a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also removes "
+"`##` when converting."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.convert_tokens_to_string:11
+msgid "Examples: .. code-block::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.save_resources:1
+msgid "Save tokenizer related resources to files under `save_directory`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.save_resources:3
+msgid "Directory to save files into."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:4
+msgid "An ERNIE sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:       ``[CLS] X [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.build_offset_mapping_with_special_tokens:14
+msgid "List of wordpiece offsets with the appropriate offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask:1
+msgid ""
+"Retrieves sequence ids from a token list that has no special tokens "
+"added. This method is called when adding special tokens using the "
+"tokenizer ``encode`` methods."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask:4
+msgid "List of ids of the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask:9
+msgid ""
+"Whether or not the token list is already formatted with special tokens "
+"for the model. Defaults to `False`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie.tokenizer.ErnieTinyTokenizer.get_special_tokens_mask:13
+msgid ""
+"The list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"sequence token."
+msgstr ""
+

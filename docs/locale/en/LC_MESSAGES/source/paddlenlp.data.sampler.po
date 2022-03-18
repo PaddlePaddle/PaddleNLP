@@ -1,0 +1,194 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.data.sampler.rst:2
+msgid "sampler"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:1
+msgid ""
+"The class is to help construct iterable sampler used for "
+":class:`paddle.io.DataLoader`. It wraps a dataset and uses its "
+":meth:`__getitem__` method. Every subclass of :class:`SamplerHelper` has "
+"to provide an :meth:`__iter__` method, providing a way to iterate over "
+"indices of dataset elements, and a :meth:`__len__` method that returns "
+"the length of the returned iterators."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:8
+msgid ""
+"The class also can be used as batch iterator instead of indices iterator "
+"when `iterator` yield samples rather than indices by initializing "
+"`iterator` with a iterable dataset."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:13
+msgid ""
+"The :meth:`__len__` method isn't strictly required by "
+":class:`paddle.io.DataLoader`, but is expected in any calculation "
+"involving the length of a :class:`paddle.io.DataLoader`."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper
+#: paddlenlp.data.sampler.SamplerHelper.batch
+#: paddlenlp.data.sampler.SamplerHelper.shard
+#: paddlenlp.data.sampler.SamplerHelper.shuffle
+#: paddlenlp.data.sampler.SamplerHelper.sort
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:17
+msgid "Input dataset for :class:`SamplerHelper`."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper:19
+msgid "Iterator of dataset. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.length:1
+msgid "Returns the length."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shuffle:1
+msgid "Shuffles the dataset according to the given buffer size and random seed."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shuffle:3
+msgid ""
+"Buffer size for shuffle. If `buffer_size < 0` or more than the length of "
+"the dataset, `buffer_size` is the length of the dataset. Default: -1."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shuffle:7
+msgid "Seed for the random. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch
+#: paddlenlp.data.sampler.SamplerHelper.shard
+#: paddlenlp.data.sampler.SamplerHelper.shuffle
+#: paddlenlp.data.sampler.SamplerHelper.sort
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shuffle:10
+msgid "A new shuffled :class:`SamplerHelper` object."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch
+#: paddlenlp.data.sampler.SamplerHelper.shard
+#: paddlenlp.data.sampler.SamplerHelper.shuffle
+#: paddlenlp.data.sampler.SamplerHelper.sort
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:25
+#: paddlenlp.data.sampler.SamplerHelper.shard:18
+#: paddlenlp.data.sampler.SamplerHelper.shuffle:14
+#: paddlenlp.data.sampler.SamplerHelper.sort:21
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:1
+msgid "Sorts the dataset according to given callable :meth:`cmp` or :meth:`key`."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:3
+msgid "The function of comparison. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:5
+msgid "The function of key. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:7
+msgid ""
+"Whether to reverse when sorting the data samples. If True, it means in "
+"descending order, and False means in ascending order. Default: False."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:11
+msgid ""
+"Buffer size for sort. If `buffer_size < 0` or `buffer_size` is more than "
+"the length of the data, `buffer_size` will be set to the length of the "
+"data. Default: -1."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.sort:17
+msgid "A new sorted :class:`SamplerHelper` object."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:1
+msgid "Batches the dataset according to given `batch_size`."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:3
+msgid "The batch size."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:5
+msgid "Whether to drop the last mini batch. Default: False."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:8
+msgid ""
+"It accepts four arguments: index of data source, the length of minibatch,"
+" the size of minibatch so far and data source, and it returns the size of"
+" mini batch so far. Actually, the returned value can be anything and "
+"would used as argument `size_so_far` in `key`. If None, it would return "
+"the length of mini match. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:15
+msgid ""
+"The function of key. It accepts the size of minibatch so far and the "
+"length of minibatch, and returns what to be compared with `batch_size`. "
+"If None, only the size of mini batch so far would be compared with "
+"`batch_size`. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.batch:21
+msgid "A new batched :class:`SamplerHelper` object."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shard:1
+msgid "Slices the dataset for multi GPU training."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shard:3
+msgid ""
+"The number of training process, and is also the number of GPU cards used "
+"in training. If None, it will be set by "
+":meth:`paddle.distributed.get_world_size` method. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shard:8
+msgid ""
+"The id of current training process. Equal to the value of the environment"
+" variable PADDLE_TRAINER_ID. If None, it will be intialized by "
+":meth:`paddle.distributed.get_rank` method. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.sampler.SamplerHelper.shard:14
+msgid "A new sliced :class:`SamplerHelper` object."
+msgstr ""
+

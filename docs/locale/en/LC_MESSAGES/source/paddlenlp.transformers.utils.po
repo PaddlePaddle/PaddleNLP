@@ -1,0 +1,71 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.utils.rst:2
+msgid "utils"
+msgstr ""
+
+#: of paddlenlp.transformers.utils.fn_args_to_dict:1
+msgid ""
+"Inspect function `func` and its arguments for running, and extract a dict"
+" mapping between argument names and keys."
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta:1
+msgid "基类：:class:`type`"
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta:1
+msgid ""
+"This metaclass wraps the `__init__` method of a class to add "
+"`init_config` attribute for instances of that class, and `init_config` "
+"use a dict to track the initial configuration. If the class has "
+"`_wrap_init` method, it would be hooked after `__init__` and called as "
+"`_wrap_init(self, init_fn, init_args)`. Since InitTrackerMeta would be "
+"used as metaclass for pretrained model classes, which always are Layer "
+"and `type(Layer)` is not `type`, thus use `type(Layer)` rather than "
+"`type` as base class for it to avoid inheritance metaclass conflicts."
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta.init_and_track_conf:1
+msgid ""
+"wraps `init_func` which is `__init__` method of a class to add "
+"`init_config` attribute for instances of that class. :param init_func: It"
+" should be the `__init__` method of a class. :type init_func: callable "
+":param help_func: If provided, it would be hooked after"
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta.init_and_track_conf:6
+msgid ""
+"`init_func` and called as `_wrap_init(self, init_func, *init_args, "
+"**init_args)`. Default None."
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta.init_and_track_conf
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta.init_and_track_conf:10
+msgid "the wrapped function"
+msgstr ""
+
+#: of paddlenlp.transformers.utils.InitTrackerMeta.init_and_track_conf
+msgid "返回类型"
+msgstr ""
+

@@ -1,0 +1,718 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.electra.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:1
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice:1
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering:1
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:1
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator:1
+#: paddlenlp.transformers.electra.modeling.ElectraModel:1
+msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:1
+msgid "The bare Electra Model transformer outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraModel
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:10
+msgid ""
+"Vocabulary size of `inputs_ids` in `ElectraModel`. Also is the vocab size"
+" of token embedding matrix. Defines the number of different tokens that "
+"can be represented by the `inputs_ids` passed when calling "
+"`ElectraModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:3
+#: paddlenlp.transformers.electra.modeling.ElectraModel:13
+msgid "Dimensionality of the embedding layer."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:15
+msgid "Dimensionality of the encoder layer and pooler layer."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:17
+msgid "Number of hidden layers in the Transformer encoder."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:19
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:21
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the encoder. Input "
+"tensors to ff layers are firstly projected from `hidden_size` to "
+"`intermediate_size`, and then projected back to `hidden_size`. Typically "
+"`intermediate_size` is larger than `hidden_size`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:25
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:31
+msgid ""
+"The dropout probability used in MultiHeadAttention in all encoder layers "
+"to drop some attention target."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:33
+msgid ""
+"The maximum value of the dimensionality of position encoding, which "
+"dictates the maximum supported length of an input sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:36
+msgid "The vocabulary size of `token_type_ids`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:38
+msgid ""
+"The standard deviation of the normal initializer.  .. note::     A "
+"normal_initializer initializes weight matrices as normal distributions."
+"     See :meth:`ElectraPretrainedModel.init_weights()` for how weights "
+"are initialized in `ElectraModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:38
+msgid "The standard deviation of the normal initializer."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:41
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`ElectraPretrainedModel.init_weights()` for how weights are "
+"initialized in `ElectraModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel:44
+msgid "The index of padding token in the token vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:1
+msgid ""
+"The ElectraModel forward method, overrides the `__call__()` special "
+"method."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:7
+msgid ""
+"Segment token indices to indicate different portions of the inputs. "
+"Selected in the range ``[0, type_vocab_size - 1]``. If `type_vocab_size` "
+"is 2, which means the inputs have two portions. Indices can either be 0 "
+"or 1:  - 0 corresponds to a *sentence A* token, - 1 corresponds to a "
+"*sentence B* token.  Its data type should be `int64` and it has a shape "
+"of [batch_size, sequence_length]. Defaults to `None`, which means we "
+"don't add segment embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:7
+msgid ""
+"Segment token indices to indicate different portions of the inputs. "
+"Selected in the range ``[0, type_vocab_size - 1]``. If `type_vocab_size` "
+"is 2, which means the inputs have two portions. Indices can either be 0 "
+"or 1:"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:12
+msgid "0 corresponds to a *sentence A* token,"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:13
+msgid "1 corresponds to a *sentence B* token."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:15
+msgid ""
+"Its data type should be `int64` and it has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`, which means we don't add segment "
+"embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:18
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, max_position_embeddings - 1]``. "
+"Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to "
+"`None`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:22
+msgid ""
+"Mask used in multi-head attention to avoid performing attention on to "
+"some unwanted positions, usually the paddings or the subsequent "
+"positions. Its data type can be int, float and bool. When the data type "
+"is bool, the `masked` tokens have `False` values and the others have "
+"`True` values. When the data type is int, the `masked` tokens have `0` "
+"values and the others have `1` values. When the data type is float, the "
+"`masked` tokens have `-INF` values and the others have `0` values. It is "
+"a tensor with shape broadcasted to `[batch_size, num_attention_heads, "
+"sequence_length, sequence_length]`. Defaults to `None`, which means "
+"nothing needed to be prevented attention to."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:32
+msgid ""
+"Returns tensor `encoder_outputs`, which is the output at the last layer "
+"of the model. Its data type should be float32 and has a shape of "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:16
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:17
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:26
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:17
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:17
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:15
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward:37
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
+msgid ""
+"An abstract class for pretrained Electra models. It provides Electra "
+"related `model_config_file`, `pretrained_init_configuration`, "
+"`resource_files_names`, `pretrained_resource_files_map`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.init_weights:1
+msgid "Initializes and tie weights if needed."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.tie_weights:1
+msgid "Tie the weights between the input embeddings and the output embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:1
+msgid "Electra Model for pretraining tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:3
+msgid "An instance of :class:`ElectraGenerator`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:5
+msgid "An instance of :class:`ElectraDiscriminator`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:1
+msgid ""
+"The ElectraForPretraining forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:9
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:9
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:9
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:9
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:14
+msgid "See :class:`ElectraModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:11
+msgid ""
+"Raw inputs used to get discriminator labels. Its data type should be "
+"`int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:14
+msgid ""
+"Labels to compute the discriminator inputs. Its data type should be int64"
+" and its shape is [batch_size, sequence_length]. The value for unmasked "
+"tokens should be -100 and value for masked tokens should be 0."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:19
+msgid ""
+"Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask).  "
+"With the fields:  - `gen_logits` (Tensor):     The scores of Electra "
+"Generator.     Its data type should be int64 and its shape is "
+"[batch_size, sequence_length, vocab_size].  - `disc_logits` (Tensor):"
+"     The the prediction result of replaced tokens.     Its data type "
+"should be float32 and if batch_size>1, its shape is [batch_size, "
+"sequence_length],     if batch_size=1, its shape is [sequence_length].  -"
+" `disc_labels` (Tensor):     The labels of electra discriminator. Its "
+"data type should be int32,     and its shape is [batch_size, "
+"sequence_length].  - `attention_mask` (Tensor):     See "
+":class:`ElectraModel`. Its data type should be bool."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:19
+msgid "Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:14
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:21
+msgid "With the fields:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:25
+msgid "`gen_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:24
+msgid ""
+"The scores of Electra Generator. Its data type should be int64 and its "
+"shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:30
+msgid "`disc_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:28
+msgid ""
+"The the prediction result of replaced tokens. Its data type should be "
+"float32 and if batch_size>1, its shape is [batch_size, sequence_length], "
+"if batch_size=1, its shape is [sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:34
+msgid "`disc_labels` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:33
+msgid ""
+"The labels of electra discriminator. Its data type should be int32, and "
+"its shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:36
+msgid "`attention_mask` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:37
+msgid "See :class:`ElectraModel`. Its data type should be bool."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:1
+msgid ""
+"The Electra Discriminator can detect the tokens that are replaced by the "
+"Electra Generator."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:3
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator:4
+msgid "An instance of :class:`ElectraModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:10
+msgid ""
+"Returns tensor `logits`, the prediction result of replaced tokens. Its "
+"data type should be float32 and if batch_size>1, its shape is "
+"[batch_size, sequence_length], if batch_size=1, its shape is "
+"[sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraGenerator:1
+msgid ""
+"The Electra Generator will replace some tokens of the given sequence, it "
+"is trained as a masked language model."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:10
+msgid ""
+"Returns tensor `prediction_scores`, the scores of Electra Generator. Its "
+"data type should be int64 and its shape is [batch_size, sequence_length, "
+"vocab_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
+msgid "Perform sentence-level classification tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:5
+msgid "The dropout probability for all fully connected layers."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:7
+msgid "The number of classes."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:1
+msgid ""
+"The ElectraClassificationHead forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:3
+msgid ""
+"Input sequence, usually the `sequence_output` of electra model. Its data "
+"type should be float32 and its shape is [batch_size, sequence_length, "
+"hidden_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:7
+msgid ""
+"Returns a tensor of the input text classification logits. Shape as "
+"`[batch_size, num_classes]` and dtype as float32."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:1
+msgid ""
+"Electra Model with a linear layer on top of the output layer, designed "
+"for sequence classification/regression tasks like GLUE tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice:4
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering:4
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:4
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:4
+msgid "An instance of ElectraModel."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:6
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:6
+msgid "The number of classes. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice:8
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:8
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:8
+msgid ""
+"The dropout probability for output of Electra. If None, use the same "
+"value as `hidden_dropout_prob` of `ElectraModel` instance `electra`. "
+"Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:1
+msgid ""
+"The ElectraForSequenceClassification forward method, overrides the "
+"__call__() special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:12
+msgid ""
+"Returns tensor `logits`, a tensor of the input text classification "
+"logits. Shape as `[batch_size, num_classes]` and dtype as float32."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:1
+msgid ""
+"Electra  Model with a linear layer on top of the hidden-states output "
+"layer, designed for token classification tasks like NER tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:1
+msgid ""
+"The ElectraForTokenClassification forward method, overrides the "
+"__call__() special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:12
+msgid ""
+"Returns tensor `logits`, a tensor of the input token classification "
+"logits. Shape as `[batch_size, sequence_length, num_classes]` and dtype "
+"as `float32`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
+msgid ""
+"Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of "
+"different tokens that can be represented by the `inputs_ids` passed when "
+"calling `ElectraModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:4
+msgid "The weight of the Electra Generator."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:6
+msgid "The weight of the Electra Discriminator."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:1
+msgid ""
+"The scores of masked token prediction. Its data type should be float32. "
+"and its shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:4
+msgid ""
+"The scores of masked token prediction. Its data type should be float32. "
+"and its shape is [batch_size, sequence_length] or [sequence length] if "
+"batch_size=1."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:7
+msgid ""
+"The labels of the generator, its dimensionality is equal to "
+"`generator_prediction_scores`. Its data type should be int64 and its "
+"shape is [batch_size, sequence_size, 1]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:10
+msgid ""
+"The labels of the discriminator, its dimensionality is equal to "
+"`discriminator_prediction_scores`. The labels should be numbers between 0"
+" and 1. Its data type should be float32 and its shape is [batch_size, "
+"sequence_size] or [sequence length] if batch_size=1."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:17
+msgid ""
+"The pretraining loss, equals to weighted generator loss plus the weighted"
+" discriminator loss. Its data type should be float32 and its shape is "
+"[1]."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice:1
+msgid ""
+"Electra Model with a linear layer on top of the hidden-states output "
+"layer, designed for multiple choice tasks like RocStories/SWAG tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice:6
+msgid "The number of choices. Defaults to `2`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:1
+msgid ""
+"The ElectraForMultipleChoice forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:3
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:5
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:7
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:9
+msgid ""
+"See :class:`ElectraModel` and shape as [batch_size, num_choice, "
+"sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:12
+msgid ""
+"Returns tensor `reshaped_logits`, a tensor of the multiple choice "
+"classification logits. Shape as `[batch_size, num_choice]` and dtype as "
+"`float32`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering:1
+msgid ""
+"Electra Model with a linear layer on top of the hidden-states output to "
+"compute `span_start_logits` and `span_end_logits`, designed for question-"
+"answering tasks like SQuAD."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:1
+msgid ""
+"The ElectraForQuestionAnswering forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:12
+msgid ""
+"Returns tuple (`start_logits`, `end_logits`).  With the fields:  - "
+"`start_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the start position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length].  -"
+" `end_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the end position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:12
+msgid "Returns tuple (`start_logits`, `end_logits`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:18
+msgid "`start_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:17
+msgid ""
+"A tensor of the input token classification logits, indicates the start "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:21
+msgid "`end_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:21
+msgid ""
+"A tensor of the input token classification logits, indicates the end "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+

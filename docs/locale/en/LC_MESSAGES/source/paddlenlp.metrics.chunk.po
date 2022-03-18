@@ -1,0 +1,176 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.metrics.chunk.rst:2
+msgid "chunk"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator:1
+msgid "基类：:class:`paddle.metric.metrics.Metric`"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator:1
+msgid ""
+"ChunkEvaluator computes the precision, recall and F1-score for chunk "
+"detection. It is often used in sequence tagging tasks, such as Named "
+"Entity Recognition(NER)."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator
+#: paddlenlp.metrics.chunk.ChunkEvaluator.compute
+#: paddlenlp.metrics.chunk.ChunkEvaluator.update
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator:4
+msgid "The label list."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator:6
+msgid ""
+"If set True, the label ends with '-B', '-I', '-E' or '-S', else the label"
+" starts with them. Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator:11
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:1
+msgid "Computes the precision, recall and F1-score for chunk detection."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:3
+msgid "The valid length of every sequence, a tensor with shape `[batch_size]`"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:5
+msgid ""
+"The predictions index, a tensor with shape `[batch_size, "
+"sequence_length]`."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:7
+msgid "The labels index, a tensor with shape `[batch_size, sequence_length]`."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:9
+msgid ""
+"Unnecessary parameter for compatibility with older versions with "
+"parameters list `inputs`, `lengths`, `predictions`, `labels`. Defaults to"
+" None."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate
+#: paddlenlp.metrics.chunk.ChunkEvaluator.compute
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:12
+msgid ""
+"Returns tuple (`num_infer_chunks, num_label_chunks, num_correct_chunks`)."
+"  With the fields:  - `num_infer_chunks` (Tensor):     The number of the "
+"inference chunks.  - `num_label_chunks` (Tensor):     The number of the "
+"label chunks.  - `num_correct_chunks` (Tensor):     The number of the "
+"correct chunks."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:12
+msgid "Returns tuple (`num_infer_chunks, num_label_chunks, num_correct_chunks`)."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:14
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:17
+msgid "`num_infer_chunks` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:17
+msgid "The number of the inference chunks."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:20
+msgid "`num_label_chunks` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:20
+msgid "The number of the label chunks."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:22
+msgid "`num_correct_chunks` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:23
+msgid "The number of the correct chunks."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate
+#: paddlenlp.metrics.chunk.ChunkEvaluator.compute
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.update:1
+msgid ""
+"This function takes (num_infer_chunks, num_label_chunks, "
+"num_correct_chunks) as input, to accumulate and update the corresponding "
+"status of the ChunkEvaluator object. The update method is as follows:"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.update:4
+msgid ""
+"\\\\ \\begin{array}{l}{\\text { self. num_infer_chunks }+=\\text { "
+"num_infer_chunks }} \\\\ {\\text { self. num_Label_chunks }+=\\text { "
+"num_label_chunks }} \\\\ {\\text { self. num_correct_chunks }+=\\text { "
+"num_correct_chunks }}\\end{array} \\\\\n"
+"\n"
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.update:7
+msgid "The number of chunks in Inference on the given minibatch."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.update:9
+msgid "The number of chunks in Label on the given mini-batch."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.update:11
+msgid "The number of chunks both in Inference and Label on the given mini-batch."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate:1
+msgid ""
+"This function returns the mean precision, recall and f1 score for all "
+"accumulated minibatches."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate:3
+msgid "Returns tuple (`precision, recall, f1 score`)."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.reset:1
+msgid "Reset function empties the evaluation memory for previous mini-batches."
+msgstr ""
+
+#: of paddlenlp.metrics.chunk.ChunkEvaluator.name:1
+msgid "Return name of metric instance."
+msgstr ""
+

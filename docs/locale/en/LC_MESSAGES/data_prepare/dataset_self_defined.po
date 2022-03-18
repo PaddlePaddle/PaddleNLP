@@ -1,0 +1,127 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../data_prepare/dataset_self_defined.rst:3
+msgid "如何自定义数据集"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:5
+msgid ""
+"通过使用PaddleNLP提供的 :func:`load_dataset` ， :class:`MapDataset` 和 "
+":class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:8
+msgid "从本地文件创建数据集"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:10
+msgid ""
+"从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` "
+"中创建数据集。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:12
+msgid ""
+"以 `waybill_ie "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie>`__"
+" 快递单信息抽取任务中的数据为例："
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:32
+msgid ""
+"我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 "
+":class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的监测数据流向。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:34
+msgid ""
+"事实上，:class:`MapDataset` 在绝大多数时候都可以满足要求。一般只有在数据集过于庞大无法一次性加载进内存的时候我们才考虑使用 "
+":class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:38
+msgid ""
+"需要注意的是，只有PaddleNLP内置的数据集具有将数据中的label自动转为id的功能（详细条件参见 "
+":doc:`创建DatasetBuilder "
+"<../community/contribute_datasets/how_to_write_a_DatasetBuilder>`）。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:40
+msgid "像上例中的自定义数据集需要在自定义的convert to feature方法中添加label转id的功能。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:42
+msgid ""
+"自定义数据读取function中的参数可以直接以关键字参数的的方式传入 :func:`load_dataset` "
+"中。而且对于自定义数据集，:attr:`lazy` 参数是 **必须** 传入的。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:45
+msgid "从 :class:`paddle.io.Dataset/IterableDataset` 创建数据集"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:47
+msgid ""
+"虽然PaddlePddle内置的 :class:`Dataset` 和 :class:`IterableDataset` 是可以直接接入 "
+":class:`DataLoader` 用于模型训练的，但有时我们希望更方便的使用一些数据处理（例如convert to feature, "
+"数据清洗，数据增强等）。而PaddleNLP内置的 :class:`MapDataset` 和 :class:`IterDataset` "
+"正好提供了能实现以上功能的API。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:49
+msgid ""
+"所以如果您习惯使用 :class:`paddle.io.Dataset/IterableDataset` "
+"创建数据集的话。只需要在原来的数据集上套上一层 :class:`MapDataset` 或 :class:`IterDataset` "
+"就可以把原来的数据集对象转换成PaddleNLP的数据集。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:51
+msgid "下面举一个简单的小例子。:class:`IterDataset` 的用法基本相同。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:78
+msgid "从其他python对象创建数据集"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:80
+msgid ""
+"理论上，我们可以使用任何包含 :func:`__getitem__` 方法和 :func:`__len__` 方法的python对象创建 "
+":class:`MapDataset`。包括 :class:`List` ，:class:`Tuple` ，:class:`DataFrame` "
+"等。只要将符合条件的python对象作为初始化参数传入 :class:`MapDataset` 即可完成创建。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:95
+msgid ""
+"同样的，我们也可以使用包含 :func:`__iter__` 方法的python对象创建 :class:`IterDataset` 。例如 "
+":class:`List`， :class:`Generator` 等。创建方法与 :class:`MapDataset` 相同。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:112
+msgid "需要注意，像上例中直接将 **生成器** 对象传入 :class:`IterDataset` 所生成的数据集。其数据只能迭代 **一次** 。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:114
+msgid "与常规的python对象一样，只要满足以上的条件，我们也可以使用同样的方法从第三方数据集创建PaddleNLP数据集。"
+msgstr ""
+
+#: ../data_prepare/dataset_self_defined.rst:116
+msgid "例如HuggingFace Dataset："
+msgstr ""
+

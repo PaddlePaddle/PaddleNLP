@@ -1,0 +1,108 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../get_started/installation.rst:2
+msgid "安装PaddleNLP"
+msgstr ""
+
+#: ../get_started/installation.rst:3
+msgid ""
+"以下安装过程默认用户已安装好paddlepaddle-"
+"gpu或paddlepaddle(版本大于或等于2.0)，paddlepaddle安装方式参照 飞桨官网_。"
+msgstr ""
+
+#: ../get_started/installation.rst:8
+msgid "pip安装"
+msgstr ""
+
+#: ../get_started/installation.rst:14
+msgid "Anaconda安装"
+msgstr ""
+
+#: ../get_started/installation.rst:15
+msgid "Anaconda是一个开源的Python发行版本，其包含了conda、Python等180多个科学包及其依赖项。使用Anaconda可以通过创建多个独立的Python环境，避免用户的Python环境安装太多不同版本依赖导致冲突。"
+msgstr ""
+
+#: ../get_started/installation.rst:18
+msgid "1、windows安装Anaconda"
+msgstr ""
+
+#: ../get_started/installation.rst:21 ../get_started/installation.rst:56
+msgid "第一步 下载"
+msgstr ""
+
+#: ../get_started/installation.rst:22
+msgid "在 Anaconda官网_ 选择下载Windows Python3.7 64-Bit版本。"
+msgstr ""
+
+#: ../get_started/installation.rst:26
+msgid "确保已经安装Visual C++ Build Tools(可以在开始菜单中找到)，如未安装，请点击 下载安装_。"
+msgstr ""
+
+#: ../get_started/installation.rst:31 ../get_started/installation.rst:62
+msgid "第二步 安装"
+msgstr ""
+
+#: ../get_started/installation.rst:32
+msgid "运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。"
+msgstr ""
+
+#: ../get_started/installation.rst:37 ../get_started/installation.rst:73
+msgid "第三步 使用"
+msgstr ""
+
+#: ../get_started/installation.rst:38
+msgid "点击Windows系统左下角的Windows图标，打开：所有程序->Anaconda3/2（64-bit）->Anaconda Prompt"
+msgstr ""
+
+#: ../get_started/installation.rst:39
+msgid "在命令行中执行下述命令"
+msgstr ""
+
+#: ../get_started/installation.rst:50 ../get_started/installation.rst:84
+msgid ""
+"按如上方式配置后，即可在环境中使用PaddleNLP了，命令行输入python回车后，import "
+"paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda "
+"Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。"
+msgstr ""
+
+#: ../get_started/installation.rst:53
+msgid "2、Linux/Mac安装安装Anaconda"
+msgstr ""
+
+#: ../get_started/installation.rst:57
+msgid "在 Anaconda官网_ 选择下载对应系统 Python3.7版本下载（Mac下载Command Line Installer版本即可)。"
+msgstr ""
+
+#: ../get_started/installation.rst:63
+msgid "打开终端，在终端安装Anaconda"
+msgstr ""
+
+#: ../get_started/installation.rst:70
+msgid "安装过程中一直回车即可，如提示设置安装路径，可根据需求修改，一般默认即可。"
+msgstr ""
+
+#: ../get_started/installation.rst:87
+msgid "代码安装"
+msgstr ""
+
+#: ../get_started/installation.rst:88
+msgid "github代码会跟随开发进度不断更新"
+msgstr ""
+

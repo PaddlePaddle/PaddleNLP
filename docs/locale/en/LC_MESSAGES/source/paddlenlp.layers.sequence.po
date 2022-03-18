@@ -1,0 +1,57 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.layers.sequence.rst:2
+msgid "sequence"
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask:1
+msgid ""
+"To boost the performance, this sequence_mask is different with "
+"paddle.fluid.layers.sequence_mask"
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask:3
+msgid ""
+"The whole sequence index, a tensor with a shape of [batch_size, "
+"sequence_length]."
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask:5
+msgid "The valid length of every sequence, a tensor with a shape of [batch_size]."
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask:8
+msgid ""
+"Returns the output sequence mask `mask`. Its dtype is `bool` and has a "
+"shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask
+msgid "返回类型"
+msgstr ""
+
