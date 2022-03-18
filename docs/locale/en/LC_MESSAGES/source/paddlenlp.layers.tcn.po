@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,12 +17,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.layers.tcn.rst:2
+#: ../source/paddlenlp.layers.tcn.rst:2
 msgid "tcn"
-msgstr ""
-
-#: of paddlenlp.layers.tcn.TCN:1 paddlenlp.layers.tcn.TemporalBlock:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.layers.tcn.TemporalBlock:1
@@ -67,16 +63,8 @@ msgstr ""
 
 #: of paddlenlp.layers.tcn.TemporalBlock.forward:1
 msgid ""
-"Defines the computation performed at every call. Should be overridden by "
-"all subclasses."
-msgstr ""
-
-#: of paddlenlp.layers.tcn.TemporalBlock.forward:4
-msgid "unpacked tuple arguments"
-msgstr ""
-
-#: of paddlenlp.layers.tcn.TemporalBlock.forward:6
-msgid "unpacked dict arguments"
+"The input tensor with a shape  of [batch_size, input_channel, "
+"sequence_length]."
 msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward:1
@@ -85,8 +73,8 @@ msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward:3
 msgid ""
-"The input tensor with shape `[batch_size, input_channel, "
-"sequence_length]`."
+"The input tensor with a shape of [batch_size, input_channel, "
+"sequence_length]."
 msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward
@@ -95,8 +83,8 @@ msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward:6
 msgid ""
-"The output tensor with shape `[batch_size, num_channels[-1], "
-"sequence_length]`."
+"The `output` tensor with a shape of [batch_size, num_channels[-1], "
+"sequence_length]."
 msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward
