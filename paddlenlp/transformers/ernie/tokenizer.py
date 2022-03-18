@@ -93,8 +93,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
             "ernie-gen-large-430g-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
-            "ernie-3.0-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0_base/vocab.txt",
             "ernie-base-cn-query-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-base-cn-title-encoder":
@@ -131,9 +129,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ppminilm-6l-768h": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-base": {
             "do_lower_case": True
         },
         "ernie-base-cn-query-encoder": {
