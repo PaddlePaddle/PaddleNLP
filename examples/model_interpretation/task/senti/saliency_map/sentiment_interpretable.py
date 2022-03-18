@@ -40,9 +40,6 @@ from paddlenlp.datasets import DatasetBuilder
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 from paddlenlp.transformers.ernie.tokenizer import ErnieTokenizer
 
-#from roberta.tokenizing_ernie import ErnieTokenizer
-#from roberta.tokenizer import RobertaTokenizer
-#from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForSequenceClassification
 
 log = logging.getLogger(__name__)

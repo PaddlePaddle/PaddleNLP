@@ -202,8 +202,7 @@ def init_lstm_var(args):
         padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
-    dev_ds = SentiData().read(
-        os.path.join(args.data_dir, 'dev'), args.language)
+    dev_ds = SentiData().read(os.path.join(args.data_dir, 'dev'), args.language)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=padding_idx),  # input_ids
         Stack(dtype="int64"),  # seq len
@@ -236,8 +235,7 @@ def init_roberta_var(args):
 
     map_fn = partial(map_fn_senti, tokenizer=tokenizer, language=args.language)
 
-    dev_ds = SentiData().read(
-        os.path.join(args.data_dir, 'dev'), args.language)
+    dev_ds = SentiData().read(os.path.join(args.data_dir, 'dev'), args.language)
     dev_ds.map(map_fn, batched=True)
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_ds, batch_size=args.batch_size, shuffle=False)
