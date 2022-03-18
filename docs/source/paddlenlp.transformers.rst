@@ -46,6 +46,7 @@ paddlenlp.transformers
    paddlenlp.transformers.reformer
    paddlenlp.transformers.roberta
    paddlenlp.transformers.roformer
+   paddlenlp.transformers.semantic_indexing
    paddlenlp.transformers.skep
    paddlenlp.transformers.squeezebert
    paddlenlp.transformers.t5
