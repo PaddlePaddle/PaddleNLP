@@ -31,4 +31,4 @@ op:
       # Fetch结果列表，以client_config中fetch_var的alias_name为准, 如果没有设置则全部返回
       fetch_list: ['output_embedding']
       # 模型路径
-      model_config: ./serving_server/
+      model_config: ../../serving_server/

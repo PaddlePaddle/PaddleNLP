@@ -101,7 +101,6 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-
     train_ds = load_dataset(
         read_simcse_text, data_path=args.train_set_file, lazy=False)
 

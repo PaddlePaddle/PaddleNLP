@@ -26,7 +26,7 @@ def search_in_milvus(text_embedding, query_text):
     print('Search milvus time cost is {} seconds '.format(end_time -
                                                           start_time))
 
-    corpus_file = "data/corpus.csv"
+    corpus_file = "data/qa_pair.csv"
     id2corpus = gen_id2corpus(corpus_file)
     list_data = []
     for line in results:
@@ -34,7 +34,7 @@ def search_in_milvus(text_embedding, query_text):
             idx = item.id
             distance = item.distance
             text = id2corpus[idx]
-            print(query_text, text, distance)
+            print(text, distance)
             list_data.append([query_text, text, distance])
     df = pd.DataFrame(list_data, columns=['query_text', 'text', 'distance'])
     df = df.sort_values(by="distance", ascending=True)
@@ -49,7 +49,7 @@ def search_in_milvus(text_embedding, query_text):
 if __name__ == "__main__":
     client = PipelineClient()
     client.connect(['127.0.0.1:8080'])
-    list_data = ["南昌市出台了哪些企业稳岗就业政策？"]
+    list_data = ["嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？"]
     feed = {}
     for i, item in enumerate(list_data):
         feed[str(i)] = item

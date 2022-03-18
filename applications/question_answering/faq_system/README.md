@@ -1,8 +1,8 @@
-# 端到端政务问答
+# 政务问答检索式 FAQ System
 
  **目录**
 
-* [1. 背景介绍](#场景概述)
+* [1. 场景概述](#场景概述)
 * [2. 系统特色](#系统特色)
 * [3. 政务问答系统方案](#政务问答系统方案)
 * [4. 动手实践——搭建自己的端到端检索式问答系统](#动手实践——搭建自己的端到端检索式问答系统)  
@@ -19,11 +19,11 @@
 ## 2. 系统特色
 
 + 低门槛
-    + 手把手搭建起检索系统
-    + 无需标注数据也能构建检索系统
+    + 手把手搭建检索式 FAQ System
+    + 无需相似 Query-Query Pair 标注数据也能构建 FAQ System
 + 效果好
-	+ 问答场景预训练模型：RocketQA 预训练模型
-    + 针对无标注数据场景的端到端专业方案
+    + 业界领先的检索预训练模型: RocketQA DualEncoder
+    + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
 
 + 性能快
     + 基于 Paddle Inference 快速抽取向量
@@ -38,17 +38,16 @@
 
 #### 3.1.1 技术方案
 
-**语义索引**：由于我们只有无监督数据，所以结合 SimCSE 和 WR (word reptition)策略的方式训练一个不错的语义索引模型。
+**语义索引**：针对政务问答只有问答对的场景，我们提供了一个 融合SimCSE 和 WR (word reptition)策略的无监督的解决方案。
 
 #### 3.1.2 评估指标
 
-* 在语义索引召回阶段使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
-
+* 该政务问答系统使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
 
 
 ### 3.2 数据说明
 
-数据集来源于疫情政务问答数据，包括源文本，问题和答案。
+数据集来源于疫情政务问答比赛数据，包括源文本，问题和答案。
 
 |  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回库 |
 | ------------ | ------------ |------------ | ------------ | ------------ |
@@ -59,8 +58,9 @@
 ```
 ├── data  # 数据集
     ├── train.csv  # 无监督训练集
-    ├── test_pair.csv  # 召回阶段测试集，用于评估召回模型的效果
-    ├── corpus.csv # 构建召回库的数据，用于评估召回阶段模型效果
+    ├── test_pair.csv  # 测试集，用于评估模型的效果
+    ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
+    ├── qa_pair.csv # 问答对，问题对应的答案
 ```
 
 ### 3.3 代码说明
@@ -98,7 +98,7 @@
 
 |  模型 |  Recall@1 | Recall@5 |Recall@10 |
 | ------------ | ------------ | ------------ |--------- |
-|  SimCSE |  81.882	 | 94.094| 96.296|
+|  SimCSE |  81.882     | 94.094| 96.296|
 |  SimCSE + WR |  84.785 | 95.896| 97.197|
 
 <a name="动手实践——搭建自己的端到端检索式问答系统"></a>
@@ -109,18 +109,18 @@
 
 ```
 python -u -m paddle.distributed.launch --gpus '4' \
-	train.py \
-	--device gpu \
-	--save_dir ./checkpoints/ \
-	--batch_size 64 \
-	--learning_rate 5E-5 \
-	--epochs 3 \
-	--save_steps 50 \
-	--max_seq_length 64 \
-	--dropout 0.2 \
+    train.py \
+    --device gpu \
+    --save_dir ./checkpoints/ \
+    --batch_size 64 \
+    --learning_rate 5E-5 \
+    --epochs 3 \
+    --save_steps 50 \
+    --max_seq_length 64 \
+    --dropout 0.2 \
     --output_emb_size 256 \
-	--dup_rate 0.3 \
-	--train_set_file "./data/train.csv"
+    --dup_rate 0.3 \
+    --train_set_file "./data/train.csv"
 ```
 
 参数含义说明
@@ -204,7 +204,7 @@ run_build_index.sh还包含cpu和gpu运行的脚本，默认是gpu的脚本
 接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10 指标:
 ```
 python -u evaluate.py \
-        --similar_text_pair "recall/dev.csv" \
+        --similar_text_pair "data/test_pair.csv" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 10
 ```
@@ -228,6 +228,8 @@ recall@10=97.197
 
 ## 4.3 模型部署
 
+模型部署模块首先要把动态图转换成静态图，然后转换成serving的格式。
+
 ### 动转静导出
 
 首先把动态图模型转换为静态图：
@@ -241,7 +243,29 @@ python export_model.py --params_path checkpoints/model_150/model_state.pdparams 
 sh scripts/export_model.sh
 ```
 
-### Paddle Serving部署
+### 问答检索引擎
+
+模型准备结束以后，开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，本项目使用[Milvus](https://milvus.io/)开源工具进行向量检索，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
+
+
+Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 embedding 向量，每个样本生成256维度的向量：
+
+```
+python feature_extract.py \
+        --model_dir=./output \
+        --corpus_file "data/corpus.csv"
+```
+其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。
+
+然后向搭建好的 Milvus 系统插入向量：
+
+```
+python vector_insert.py
+```
+
+### Paddle Serving 部署
+
+首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
 
 ```
 python export_to_serving.py \
@@ -298,47 +322,31 @@ list_data = [
 python rpc_client.py
 ```
 
+## 4.4 问答系统整个流程
 
-## 4.4 检索引擎搭建
+问答系统使用了Client Server的模式，即抽取向量的模型部署在服务端，然后启动客户端（Client）端去访问。
 
-数据准备结束以后，我们开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
-
-
-Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 embedding 向量，每个样本生成256维度的向量：
-
-```
-python feature_extract.py \
-        --model_dir=./output \
-        --corpus_file "data/corpus.csv"
-```
-其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。
-
-然后向搭建好的 Milvus 系统插入向量：
-
-```
-python vector_insert.py
-```
-
-
-## 4.5 问答系统整个流程
-
-问答系统使用了Client Server的模式，即抽取向量的模型部署在服务端，然后启动client端去访问。
 
 ```
 python run_system.py
 ```
+代码内置的测试用例为：
+
+```
+list_data = ["嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？"]
+```
+
 会输出如下的结果：
 
 ```
-PipelineClient::predict pack_data time:1647502428.416663
-PipelineClient::predict before time:1647502428.417196
-Extract feature time to cost :0.012468099594116211 seconds
-Search milvus time cost is 0.004625797271728516 seconds
-南昌市出台了哪些企业稳岗就业政策？ 南昌市出台了哪些企业稳定就业政策？ 0.43538036942481995
-南昌市出台了哪些企业稳岗就业政策？ 江西省政府保障企业用工有哪些补贴政策？ 0.7589598894119263
-南昌市出台了哪些企业稳岗就业政策？ 安徽省在用工和就业服务方面做了哪些调整？ 0.7852447032928467
-南昌市出台了哪些企业稳岗就业政策？ 人社部为支持中小微企业稳定就业提供了哪些政策？ 0.8440104126930237
-南昌市出台了哪些企业稳岗就业政策？ 安徽为新增就业岗位的小微企业提供什么政策？ 0.8762376308441162
-南昌市出台了哪些企业稳岗就业政策？ 遂宁市的企业灵活用工有什么政策？ 0.9104158878326416
+......
+Extract feature time to cost :0.01161503791809082 seconds
+Search milvus time cost is 0.004535675048828125 seconds
+嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？      拦、查、问、测、记 1.2107588152551751e-12
+上海市黄浦区老西门街道建立的党建责任区包干机制内容是什么？      街道工作人员担任楼宇联络员，分片区对接商务楼宇所属的物业公司，引导楼宇企业共同落实严防严控任务 0.4956303834915161
+上海市街道执行“四个统一”具体指什么？    统一由居委会干部在统一时间（每周三、五下午），递交至统一地点（社区事务受理服务中心专设窗口），街道统一收集至後台 0.6684658527374268
+怀柔区城管委在加强监督检查方面是如何落实的？    严格落实四方责任，保证每周2~3次深入环卫、电、气、热、公共自行车、垃圾处置等单位进行巡查，督促企业做好防疫工作，协调复工复产中存在的问题，确保安全复工复产有效落实。 0.7147952318191528
+华新镇“亮牌分批复工”工作方案具体内容是什么？    所有店铺一律先贴“红牌”禁止经营，经相关部门审批後，再换贴“蓝牌”准许复工。 0.7162970900535583
 .....
 ```
+输出的结果包括特征提取和检索的时间，还包含检索出来的问答对，
