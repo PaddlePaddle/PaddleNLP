@@ -32,7 +32,9 @@
 ```text
 cblue/
 ├── README.md # 使用说明
-└── train_classification.py # 分类任务训练评估脚本
+├── train_classification.py # 分类任务训练评估脚本
+├── train_ner.py # 实体识别任务训练评估脚本
+└── train_spo.py # 关系抽取任务训练评估脚本
 ```
 
 ### 模型训练

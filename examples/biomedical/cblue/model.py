@@ -13,9 +13,6 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
             An instance of ElectraModel.
         num_classes (list):
             The number of classes.
-        use_crf (bool, optional):
-            Use conditional random fields for named entity recognition.
-            Defaults to False.
         dropout (float, optionl):
             The dropout probability for output of Electra.
             If None, use the same value as `hidden_dropout_prob' of 'ElectraModel`
@@ -41,11 +38,6 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        r"""
-        The ElectraForMedicalClassification forward method, overrides the __call__() special method.
-
-        TODO
-        """
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
         sequence_output = self.dropout(sequence_output)
@@ -56,6 +48,10 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
 
 
 class MultiHeadAttentionForSPO(nn.Layer):
+    """
+    Multi-head attention layer for SPO task.
+    """
+
     def __init__(self, embed_dim, num_heads, scale_value=768):
         super(MultiHeadAttentionForSPO, self).__init__()
         self.embed_dim = embed_dim
@@ -78,6 +74,19 @@ class MultiHeadAttentionForSPO(nn.Layer):
 
 class ElectraForSPO(ElectraPretrainedModel):
     """
+    Electra Model with a linear layer on top of the hidden-states output
+    layers for entity recognition, and a multi-head attention layer for
+    relation classification.
+
+    Args: 
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_classes (int):
+            The number of classes.
+        dropout (float, optionl):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob' of 'ElectraModel`
+            instance `electra`. Defaults to None.
     """
 
     def __init__(self, electra, num_classes, dropout=None):

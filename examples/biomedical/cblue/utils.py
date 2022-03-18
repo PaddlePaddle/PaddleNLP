@@ -114,9 +114,8 @@ def convert_example_ner(example,
         text=text,
         max_seq_len=max_seq_length,
         return_position_ids=True,
-        return_length=True)
+        return_attention_mask=True)
     input_len = len(encoded_inputs['input_ids'])
-    encoded_inputs['mask'] = np.ones(input_len)
 
     if example.get('labels', None):
         labels = example['labels']
