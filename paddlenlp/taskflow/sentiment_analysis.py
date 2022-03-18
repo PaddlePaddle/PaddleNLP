@@ -23,7 +23,7 @@ import itertools
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..datasets import load_dataset, MapDataset
+from ..datasets import load_dataset_pd, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
 from ..transformers import SkepTokenizer
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard

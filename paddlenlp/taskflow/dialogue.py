@@ -20,7 +20,7 @@ import numpy as np
 import paddle
 
 from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-from ..datasets import load_dataset
+from datasets import load_dataset
 from ..data import Pad
 from .utils import dygraph_mode_guard
 from .task import Task

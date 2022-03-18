@@ -26,7 +26,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ..transformers import ErnieTokenizer, ErnieModel
 from ..transformers import is_chinese_char
-from ..datasets import load_dataset
+from ..datasets import load_dataset_pd
 from ..data import Stack, Pad, Tuple, Vocab
 from .utils import download_file, add_docstrings, static_mode_guard
 from .models import ErnieForCSC

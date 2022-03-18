@@ -34,7 +34,7 @@ except:
 from paddlenlp.layers.crf import LinearChainCrf
 from paddlenlp.utils.tools import compare_version
 
-from ..datasets import MapDataset, load_dataset
+from ..datasets import MapDataset, load_dataset_pd
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
@@ -300,7 +300,7 @@ class WordTagTask(Task):
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
-        infer_ds = load_dataset(
+        infer_ds = load_dataset_pd(
             read, inputs=short_input_texts, lazy=self._lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
@@ -698,7 +698,7 @@ class NPTagTask(Task):
                 yield tokenized_output["input_ids"], tokenized_output[
                     "token_type_ids"], label_indices
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
+        infer_ds = load_dataset_pd(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Stack(dtype='int64'),  # input_ids
             Stack(dtype='int64'),  # token_type_ids

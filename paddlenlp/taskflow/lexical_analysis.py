@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..datasets import load_dataset, MapDataset
+from ..datasets import load_dataset_pd, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import Customization
@@ -207,7 +207,7 @@ class LacTask(Task):
                 lens = len(ids)
                 yield ids, lens
 
-        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=False)
+        infer_ds = load_dataset_pd(read, inputs=short_input_texts, lazy=False)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=0, dtype="int64"),  # input_ids
             Stack(dtype='int64'),  # seq_len

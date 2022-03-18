@@ -26,7 +26,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ..transformers import GPTForGreedyGeneration
 from ..transformers import GPTChineseTokenizer, GPTTokenizer
-from ..datasets import load_dataset
+from ..datasets import load_dataset_pd
 from ..data import Stack, Pad, Tuple
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .task import Task

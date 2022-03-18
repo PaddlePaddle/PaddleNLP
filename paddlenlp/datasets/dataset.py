@@ -35,7 +35,7 @@ from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
 from functools import partial
 
-__all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
+__all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset_pd']
 
 DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
@@ -130,12 +130,12 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     return datasets
 
 
-def load_dataset(path_or_read_func,
-                 name=None,
-                 data_files=None,
-                 splits=None,
-                 lazy=None,
-                 **kwargs):
+def load_dataset_pd(path_or_read_func,
+                    name=None,
+                    data_files=None,
+                    splits=None,
+                    lazy=None,
+                    **kwargs):
     """
     This method will load a dataset, either form PaddleNLP library or from a 
     self-defined data loading script, by calling functions in `DatasetBuilder`.
