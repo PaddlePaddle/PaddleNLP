@@ -152,18 +152,12 @@ def do_train():
     if args.batch_size % args.chunk_numbers == 0:
         chunk_numbers = args.chunk_numbers
 
-
-
-
     def split(inputs,chunk_numbers,axis=0):
         if inputs.shape[0] % chunk_numbers == 0:
             return paddle.split(inputs,chunk_numbers,axis=0)
         else:
             #return paddle.split(inputs,2,axis=0)
             return paddle.split(inputs,inputs.shape[0],axis=0)
-        
-            
-   
 
     global_step = 0
     tic_train = time.time()
@@ -182,16 +176,12 @@ def do_train():
             all_CUDA_rnd_state = []
             all_global_rnd_state = []
 
-          
             for sub_batch in sub_batchs:
-             
 
                 all_reps = []
                 all_labels = []
 
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
-
-
 
                 with paddle.amp.auto_cast(
                         args.use_amp,
@@ -205,7 +195,6 @@ def do_train():
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
                         #all_global_rnd_state.append(sub_global_rnd_state)
 
-
                         sub_cosine_sim, sub_label = model(
                             query_input_ids=sub_query_input_ids,
                             title_input_ids=sub_title_input_ids,
@@ -214,7 +203,6 @@ def do_train():
 
                         all_reps.append(sub_cosine_sim)  
                         all_labels.append(sub_label)
-
 
                 model_reps = paddle.concat(all_reps, axis=0)
 
@@ -228,25 +216,16 @@ def do_train():
 
                 loss = F.cross_entropy(input=model_reps, label=model_label)
 
-
                 loss.backward()
 
-               
                 all_grads.append(model_reps.grad)
 
-                
-             
             for sub_batch,CUDA_state,grad in zip(sub_batchs,all_CUDA_rnd_state,all_grads):
-
-
 
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
 
-
-
                 paddle.framework.random.set_cuda_rng_state(CUDA_state)
                 #paddle.framework.random.set_random_seed_generator(global_random_generator,global_rnd_state)
-
 
                 cosine_sim, _ = model(
                     query_input_ids=sub_query_input_ids,
@@ -254,25 +233,18 @@ def do_train():
                     query_token_type_ids=sub_query_token_type_ids,
                     title_token_type_ids=sub_title_token_type_ids)
 
-
                 surrogate = paddle.dot(cosine_sim,grad)
-                
 
                 if args.use_amp:
                     scaled = scaler.scale(surrogate)
                     scaled.backward()
-
                 else:
                     surrogate.backward() 
-
 
             if args.use_amp:
                 scaler.minimize(optimizer, scaled)
             else:
                 optimizer.step()
-
-
-
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
