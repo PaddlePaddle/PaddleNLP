@@ -25,10 +25,7 @@ from paddlenlp.datasets import load_dataset
 
 from model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
 from utils import convert_example, CharTokenizer
-
-sys.path.append('..')
-from roberta.tokenizing_ernie import ErnieTokenizer
-#from paddlenlp.transformers import SkepTokenizer
+from paddlenlp.transformers.ernie.tokenizer import ErnieTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)

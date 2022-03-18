@@ -28,20 +28,21 @@ from tqdm import tqdm
 from functools import reduce, partial
 from pathlib import Path
 import numpy as np
-from LAC import LAC
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from LIME.lime_text import LimeTextExplainer
-from roberta.tokenizing_ernie import ErnieTokenizer
 from rnn.model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
 from rnn.utils import CharTokenizer, convert_example
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
 from paddlenlp.data import Dict, Pad, Stack, Vocab
 from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+from paddlenlp.transformers.ernie.tokenizer import ErnieTokenizer
 
-from roberta.tokenizer import RobertaTokenizer
-from roberta.tokenizer_en import RobertaBPETokenizer
+#from roberta.tokenizing_ernie import ErnieTokenizer
+#from roberta.tokenizer import RobertaTokenizer
+#from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForSequenceClassification
 
 log = logging.getLogger(__name__)

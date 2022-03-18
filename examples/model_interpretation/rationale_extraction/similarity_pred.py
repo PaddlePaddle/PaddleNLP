@@ -30,11 +30,10 @@ import argparse
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad, Dict, Vocab
 from paddlenlp.datasets import load_dataset, DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
 sys.path.append('../task/similarity')
 from LIME.lime_text import LimeTextExplainer
-from roberta.tokenizer import RobertaTokenizer
-from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForSequenceClassification
 from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet

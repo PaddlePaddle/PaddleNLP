@@ -16,4 +16,4 @@
     RoBERTa：model_interpretation/task/similarity/pretrained_models/run_train_pointwise.sh
     LSTM：model_interpretation/task/similarity/simnet/lstm_train.sh
 #### 阅读理解
-    RoBERTa：model_interpretation/task/MRC/run_train_rc.sh
+    RoBERTa：model_interpretation/task/mrc/run_train_rc.sh

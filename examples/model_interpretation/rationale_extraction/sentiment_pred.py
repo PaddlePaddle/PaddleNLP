@@ -30,15 +30,14 @@ import argparse
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad, Dict, Vocab
 from paddlenlp.datasets import load_dataset, DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+from paddlenlp.transformers.ernie.tokenizer import ErnieTokenizer
 
 sys.path.append('../task/senti')
 from LIME.lime_text import LimeTextExplainer
-from roberta.tokenizing_ernie import ErnieTokenizer
 from rnn.model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
 from rnn.utils import CharTokenizer, convert_example
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
-from roberta.tokenizer_en import RobertaBPETokenizer
-from roberta.tokenizer import RobertaTokenizer
 from roberta.modeling import RobertaForSequenceClassification
 sys.path.remove('../task/senti')
 
@@ -113,7 +112,7 @@ def get_args():
     return args
 
 
-class Senti_data(DatasetBuilder):
+class SentiData(DatasetBuilder):
     def _read(self, filename, language):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
@@ -203,7 +202,7 @@ def init_lstm_var(args):
         padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
-    dev_ds = Senti_data().read(
+    dev_ds = SentiData().read(
         os.path.join(args.data_dir, 'dev'), args.language)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=padding_idx),  # input_ids
@@ -237,7 +236,7 @@ def init_roberta_var(args):
 
     map_fn = partial(map_fn_senti, tokenizer=tokenizer, language=args.language)
 
-    dev_ds = Senti_data().read(
+    dev_ds = SentiData().read(
         os.path.join(args.data_dir, 'dev'), args.language)
     dev_ds.map(map_fn, batched=True)
     dev_batch_sampler = paddle.io.BatchSampler(

@@ -1,7 +1,7 @@
 ###
  # This script generates mrc predictions for texts contains rationales only and contains non-rationales only
 ###
-export CUDA_VISIBLE_DEVICES=`python ./code/available_gpu.py --best 1`
+export CUDA_VISIBLE_DEVICES=`python ./available_gpu.py --best 1`
 export PYTHONPATH=./:$PYTHONPATH
 
 BASE_MODEL=$1
@@ -22,11 +22,11 @@ do
         fi
     elif [[ $LANGUAGE == "en" ]]; then
         if [[ $BASE_MODEL == "roberta_base" ]]; then
-            FROM_PRETRAIN=../task/${TASK}/roberta-base
+            FROM_PRETRAIN=roberta-base
             CKPT=../task/${TASK}/models/roberta_base_squad2_20211113_104225/ckpt.bin
             
         elif [[ $BASE_MODEL == "roberta_large" ]]; then
-            FROM_PRETRAIN=../task/${TASK}/roberta-large
+            FROM_PRETRAIN=roberta-large
             CKPT=../task/${TASK}/models/roberta_large_squad2_20211113_111300/ckpt.bin
         fi
     fi
@@ -34,7 +34,7 @@ do
     OUTPUT=./prediction/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}/${RATIONAL_TYPE}/dev
     [ -d $OUTPUT ] || mkdir -p $OUTPUT
     set -x
-    python3 ./code/mrc_pred.py  \
+    python3 ./mrc_pred.py  \
         --input_data ../data/${TASK}_${LANGUAGE} \
         --base_model $BASE_MODEL \
         --data_dir ./rationale/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}/${RATIONAL_TYPE}/dev \

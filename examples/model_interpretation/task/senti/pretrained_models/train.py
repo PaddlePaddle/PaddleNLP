@@ -20,6 +20,7 @@ import os
 import six
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -28,10 +29,8 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-import sys
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 sys.path.append('..')
-from roberta.tokenizer import RobertaTokenizer
-from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForSequenceClassification
 sys.path.remove('..')
 from utils import convert_example

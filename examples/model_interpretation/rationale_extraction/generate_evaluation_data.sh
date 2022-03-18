@@ -13,7 +13,7 @@ SAVE_PATH=./evaluation_data/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}
 SAVE_DIR=./evaluation_data/${TASK}/
 [ -d $SAVE_DIR ] || mkdir -p $SAVE_DIR
 
-python3 ./code/generate_evaluation_data.py \
+python3 generate_evaluation_data.py \
     --data_dir ./prediction/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE} \
     --data_dir2 ./rationale/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE} \
     --pred_path $PRED_PATH \

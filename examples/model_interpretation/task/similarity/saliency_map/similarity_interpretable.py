@@ -33,9 +33,8 @@ from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Dict, Pad, Stack
 from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
-from roberta.tokenizer_en import RobertaBPETokenizer
-from roberta.tokenizer import RobertaTokenizer
 from roberta.modeling import RobertaForSequenceClassification
 from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet

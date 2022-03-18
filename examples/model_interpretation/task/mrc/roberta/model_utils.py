@@ -261,6 +261,8 @@ class PretrainedModel(Layer, GenerationMixin):
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class",
                                      cls.base_model_class.__name__)
+        if "layer_norm_eps" in init_kwargs:
+            layer_norm_eps = init_kwargs.pop("layer_norm_eps")
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
         if init_class == cls.base_model_class.__name__:

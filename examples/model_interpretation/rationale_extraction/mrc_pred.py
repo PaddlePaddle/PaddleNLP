@@ -34,13 +34,12 @@ from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics.squad import squad_evaluate
 from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
 sys.path.append('../task/mrc')
 from saliency_map.squad import compute_prediction
 from saliency_map.squad import DuReaderChecklist, RCInterpret, compute_prediction_checklist
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
-from roberta.tokenizer_en import RobertaBPETokenizer
-from roberta.tokenizer import RobertaTokenizer
 from roberta.modeling import RobertaForQuestionAnswering
 sys.path.remove('../task/mrc')
 

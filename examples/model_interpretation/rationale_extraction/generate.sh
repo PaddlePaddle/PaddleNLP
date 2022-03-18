@@ -1,10 +1,10 @@
-TASK=similarity
+TASK=senti
 
 if [[ $TASK == "mrc" ]]; then
     MODELS=("roberta_base" "roberta_large")
     MODES=("attention" "integrated_gradient")
 else
-    MODELS=("lstm" "roberta_base" "roberta_large")
+    MODELS=("roberta_large" "roberta_base" "lstm")
     MODES=("attention" "integrated_gradient" "lime")
 fi
 

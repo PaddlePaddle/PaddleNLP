@@ -2,7 +2,7 @@
  # This script generates sentiment predictions for texts contains rationales only and contains non-rationales only
 ###
 
-export CUDA_VISIBLE_DEVICES=`python ./code/available_gpu.py --best 1`
+export CUDA_VISIBLE_DEVICES=`python ./available_gpu.py --best 1`
 export PYTHONPATH=./:$PYTHONPATH
 
 BASE_MODEL=$1
@@ -17,12 +17,12 @@ do
     if [[ $LANGUAGE == "en" ]]; then
 
         if [[ $BASE_MODEL == "roberta_base" ]]; then
-            FROM_PRETRAIN=../task/${TASK}/pretrained_models/roberta-base
-            CKPT=../task/${TASK}/pretrained_models/saved_model_en/roberta_base_20211105_135732/model_10000/model_state.pdparams
+            FROM_PRETRAIN=roberta-base
+            CKPT=../task/${TASK}/pretrained_models/saved_model_en/roberta_base_20220318_185322/model_10000/model_state.pdparams
             #CKPT=../../../${TASK}/pretrained_models/saved_model_en/roberta_base_20211206_164443/model_10000/model_state.pdparams
         elif [[ $BASE_MODEL == "roberta_large" ]]; then
-            FROM_PRETRAIN=../task/${TASK}/pretrained_models/roberta-large
-            CKPT=../task/${TASK}/pretrained_models/saved_model_en/roberta_large_20211105_160323/model_4000/model_state.pdparams
+            FROM_PRETRAIN=roberta-large
+            CKPT=../task/${TASK}/pretrained_models/saved_model_en/roberta_large_20220318_183813/model_4000/model_state.pdparams
             #CKPT=../../../${TASK}/pretrained_models/saved_model_en/roberta_large_20211207_174631/model_4000/model_state.pdparams
         elif [[ $BASE_MODEL == "lstm" ]]; then
             VOCAB_PATH=../task/${TASK}/rnn/vocab.sst2_train
@@ -34,11 +34,11 @@ do
 
         if [[ $BASE_MODEL == "roberta_base" ]]; then
             FROM_PRETRAIN='roberta-wwm-ext'     
-            CKPT=../task/${TASK}/pretrained_models/saved_model_ch/roberta_base/model_900/model_state.pdparams
+            CKPT=../task/${TASK}/pretrained_models/saved_model_ch/roberta_base_20220318_155933/model_900/model_state.pdparams
             #CKPT=../../../${TASK}/pretrained_models/saved_model_ch/roberta_base_20211206_180737/model_900/model_state.pdparams
         elif [[ $BASE_MODEL == "roberta_large" ]]; then
             FROM_PRETRAIN='roberta-wwm-ext-large'       
-            CKPT=../task/${TASK}/pretrained_models/saved_model_ch/roberta_large_20211014_192021/model_900/model_state.pdparams
+            CKPT=../task/${TASK}/pretrained_models/saved_model_ch/roberta_large_20220318_170123/model_900/model_state.pdparams
             #CKPT=../../../${TASK}/pretrained_models/saved_model_ch/roberta_large_20211207_143351/model_900/model_state.pdparams
         elif [[ $BASE_MODEL == "lstm" ]]; then
             VOCAB_PATH=../task/${TASK}/rnn/vocab.txt
@@ -50,7 +50,7 @@ do
     OUTPUT=./prediction/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}/${RATIONAL_TYPE}/dev
     [ -d $OUTPUT ] || mkdir -p $OUTPUT
     set -x
-    python3 ./code/sentiment_pred.py \
+    python3 ./sentiment_pred.py \
         --base_model $BASE_MODEL \
         --data_dir ./rationale/${TASK}/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}/${RATIONAL_TYPE}/dev \
         --output_dir $OUTPUT \

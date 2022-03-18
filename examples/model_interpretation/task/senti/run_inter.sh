@@ -3,26 +3,27 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=7
+export CUDA_VISIBLE_DEVICES=6
 export PYTHONPATH=./:$PYTHONPATH
 
-LANGUAGE=ch                         # LANGUAGE choose in [ch, en]
-BASE_MODEL=lstm            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
+LANGUAGE=en                         # LANGUAGE choose in [ch, en]
+BASE_MODEL=roberta_base            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
 INTER_MODE=attention                     # INTER_MODE choice in [attention, integrated_gradient, lime]
 TASK=senti_${LANGUAGE}
 DATA=../../data/${TASK}
 START_ID=0
 FROM_PRETRAIN='test'
+VOCAB_PATH='test'
 
 if [[ $LANGUAGE == "en" ]]; then
 
     if [[ $BASE_MODEL == "roberta_base" ]]; then
-        FROM_PRETRAIN='pretrained_models/roberta-base'
-        CKPT=pretrained_models/saved_model_en/roberta_base_20211105_135732/model_10000/model_state.pdparams
+        FROM_PRETRAIN='roberta-base'
+        CKPT=pretrained_models/saved_model_en/roberta_base_20220318_185322/model_10000/model_state.pdparams
         #CKPT=pretrained_models/saved_model_en/roberta_base_20211206_164443/model_10000/model_state.pdparams
     elif [[ $BASE_MODEL == "roberta_large" ]]; then
-        FROM_PRETRAIN='pretrained_models/roberta-large'
-        CKPT=pretrained_models/saved_model_en/roberta_large_20211105_160323/model_4000/model_state.pdparams
+        FROM_PRETRAIN='roberta-large'
+        CKPT=pretrained_models/saved_model_en/roberta_large_20220318_183813/model_4000/model_state.pdparams
         #CKPT=pretrained_models/saved_model_en/roberta_large_20211207_174631/model_4000/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
         VOCAB_PATH='rnn/vocab.sst2_train'
@@ -34,11 +35,11 @@ elif [[ $LANGUAGE == "ch" ]]; then
 
     if [[ $BASE_MODEL == "roberta_base" ]]; then
         FROM_PRETRAIN='roberta-wwm-ext'     
-        CKPT=pretrained_models/saved_model_ch/roberta_base/model_900/model_state.pdparams
+        CKPT=pretrained_models/saved_model_ch/roberta_base_20220318_155933/model_900/model_state.pdparams
         #CKPT=pretrained_models/saved_model_ch/roberta_base_20211229_101252/model_900/model_state.pdparams
     elif [[ $BASE_MODEL == "roberta_large" ]]; then
         FROM_PRETRAIN='roberta-wwm-ext-large'       
-        CKPT=pretrained_models/saved_model_ch/roberta_large_20211014_192021/model_900/model_state.pdparams
+        CKPT=pretrained_models/saved_model_ch/roberta_large_20220318_170123/model_900/model_state.pdparams
         #CKPT=pretrained_models/saved_model_ch/roberta_large_20211229_105019/model_900/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
         VOCAB_PATH='rnn/vocab.txt'

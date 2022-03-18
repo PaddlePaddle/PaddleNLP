@@ -24,12 +24,11 @@ import argparse
 
 from paddle.io import DataLoader
 from paddlenlp.data import Pad, Stack, Dict
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 import paddle
 
 from squad import DuReaderChecklist
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
-from roberta.tokenizer import RobertaTokenizer
-from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForQuestionAnswering
 
 log = logging.getLogger(__name__)

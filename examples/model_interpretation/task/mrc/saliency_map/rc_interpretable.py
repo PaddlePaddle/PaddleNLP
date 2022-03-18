@@ -29,9 +29,8 @@ from paddle.io import DataLoader
 from paddlenlp.data import Stack, Pad, Dict
 from paddlenlp.transformers import ErnieTokenizer
 from squad import RCInterpret
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
-from roberta.tokenizer import RobertaTokenizer
-from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForQuestionAnswering
 
 log = logging.getLogger(__name__)

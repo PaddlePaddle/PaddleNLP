@@ -29,8 +29,8 @@ from paddlenlp.metrics.squad import squad_evaluate
 
 from squad import RCInterpret
 from squad import compute_prediction
-from roberta.tokenizer_en import RobertaBPETokenizer
-from roberta.tokenizer import RobertaTokenizer
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
+
 from roberta.modeling import RobertaForQuestionAnswering
 
 log = logging.getLogger(__name__)

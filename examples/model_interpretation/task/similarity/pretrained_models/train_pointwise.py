@@ -27,14 +27,13 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
 from data import create_dataloader
 from data import convert_pointwise_example as convert_example
 import sys
 sys.path.append('..')
-from roberta.tokenizer_en import RobertaBPETokenizer
 from roberta.modeling import RobertaForSequenceClassification
-from roberta.tokenizer import RobertaTokenizer
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

@@ -19,7 +19,6 @@ import numpy as np
 import argparse
 import os
 import sys
-import spacy
 
 
 def get_args():

@@ -34,11 +34,11 @@ do
 
             elif [[ $LANGUAGE == "en" ]]; then
                 if [[ $BASE_MODEL == "roberta_base" ]]; then
-                    FROM_PRETRAIN=pretrained_models/roberta-base
+                    FROM_PRETRAIN=roberta-base
                     CKPT=pretrained_models/saved_model_en/roberta_base_20211109_205245/model_54000/model_state.pdparams
                     #CKPT=pretrained_models/saved_model_en/roberta_base_20211208_121339/model_54000/model_state.pdparams
                 elif [[ $BASE_MODEL == "roberta_large" ]]; then
-                    FROM_PRETRAIN=pretrained_models/roberta-large
+                    FROM_PRETRAIN=roberta-large
                     CKPT=pretrained_models/saved_model_en/roberta_large_20211109_205649/model_46000/model_state.pdparams
                     #CKPT=pretrained_models/saved_model_en/roberta_large_20211208_131440/model_42000/model_state.pdparams
                 elif [[ $BASE_MODEL == "lstm" ]]; then

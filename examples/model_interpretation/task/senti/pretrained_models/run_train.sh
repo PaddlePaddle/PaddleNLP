@@ -5,7 +5,7 @@
 export CUDA_VISIBLE_DEVICES=5
 
 LANGUAGE=en
-BASE_MODEL=roberta_large        # [roberta_base, roberta_large]
+BASE_MODEL=roberta_base        # [roberta_base, roberta_large]
 timestamp=`date  +"%Y%m%d_%H%M%S"`
 
 if [[ $LANGUAGE == "ch" ]]; then

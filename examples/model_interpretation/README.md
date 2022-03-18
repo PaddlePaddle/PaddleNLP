@@ -165,11 +165,6 @@ pip3 install paddlepaddle-gpu
 中文推荐使用[DuReader_Checklist](https://dataset-bj.cdn.bcebos.com/lic2021/dureader_checklist.dataset.tar.gz)，英文推荐使用[SQUDA2](https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v2.0.json)。请将阅读理解训练数据放置在/model_interpretation/task/MRC/data目录下。
 
 ### 下载预训练模型
-#### 英文RoBERTa：
-
-请将[英文RoBERTa模型](https://aistudio.baidu.com/aistudio/datasetdetail/111650/0)（RoBERTa-base和RoBERTa-large）放置在各个task的pretrained_models目录下。
-
-#### 中文RoBERTa：
 
 使用paddlenlp框架自动缓存模型文件。
 
