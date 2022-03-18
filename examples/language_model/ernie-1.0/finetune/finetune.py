@@ -280,7 +280,6 @@ def do_train(args):
             tokenizer,
             args,
             test_ds=all_ds["test"])
-
     trainer.train()
     trainer.eval()
 
