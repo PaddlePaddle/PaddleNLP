@@ -1,0 +1,116 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.distill_utils.rst:2
+msgid "distill\\_utils"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.to_distill:1
+msgid ""
+"Can be bound to object with transformer encoder layers, and make model "
+"expose attributes `outputs.q`, `outputs.k`, `outputs.v`, "
+"`outputs.scaled_qks`, `outputs.hidden_states`and `outputs.attentions` of "
+"the object for distillation. It could be returned intermediate tensor "
+"using in MiniLM and TinyBERT strategy."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_minilm_loss:1
+msgid ""
+"Calculates loss for Q-Q, K-K, V-V relation from MiniLMv2. :param "
+"loss_fct: Loss function for distillation. It only supports kl_div loss "
+"now. :type loss_fct: callable :param s: Q, K, V of Student. :type s: "
+"Tensor :param t: Q, K, V of teacher. :type t: Tensor :param attn_mask: "
+"Attention mask for relation. :type attn_mask: Tensor :param "
+"num_relation_heads: The number of relation heads. 0 means "
+"`num_relation_heads` equals"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_minilm_loss:11
+msgid "to origin head num. Defaults to 0."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_minilm_loss
+#: paddlenlp.transformers.distill_utils.calc_multi_relation_loss
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_minilm_loss:15
+msgid "MiniLM loss value."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_minilm_loss
+#: paddlenlp.transformers.distill_utils.calc_multi_relation_loss
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:1
+msgid ""
+"Calculates loss for multiple Q-Q, K-K and V-V relation. It supports head-"
+"head relation, sample-sample relation and origin token-token relation. "
+"The final loss value could be balanced by weight `alpha` and `beta`."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:5
+msgid "Loss function for distillation. It only supports kl_div loss now."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:7
+msgid "Q, K, V of Student."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:9
+msgid "Q, K, V of teacher."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:11
+msgid "Attention mask for relation."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:13
+msgid ""
+"The number of relation heads. 0 means `num_relation_heads` equals to "
+"origin head num. Defaults to 0."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:17
+msgid "The weight for head-head relation. Defaults to 0.0."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:20
+msgid "The weight for sample-sample relation. Defaults to 0.0."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:24
+msgid ""
+"Weighted loss of token-token loss, head-head loss and     sample-sample "
+"loss."
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:26
+msgid "Weighted loss of token-token loss, head-head loss and"
+msgstr ""
+
+#: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:27
+msgid "sample-sample loss."
+msgstr ""
+
