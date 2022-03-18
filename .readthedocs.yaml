@@ -23,6 +23,6 @@ python:
   install:
     - requirements: docs/requirements.txt
     - requirements: requirements.txt
-    - method: pip
+    - method: setuptools
       path: .
   system_packages: true
