@@ -94,3 +94,7 @@ from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
+from .nystromformer.modeling import *
+from .nystromformer.nystromformer_config import *
+from .nystromformer.nystromformer_tokenizer import *
+from .nystromformer.nystromformer_utils import *
