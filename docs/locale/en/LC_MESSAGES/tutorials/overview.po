@@ -1,0 +1,133 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../tutorials/overview.rst:3
+msgid "整体介绍"
+msgstr ""
+
+#: ../tutorials/overview.rst:7
+msgid "案例集"
+msgstr ""
+
+#: ../tutorials/overview.rst:9
+msgid "词向量"
+msgstr ""
+
+#: ../tutorials/overview.rst:11
+msgid ""
+"`使用预训练词向量改善模型效果 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1535355>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:13
+msgid "文本分类"
+msgstr ""
+
+#: ../tutorials/overview.rst:15
+msgid ""
+"`基于LSTM等RNN网络的文本分类 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1283423>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:16
+msgid ""
+"`基于预训练模型的文本分类 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1294333>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:17
+msgid ""
+"`自定义数据集实现文本多分类任务 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1468469>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:19
+msgid "信息抽取"
+msgstr ""
+
+#: ../tutorials/overview.rst:21
+msgid ""
+"`使用BiGRU-CRF模型完成快递单信息抽取 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1317771>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:22
+msgid ""
+"`使用预训练模型ERNIE优化快递单信息抽取 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1329361>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:23
+msgid "`关系抽取 <https://aistudio.baidu.com/aistudio/projectdetail/1639963>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:24
+msgid "`事件抽取 <https://aistudio.baidu.com/aistudio/projectdetail/1639964>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:26
+msgid "阅读理解式问答"
+msgstr ""
+
+#: ../tutorials/overview.rst:28
+msgid ""
+"`使用预训练模型完成阅读理解 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1339612>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:30
+msgid "对话"
+msgstr ""
+
+#: ../tutorials/overview.rst:32
+msgid "`多技能对话 <https://aistudio.baidu.com/aistudio/projectdetail/1640180>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:34
+msgid "文本生成"
+msgstr ""
+
+#: ../tutorials/overview.rst:36
+msgid ""
+"`使用Seq2Seq模型完成自动对联 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1321118>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:37
+msgid ""
+"`使用预训练模型ERNIE-GEN实现智能写诗 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1339888>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:39
+msgid "时序预测"
+msgstr ""
+
+#: ../tutorials/overview.rst:41
+msgid ""
+"`使用TCN网络完成新冠疫情病例数预测 "
+"<https://aistudio.baidu.com/aistudio/projectdetail/1290873>`_"
+msgstr ""
+
+#: ../tutorials/overview.rst:43
+msgid ""
+"更多教程参见 `PaddleNLP on AI Studio "
+"<https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995>`_"
+msgstr ""
+
