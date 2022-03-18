@@ -23,6 +23,8 @@ import inspect
 from collections import namedtuple
 from multiprocess import Pool, RLock
 import time
+import paddlenlp
+import datasets
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -36,6 +38,20 @@ from functools import partial
 __all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
 
 DATASETS_MODULE_PATH = "paddlenlp.datasets."
+
+# Patch for intranet
+from datasets import load_dataset as origin_load_dataset
+
+
+def load_from_ppnlp(path, **kwargs):
+    ppnlp_path = paddlenlp.datasets.__path__[0]
+    path = os.path.split(path)[-1]
+    path = os.path.join(ppnlp_path, path + '.py')
+    return origin_load_dataset(path, **kwargs)
+
+
+if os.environ.get('ISINTRANET', '0') == '1':
+    datasets.load_dataset = load_from_ppnlp
 
 
 class DatasetTuple:

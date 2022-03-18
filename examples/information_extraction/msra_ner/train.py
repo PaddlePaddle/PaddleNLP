@@ -26,7 +26,7 @@ from paddle.io import DataLoader
 import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.datasets import load_dataset
+from datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
@@ -83,25 +83,6 @@ def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
     model.train()
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
-                              max_seq_len=512):
-    labels = example['labels']
-    example = example['tokens']
-    tokenized_input = tokenizer(
-        example,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
-
-    # -2 for [CLS] and [SEP]
-    if len(tokenized_input['input_ids']) - 2 < len(labels):
-        labels = labels[:len(tokenized_input['input_ids']) - 2]
-    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
-    tokenized_input['labels'] += [no_entity_id] * (
-        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
-    return tokenized_input
-
-
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -109,26 +90,42 @@ def do_train(args):
 
     # Create dataset, tokenizer and dataloader.
     if args.dataset == "peoples_daily_ner":
-        train_ds, dev_ds, test_ds = load_dataset(
-            args.dataset, splits=('train', 'dev', 'test'), lazy=False)
+        raw_datasets = load_dataset(args.dataset)
     else:
-        train_ds, test_ds = load_dataset(
-            args.dataset, splits=('train', 'test'), lazy=False)
+        raw_datasets = load_dataset(args.dataset)
 
     AutoForTokenClassification, AutoTokenizer = MODEL_CLASSES[args.model_type]
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    train_ds = raw_datasets['train']
 
-    label_list = train_ds.label_list
+    label_list = train_ds.features['ner_tags'].feature.names
     label_num = len(label_list)
-    no_entity_id = label_num - 1
+    no_entity_id = 0
 
-    trans_func = partial(
-        tokenize_and_align_labels,
-        tokenizer=tokenizer,
-        no_entity_id=no_entity_id,
-        max_seq_len=args.max_seq_length)
+    def tokenize_and_align_labels(examples):
+        tokenized_inputs = tokenizer(
+            examples['tokens'],
+            max_seq_len=args.max_seq_length,
+            # We use this argument because the texts in our dataset are lists of words (with a label for each word).
+            is_split_into_words=True,
+            return_length=True)
+        labels = []
 
-    train_ds = train_ds.map(trans_func)
+        for i, label in enumerate(examples['ner_tags']):
+            label_ids = label
+            if len(tokenized_inputs['input_ids'][i]) - 2 < len(label_ids):
+                label_ids = label_ids[:len(tokenized_inputs['input_ids'][i]) -
+                                      2]
+            label_ids = [no_entity_id] + label_ids + [no_entity_id]
+            label_ids += [no_entity_id] * (
+                len(tokenized_inputs['input_ids'][i]) - len(label_ids))
+
+            labels.append(label_ids)
+        tokenized_inputs["labels"] = labels
+        return tokenized_inputs
+
+    train_ds = train_ds.select(range(len(train_ds) - 1))
+    train_ds = train_ds.map(tokenize_and_align_labels, batched=True)
 
     ignore_label = -100
 
@@ -149,7 +146,9 @@ def do_train(args):
         batch_sampler=train_batch_sampler,
         return_list=True)
 
-    test_ds = test_ds.map(trans_func)
+    test_ds = raw_datasets['test']
+    test_ds = test_ds.select(range(len(test_ds) - 1))
+    test_ds = test_ds.map(tokenize_and_align_labels, batched=True)
 
     test_data_loader = DataLoader(
         dataset=test_ds,
@@ -159,7 +158,9 @@ def do_train(args):
         return_list=True)
 
     if args.dataset == "peoples_daily_ner":
-        dev_ds = dev_ds.map(trans_func)
+        dev_ds = raw_datasets['validation']
+        dev_ds = dev_ds.select(range(len(dev_ds) - 1))
+        dev_ds = dev_ds.map(tokenize_and_align_labels, batched=True)
 
         dev_data_loader = DataLoader(
             dataset=dev_ds,
