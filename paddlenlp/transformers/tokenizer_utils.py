@@ -1702,8 +1702,8 @@ class PretrainedTokenizer(object):
 
             else:
                 encoded_inputs = self.encode(
-                    first_ids,
-                    second_ids,
+                    text,
+                    text_pair,
                     max_seq_len=max_seq_len,
                     pad_to_max_seq_len=pad_to_max_seq_len,
                     truncation_strategy=truncation_strategy,
