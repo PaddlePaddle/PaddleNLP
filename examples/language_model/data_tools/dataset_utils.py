@@ -25,7 +25,11 @@ import collections
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet as fleet
+
+
+def get_local_rank():
+    return int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+
 
 print_rank_0 = print
 
@@ -706,9 +710,9 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     indexmap_filename += '_{}s'.format(seed)
     indexmap_filename += '.npy'
 
-    local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
+    local_rank = get_local_rank()
     if share_folder:
-        local_rank = fleet.worker_index()
+        local_rank = paddle.distributed.get_rank()
     # Build the indexed mapping if not exist.
 
     if local_rank == 0 and \
