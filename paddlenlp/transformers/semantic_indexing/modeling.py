@@ -132,7 +132,6 @@ class ErnieDualEncoder(nn.Layer):
                    title_token_type_ids=None,
                    title_position_ids=None,
                    title_attention_mask=None):
-
         query_cls_embedding = self.get_pooled_embedding(
             query_input_ids, query_token_type_ids, query_position_ids,
             query_attention_mask)
