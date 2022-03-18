@@ -33,8 +33,9 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
 微信扫描下方二维码加入官方交流群，与各行各业开发者充分交流，期待您的加入⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/157790710-cfad5c8a-0edd-49d7-9711-eb1c683a687c.png" width="188" height="188" />
+  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
 </div>
+
 
 ## 安装
 
