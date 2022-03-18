@@ -59,10 +59,10 @@ class ErnieDualEncoder(nn.Layer):
         .. code-block::
 
             import paddle
-            from paddlenlp.transformers import ErnieDualEncoder
+            from paddlenlp.transformers import ErnieDualEncoder, ErnieTokenizer
         
-            model = ErnieDualEncoder("ernie-base-cn-query-encoder", "ernie-base-cn-para-encoder")
-            tokenizer = ErnieTokenizer.from_pretrained("ernie-base-cn-query-encoder")
+            model = ErnieDualEncoder("rocketqa-zh-dureader-query-encoder", "rocketqa-zh-dureader-para-encoder")
+            tokenizer = ErnieTokenizer.from_pretrained("rocketqa-zh-dureader-query-encoder")
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
