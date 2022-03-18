@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.metrics.rouge.rst:2
+#: ../source/paddlenlp.metrics.rouge.rst:2
 msgid "rouge"
 msgstr ""
 
@@ -39,37 +39,65 @@ msgid ""
 "\n"
 "P_{LCS} & = \\frac{LCS(C,S)}{len(C)}\n"
 "\n"
-"F_{LCS} & = \\frac{(1 + \\gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + "
+"F_{LCS} & = \\frac{(1 + \\gamma^2)R_{LCS}P_{LCS}}{R_{LCS}} + "
 "\\gamma^2{R_{LCS}}"
 msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL:14
-msgid "where `C` is the candidate sentence, and 'S' is the refrence sentence."
+msgid "where `C` is the candidate sentence, and `S` is the reference sentence."
 msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL paddlenlp.metrics.rouge.RougeL.add_inst
+#: paddlenlp.metrics.rouge.RougeL.lcs paddlenlp.metrics.rouge.RougeLForDuReader
 #: paddlenlp.metrics.rouge.RougeLForDuReader.add_inst
 msgid "参数"
 msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL:16
-msgid "A hyperparameter to decide the weight of recall. Default: 1.2."
+msgid "`trans_func` transforms the network output to string to calculate."
 msgstr ""
 
-#: of paddlenlp.metrics.rouge.RougeL:23
-msgid "Examples:(TODO: liujiaqi)"
+#: of paddlenlp.metrics.rouge.RougeL:19
+msgid ""
+"Vocab for target language. If `trans_func` is None and RougeL is used as "
+"`paddle.metric.Metric` instance, `default_trans_func` will be performed "
+"and `vocab` must be provided."
 msgstr ""
 
-#: of paddlenlp.metrics.rouge.RougeL:20
-msgid "Using as a general evaluation object."
+#: of paddlenlp.metrics.rouge.RougeL:24
+msgid "A hyperparameter to decide the weight of recall. Defaults to 1.2."
 msgstr ""
 
-#: of paddlenlp.metrics.rouge.RougeL:21
-msgid "Using as an instance of `paddle.metric.Metric`."
+#: of paddlenlp.metrics.rouge.RougeL:26
+msgid "Name of `paddle.metric.Metric` instance. Defaults to \"rouge-l\"."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL:30
+msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL.lcs:1
 msgid "Calculate the length of longest common subsequence of string and sub."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL.lcs:3
+msgid "The string to be calculated, usually longer the sub string."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL.lcs:5
+msgid "The sub string to be calculated."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL.lcs
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL.lcs:8
+msgid "Returns the length of the longest common subsequence of string and sub."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeL.lcs
+msgid "返回类型"
 msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL.add_inst:1
@@ -128,5 +156,17 @@ msgid ""
 "Please refer to `DuReader "
 "Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for "
 "more details."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeLForDuReader:5
+msgid ""
+"Weight of YesNo dataset when adding bonus for DuReader contest. Defaults "
+"to 1.0."
+msgstr ""
+
+#: of paddlenlp.metrics.rouge.RougeLForDuReader:7
+msgid ""
+"Weight of Entity dataset when adding bonus for DuReader contest. Defaults"
+" to 1.0."
 msgstr ""
 
