@@ -259,7 +259,7 @@ class ErniePretrainedModel(PretrainedModel):
             "ernie-base-en-query-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-en-query-encoder.pdparams",
             "ernie-base-en-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base_en-para-encoder.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-en-para-encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
