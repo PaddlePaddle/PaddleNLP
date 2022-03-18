@@ -25,13 +25,14 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.io import DataLoader
+import paddlenlp
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForQuestionAnswering
 from paddlenlp.transformers import ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
-from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import AdamWDL
+from datasets import load_dataset
 
 from data import MRCIterator
 from metrics import compute_qa_predictions, EM_AND_F1
@@ -65,7 +66,7 @@ args = parser.parse_args()
 
 # eval_dataset, test_dataset, 
 DATASET_INFO = {
-    "dureader_robust": ["dev", "dev", ErnieDocTokenizer],
+    "dureader_robust": ["validation", "validation", ErnieDocTokenizer],
     "cmrc2018": ["dev", "dev", ErnieDocTokenizer],
     "drcd": ["dev", "test", ErnieDocTokenizer],
 }
@@ -167,12 +168,18 @@ def do_train(args):
 
     DEV, TEST, TOKENIZER_CLASS = DATASET_INFO[args.dataset]
     tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
-
-    train_ds, eval_ds = load_dataset(args.dataset, splits=['train', DEV])
-    if DEV == TEST:
-        test_ds = eval_ds
+    # TODO(zhoushunjie): Use hf datasets later.
+    if args.dataset == "dureader_robust":
+        train_ds, eval_ds, test_ds = load_dataset(
+            'PaddlePaddle/' + args.dataset, split=["train", DEV, TEST])
     else:
-        test_ds = load_dataset(args.dataset, splits=[TEST])
+        train_ds, eval_ds = paddlenlp.datasets.load_dataset(
+            args.dataset, splits=['train', DEV])
+        if DEV == TEST:
+            test_ds = eval_ds
+        else:
+            test_ds = paddlenlp.datasets.load_dataset(
+                args.dataset, splits=[TEST])
 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()

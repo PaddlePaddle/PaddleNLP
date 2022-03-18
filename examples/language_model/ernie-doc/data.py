@@ -408,12 +408,21 @@ class MRCIterator(ClassifierIterator):
             end_pos = None
             orig_answer_text = None
             if self.mode == 'train':
-                if len(qa["answers"]) != 1:
-                    raise ValueError(
-                        "For training, each question should have exactly 1 answer."
-                    )
-                orig_answer_text = qa["answers"][0]
-                answer_offset = qa["answer_starts"][0]
+                # TODO(zhoushunjie): Use hf datasets later.
+                if isinstance(qa['answers'], dict):
+                    if len(qa["answers"]["text"]) != 1:
+                        raise ValueError(
+                            "For training, each question should have exactly 1 answer."
+                        )
+                    orig_answer_text = qa["answers"]["text"][0]
+                    answer_offset = qa["answers"]["answer_start"][0]
+                else:
+                    if len(qa["answers"]) != 1:
+                        raise ValueError(
+                            "For training, each question should have exactly 1 answer."
+                        )
+                    orig_answer_text = qa["answers"][0]
+                    answer_offset = qa["answer_starts"][0]
                 answer_length = len(orig_answer_text)
                 doc_tokens = [
                     context[:answer_offset],
