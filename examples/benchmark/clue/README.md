@@ -18,9 +18,9 @@
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优，训练每间隔 100 steps 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
 
-2. Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5
+2. Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5;
 
-3. 因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
+3. 因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，对CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
 
 
 ## 一键复现模型效果
@@ -107,7 +107,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu' 表示使用GPU, 'xpu' 表示使用百度昆仑卡, 'cpu' 表示使用 CPU。
 
-Fine-tuning 过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
+Fine-tuning 过程将按照 `logging_steps` 和 `save_steps` 的设置打印出如下日志：
 
 ```
 global step 100/20010, epoch: 0, batch: 99, rank_id: 0, loss: 2.734340, lr: 0.0000014993, speed: 8.7969 step/s
@@ -124,7 +124,7 @@ eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 
 对于 CLUE 分类任务，可以直接使用本项目中提供的脚本 `classification/predict_clue_classifier.py` 对单个任务进行预测，并将分类结果输出到文件。
 
-以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，用户可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
+以 TNEWS 为例，假设 TNEWS 模型所在路径为 `${TNEWS_MODEL}`，可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/tnews_predict.json`：
 
 ```
 cd classification
@@ -138,4 +138,4 @@ python predict_clue_classifier.py \
     --output_dir ${OUTPUT_DIR} \
 ```
 
-对于 CLUE 每个任务上的模型，用户需要运行以上脚本得到每个模型在相应测试集上的结果，再把多个结果文件进行压缩，最后把压缩包提交至 CLUE 官网进行评测。
+对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至CLUE官网进行评测。
