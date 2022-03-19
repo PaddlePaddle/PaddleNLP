@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Pretrain  ERNIE in static graph mode.
+ERNIE pretraining scripts for paddlepaddle static graph mode.
 """
 import argparse
 import math
@@ -43,7 +43,7 @@ from visualdl import LogWriter
 
 from args import parse_args
 import sys
-sys.path.insert(0, "../")
+sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
 
 MODEL_CLASSES = {
@@ -669,5 +669,9 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    config = parse_args(MODEL_CLASSES)
-    do_train(config)
+    args = parse_args(MODEL_CLASSES)
+    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
+    do_train(args)

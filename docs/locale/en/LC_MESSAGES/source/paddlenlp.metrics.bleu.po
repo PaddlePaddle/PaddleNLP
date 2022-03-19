@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.metrics.bleu.rst:2
+#: ../source/paddlenlp.metrics.bleu.rst:2
 msgid "bleu"
 msgstr ""
 
@@ -59,11 +59,12 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:26
 msgid ""
-"where `c` is the length of candidate sentence, and 'r' is the length of "
-"refrence sentence."
+"where `c` is the length of candidate sentence, and `r` is the length of "
+"reference sentence."
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU paddlenlp.metrics.bleu.BLEU.add_inst
+#: paddlenlp.metrics.bleu.BLEUForDuReader
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst
 msgid "参数"
 msgstr ""
@@ -79,16 +80,16 @@ msgid ""
 "and `vocab` must be provided."
 msgstr ""
 
-#: of paddlenlp.metrics.bleu.BLEU:36
-msgid "Number of gram for BLEU metric. Default: 4."
+#: of paddlenlp.metrics.bleu.BLEU:36 paddlenlp.metrics.bleu.BLEUForDuReader:5
+msgid "Number of gram for BLEU metric. Defaults to 4."
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:38
-msgid "The weights of precision of each gram. Default: None."
+msgid "The weights of precision of each gram. Defaults to None."
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:41
-msgid "Name of `paddle.metric.Metric` instance. Default: \"bleu\"."
+msgid "Name of `paddle.metric.Metric` instance. Defaults to \"bleu\"."
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:46
@@ -96,19 +97,10 @@ msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:47
-msgid "1. Using as a general evaluation object. .. code-block:: python"
+msgid "Using as a general evaluation object."
 msgstr ""
 
-#: of paddlenlp.metrics.bleu.BLEU:50
-msgid ""
-"from paddlenlp.metrics import BLEU bleu = BLEU() cand = "
-"[\"The\",\"cat\",\"The\",\"cat\",\"on\",\"the\",\"mat\"] ref_list = "
-"[[\"The\",\"cat\",\"is\",\"on\",\"the\",\"mat\"], "
-"[\"There\",\"is\",\"a\",\"cat\",\"on\",\"the\",\"mat\"]] "
-"bleu.add_inst(cand, ref_list) print(bleu.score()) # 0.4671379777282001"
-msgstr ""
-
-#: of paddlenlp.metrics.bleu.BLEU:57
+#: of paddlenlp.metrics.bleu.BLEU:58
 msgid "Using as an instance of `paddle.metric.Metric`."
 msgstr ""
 
@@ -148,7 +140,19 @@ msgid "Reset states and result"
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU.accumulate:1
-msgid "Calculate the final bleu metric."
+msgid "Calculates and returns the final bleu metric."
+msgstr ""
+
+#: of paddlenlp.metrics.bleu.BLEU.accumulate
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.bleu.BLEU.accumulate:3
+msgid "Returns the accumulated metric `bleu` and its data type is float64."
+msgstr ""
+
+#: of paddlenlp.metrics.bleu.BLEU.accumulate
+msgid "返回类型"
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU.name:1
@@ -168,5 +172,17 @@ msgid ""
 "Please refer to `DuReader "
 "Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for "
 "more details."
+msgstr ""
+
+#: of paddlenlp.metrics.bleu.BLEUForDuReader:7
+msgid ""
+"Weight of YesNo dataset when adding bonus for DuReader contest. Defaults "
+"to 1.0."
+msgstr ""
+
+#: of paddlenlp.metrics.bleu.BLEUForDuReader:9
+msgid ""
+"Weight of Entity dataset when adding bonus for DuReader contest. Defaults"
+" to 1.0."
 msgstr ""
 
