@@ -33,36 +33,29 @@ from data import read_text_pair, convert_example, create_dataloader
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./checkpoint', type=str,
-                    help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int,
-                    help="The maximum total input sequence length after tokenization. "
-                         "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--save_dir", default='./checkpoint', type=str,help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--max_seq_length", default=128, type=int,help="The maximum total input sequence length after tokenization. ""Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float,
-                    help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float,help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint.")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--margin", default=0.3, type=float, help="Margin beteween pos_sample and neg_samples.")
 parser.add_argument("--scale", default=30, type=int, help="Scale for pair-wise margin_rank_loss")
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
-parser.add_argument("--amp_loss_scale", default=32768, type=float,
-                    help="The value of scale_loss for fp16. This is only used for AMP training.")
+parser.add_argument("--amp_loss_scale", default=32768, type=float,help="The value of scale_loss for fp16. This is only used for AMP training.")
 parser.add_argument("--chunk_numbers",type=int,default=50,help="The number of the chunks for model")
 
 args = parser.parse_args()
 
 
 # yapf: enable
-
 
 
 def set_seed(seed):
@@ -82,9 +75,9 @@ def do_train():
     np.random.seed(args.seed)
     paddle.seed(args.seed)
 
-
-    train_ds = load_dataset(
-        read_text_pair, data_path=args.train_set_file, lazy=False)
+    train_ds = load_dataset(read_text_pair,
+                            data_path=args.train_set_file,
+                            lazy=False)
 
     # If you wanna use bert/roberta pretrained model,
     # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
@@ -97,10 +90,9 @@ def do_train():
     # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -109,18 +101,16 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    model = SemanticIndexCacheNeg(
-        pretrained_model,
-        margin=args.margin,
-        scale=args.scale,
-        output_emb_size=args.output_emb_size)
+    model = SemanticIndexCacheNeg(pretrained_model,
+                                  margin=args.margin,
+                                  scale=args.scale,
+                                  output_emb_size=args.output_emb_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -131,7 +121,8 @@ def do_train():
 
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                         num_training_steps,
                                          args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
@@ -152,19 +143,19 @@ def do_train():
     if args.batch_size % args.chunk_numbers == 0:
         chunk_numbers = args.chunk_numbers
 
-    def split(inputs,chunk_numbers,axis=0):
+    def split(inputs, chunk_numbers, axis=0):
         if inputs.shape[0] % chunk_numbers == 0:
-            return paddle.split(inputs,chunk_numbers,axis=0)
+            return paddle.split(inputs, chunk_numbers, axis=0)
         else:
             #return paddle.split(inputs,2,axis=0)
-            return paddle.split(inputs,inputs.shape[0],axis=0)
+            return paddle.split(inputs, inputs.shape[0], axis=0)
 
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
 
-            chunked_x = [split(t,chunk_numbers, axis=0) for t in batch]
+            chunked_x = [split(t, chunk_numbers, axis=0) for t in batch]
 
             sub_batchs = [list(s) for s in zip(*chunked_x)]
 
@@ -189,7 +180,8 @@ def do_train():
 
                     with paddle.no_grad():
 
-                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state()
+                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state(
+                        )
                         #sub_global_rnd_state = paddle.framework.random.get_random_seed_generator(global_random_generator)
 
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
@@ -201,7 +193,7 @@ def do_train():
                             query_token_type_ids=sub_query_token_type_ids,
                             title_token_type_ids=sub_title_token_type_ids)
 
-                        all_reps.append(sub_cosine_sim)  
+                        all_reps.append(sub_cosine_sim)
                         all_labels.append(sub_label)
 
                 model_reps = paddle.concat(all_reps, axis=0)
@@ -212,15 +204,18 @@ def do_train():
 
                 #Model_Repos.stop_gradient = False
 
-                model_label = paddle.concat(all_labels,axis=0)
+                model_label = paddle.concat(all_labels, axis=0)
 
                 loss = F.cross_entropy(input=model_reps, label=model_label)
 
                 loss.backward()
 
+                #all_grads = [repos.grad for repos in model_reps]
                 all_grads.append(model_reps.grad)
 
-            for sub_batch,CUDA_state,grad in zip(sub_batchs,all_CUDA_rnd_state,all_grads):
+            for sub_batch, CUDA_state, grad in zip(sub_batchs,
+                                                   all_CUDA_rnd_state,
+                                                   all_grads):
 
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
 
@@ -233,13 +228,13 @@ def do_train():
                     query_token_type_ids=sub_query_token_type_ids,
                     title_token_type_ids=sub_title_token_type_ids)
 
-                surrogate = paddle.dot(cosine_sim,grad)
+                surrogate = paddle.dot(cosine_sim, grad)
 
                 if args.use_amp:
                     scaled = scaler.scale(surrogate)
                     scaled.backward()
                 else:
-                    surrogate.backward() 
+                    surrogate.backward()
 
             if args.use_amp:
                 scaler.minimize(optimizer, scaled)
@@ -250,18 +245,20 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             lr_scheduler.step()
             optimizer.clear_grad()
 
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+                save_dir = os.path.join(args.save_dir,
+                                        "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+                save_param_path = os.path.join(save_dir,
+                                               'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
