@@ -58,9 +58,11 @@ class ErnieDualEncoder(nn.Layer):
 
         .. code-block::
 
-            from paddlenlp.transformers import ErnieDualEncoder
+            import paddle
+            from paddlenlp.transformers import ErnieDualEncoder, ErnieTokenizer
         
-            model = ErnieDualEncoder("ernie-base-cn-query-encoder", "ernie-base-cn-title-encoder")
+            model = ErnieDualEncoder("rocketqa-zh-dureader-query-encoder", "rocketqa-zh-dureader-para-encoder")
+            tokenizer = ErnieTokenizer.from_pretrained("rocketqa-zh-dureader-query-encoder")
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -130,7 +132,6 @@ class ErnieDualEncoder(nn.Layer):
                    title_token_type_ids=None,
                    title_position_ids=None,
                    title_attention_mask=None):
-
         query_cls_embedding = self.get_pooled_embedding(
             query_input_ids, query_token_type_ids, query_position_ids,
             query_attention_mask)
