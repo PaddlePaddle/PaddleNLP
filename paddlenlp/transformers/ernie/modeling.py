@@ -287,9 +287,9 @@ class ErniePretrainedModel(PretrainedModel):
             "rocketqa-v1-marco-para-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_para_encoder.pdparams",
             "rocketqa-zh-dureader-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-cross-encoder.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_cross_encoder.pdparams",
             "rocketqa-v1-marco-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-cross-encoder.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_cross_encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
