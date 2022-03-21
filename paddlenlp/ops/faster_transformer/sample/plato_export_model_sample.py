@@ -95,6 +95,9 @@ def do_predict(args):
     place = "gpu"
     place = paddle.set_device(place)
 
+    if args.use_fp16_decoding and os.getenv("PPFG_QKV_MEM_OPT", "0") == "1":
+        paddle.set_default_dtype("float16")
+
     model_name = 'plato-xl'
     model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
