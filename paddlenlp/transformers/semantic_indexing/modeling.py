@@ -18,7 +18,7 @@ import paddle.nn.functional as F
 
 from ..ernie.modeling import ErniePretrainedModel
 
-__all__ = ['ErnieDualEncoder']
+__all__ = ['ErnieDualEncoder', 'ErnieCrossEncoder']
 
 
 class ErnieEncoder(ErniePretrainedModel):
@@ -90,7 +90,6 @@ class ErnieDualEncoder(nn.Layer):
         elif title_model_name_or_path is not None:
             self.title_ernie = ErnieEncoder.from_pretrained(
                 title_model_name_or_path)
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
     def get_semantic_embedding(self, data_loader):
         self.eval()
@@ -214,56 +213,55 @@ class ErnieForRanking(ErniePretrainedModel):
         if isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
 
-    def __init__(self, ernie):
+    def __init__(self, ernie, num_classes=2, dropout=None):
         super(ErnieForRanking, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.apply(self.init_weights)
+        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
+        weight_attr = paddle.ParamAttr(
+            initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
+        self.classifier = paddle.nn.Linear(
+            768, num_classes, weight_attr=weight_attr)
 
     def forward(self,
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        logits = self.ernie(
+        sequence_output, pooled_output = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask)
-        # probs = paddle.nn.functional.softmax(logits, axis=1)
-        # return logits, probs
-        return sequence_output, pooled_output
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        return logits
 
 
 class ErnieCrossEncoder(nn.Layer):
     """
-
     Example:
 
         .. code-block::
 
-            from paddlenlp.transformers import ErnieCrossEncoder
+            import paddle
+            from paddlenlp.transformers import ErnieCrossEncoder, ErnieTokenizer
         
-            model = ErnieCrossEncoder("ernie-base-cn-cross-encoder")
+            model = ErnieCrossEncoder("rocketqa-zh-dureader-cross-encoder")
+            tokenizer = ErnieTokenizer.from_pretrained("rocketqa-zh-dureader-cross-encoder")
 
             inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
             # Get classification outputs
-            title_embedding = model.get_pooled_output(**inputs)
+            embedding = model.get_pooled_output(**inputs)
 
     """
 
-    def __init__(self, pretrained_model_name_or_path, dropout=None,
-                 num_label=1):
+    def __init__(self, pretrained_model_name_or_path):
         super().__init__()
         self.ernie = ErnieForRanking.from_pretrained(
             pretrained_model_name_or_path)
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-
-        weight_attr = paddle.ParamAttr(
-            initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-        self.classifier = paddle.nn.Linear(
-            768, num_label, weight_attr=weight_attr)
 
     def get_pooled_output(self,
                           input_ids,
@@ -271,33 +269,21 @@ class ErnieCrossEncoder(nn.Layer):
                           position_ids=None,
                           attention_mask=None,
                           return_probs=True):
-        _, cls_embedding = self.ernie(input_ids, token_type_ids, position_ids,
-                                      attention_mask)
-
-        cls_embedding = self.dropout(cls_embedding)
-        cls_embedding = self.classifier(cls_embedding)
-
+        cls_embedding = self.ernie(input_ids, token_type_ids, position_ids,
+                                   attention_mask)
         if return_probs:
             probs = F.softmax(cls_embedding, axis=1)
-            return probs
+            return cls_embedding, probs
         return cls_embedding
 
     def forward(self,
                 input_ids,
-                is_prediction=False,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
                 labels=None):
-        logits = self.get_pooled_output(input_ids, token_type_ids, position_ids,
-                                        attention_mask)
-
-        if is_prediction:
-            probs = F.softmax(logits)
-            outputs = {"probs": probs[:, 1]}
-            return outputs
-
-        probs = F.softmax(logits)
+        logits, probs = self.get_pooled_output(input_ids, token_type_ids,
+                                               position_ids, attention_mask)
         accuracy = paddle.metric.accuracy(input=probs, label=labels)
         loss = F.cross_entropy(input=logits, label=labels)
 

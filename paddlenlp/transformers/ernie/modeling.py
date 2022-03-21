@@ -286,10 +286,10 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_query_encoder.pdparams",
             "ernie-base-en-para-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie_base_en_para_encoder.pdparams",
-            "ernie-base-cn-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-cn-cross-encoder.pdparams",
-            "ernie-base-en-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/semantic_indexing/ernie-base-en-cross-encoder.pdparams",
+            "rocketqa-zh-dureader-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-cross-encoder.pdparams",
+            "rocketqa-v1-marco-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-cross-encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
