@@ -21,6 +21,7 @@ import json
 import os
 import six
 import unicodedata
+from collections import OrderedDict, UserDict
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
@@ -43,6 +44,28 @@ __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
     'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
 ]
+
+
+class BatchEncoding(UserDict):
+    def __init__(self, data=None):
+        super().__init__(data)
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self.data[item]
+        else:
+            raise KeyError(
+                "Indexing with integers is not available when using retrun_dict=True."
+                "Please set return_dict to False to use integer indexing.")
+
+    def keys(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
+
+    def items(self):
+        return self.data.items()
 
 
 def convert_to_unicode(text):
@@ -558,6 +581,7 @@ class PretrainedTokenizer(object):
                  return_token_type_ids=True,
                  return_attention_mask=False,
                  return_length=False,
+                 return_dict=True,
                  return_overflowing_tokens=False,
                  return_special_tokens_mask=False):
         """
@@ -694,6 +718,7 @@ class PretrainedTokenizer(object):
                 return_token_type_ids=return_token_type_ids,
                 return_attention_mask=return_attention_mask,
                 return_length=return_length,
+                return_dict=return_dict,
                 return_overflowing_tokens=return_overflowing_tokens,
                 return_special_tokens_mask=return_special_tokens_mask)
         else:
@@ -1533,6 +1558,7 @@ class PretrainedTokenizer(object):
                      return_token_type_ids=True,
                      return_attention_mask=False,
                      return_length=False,
+                     return_dict=True,
                      return_overflowing_tokens=False,
                      return_special_tokens_mask=False):
         """
@@ -1765,10 +1791,13 @@ class PretrainedTokenizer(object):
                             range(len(encoded_inputs["input_ids"])))
 
                     encoded_inputs['overflow_to_sample'] = example_id
-                    for key, value in encoded_inputs.items():
-                        if key not in batch_outputs:
-                            batch_outputs[key] = []
-                        batch_outputs[key].append(value)
+                    if return_dict:
+                        for key, value in encoded_inputs.items():
+                            if key not in batch_outputs:
+                                batch_outputs[key] = []
+                            batch_outputs[key].append(value)
+                    else:
+                        batch_encode_inputs.append(encoded_inputs)
                     if offset + length == len(second_ids):
                         break
                     offset += min(length, stride)
@@ -1787,12 +1816,16 @@ class PretrainedTokenizer(object):
                     return_overflowing_tokens=return_overflowing_tokens,
                     return_special_tokens_mask=return_special_tokens_mask)
 
-                for key, value in encoded_inputs.items():
-                    if key not in batch_outputs:
-                        batch_outputs[key] = []
-                    batch_outputs[key].append(value)
+                if return_dict:
+                    for key, value in encoded_inputs.items():
+                        if key not in batch_outputs:
+                            batch_outputs[key] = []
+                        batch_outputs[key].append(value)
+                else:
+                    batch_encode_inputs.append(encoded_inputs)
 
-        return batch_outputs
+        return BatchEncoding(
+            batch_outputs) if return_dict else batch_encode_inputs
 
     def get_offset_mapping(self, text):
         """
