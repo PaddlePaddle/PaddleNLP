@@ -16,6 +16,8 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.nn import TransformerEncoderLayer, TransformerEncoder
+from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
 
@@ -59,6 +61,97 @@ ACT2FN = {
 }
 
 
+class TransformerEncoderLayerPro(TransformerEncoderLayer):
+    def __init__(self,
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout=0.1,
+                 activation="relu",
+                 attn_dropout=None,
+                 act_dropout=None,
+                 normalize_before=False,
+                 weight_attr=None,
+                 bias_attr=None):
+        super(TransformerEncoderLayerPro, self).__init__(
+            d_model, nhead, dim_feedforward, dropout, activation, attn_dropout,
+            act_dropout, normalize_before, weight_attr, bias_attr)
+
+    def forward(self, src, src_mask=None, cache=None, output_attentions=False):
+        self.self_attn.need_weights = output_attentions
+        src_mask = _convert_attention_mask(src_mask, src.dtype)
+        attentions = None
+
+        residual = src
+        if self.normalize_before:
+            src = self.norm1(src)
+        if cache is None:
+            src = self.self_attn(src, src, src, src_mask)
+            if output_attentions:
+                src, attentions = src
+        else:
+            output = self.self_attn(src, src, src, src_mask, cache)
+            if output_attentions:
+                src, attentions, incremental_cache = output
+            else:
+                src, incremental_cache = output
+
+        src = residual + self.dropout1(src)
+        if not self.normalize_before:
+            src = self.norm1(src)
+
+        residual = src
+        if self.normalize_before:
+            src = self.norm2(src)
+        src = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = residual + self.dropout2(src)
+        if not self.normalize_before:
+            src = self.norm2(src)
+        if output_attentions:
+            src = (src, attentions)
+        return src if cache is None else (src, incremental_cache)
+
+
+class TransformerEncoderPro(TransformerEncoder):
+    def __init__(self, encoder_layer, num_layers, norm=None):
+        super(TransformerEncoderPro, self).__init__(encoder_layer, num_layers,
+                                                    norm)
+
+    def forward(self,
+                src,
+                src_mask=None,
+                cache=None,
+                output_attentions=False,
+                output_hidden_states=False):
+        src_mask = _convert_attention_mask(src_mask, src.dtype)
+
+        output = src
+        new_caches = []
+        all_attentions = []
+        all_hidden_states = []
+        for i, mod in enumerate(self.layers):
+            if cache is None:
+                output = mod(output, src_mask=src_mask)
+            else:
+                output, new_cache = mod(output,
+                                        src_mask=src_mask,
+                                        cache=cache[i])
+                new_caches.append(new_cache)
+            if output_attentions:
+                all_attentions.append(output[1])
+                output = output[0]
+            if output_hidden_states:
+                all_hidden_states.append(output)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        if output_attentions or output_hidden_states:
+            output = (output, all_attentions, all_hidden_states)
+
+        return output if cache is None else (output, new_caches)
+
+
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
@@ -91,6 +184,7 @@ class ElectraEmbeddings(nn.Layer):
         embeddings = input_embeddings + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
+
         return embeddings
 
 
@@ -208,7 +302,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 21128,
+            "vocab_size": 21128
         },
         "chinese-electra-base": {
             "attention_probs_dropout_prob": 0.1,
@@ -223,7 +317,22 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 21128,
+            "vocab_size": 21128
+        },
+        "ehealth-chinese": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 22608
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -239,6 +348,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
+            "ehealth-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ehealth_chinese/ehealth-chinese.pdparams"
         }
     }
 
@@ -275,7 +386,7 @@ class ElectraPretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = 1e-12
+            layer._epsilon = getattr(self, "layer_norm_eps", 1e-12)
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
@@ -371,7 +482,7 @@ class ElectraModel(ElectraPretrainedModel):
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
 
-        encoder_layer = nn.TransformerEncoderLayer(
+        encoder_layer = TransformerEncoderLayerPro(
             hidden_size,
             num_attention_heads,
             intermediate_size,
@@ -379,7 +490,7 @@ class ElectraModel(ElectraPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = TransformerEncoderPro(encoder_layer, num_hidden_layers)
 
         self.init_weights()
 
@@ -393,7 +504,9 @@ class ElectraModel(ElectraPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_attentions=False,
+                output_hidden_states=False):
         r'''
         The ElectraModel forward method, overrides the `__call__()` special method.
 
@@ -462,7 +575,11 @@ class ElectraModel(ElectraPretrainedModel):
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
+        encoder_outputs = self.encoder(
+            embedding_output,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states)
 
         return encoder_outputs
 
@@ -627,15 +744,18 @@ class ElectraClassificationHead(nn.Layer):
             The dropout probability for all fully connected layers.
         num_classes (int):
             The number of classes.
+        activation (str):
+            The activation function name between layers.
 
     """
 
-    def __init__(self, hidden_size, hidden_dropout_prob, num_classes):
+    def __init__(self, hidden_size, hidden_dropout_prob, num_classes,
+                 activation):
         super(ElectraClassificationHead, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.out_proj = nn.Linear(hidden_size, num_classes)
-        self.act = get_activation("gelu")
+        self.act = get_activation(activation)
 
     def forward(self, features, **kwargs):
         r"""
@@ -653,7 +773,7 @@ class ElectraClassificationHead(nn.Layer):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
-        x = self.act(x)  # Electra paper used gelu here
+        x = self.act(x)
         x = self.dropout(x)
         x = self.out_proj(x)
         return x
@@ -673,18 +793,32 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             The dropout probability for output of Electra.
             If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
             instance `electra`. Defaults to None.
+        activation (str, optional):
+            The activation function name for classifier.
+            Defaults to "gelu".
+        layer_norm_eps (float, optional):
+            The epsilon to initialize nn.LayerNorm layers.
+            Defaults to 1e-12.
     """
 
-    def __init__(self, electra, num_classes=2, dropout=None):
+    def __init__(self,
+                 electra,
+                 num_classes=2,
+                 dropout=None,
+                 activation="gelu",
+                 layer_norm_eps=1e-12):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
+        self.layer_norm_eps = layer_norm_eps
         self.classifier = ElectraClassificationHead(
             hidden_size=self.electra.config["hidden_size"],
             hidden_dropout_prob=dropout if dropout is not None else
             self.electra.config["hidden_dropout_prob"],
-            num_classes=self.num_classes, )
+            num_classes=self.num_classes,
+            activation=activation)
         self.init_weights()
+        self.electra.embeddings.layer_norm._epsilon = layer_norm_eps
 
     def forward(self,
                 input_ids=None,
