@@ -39,10 +39,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
 # add sharding stage2/3
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.sharding_optimizer_stage2 import ShardingOptimizerStage2
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage2 import ShardingStage2
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage3 import ShardingStage3
+from paddle.distributed.sharding import group_sharded_parallel
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -125,6 +122,7 @@ def get_train_data_file(args):
 
 def do_train(args):
     paddle.set_device(args.device)
+    nranks = paddle.distributed.get_world_size()
     strategy = fleet.DistributedStrategy()
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
@@ -266,10 +264,7 @@ def do_train(args):
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         # level O2 means converting the network to FP16
-        if args.sharding_stage in [2, 3]:
-            # TODO(Baibaifan): combine ShardingScaler and fleet.distributed_scaler in feature
-            scaler = ShardingScaler(scaler)
-        else:
+        if args.sharding_stage not in [2, 3]:
             scaler = fleet.distributed_scaler(scaler)
         model = paddle.amp.decorate(
             models=model, level='O2', save_dtype='float32')
@@ -277,9 +272,9 @@ def do_train(args):
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
-        model, optimizer = wrap_sharding_2_3(accumulate_steps, model, optimizer,
-                                             args.sharding_offload,
-                                             args.use_recompute)
+        scaler = scaler if args.use_pure_fp16 else None
+        model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
+                                                     args.sharding_offload)
 
     elif paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -399,9 +394,10 @@ def do_train(args):
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, ips_per_card: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, avg_reader_cost,
                            1. / speed, speed, speed * default_global_tokens_num,
+                           speed * default_global_tokens_num / nranks,
                            optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate",
@@ -473,29 +469,16 @@ def do_train(args):
             del train_data_loader
 
 
-def wrap_sharding_2_3(accumulate_steps, model, optimizer, sharding_offload,
-                      use_recompute):
-    group = fleet.get_hybrid_communicate_group().get_check_parallel_group()
-    accumulate_grads = True if accumulate_steps > 1 else False
-
-    if args.sharding_stage == 2:
-        optimizer = ShardingOptimizerStage2(
-            params=model.parameters(),
-            optim=optimizer,
-            group=group,
-            offload=sharding_offload)
-        model = ShardingStage2(
-            model, optimizer, group=group, accumulate_grads=accumulate_grads)
-
-    elif args.sharding_stage == 3:
-        model = ShardingStage3(
-            model,
-            optimizer,
-            group=group,
-            accumulate_grads=accumulate_grads,
-            sync_comm=use_recompute,
-            offload=sharding_offload)
-    return model, optimizer
+def wrap_sharding_2_3(model, optimizer, scaler, sharding_offload):
+    group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
+    level = "p_g_os" if args.sharding_stage == 3 else "os_g"
+    return group_sharded_parallel(
+        model=model,
+        optimizer=optimizer,
+        level=level,
+        scaler=scaler,
+        group=group,
+        offload=sharding_offload)
 
 
 if __name__ == "__main__":

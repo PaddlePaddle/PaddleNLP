@@ -1,3 +1,5 @@
+
+
 English | [简体中文](./README.md)
 
 <p align="center">
@@ -29,6 +31,25 @@ English | [简体中文](./README.md)
 
 * **High Performance Distributed Training**
   -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
+
+## Community
+
+### Special Interest Group (SIG)
+
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+
+### Slack
+
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+
+### WeChat
+
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
+</div>
+
 
 ## Installation
 
@@ -201,23 +222,6 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 * [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
 
 * [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-## Community
-
-### Special Interest Group (SIG)
-
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
-
-### Slack
-To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
-
-### WeChat
-Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
-
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/153517320-2e1f35b5-ae5a-42db-971c-ae96c6480778.jpg" width="210" height="200" />
-</div>
-
 
 ## ChangeLog
 

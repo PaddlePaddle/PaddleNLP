@@ -22,9 +22,9 @@ import distutils.util
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from utils import convert_example
@@ -120,9 +120,9 @@ def do_train():
     train_ds, dev_ds, test_ds = load_dataset(
         args.dataset, splits=["train", "dev", "test"])
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=len(train_ds.label_list))
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
         convert_example,

@@ -41,7 +41,9 @@ public:
   const T *trans_bias = nullptr;
 
   const T *memory_tensor = nullptr;
+
   const int *type_id = nullptr;
+  const int *decoder_type_id = nullptr;
   const int *memory_sequence_length = nullptr;
 
   // Used for force decoding.
@@ -53,6 +55,16 @@ public:
   // segment table
   const T *type_table = nullptr;
 
+  // For PLATO embedding.
+  const int* latent_id = nullptr;
+  const T* latent_embedding_table = nullptr;
+  const int* role_id = nullptr;
+  const int* decoder_role_id = nullptr;
+  const T* role_embedding_table = nullptr;
+  // Custom position.
+  const int* position_ids = nullptr;
+  const int* decoder_position_ids = nullptr;
+
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
   LayerNormWeight<T> mbart_layernorm;
@@ -62,6 +74,8 @@ public:
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
+  float* output_scores = nullptr;
+
   cublasHandle_t cublas_handle;
   cublasLtHandle_t cublaslt_handle;
   cudaStream_t stream;
@@ -92,6 +106,8 @@ struct DecodingArguments : public TransformerArguments {
   int start_id_;
   int end_id_;
   int vocab_size_padded_;
+
+  int min_length_{0};
 };
 
 struct DecodingSamplingArguments : public DecodingArguments {
