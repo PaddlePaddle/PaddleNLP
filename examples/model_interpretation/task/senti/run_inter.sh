@@ -3,11 +3,11 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=6
+export CUDA_VISIBLE_DEVICES=4
 export PYTHONPATH=./:$PYTHONPATH
 
 LANGUAGE=en                         # LANGUAGE choose in [ch, en]
-BASE_MODEL=roberta_base            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
+BASE_MODEL=lstm            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
 INTER_MODE=attention                     # INTER_MODE choice in [attention, integrated_gradient, lime]
 TASK=senti_${LANGUAGE}
 DATA=../../data/${TASK}
@@ -35,14 +35,14 @@ elif [[ $LANGUAGE == "ch" ]]; then
 
     if [[ $BASE_MODEL == "roberta_base" ]]; then
         FROM_PRETRAIN='roberta-wwm-ext'     
-        CKPT=pretrained_models/saved_model_ch/roberta_base_20220318_155933/model_900/model_state.pdparams
+        CKPT=pretrained_models/saved_model_ch/roberta_base/model_900/model_state.pdparams
         #CKPT=pretrained_models/saved_model_ch/roberta_base_20211229_101252/model_900/model_state.pdparams
     elif [[ $BASE_MODEL == "roberta_large" ]]; then
         FROM_PRETRAIN='roberta-wwm-ext-large'       
-        CKPT=pretrained_models/saved_model_ch/roberta_large_20220318_170123/model_900/model_state.pdparams
+        CKPT=pretrained_models/saved_model_ch/roberta_large_20211014_192021/model_900/model_state.pdparams
         #CKPT=pretrained_models/saved_model_ch/roberta_large_20211229_105019/model_900/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
-        VOCAB_PATH='rnn/vocab.txt'
+        VOCAB_PATH='rnn'
         CKPT=rnn/checkpoints_ch_ori/final.pdparams
         #CKPT=rnn/checkpoints_ch/final.pdparams
     fi

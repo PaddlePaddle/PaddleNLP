@@ -3,16 +3,17 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 export PYTHONPATH=./:$PYTHONPATH
 START_ID=0
 FROM_PRETRAIN='test'
+VOCAB_PATH='test'
 
 for BASE_MODEL in "lstm" "roberta_base" "roberta_large";
 do
     for INTER_MODE in "attention" "integrated_gradient" "lime";
     do
-        for LANGUAGE in "ch" "en";
+        for LANGUAGE in "ch";
         do
             TASK=senti_${LANGUAGE}
             DATA=../../data/${TASK}
@@ -44,7 +45,7 @@ do
                     CKPT=pretrained_models/saved_model_ch/roberta_large_20211014_192021/model_900/model_state.pdparams
                     #CKPT=pretrained_models/saved_model_ch/roberta_large_20211229_105019/model_900/model_state.pdparams
                 elif [[ $BASE_MODEL == "lstm" ]]; then
-                    VOCAB_PATH='rnn/vocab.txt'
+                    VOCAB_PATH='rnn'
                     CKPT=rnn/checkpoints_ch_ori/final.pdparams
                     #CKPT=rnn/checkpoints_ch/final.pdparams
                 fi

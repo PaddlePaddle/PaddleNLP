@@ -41,7 +41,7 @@ do
             CKPT=../task/${TASK}/pretrained_models/saved_model_ch/roberta_large_20220318_170123/model_900/model_state.pdparams
             #CKPT=../../../${TASK}/pretrained_models/saved_model_ch/roberta_large_20211207_143351/model_900/model_state.pdparams
         elif [[ $BASE_MODEL == "lstm" ]]; then
-            VOCAB_PATH=../task/${TASK}/rnn/vocab.txt
+            VOCAB_PATH=../task/${TASK}/rnn
             CKPT=../task/${TASK}/rnn/checkpoints_ch_ori/final.pdparams
             #CKPT=../../../${TASK}/rnn/checkpoints_ch/final.pdparams
         fi

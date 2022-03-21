@@ -38,7 +38,7 @@ from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
 from paddlenlp.data import Dict, Pad, Stack, Vocab
 from paddlenlp.datasets import DatasetBuilder
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
-from paddlenlp.transformers.ernie.tokenizer import ErnieTokenizer
+from ernie.tokenizing_ernie import ErnieTokenizer
 
 from roberta.modeling import RobertaForSequenceClassification
 
@@ -171,7 +171,7 @@ def init_lstm_var(args):
     if args.language == "ch":
         tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
         padding_idx = tokenizer.vocab.get('[PAD]')
-
+        tokenizer.inverse_vocab = [item[0] for item in sorted(tokenizer.vocab.items(), key=lambda x: x[1])]
     else:
         vocab = Vocab.load_vocabulary(
             args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
