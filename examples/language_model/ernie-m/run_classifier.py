@@ -345,7 +345,6 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, test_data_loader,
                              language)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                    del test_data_loader
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "ernie_m_ft_model_%d.pdparams" %
@@ -358,7 +357,6 @@ def do_train(args):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
-                del train_data_loader
                 break
         if global_step >= num_training_steps:
             break
