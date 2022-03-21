@@ -168,17 +168,17 @@ class TrainerCallback:
             The current state of the [`Trainer`].
         control ([`TrainerControl`]):
             The object that is returned to the [`Trainer`] and can be used to make some decisions.
-        model ([`PreTrainedModel`] or `torch.nn.Module`):
+        model ([`PreTrainedModel`] or `paddle.nn.Layer`):
             The model being trained.
         tokenizer ([`PreTrainedTokenizer`]):
             The tokenizer used for encoding the data.
-        optimizer (`torch.optim.Optimizer`):
+        optimizer (`paddle.optimizer.Optimizer`):
             The optimizer used for the training steps.
-        lr_scheduler (`torch.optim.lr_scheduler.LambdaLR`):
+        lr_scheduler (`paddle.optimizer.lr.LRScheduler`):
             The scheduler used for setting the learning rate.
-        train_dataloader (`torch.utils.data.DataLoader`, *optional*):
+        train_dataloader (`paddle.io.DataLoader`, *optional*):
             The current dataloader used for training.
-        eval_dataloader (`torch.utils.data.DataLoader`, *optional*):
+        eval_dataloader (`paddle.io.DataLoader`, *optional*):
             The current dataloader used for training.
         metrics (`Dict[str, float]`):
             The metrics computed by the last evaluation phase.

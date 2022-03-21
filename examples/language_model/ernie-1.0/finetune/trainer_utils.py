@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Utilities for the Trainer and TFTrainer class. Should be independent from PyTorch and TensorFlow.
+Utilities for the Trainer class. 
 """
 
 import copy
@@ -106,6 +106,15 @@ class EvaluationStrategy(ExplicitEnum):
     EPOCH = "epoch"
 
 
+class OptimizerNames(ExplicitEnum):
+    """
+    Stores the acceptable string identifiers for optimizers.
+    """
+
+    ADAMW = "adamw"
+    ADAFACTOR = "adafactor"
+
+
 class BestRun(NamedTuple):
     """
     The best run found by an hyperparameter search (see [`~Trainer.hyperparameter_search`]).
@@ -160,7 +169,7 @@ def is_main_process(local_rank):
 
 def total_processes_number(local_rank):
     """
-    Return the number of processes launched in parallel. Works with `torch.distributed` and TPUs.
+    Return the number of processes launched in parallel. Works with `paddle.distributed` and TPUs.
     """
     if local_rank != -1:
         import paddle

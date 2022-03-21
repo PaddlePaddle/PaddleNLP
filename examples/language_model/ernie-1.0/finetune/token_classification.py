@@ -150,7 +150,7 @@ class NerTrainer(TrainerBase):
                 self.lr_scheduler.step()
                 self.optimizer.clear_grad()
 
-                if global_step % self.args.valid_steps == 0 or global_step == self.args.num_training_steps:
+                if global_step % self.args.eval_steps == 0 or global_step == self.args.num_training_steps:
                     if paddle.distributed.get_rank() == 0:
                         dev_f1 = evaluate(self.model, loss_fct, metric,
                                           self.dev_dl, label_num, "valid")

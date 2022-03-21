@@ -39,16 +39,12 @@ from paddle.io import DataLoader, DistributedBatchSampler
 
 import numpy as np
 
-from trainer_args import TrainingArguments
+from trainer_args import (TrainingArguments, )
 # from trainer_callback import TrainerState, TrainerControl
 
-from trainer_utils import (
-    IntervalStrategy,
-    EvaluationStrategy,
-    EvalPrediction,
-    PredictionOutput,
-    EvalLoopOutput,
-    speed_metrics, )
+from trainer_utils import (IntervalStrategy, EvaluationStrategy, EvalPrediction,
+                           PredictionOutput, EvalLoopOutput, speed_metrics,
+                           OptimizerNames)
 
 from trainer_callback import (
     CallbackHandler,
@@ -198,9 +194,9 @@ class Trainer:
         - **model** -- Always points to the core model. If using a transformers model, it will be a [`PretrainedModel`]
           subclass.
         - **model_wrapped** -- Always points to the most external model in case one or more other modules wrap the
-          original model. This is the model that should be used for the forward pass. For example, under `DeepSpeed`,
-          the inner model is wrapped in `DeepSpeed` and then again in `paddle.nn.DistributedDataParallel`. If the inner
-          model hasn't been wrapped, then `self.model_wrapped` is the same as `self.model`.
+          original model. This is the model that should be used for the forward pass. For example, the inner model is 
+          wrapped in `paddle.nn.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
+          as `self.model`.
         - **is_model_parallel** -- Whether or not a model has been switched to a model parallel mode (different from
           data parallelism, this means some of the model layers are split on different GPUs).
         - **place_model_on_device** -- Whether or not to automatically place the model on the device - it will be set
@@ -231,40 +227,26 @@ class Trainer:
                 f"No `TrainingArguments` passed, using `output_dir={output_dir}`."
             )
             args = TrainingArguments(output_dir=output_dir)
-        args.world_size = 1
-        args.fp16 = args.use_amp
-        args.do_grad_scaling = args.use_amp
-        self.do_grad_scaling = args.do_grad_scaling
-        args.train_batch_size = args.batch_size
-        args.eval_batch_size = args.batch_size
 
-        args.dataloader_drop_last = True
-        args.dataloader_num_workers = 0
-        args.dataloader_pin_memory = True
-        args.n_gpu = 1
-        args.lr_scheduler_type = "linear"
-        args.adam_beta1 = 0.9
-        args.adam_beta2 = 0.999
-        args.optim = "OptimizerNames.ADAMW"
-        args.past_index = -1
+        output_dir = "tmp_trainer"
+        new_args = TrainingArguments(output_dir=output_dir)
+
         args.per_device_train_batch_size = args.batch_size
         args.per_device_eval_batch_size = args.batch_size
-        args.logging_first_step = True
-        args.logging_strategy = IntervalStrategy.STEPS
-        args.evaluation_strategy = IntervalStrategy.STEPS
-        args.save_strategy = IntervalStrategy.STEPS
-        args.eval_steps = 500
-        args.save_steps = 500
-        args.label_names = None
-        args.prediction_loss_only = False
-        args.output_dir = "./out"
-        args.should_save = True
-        args.local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-        args.save_total_limit = 3
-        args.metric_for_best_model = "accuracy"
-        args.greater_is_better = True
+
+        for arg in vars(args):
+            v = getattr(args, arg)
+            if v is not None:
+                try:
+                    setattr(new_args, arg, v)
+                except Exception as e:
+                    print(arg, v)
+                    pass
+        args = new_args
 
         self.args = args
+        self.do_grad_scaling = args.fp16
+
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
         if model is None:
@@ -316,6 +298,7 @@ class Trainer:
                                "QusetionAnswering" in type(self.model).__name__
                                else ["labels"])
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+        self.print_config()
 
     def add_callback(self, callback):
         """
@@ -338,49 +321,50 @@ class Trainer:
         train_dataloader = self.get_train_dataloader()
         model = self._wrap_model(self.model_wrapped)
 
+        args = self.args
         self.state = TrainerState()
 
-        if self.args.max_steps > 0:
-            self.args.num_training_steps = self.args.max_steps
-            self.args.num_train_epochs = math.ceil(
-                self.args.num_training_steps / len(train_dataloader))
+        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+
+        if args.max_steps > 0:
+            args.num_training_steps = args.max_steps
+            num_train_epochs = math.ceil(args.num_training_steps /
+                                         len(train_dataloader))
+            num_train_samples = args.max_steps * total_train_batch_size
 
         else:
-            self.args.num_training_steps = len(
-                train_dataloader) * self.args.num_train_epochs
-            self.args.num_train_epochs = self.args.num_train_epochs
+            args.num_training_steps = len(
+                train_dataloader) * args.num_train_epochs
+            num_train_epochs = math.ceil(args.num_train_epochs)
+            num_train_samples = len(self.train_dataset) * args.num_train_epochs
 
-        if self.args.num_training_steps // self.args.valid_steps < self.args.minimum_valid_times:
-            exp_step = self.args.num_training_steps / self.args.minimum_valid_times
+        if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
+            exp_step = args.num_training_steps / args.minimum_eval_times
             exp_step = max(int(exp_step - exp_step % 10), 10)
             logger.info("Set eval step to %d" % exp_step)
-            self.args.valid_steps = exp_step
-
-        args = self.args
+            args.eval_steps = exp_step
 
         self.create_optimizer_and_scheduler(
             num_training_steps=args.num_training_steps)
 
         num_examples = len(self.train_dataset)
-        total_train_batch_size = self.args.per_device_train_batch_size * paddle.distributed.get_world_size(
-        )
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
-        logger.info(f"  Num Epochs = {self.args.num_train_epochs}")
+        logger.info(f"  Num Epochs = {num_train_epochs}")
         logger.info(
-            f"  Instantaneous batch size per device = {self.args.per_device_train_batch_size}"
+            f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
         )
         logger.info(
             f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
         )
         logger.info(f"  Gradient Accumulation steps = {1}")
-        logger.info(
-            f"  Total optimization steps = {self.args.num_training_steps}")
+        logger.info(f"  Total optimization steps = {args.num_training_steps}")
+        logger.info(f"  Total num train samples = {num_train_samples}")
 
         self.state.epoch = 0
-        self.state.max_steps = int(self.args.num_training_steps)
-        self.state.num_train_epochs = int(self.args.num_train_epochs)
+        self.state.max_steps = int(args.num_training_steps)
+        self.state.num_train_epochs = num_train_epochs
         self.state.is_local_process_zero = 0
         self.state.is_world_process_zero = 0
 
@@ -406,7 +390,7 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
-        for epoch in range(epochs_trained, args.num_train_epochs):
+        for epoch in range(epochs_trained, num_train_epochs):
             step = -1
 
             self.control = self.callback_handler.on_epoch_begin(
@@ -457,7 +441,7 @@ class Trainer:
                 self.train_dataset,
                 # num_replicas=self.args.world_size,
                 # rank=self.args.process_index,
-                batch_size=self.args.batch_size,
+                batch_size=self.args.train_batch_size,
                 shuffle=True,
                 # seed=self.args.seed,
             )
@@ -493,6 +477,7 @@ class Trainer:
 
         metrics = None
         if self.control.should_evaluate:
+            logger.info("evaluating!!!!!")
             metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
@@ -535,14 +520,14 @@ class Trainer:
                 eval_dataset,
                 # num_replicas=self.args.world_size,
                 # rank=self.args.process_index,
-                batch_size=self.args.per_device_eval_batch_size,
+                batch_size=self.args.eval_batch_size,
                 shuffle=False,
                 # seed=self.args.seed,
             )
         else:
             return DistributedBatchSampler(
                 eval_dataset,
-                batch_size=self.args.per_device_eval_batch_size,
+                batch_size=self.args.eval_batch_size,
                 shuffle=False)
 
     def get_eval_dataloader(self,
@@ -653,7 +638,7 @@ class Trainer:
             "beta2": args.adam_beta2,
             "epsilon": args.adam_epsilon,
         }
-        if args.optim == "OptimizerNames.ADAMW":
+        if args.optim == OptimizerNames.ADAMW:
             from paddle.optimizer import AdamW
 
             optimizer_cls = AdamW
@@ -681,7 +666,7 @@ class Trainer:
             return LinearDecayWithWarmup(learning_rate, num_training_steps,
                                          num_warmup_steps)
 
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_proportion
+        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
 
         if self.lr_scheduler is None:
             self.lr_scheduler = get_scheduler(
@@ -742,7 +727,7 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.args.use_amp:
+        if self.args.fp16:
             ctx_manager = autocast()
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
@@ -835,8 +820,6 @@ class Trainer:
             self._save(output_dir)
 
     def _save_checkpoint(self, model, metrics=None):
-        # In all cases, including ddp/dp/deepspeed, self.model is always a reference to the model we
-        # want to save except FullyShardedDDP.
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
 
         # Save model checkpoint
@@ -1307,13 +1290,13 @@ class Trainer:
                 self.train_dl) * self.args.num_train_epochs
             self.args.num_train_epochs = self.args.num_train_epochs
 
-        if self.args.num_training_steps // self.args.valid_steps < self.args.minimum_valid_times:
-            exp_step = self.args.num_training_steps / self.args.minimum_valid_times
+        if self.args.num_training_steps // self.args.eval_steps < self.args.minimum_eval_times:
+            exp_step = self.args.num_training_steps / self.args.minimum_eval_times
             exp_step = max(int(exp_step - exp_step % 10), 10)
             logger.info("Set eval step to %d" % exp_step)
-            self.args.valid_steps = exp_step
+            self.args.eval_steps = exp_step
 
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_proportion
+        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
 
         self.lr_scheduler = LinearDecayWithWarmup(
             self.args.learning_rate, self.args.num_training_steps, warmup)
@@ -1339,10 +1322,10 @@ class Trainer:
         """
         """
         logger.info('{:^40}'.format("Configuration Arguments"))
-        logger.info('{:20}:{}'.format("paddle commit id",
+        logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
         for arg in vars(self.args):
-            logger.info('{:20}:{}'.format(arg, getattr(self.args, arg)))
+            logger.info('{:30}:{}'.format(arg, getattr(self.args, arg)))
 
 
 class TrainerBase(object):
@@ -1399,13 +1382,13 @@ class TrainerBase(object):
                 self.train_dl) * self.args.num_train_epochs
             self.args.num_train_epochs = self.args.num_train_epochs
 
-        if self.args.num_training_steps // self.args.valid_steps < self.args.minimum_valid_times:
-            exp_step = self.args.num_training_steps / self.args.minimum_valid_times
+        if self.args.num_training_steps // self.args.eval_steps < self.args.minimum_eval_times:
+            exp_step = self.args.num_training_steps / self.args.minimum_eval_times
             exp_step = max(int(exp_step - exp_step % 10), 10)
             logger.info("Set eval step to %d" % exp_step)
-            self.args.valid_steps = exp_step
+            self.args.eval_steps = exp_step
 
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_proportion
+        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
 
         self.lr_scheduler = LinearDecayWithWarmup(
             self.args.learning_rate, self.args.num_training_steps, warmup)

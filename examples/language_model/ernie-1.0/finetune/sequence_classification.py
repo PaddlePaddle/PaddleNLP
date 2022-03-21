@@ -239,7 +239,7 @@ class ClueTrainer(TrainerBase):
 
         metric = Accuracy()
 
-        if self.args.use_amp:
+        if self.args.fp16:
             scaler = paddle.amp.GradScaler(
                 init_loss_scaling=self.args.scale_loss)
 
@@ -253,7 +253,7 @@ class ClueTrainer(TrainerBase):
                 global_step += 1
                 input_ids, segment_ids, labels = batch
                 with paddle.amp.auto_cast(
-                        bool(self.args.use_amp),
+                        bool(self.args.fp16),
                         custom_white_list=["layer_norm", "softmax", "gelu"], ):
                     logits = self.model(input_ids, segment_ids)
                     loss = loss_fct(logits, labels)
@@ -263,7 +263,7 @@ class ClueTrainer(TrainerBase):
                 metric.update(correct)
                 acc = metric.accumulate()
 
-                if self.args.use_amp:
+                if self.args.fp16:
                     scaler.scale(loss).backward()
                     scaler.minimize(self.optimizer, loss)
                 else:
@@ -282,7 +282,7 @@ class ClueTrainer(TrainerBase):
                            self.args.logging_steps / (time.time() - tic_train)))
                     metric.reset()
                     tic_train = time.time()
-                if global_step % self.args.valid_steps == 0 or global_step == self.args.num_training_steps:
+                if global_step % self.args.eval_steps == 0 or global_step == self.args.num_training_steps:
                     tic_eval = time.time()
                     metric.reset()
                     if self.dev_dl is not None:

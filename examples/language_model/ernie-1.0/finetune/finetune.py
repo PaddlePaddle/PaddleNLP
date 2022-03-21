@@ -124,15 +124,15 @@ def parse_args():
         default=10,
         help="Log every X updates steps.")
     group.add_argument(
-        "--valid_steps",
+        "--eval_steps",
         type=int,
         default=200,
         help="Save checkpoint every X updates steps.")
     group.add_argument(
-        "--minimum_valid_times",
+        "--minimum_eval_times",
         type=int,
         default=None,
-        help="If under valid_steps, the valid time is less then minimum_valid_times, the config of override valid_steps."
+        help="If under eval_steps, the valid time is less then minimum_eval_times, the config of override eval_steps."
     )
     group.add_argument(
         "--max_steps",
@@ -144,17 +144,16 @@ def parse_args():
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_ratio")
     group.add_argument(
-        "--warmup_proportion",
+        "--warmup_ratio",
         default=0.1,
         type=float,
         help="Linear warmup proportion over total steps.")
 
     group = parser.add_argument_group(title='Additional training configs.')
     group.add_argument(
-        "--use_amp",
+        "--fp16",
         type=distutils.util.strtobool,
         default=False,
         help="Enable mixed precision training.")

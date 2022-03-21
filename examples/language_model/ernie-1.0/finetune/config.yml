@@ -7,8 +7,8 @@ DefaultArgs:
     max_seq_length: 128
     weight_decay: 0.01
     logging_steps: 10
-    valid_steps: 200
-    minimum_valid_times: 20
+    eval_steps: 200
+    minimum_eval_times: 20
     max_steps: -1
     warmup_steps: 0
     metric: "Accuracy"

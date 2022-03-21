@@ -257,7 +257,7 @@ class MrcTrainer(TrainerBase):
                 self.lr_scheduler.step()
                 self.optimizer.clear_grad()
 
-                if global_step % self.args.valid_steps == 0:
+                if global_step % self.args.eval_steps == 0:
                     self.eval()
 
                 if global_step == self.args.num_training_steps:
