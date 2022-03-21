@@ -15,7 +15,10 @@
 import numpy as np
 import paddle
 
-__all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
+__all__ = [
+    'Stack', 'Pad', 'Tuple', 'Dict', 'DataCollatorWithPadding',
+    'default_data_collator'
+]
 
 
 class Stack(object):
@@ -321,16 +324,6 @@ class Dict(object):
         return tuple(ret)
 
 
-class DefaultDataCollator(DataCollatorMixin):
-    return_tensors: str = "pt"
-
-    def __call__(self, features: List[Dict[str, Any]],
-                 return_tensors=None) -> Dict[str, Any]:
-        if return_tensors is None:
-            return_tensors = self.return_tensors
-        return default_data_collator(features, return_tensors)
-
-
 def default_data_collator(data):
 
     if not isinstance(features[0], dict):
@@ -342,29 +335,19 @@ def default_data_collator(data):
     # Ensure that tensor is created with the correct type
     # (it should be automatically the case, but let's make sure of it.)
     if "label" in first and first["label"] is not None:
-        label = first["label"].item() if isinstance(
-            first["label"], paddle.Tensor) else first["label"]
-        dtype = torch.long if isinstance(label, int) else torch.float
-        batch["labels"] = torch.tensor(
-            [f["label"] for f in features], dtype=dtype)
+        label = first["label"]
+        dtype = 'int64' if isinstance(label, int) else 'float32'
+        batch["labels"] = Stack(dtype=dtype)([d["label"] for d in data])
     elif "label_ids" in first and first["label_ids"] is not None:
-        if isinstance(first["label_ids"], torch.Tensor):
-            batch["labels"] = torch.stack([f["label_ids"] for f in features])
-        else:
-            dtype = torch.long if type(first["label_ids"][
-                0]) is int else torch.float
-            batch["labels"] = torch.tensor(
-                [f["label_ids"] for f in features], dtype=dtype)
+        dtype = 'int64' if type(first["label_ids"][0]) is int else 'float32'
+        batch["labels"] = Stack(dtype=dtype)([d["label_ids"] for d in data])
 
     # Handling of all other possible keys.
     # Again, we will use the first element to figure out which key/values are not None for this model.
     for k, v in first.items():
         if k not in ("label", "label_ids") and v is not None and not isinstance(
                 v, str):
-            if isinstance(v, torch.Tensor):
-                batch[k] = torch.stack([f[k] for f in features])
-            else:
-                batch[k] = torch.tensor([f[k] for f in features])
+            batch[k] = Stack(dtype='int64')([d[k] for d in data])
 
     return batch
 
@@ -410,12 +393,17 @@ class DataCollatorWithPadding:
         elif "label_ids" in first and first["label_ids"] is not None:
             dtype = 'int64' if type(first["label_ids"][0]) is int else 'float32'
             batch["labels"] = Stack(dtype=dtype)([d["label_ids"] for d in data])
-
+        print(data)
         for k, v in first.items():
             if k not in ("label", "label_ids"
                          ) and v is not None and not isinstance(v, str):
-                batch[k] = Pad(axis=0,
-                               pad_val=self.tokenizer.pad_token_type_id,
-                               dtype=dtype)([d[k] for d in data])
+                if k == 'token_type_ids':
+                    batch[k] = Pad(axis=0,
+                                   pad_val=self.tokenizer.pad_token_type_id,
+                                   dtype='int64')([d[k] for d in data])
+                else:
+                    batch[k] = Pad(axis=0,
+                                   pad_val=self.tokenizer.pad_token_id,
+                                   dtype='int64')([d[k] for d in data])
 
         return batch
