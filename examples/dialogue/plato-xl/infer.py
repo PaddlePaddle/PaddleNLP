@@ -74,6 +74,11 @@ def setup_args():
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
+    parser.add_argument(
+        "--num_return_sequences",
+        default=1,
+        type=int,
+        help="The number of returned sequences. ")
 
     args = parser.parse_args()
 
@@ -141,6 +146,7 @@ def infer(args):
             top_k=args.topk,
             top_p=args.topp,
             num_beams=args.num_beams,
+            num_return_sequences=args.num_return_sequences,
             use_fp16_decoding=args.use_fp16_decoding,
             use_faster=args.faster)
 
