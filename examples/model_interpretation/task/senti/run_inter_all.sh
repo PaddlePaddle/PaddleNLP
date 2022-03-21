@@ -13,7 +13,7 @@ for BASE_MODEL in "lstm" "roberta_base" "roberta_large";
 do
     for INTER_MODE in "attention" "integrated_gradient" "lime";
     do
-        for LANGUAGE in "ch";
+        for LANGUAGE in "ch" "en";
         do
             TASK=senti_${LANGUAGE}
             DATA=../../data/${TASK}

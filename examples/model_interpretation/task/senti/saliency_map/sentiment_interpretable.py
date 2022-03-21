@@ -171,7 +171,11 @@ def init_lstm_var(args):
     if args.language == "ch":
         tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
         padding_idx = tokenizer.vocab.get('[PAD]')
-        tokenizer.inverse_vocab = [item[0] for item in sorted(tokenizer.vocab.items(), key=lambda x: x[1])]
+        tokenizer.inverse_vocab = [
+            item[0]
+            for item in sorted(
+                tokenizer.vocab.items(), key=lambda x: x[1])
+        ]
     else:
         vocab = Vocab.load_vocabulary(
             args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')

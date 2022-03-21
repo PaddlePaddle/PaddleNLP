@@ -164,7 +164,7 @@ def init_roberta_var(args):
         collate_fn=batchify_fn,
         return_list=True)
 
-    return model, tokenizer, dataloader
+    return model, tokenizer, dataloader, dev_ds
 
 
 def init_lstm_var(args):
@@ -197,16 +197,17 @@ def init_lstm_var(args):
         Stack(dtype="int64"),  # title_seq_lens
     ): [data for data in fn(samples)]
 
-    return model, tokenizer, batches, batchify_fn, vocab
+    return model, tokenizer, batches, batchify_fn, vocab, dev_ds
 
 
 if __name__ == "__main__":
     args = get_args()
     if args.base_model.startswith('roberta'):
-        model, tokenizer, dataloader = init_roberta_var(args)
+        model, tokenizer, dataloader, dev_ds = init_roberta_var(args)
 
     elif args.base_model == 'lstm':
-        model, tokenizer, dataloader, batchify_fn, vocab = init_lstm_var(args)
+        model, tokenizer, dataloader, batchify_fn, vocab, dev_ds = init_lstm_var(
+            args)
     else:
         raise ValueError('unsupported base model name.')
 
@@ -255,7 +256,7 @@ if __name__ == "__main__":
                     vocab._idx_to_token[idx] for idx in title_ids.tolist()[0]
                 ]
 
-            result['id'] = dataloader.dataset.data[step]['id']
+            result['id'] = dev_ds.data[step]['id']
 
             probs, atts, embedded = model.forward_interpret(*fwd_args,
                                                             **fwd_kwargs)
