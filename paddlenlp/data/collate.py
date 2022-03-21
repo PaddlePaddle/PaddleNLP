@@ -321,15 +321,14 @@ class Dict(object):
         return tuple(ret)
 
 
-'''
 class DefaultDataCollator(DataCollatorMixin):
     return_tensors: str = "pt"
 
-    def __call__(self, features: List[Dict[str, Any]], return_tensors=None) -> Dict[str, Any]:
+    def __call__(self, features: List[Dict[str, Any]],
+                 return_tensors=None) -> Dict[str, Any]:
         if return_tensors is None:
             return_tensors = self.return_tensors
         return default_data_collator(features, return_tensors)
-'''
 
 
 def default_data_collator(data):
@@ -396,11 +395,8 @@ class DataCollatorWithPadding:
             7.5 (Volta).
     """
 
-    tokenizer: PreTrainedTokenizerBase
-    padding: Union[bool, str, PaddingStrategy] = True
-    max_length: Optional[int] = None
-    pad_to_multiple_of: Optional[int] = None
-    return_tensors: str = "pt"
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
 
     def __call__(self, data):
         first = data[0]
