@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 import argparse
 from pprint import pprint
@@ -93,6 +94,10 @@ def postprocess_response(token_ids, tokenizer):
 
 
 def infer(args):
+    if args.faster and args.use_fp16_decoding and os.getenv("PPFG_QKV_MEM_OPT",
+                                                            "0") == "1":
+        paddle.set_default_dtype("float16")
+
     model_name = 'plato-xl'
     model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
