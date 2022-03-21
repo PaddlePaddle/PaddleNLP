@@ -108,14 +108,16 @@ def convert_example_ner(example,
                         tokenizer,
                         max_seq_length=512,
                         pad_label_id=-100):
+    encoded_inputs = {}
     text = example['text']
-    text = tokenize_special_chars(normalize_chars(text))
-    encoded_inputs = tokenizer(
-        text=text,
-        max_seq_len=max_seq_length,
-        return_position_ids=True,
-        return_attention_mask=True)
-    input_len = len(encoded_inputs['input_ids'])
+    if len(text) > max_seq_length - 2:
+        text = text[:max_seq_length - 2]
+    text = ['[CLS]'] + [x.lower() for x in text] + ['[SEP]']
+    input_len = len(text)
+    encoded_inputs['input_ids'] = tokenizer.convert_tokens_to_ids(text)
+    encoded_inputs['token_type_ids'] = np.zeros(input_len)
+    encoded_inputs['position_ids'] = list(range(input_len))
+    encoded_inputs['attention_mask'] = np.ones(input_len)
 
     if example.get('labels', None):
         labels = example['labels']
