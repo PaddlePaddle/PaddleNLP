@@ -1,0 +1,477 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.blenderbot_small.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallDecoder:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallEncoder:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:1
+msgid "基类：:class:`paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:1
+msgid "Construct a bare BlenderbotSmall Model."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:10
+msgid "Vocabulary size of the BlenderbotSmall model."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:12
+msgid "The id for begging of sentences token. Defaults to ``1``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:14
+msgid "The id for padding token. Defaults to ``0``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:16
+msgid "The id for end of sentence token. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:18
+msgid "The id indicating the start of decoding sentence. Defaults to ``1``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:20
+msgid "Dimensionality of the layers and the pooler layer. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:22
+msgid ""
+"Number of Transformer encoder layers for BlenderbotSmallEncoder. Defaults"
+" to ``8``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:24
+msgid ""
+"Number of Transformer decoder layers for BlenderbotSmallDecoder. Defaults"
+" to ``8``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:26
+msgid ""
+"Number of attention heads for each Transformer encoder layer in "
+"BlenderbotSmallEncoder. Defaults to ``16``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:29
+msgid ""
+"Number of attention heads for each Transformer decoder layer in "
+"BlenderbotSmallDecoder. Defaults to ``16``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:32
+msgid ""
+"Dimensionality of the feed-forward layer for each Transformer encoder "
+"layer in BlenderbotSmallEncoder. Defaults to ``2048``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:35
+msgid ""
+"Dimensionality of the feed-forward layer for each Transformer dncoder "
+"layer in BlenderbotSmallDncoder. Defaults to ``2048``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:38
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings,"
+" encoder, and pooler. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:41
+msgid ""
+"The non-linear activation function (function or string) in the encoder "
+"and pooler. ``\"gelu\"``, ``\"relu\"`` and any other paddle supported "
+"activation functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:45
+msgid "The dropout ratio for the attention probabilities. Defaults to ``0.0``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:48
+msgid "The dropout ratio for activations inside the fully connected layer."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:50
+msgid ", The max position index of an input sequence. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:53
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:56
+msgid ""
+"Indicate whether to scale embeddings by diving by sqrt(d_model). Defaults"
+" to ``True``."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:58
+msgid ""
+"Indicate whether to put layer normalization into preprocessing of MHA and"
+" FFN sub-layers. If True, pre-process is layer normalization and post-"
+"precess includes dropout, residual connection. Otherwise, no pre-process "
+"and post-precess includes dropout, residual connection, layer "
+"normalization. Defaults to ``False``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:1
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:5
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:5
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**.  - **1** for tokens that are "
+"**not masked**, - **0** for tokens that are **masked**.  It's data type "
+"should be `float32` and has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:5
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:5
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:10
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:10
+msgid "**1** for tokens that are **not masked**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:11
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:11
+msgid "**0** for tokens that are **masked**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:13
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:13
+msgid ""
+"It's data type should be `float32` and has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:16
+msgid ""
+"If not provided, ``decoder_input_ids`` will be automatically generated "
+"based on ``decoder_start_token_id`` and ``input_ids``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:19
+msgid ""
+"If not provided, the default ``decoder_attention_mask`` will be a tensor "
+"with upper triangular part being ``-np.inf``. the shape will be "
+"``(decoder_length, decoder_length)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:22
+msgid ""
+"The output of encoder. If not provided, a new ``encoder_output`` will be "
+"generated from BlenderbotEncoder. Defaults to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:16
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:25
+msgid "Indicates whether to use cache to speed up decoding. Defaults to ``False``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:27
+msgid ""
+"It is a list, and each element in the list is a tuple( "
+":code:`(incremental_cache, static_cache)` ). See "
+"`TransformerDecoder.gen_cache` for more details. It is only used for "
+"inference and should be None for training. Default None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallEncoder.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:33
+msgid ""
+"If ``use_cache=False``, the return will be the last hidden state of "
+"decoder with shape of [batch_size, seq_lens, hidden_size]. ``seq_lens`` "
+"corresponds to the length of input sequence. Otherwise, the return will "
+"be a tuple of ``(decoder_output, cache)``. Please refer to class "
+":class:`paddle.nn.TransformerDecoder` for more information regarding "
+"``cache``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallEncoder.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:32
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:11
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:40
+msgid "示例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:43
+msgid ""
+"import paddle from paddlenlp.transformers import "
+"BlenderbotSmallTokenizer, BlenderbotSmallModel"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:46
+msgid ""
+"# \"blenderbot_small-90M\" is pretrained weight of "
+"BlenderbotSmallForConditionalGeneration, # Therefore some weight of "
+"additional layers in BlenderbotSmallForConditionalGeneration # might not "
+"be loaded and used. pretrained_model_name = \"blenderbot_small-90M\" "
+"tokenizer = "
+"BlenderbotSmallTokenizer.from_pretrained(pretrained_model_name) model = "
+"BlenderbotSmallModel.from_pretrained(pretrained_model_name)"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:53
+msgid ""
+"sample_text = \"My friends are cool but they eat too many carbs.\" inputs"
+" = tokenizer(sample_text, return_attention_mask=True, "
+"return_token_type_ids=False) inputs = {k:paddle.to_tensor([v]) for (k, v)"
+" in inputs.items()} decoder_output = model(**inputs)"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration.get_encoder:1
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.get_encoder:1
+msgid "This method is required for model with encoder-decoder architecture."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel:1
+msgid ""
+"An abstract class for pretrained BlenderbotSmall models. It provides "
+"BlenderbotSmall related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. Refer "
+"to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallEncoder:1
+msgid ""
+"The encoder of BlenderbotSmall Model. Please refer to "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` or "
+":class:`~paddlenlp.transformers.Blenderbot.BlenderbotSmallModel` for more"
+" details regarding methods and arguments."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallEncoder.forward:1
+msgid ""
+"The last hidden-states at the last layer of the encoder. It's data type "
+"should be `float` and has a shape of `(batch_size, seq_lens, "
+"hidden_size)`. ``seq_lens`` corresponds to the length of input sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallDecoder:1
+msgid ""
+"The decoder of BlenderbotSmall Model. Please refer to "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` and "
+":class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more "
+"information regarding methods and arguments."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallDecoder.forward:1
+msgid ""
+"Please refer to "
+":class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more "
+"information regarding the arguments."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:1
+msgid ""
+"Please refer to "
+":class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more "
+"information regarding arguments. :returns:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:27
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:6
+msgid "If ``use_cache=False``, the return will be a tensor with shape of"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:6
+msgid ""
+"[batch_size, seq_lens, hidden_size]. Otherwise, the return will be a "
+"tuple of ``(decoder_output, cache)``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM:1
+msgid ""
+"Constructs BLenderbotSmall For Causal Language Model. This model is "
+"equivalent to the blenderbotSmall decoder without cross-attention."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:18
+msgid ""
+"It is a list, and each element in the list is a tuple( "
+":code:`(incremental_cache, static_cache)` ). See "
+"`paddle.nn.TransformerDecoder.gen_cache` for more details. It is only "
+"used for inference and should be None for training. Default None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:24
+msgid ""
+"If ``use_cache=False``, the return will be a tensor with shape of     "
+"[batch_size, seq_lens, hidden_size]. Otherwise, the return will be a "
+"tuple     of ``(lm_logits, cache)``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:27
+msgid ""
+"[batch_size, seq_lens, hidden_size]. Otherwise, the return will be a "
+"tuple of ``(lm_logits, cache)``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:35
+msgid ""
+"import paddle from paddlenlp.transformers import "
+"BlenderbotSmallTokenizer, BlenderbotSmallForCausalLM use_cache = False "
+"text = \"My friends are cool but they eat too many carbs.\" model_name = "
+"\"blenderbot_small-90M\" tokenizer = "
+"BlenderbotSmallTokenizer.from_pretrained(model_name) model = "
+"BlenderbotSmallForCausalLM.from_pretrained(model_name) model.eval() "
+"inputs = tokenizer(text, return_attention_mask=True, "
+"return_token_type_ids=False) inputs = {k: paddle.to_tensor([v]) for (k, "
+"v) in inputs.items()}"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:47
+msgid "with paddle.no_grad():"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:47
+msgid ""
+"outputs = model(**inputs, use_cache=use_cache) # outputs is a tuple of "
+"(lm_logits, cache) if ``use_cache=True``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.prepare_inputs_for_generation:1
+msgid ""
+"Prepare inputs for decoder to generate sentences. :returns: A dictionary "
+"containing necessary inputs for generating next token. :rtype: dict"
+msgstr ""
+
