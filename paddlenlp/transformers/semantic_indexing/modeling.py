@@ -217,12 +217,12 @@ class ErnieForRanking(ErniePretrainedModel):
     def __init__(self, ernie, num_classes=2, dropout=None):
         super(ErnieForRanking, self).__init__()
         self.ernie = ernie  # allow ernie to be config
-        self.apply(self.init_weights)
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
         weight_attr = paddle.ParamAttr(
             initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
         self.classifier = paddle.nn.Linear(
             768, num_classes, weight_attr=weight_attr)
+        self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
