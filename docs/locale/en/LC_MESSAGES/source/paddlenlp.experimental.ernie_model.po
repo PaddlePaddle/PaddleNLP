@@ -1,0 +1,161 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.experimental.ernie_model.rst:2
+msgid "ernie\\_model"
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:1
+msgid "The bare ERNIE Model transformer outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of
+#: paddlenlp.experimental.ernie_model.FasterErnieForSequenceClassification.forward
+#: paddlenlp.experimental.ernie_model.FasterErnieForTokenClassification.forward
+#: paddlenlp.experimental.ernie_model.FasterErnieModel
+#: paddlenlp.experimental.ernie_model.FasterErnieModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:10
+msgid ""
+"Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size "
+"of token embedding matrix. Defines the number of different tokens that "
+"can be represented by the `inputs_ids` passed when calling `ErnieModel`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:13
+msgid ""
+"Dimensionality of the embedding layer, encoder layers and pooler layer. "
+"Defaults to `768`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:15
+msgid "Number of hidden layers in the Transformer encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:17
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:20
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the encoder. Input "
+"tensors to ff layers are firstly projected from `hidden_size` to "
+"`intermediate_size`, and then projected back to `hidden_size`. Typically "
+"`intermediate_size` is larger than `hidden_size`. Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:25
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to `\"gelu\"`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:32
+msgid ""
+"The dropout probability used in MultiHeadAttention in all encoder layers "
+"to drop some attention target. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:35
+msgid ""
+"The maximum value of the dimensionality of position encoding, which "
+"dictates the maximum supported length of an input sequence. Defaults to "
+"`512`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:38
+msgid "The vocabulary size of the `token_type_ids`. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:41
+msgid ""
+"The standard deviation of the normal initializer for initializing all "
+"weight matrices. Defaults to `0.02`.  .. note::     A normal_initializer "
+"initializes weight matrices as normal distributions.     See "
+":meth:`ErniePretrainedModel._init_weights()` for how weights are "
+"initialized in `ErnieModel`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:41
+msgid ""
+"The standard deviation of the normal initializer for initializing all "
+"weight matrices. Defaults to `0.02`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:45
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`ErniePretrainedModel._init_weights()` for how weights are "
+"initialized in `ErnieModel`."
+msgstr ""
+
+#: of paddlenlp.experimental.ernie_model.FasterErnieModel:48
+msgid "The index of padding token in the token vocabulary. Defaults to `0`."
+msgstr ""
+
+#: of
+#: paddlenlp.experimental.ernie_model.FasterErnieForSequenceClassification.forward:1
+#: paddlenlp.experimental.ernie_model.FasterErnieForTokenClassification.forward:1
+#: paddlenlp.experimental.ernie_model.FasterErnieModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.experimental.ernie_model.FasterErnieForSequenceClassification.forward:4
+#: paddlenlp.experimental.ernie_model.FasterErnieForTokenClassification.forward:4
+#: paddlenlp.experimental.ernie_model.FasterErnieModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.experimental.ernie_model.FasterErnieForSequenceClassification.forward:6
+#: paddlenlp.experimental.ernie_model.FasterErnieForTokenClassification.forward:6
+#: paddlenlp.experimental.ernie_model.FasterErnieModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
