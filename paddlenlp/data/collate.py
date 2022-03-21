@@ -137,9 +137,11 @@ class Pad(object):
                  [8, 9, 0, 0]]
                 '''
         """
-        print(data)
+        if not isinstance(data[0], list):
+            return np.asarray(
+                data,
+                dtype=self._dtype if self._dtype is not None else np.int64)
         arrs = [np.asarray(ele) for ele in data]
-        print(arrs)
         original_length = [ele.shape[self._axis] for ele in arrs]
         max_size = max(original_length)
         ret_shape = list(arrs[0].shape)
@@ -395,13 +397,9 @@ class DataCollatorWithPadding:
         elif "label_ids" in first and first["label_ids"] is not None:
             dtype = 'int64' if type(first["label_ids"][0]) is int else 'float32'
             batch["labels"] = Stack(dtype=dtype)([d["label_ids"] for d in data])
-        elif "labels" in first and first["labels"] is not None:
-            dtype = 'int64' if type(first["labels"][0]) is int else 'float32'
-            batch["labels"] = Stack(dtype=dtype)([d["labels"] for d in data])
 
-        print(data)
         for k, v in first.items():
-            if k not in ("label", "label_ids"
+            if k not in ("label", "label_ids", "labels"
                          ) and v is not None and not isinstance(v, str):
                 if k == 'token_type_ids':
                     batch[k] = Pad(axis=0,
