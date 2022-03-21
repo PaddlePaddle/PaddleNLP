@@ -162,17 +162,20 @@ def do_train():
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                lengths = paddle.sum(masks, axis=1)
+                loss_masks = paddle.unsqueeze(masks, 2)
+                masks = paddle.scale(
+                    masks, scale=10000.0, bias=-1.0, bias_after_scale=False)
                 logits = model(input_ids, token_type_ids, position_ids, masks)
 
                 loss_oth = criterion(logits[0], paddle.unsqueeze(label_oth, 2))
                 loss_sym = criterion(logits[1], paddle.unsqueeze(label_sym, 2))
-                loss_masks = paddle.unsqueeze(masks, 2)
+
                 loss_oth = paddle.mean(loss_oth * loss_masks)
                 loss_sym = paddle.mean(loss_sym * loss_masks)
 
                 loss = loss_oth + loss_sym
 
-                lengths = paddle.sum(masks, axis=1)
                 pred_oth = paddle.argmax(logits[0], axis=-1)
                 pred_sym = paddle.argmax(logits[1], axis=-1)
                 correct_oth = metrics[0].compute(lengths, pred_oth, label_oth)
