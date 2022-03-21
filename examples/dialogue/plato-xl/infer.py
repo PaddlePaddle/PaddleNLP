@@ -104,8 +104,10 @@ def infer(args):
         paddle.set_default_dtype("float16")
 
     model_name = 'plato-xl'
-    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
+    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name, load_state_as_np=os.getenv("PPFG_QKV_MEM_OPT", "0") == "1")
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
+
+    model.eval()
 
     context = [
         "Hi , Becky , what's up ?",
