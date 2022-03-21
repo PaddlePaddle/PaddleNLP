@@ -1,0 +1,119 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.models.sentiment_analysis_model.rst:2
+msgid "sentiment\\_analysis\\_model"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel:1
+msgid ""
+"This class implements the Bag of Words Classification Network model to "
+"classify texts. At a high level, the model starts by embedding the tokens"
+" and running them through a word embedding. Then, we encode these "
+"epresentations with a `BoWEncoder`. Lastly, we take the output of the "
+"encoder to create a final representation, which is passed through some "
+"feed-forward layers to output a logits (`output_layer`). :param "
+"vocab_size: The vocab size that used to create the embedding. :type "
+"vocab_size: int :param num_class: The num class of the classifier. :type "
+"num_class: int :param emb_dim: The size of the embedding, default value "
+"is 128. :type emb_dim: int. optinal :param padding_idx: The padding value"
+" in the embedding, the padding_idx of embedding value will"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel:13
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:13
+msgid "not be updated, the default value is 0."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel
+#: paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel.forward
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel.forward
+#: paddlenlp.taskflow.models.sentiment_analysis_model.SkepSequenceModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel:15
+msgid "The output size of linear that after the bow, default value is 128."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel:17
+msgid ""
+"The output size of linear that after the fisrt linear, default value is "
+"96."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel.forward:1
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel.forward:1
+#: paddlenlp.taskflow.models.sentiment_analysis_model.SkepSequenceModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel.forward:4
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel.forward:4
+#: paddlenlp.taskflow.models.sentiment_analysis_model.SkepSequenceModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel.forward:6
+#: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel.forward:6
+#: paddlenlp.taskflow.models.sentiment_analysis_model.SkepSequenceModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:1
+msgid ""
+"This class implements the Bag of Words Classification Network model to "
+"classify texts. At a high level, the model starts by embedding the tokens"
+" and running them through a word embedding. Then, we encode these "
+"epresentations with a `BoWEncoder`. Lastly, we take the output of the "
+"encoder to create a final representation, which is passed through some "
+"feed-forward layers to output a logits (`output_layer`). :param "
+"vocab_size: The vocab size that used to create the embedding. :type "
+"vocab_size: int :param num_class: The num clas of the classifier. :type "
+"num_class: int :param emb_dim: The size of the embedding, default value "
+"is 128. :type emb_dim: int. optinal :param padding_idx: The padding value"
+" in the embedding, the padding_idx of embedding value will"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:15
+msgid "The output size of the lstm, defalut value 198."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:17
+msgid "The direction of lstm, default value is `forward`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:19
+msgid "The num of lstm layer."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:21
+msgid "The dropout rate of lstm."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:23
+msgid ""
+"The pooling type of lstm. Defalut value is None, if `pooling_type` is "
+"None, then the LSTMEncoder will return the hidden state of the last time "
+"step at last layer as a single vector."
+msgstr ""
+
