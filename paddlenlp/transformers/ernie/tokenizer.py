@@ -93,14 +93,14 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
             "ernie-gen-large-430g-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
-            "ernie-base-cn-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-base-cn-title-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-base-en-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-base-en-title-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "rocketqa-zh-dureader-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-zh-dureader-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-v1-marco-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "rocketqa-v1-marco-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -131,16 +131,16 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ppminilm-6l-768h": {
             "do_lower_case": True
         },
-        "ernie-base-cn-query-encoder": {
+        "rocketqa-zh-dureader-query-encoder": {
             "do_lower_case": True
         },
-        "ernie-base-cn-title-encoder": {
+        "rocketqa-zh-dureader-para-encoder": {
             "do_lower_case": True
         },
-        "ernie-base-en-query-encoder": {
+        "rocketqa-v1-marco-query-encoder": {
             "do_lower_case": True
         },
-        "ernie-base-en-title-encoder": {
+        "rocketqa-v1-marco-para-encoder": {
             "do_lower_case": True
         },
     }
