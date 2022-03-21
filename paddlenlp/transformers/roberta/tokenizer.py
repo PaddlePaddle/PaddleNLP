@@ -73,6 +73,7 @@ class RobertaTokenizer(PretrainedTokenizer):
     # resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     resource_files_names = {
         "vocab_file": "vocab.txt",
+        "vocab_json_file": "vocab.json",
         "merges_file": "merges.txt"
     }
     pretrained_resource_files_map = {
@@ -85,37 +86,18 @@ class RobertaTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
-            "roberta-base-ft-chinanews-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
-            "roberta-base-ft-cluener2020-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
-            "roberta-base-chn-extractive-qa":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
+        },
+        "vocab_json_file": {
+            "roberta-wwm-ext": None,
+            "roberta-wwm-ext-large": None,
+            "rbt3": None,
+            "rbtl3": None,
         },
         "merges_file": {
             "roberta-wwm-ext": None,
             "roberta-wwm-ext-large": None,
             "rbt3": None,
             "rbtl3": None,
-            "roberta-base-ft-chinanews-chn": None,
-            "roberta-base-ft-cluener2020-chn": None,
-            "roberta-base-chn-extractive-qa": None,
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
         }
     }
     pretrained_init_configuration = {
@@ -131,23 +113,11 @@ class RobertaTokenizer(PretrainedTokenizer):
         "rbtl3": {
             "do_lower_case": True
         },
-        "roberta-base-ft-chinanews-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-cluener2020-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-chn-extractive-qa": {
-            "do_lower_case": True
-        },
-        "roberta-en-base": {},
-        "roberta-en-large": {},
-        "roberta-base-squad2": {},
-        "tiny-distilroberta-base": {},
     }
 
     def __init__(self,
                  vocab_file,
+                 vocab_json_file,
                  merges_file,
                  do_lower_case=True,
                  unk_token="[UNK]",
@@ -159,11 +129,12 @@ class RobertaTokenizer(PretrainedTokenizer):
 
         self.do_lower_case = do_lower_case
         self.vocab_file = vocab_file
+        self.vocab_json_file = vocab_json_file
         self.merges_file = merges_file
 
-        if vocab_file is not None and merges_file is not None:
+        if vocab_json_file is not None and merges_file is not None:
             self.tokenizer = RobertaBPETokenizer(
-                vocab_file=vocab_file, merges_file=merges_file, **kwargs)
+                vocab_file=vocab_json_file, merges_file=merges_file, **kwargs)
         elif vocab_file is not None:
             self.tokenizer = RobertaChineseTokenizer(
                 vocab_file=vocab_file, do_lower_case=True, **kwargs)
@@ -172,7 +143,7 @@ class RobertaTokenizer(PretrainedTokenizer):
             self.vocab = self.tokenizer.vocab
         else:
             raise ValueError(
-                "You should specify both of 'vocal_file'"
+                "You should specify both of 'vocab_file'"
                 "and 'merges_file' to construct an roberta BPE tokenizer."
                 "Specify 'vocal_file' for Chinese tokenizer")
 
@@ -466,12 +437,6 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
-            "roberta-base-ft-chinanews-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
-            "roberta-base-ft-cluener2020-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
-            "roberta-base-chn-extractive-qa":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -485,15 +450,6 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rbtl3": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-chinanews-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-cluener2020-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-chn-extractive-qa": {
             "do_lower_case": True
         },
     }
@@ -753,34 +709,8 @@ class RobertaBPETokenizer(GPTTokenizer):
         "merges_file": "merges.txt"
     }  # for save_pretrained
 
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
-        },
-        "merges_file": {
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
-        }
-    }
-    pretrained_init_configuration = {
-        "roberta-en-base": {},
-        "roberta-en-large": {},
-        "roberta-base-squad2": {},
-        "tiny-distilroberta-base": {}
-    }
+    pretrained_resource_files_map = {}
+    pretrained_init_configuration = {}
 
     def __init__(self,
                  vocab_file,
