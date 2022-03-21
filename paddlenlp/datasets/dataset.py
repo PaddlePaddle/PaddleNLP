@@ -46,10 +46,10 @@ from datasets import load_dataset as origin_load_dataset
 def load_from_ppnlp(path, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
     new_path = os.path.split(path)[-1]
-    new_path = os.path.join(ppnlp_path, 'hf_datasets', path + '.py')
-    try:
+    new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
+    if os.path.exists(new_path):
         return origin_load_dataset(new_path, **kwargs)
-    except FileNotFoundError:
+    else:
         return origin_load_dataset(path, **kwargs)
 
 
