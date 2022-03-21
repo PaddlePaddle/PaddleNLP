@@ -55,8 +55,9 @@ class BatchEncoding(UserDict):
             return self.data[item]
         else:
             raise KeyError(
-                "Indexing with integers is not available when using retrun_dict=True."
-                "Please set return_dict to False to use integer indexing.")
+                "Indexing with integers is not available when using tokenizer.__call__()"
+                " with return_dict=True. Please set return_dict to False to use integer indexing."
+            )
 
     def keys(self):
         return self.data.keys()
@@ -581,9 +582,9 @@ class PretrainedTokenizer(object):
                  return_token_type_ids=True,
                  return_attention_mask=False,
                  return_length=False,
-                 return_dict=True,
                  return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+                 return_special_tokens_mask=False,
+                 return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
@@ -718,9 +719,9 @@ class PretrainedTokenizer(object):
                 return_token_type_ids=return_token_type_ids,
                 return_attention_mask=return_attention_mask,
                 return_length=return_length,
-                return_dict=return_dict,
                 return_overflowing_tokens=return_overflowing_tokens,
-                return_special_tokens_mask=return_special_tokens_mask)
+                return_special_tokens_mask=return_special_tokens_mask,
+                return_dict=return_dict)
         else:
             return self.encode(
                 text=text,
@@ -1558,9 +1559,9 @@ class PretrainedTokenizer(object):
                      return_token_type_ids=True,
                      return_attention_mask=False,
                      return_length=False,
-                     return_dict=True,
                      return_overflowing_tokens=False,
-                     return_special_tokens_mask=False):
+                     return_special_tokens_mask=False,
+                     return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
