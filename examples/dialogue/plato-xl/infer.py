@@ -105,7 +105,7 @@ def infer(args):
 
     model_name = 'plato-xl'
     model = UnifiedTransformerLMHeadModel.from_pretrained(
-        model_name, load_state_as_np=os.getenv("PPFG_QKV_MEM_OPT", "0") == "1")
+        model_name, load_state_as_np=True)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 
     model.eval()
