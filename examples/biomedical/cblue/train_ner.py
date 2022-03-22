@@ -9,11 +9,11 @@ import numpy as np
 import paddle
 from paddlenlp.data import Pad, Dict
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup, ElectraTokenizer
+from paddlenlp.transformers import ElectraTokenizer
 from paddlenlp.metrics import ChunkEvaluator
 
 from model import ElectraForBinaryTokenClassification
-from utils import create_dataloader, convert_example_ner
+from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -200,9 +200,10 @@ def do_train():
                     time_diff = time.time() - tic_train
                     total_train_time += time_diff
                     print(
-                        'global step %d, epoch: %d, batch: %d, loss: %.5f, loss symptom: %.5f, loss others: %.5f, f1: %.5f, speed: %.2f step/s'
+                        'global step %d, epoch: %d, batch: %d, loss: %.5f, loss symptom: %.5f, loss others: %.5f, f1: %.5f, speed: %.2f step/s, learning_rate: %f'
                         % (global_step, epoch, step, loss, loss_sym, loss_oth,
-                           f1, args.logging_steps / time_diff))
+                           f1, args.logging_steps / time_diff,
+                           lr_scheduler.get_lr()))
                     tic_train = time.time()
 
                 if global_step % args.valid_steps == 0 and rank == 0:

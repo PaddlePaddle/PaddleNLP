@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+import math
 import numpy as np
 import paddle
+from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.transformers import normalize_chars, tokenize_special_chars
 
@@ -39,6 +42,31 @@ def create_dataloader(dataset,
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         return_list=True)
+
+
+def is_integer(number):
+    if sys.version > '3':
+        return isinstance(number, int)
+    return isinstance(number, (int, long))
+
+
+class LinearDecayWithWarmup(LambdaDecay):
+    def __init__(self,
+                 learning_rate,
+                 total_steps,
+                 warmup,
+                 last_epoch=-1,
+                 verbose=False):
+        warmup_steps = warmup if is_integer(warmup) else int(
+            math.floor(warmup * total_steps))
+
+        def lr_lambda(current_step):
+            if current_step < warmup_steps:
+                return float(current_step) / float(max(1, warmup_steps))
+            return max(0.0, 1.0 - current_step / total_steps)
+
+        super(LinearDecayWithWarmup, self).__init__(learning_rate, lr_lambda,
+                                                    last_epoch, verbose)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
