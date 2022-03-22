@@ -33,6 +33,7 @@ from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokeni
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
@@ -56,6 +57,7 @@ MODEL_CLASSES = {
     "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
     "albert": (AlbertForSequenceClassification, AlbertTokenizer),
+    "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
 }
 
 
@@ -83,6 +85,17 @@ def parse_args():
         type=str,
         required=True,
         help="Path to pre-trained model or shortcut name selected in the list: "
+        + ", ".join(
+            sum([
+                list(classes[-1].pretrained_init_configuration.keys())
+                for classes in MODEL_CLASSES.values()
+            ], [])), )
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        required=True,
+        help="Path to tokenizer or shortcut name selected in the list: "
         + ", ".join(
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
@@ -248,7 +261,7 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
 
     trans_func = partial(
         convert_example,
