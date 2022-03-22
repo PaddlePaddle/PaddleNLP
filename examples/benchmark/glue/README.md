@@ -4,6 +4,8 @@
 
 本项目是 GLUE评测任务 在 Paddle 2.0上的开源实现。
 
+本项目支持BERT, ELECTRA,ERNIE,ALBERT,RoBERTa模型，可在model_type中进行指定。
+
 ## 快速开始
 
 ### 启动GLUE任务
