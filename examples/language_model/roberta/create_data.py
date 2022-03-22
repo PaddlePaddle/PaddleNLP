@@ -39,11 +39,8 @@ parser.add_argument("--overwrite_cache", type=bool, default=False, help="Overwri
 
 
 def main(args):
-    # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
-    accelerator = Accelerator()
     if args.output_dir is not None:
         os.makedirs(args.output_dir, exist_ok=True)
-    accelerator.wait_for_everyone()
 
     # Get the datasets: 
     if args.dataset_name is not None:
@@ -77,15 +74,15 @@ def main(args):
                 return_special_tokens_mask=True,
             )
 
-        with accelerator.main_process_first():
-            tokenized_datasets = raw_datasets.map(
-                tokenize_function,
-                batched=True,
-                num_proc=args.preprocessing_num_workers,
-                remove_columns=[text_column_name],
-                load_from_cache_file=not args.overwrite_cache,
-                desc="Running tokenizer on dataset line_by_line",
-            )
+
+        tokenized_datasets = raw_datasets.map(
+            tokenize_function,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+            remove_columns=[text_column_name],
+            load_from_cache_file=not args.overwrite_cache,
+            desc="Running tokenizer on dataset line_by_line",
+        )
     else:
         # Otherwise, we tokenize every text, then concatenate them together before splitting them in smaller parts.
         # We use `return_special_tokens_mask=True` because DataCollatorForLanguageModeling (see below) is more
@@ -93,15 +90,15 @@ def main(args):
         def tokenize_function(examples):
             return tokenizer(examples[text_column_name], return_special_tokens_mask=True)
 
-        with accelerator.main_process_first():
-            tokenized_datasets = raw_datasets.map(
-                tokenize_function,
-                batched=True,
-                num_proc=args.preprocessing_num_workers,
-                remove_columns=column_names,
-                load_from_cache_file=not args.overwrite_cache,
-                desc="Running tokenizer on every text in dataset",
-            )
+
+        tokenized_datasets = raw_datasets.map(
+            tokenize_function,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+            remove_columns=column_names,
+            load_from_cache_file=not args.overwrite_cache,
+            desc="Running tokenizer on every text in dataset",
+        )
 
         # Main data processing function that will concatenate all texts from our dataset and generate chunks of
         # max_seq_length.
@@ -124,14 +121,14 @@ def main(args):
         # remainder for each of those groups of 1,000 texts. You can adjust that batch_size here but a higher value
         # might be slower to preprocess.
 
-        with accelerator.main_process_first():
-            tokenized_datasets = tokenized_datasets.map(
-                group_texts,
-                batched=True,
-                num_proc=args.preprocessing_num_workers,
-                load_from_cache_file=not args.overwrite_cache,
-                desc=f"Grouping texts in chunks of {args.max_seq_length}",
-            )
+
+        tokenized_datasets = tokenized_datasets.map(
+            group_texts,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+            load_from_cache_file=not args.overwrite_cache,
+            desc=f"Grouping texts in chunks of {args.max_seq_length}",
+        )
     tokenized_datasets.save_to_disk(args.output_dir)
 
 if __name__ == "__main__":
