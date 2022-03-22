@@ -28,7 +28,7 @@ from args import parse_args
 
 import paddlenlp as ppnlp
 
-from paddlenlp.data import Pad, Stack, Tuple, Dict
+from paddlenlp.data import default_data_collator, DataCollatorWithPadding
 from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, FunnelForQuestionAnswering, FunnelTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
@@ -178,11 +178,10 @@ def evaluate(model, data_loader, raw_dataset, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, token_type_ids, attention_mask = batch
         start_logits_tensor, end_logits_tensor = model(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+            batch['input_ids'],
+            token_type_ids=batch['token_type_ids'],
+            attention_mask=batch['attention_mask'])
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -262,13 +261,7 @@ def run(args):
                                       num_proc=4)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
-        train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            'attention_mask': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "start_positions": Stack(dtype="int64"),
-            "end_positions": Stack(dtype="int64")
-        }): fn(samples)
+        train_batchify_fn = DataCollatorWithPadding(tokenizer)
 
         train_data_loader = DataLoader(
             dataset=train_ds,
@@ -304,12 +297,12 @@ def run(args):
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
                 logits = model(
-                    input_ids=input_ids,
-                    token_type_ids=token_type_ids,
-                    attention_mask=attention_mask)
-                loss = criterion(logits, (start_positions, end_positions))
+                    input_ids=batch['input_ids'],
+                    token_type_ids=batch['token_type_ids'],
+                    attention_mask=batch['attention_mask'])
+                loss = criterion(logits, (batch['start_positions'],
+                                          batch['end_positions']))
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
@@ -345,11 +338,7 @@ def run(args):
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
-        dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+        dev_batchify_fn = DataCollatorWithPadding(tokenizer)
 
         dev_data_loader = DataLoader(
             dataset=dev_ds,

@@ -330,9 +330,9 @@ class Dict(object):
 
 def default_data_collator(data):
 
-    if not isinstance(features[0], dict):
-        features = [vars(f) for f in features]
-    first = features[0]
+    if not isinstance(data[0], dict):
+        data = [vars(f) for f in data]
+    first = data[0]
     batch = {}
 
     # Special handling for labels.
@@ -399,7 +399,7 @@ class DataCollatorWithPadding:
             batch["labels"] = Stack(dtype=dtype)([d["label_ids"] for d in data])
 
         for k, v in first.items():
-            if k not in ("label", "label_ids", "labels"
+            if k not in ("label", "label_ids"
                          ) and v is not None and not isinstance(v, str):
                 if k == 'token_type_ids':
                     batch[k] = Pad(axis=0,
