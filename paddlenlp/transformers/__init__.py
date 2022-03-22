@@ -98,4 +98,4 @@ from .luke.modeling import *
 from .luke.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
-from .semantic_indexing.modeling import *
+from .semantic_search.modeling import *
