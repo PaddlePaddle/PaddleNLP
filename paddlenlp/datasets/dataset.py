@@ -45,19 +45,21 @@ from datasets import load_dataset as origin_load_dataset
 
 def load_from_ppnlp(path, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
-    path = os.path.split(path)[-1]
-    path = os.path.join(ppnlp_path, path + '.py')
-    return origin_load_dataset(path, **kwargs)
+    new_path = os.path.split(path)[-1]
+    new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
+    if os.path.exists(new_path):
+        return origin_load_dataset(new_path, **kwargs)
+    else:
+        return origin_load_dataset(path, **kwargs)
 
 
-if os.environ.get('ISINTRANET', '0') == '1':
-    datasets.load_dataset = load_from_ppnlp
+datasets.load_dataset = load_from_ppnlp
 
 
 class DatasetTuple:
     def __init__(self, splits):
         self.tuple_cls = namedtuple('datasets', splits)
-        self.tuple = self.tuple_cls(*[None for _ in splits])
+        self.tuple = self.tuple_cls(* [None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
