@@ -24,7 +24,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from transformers import AutoTokenizer
-from accelerate import Accelerator, DistributedType
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--output_dir", default='wiki', type=str, required=False, help="The output directory where the model predictions and checkpoints will be written.")
