@@ -1,5 +1,6 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
-#
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -17,7 +18,7 @@ import paddle
 
 __all__ = [
     'Stack', 'Pad', 'Tuple', 'Dict', 'DataCollatorWithPadding',
-    'default_data_collator'
+    'default_data_collator', 'DataCollatorForTokenClassification'
 ]
 
 
@@ -391,56 +392,41 @@ class DataCollatorWithPadding:
         return batch
 
 
-'''
 class DataCollatorForTokenClassification:
     """
     Data collator that will dynamically pad the inputs received, as well as the labels.
 
     Args:
-        tokenizer ([`PreTrainedTokenizer`] or [`PreTrainedTokenizerFast`]):
+        tokenizer (`paddlenlp.transformers.PreTrainedTokenizer`):
             The tokenizer used for encoding the data.
+        label_pad_token_id (int, optional):
+            The id to use when padding the labels. Defaults to -100.
     """
 
-    tokenizer: PreTrainedTokenizerBase
-    padding: Union[bool, str, PaddingStrategy] = True
-    max_length: Optional[int] = None
-    pad_to_multiple_of: Optional[int] = None
-    label_pad_token_id: int = -100
-    return_tensors: str = "pt"
+    def __init__(self, tokenizer, label_pad_token_id=-100):
+        self.tokenizer = tokenizer
+        self.label_pad_token_id = label_pad_token_id
 
-    def torch_call(self, features):
-        import torch
+    def __call__(self, data):
+        first = data[0]
+        assert isinstance(first, dict), 'Input pattern not understood. The input of collatot must be a dict with key of input column name and value of data ' \
+                                   'Received input type:' % (type(first))
+        batch = {}
 
-        label_name = "label" if "label" in features[0].keys() else "labels"
-        labels = [feature[label_name] for feature in
-                  features] if label_name in features[0].keys() else None
-        batch = self.tokenizer.pad(
-            features,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            # Conversion to tensors will fail if we have labels as they are not of the same length yet.
-            return_tensors="pt" if labels is None else None, )
+        for k, v in first.items():
+            if k not in ("label", "label_ids"
+                         ) and v is not None and not isinstance(v, str):
+                if k == 'token_type_ids':
+                    batch[k] = Pad(axis=0,
+                                   pad_val=self.tokenizer.pad_token_type_id,
+                                   dtype='int64')([d[k] for d in data])
+                else:
+                    batch[k] = Pad(axis=0,
+                                   pad_val=self.tokenizer.pad_token_id,
+                                   dtype='int64')([d[k] for d in data])
+            else:
+                batch[k] = Pad(axis=0,
+                               pad_val=self.label_pad_token_id,
+                               dtype='int64')([d[k] for d in data])
 
-        if labels is None:
-            return batch
-
-        sequence_length = torch.tensor(batch["input_ids"]).shape[1]
-        padding_side = self.tokenizer.padding_side
-        if padding_side == "right":
-            batch[label_name] = [
-                list(label) + [self.label_pad_token_id] *
-                (sequence_length - len(label)) for label in labels
-            ]
-        else:
-            batch[label_name] = [[self.label_pad_token_id] *
-                                 (sequence_length - len(label)) + list(label)
-                                 for label in labels]
-
-        batch = {
-            k: torch.tensor(
-                v, dtype=torch.int64)
-            for k, v in batch.items()
-        }
         return batch
-'''
