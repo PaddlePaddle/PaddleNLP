@@ -652,7 +652,7 @@ class PretrainedTokenizer(object):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
             return_dict (bool, optional):
-                Decide the format for returned encoded batch inputs. 
+                Decide the format for returned encoded batch inputs. Only works in batch_encode.
                 
                 - If `True`, encoded inputs would be a dictionary like: 
                     ``{'input_ids': [[1, 4444, 4385, 1545, 6712],[1, 4444, 4385]],
