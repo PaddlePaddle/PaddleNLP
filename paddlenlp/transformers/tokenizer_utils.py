@@ -660,7 +660,7 @@ class PretrainedTokenizer(object):
                     - If `False`, encoded inputs would be a list like:
                         ``[{'input_ids': [1, 4444, 4385, 1545, 6712],
                             'token_type_ids': [0, 0, 0, 0, 0]},
-                        {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
+                        {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]``
 
                 Defaults to `True`.
                  
