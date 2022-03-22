@@ -331,7 +331,7 @@ def extract_integrated_gradient_scores(
         start_logit = start_logits[:, start_index].sum()
         start_logit.backward(retain_graph=False)
         embedded_start_grad = embedded.grad
-        model.clear_grad()
+        model.clear_gradients()
         # embedded_end_grad
         # end_logits: (bsz, seq); embedded: (bsz, seq, emb)
         _, _, end_logits, _, _, embedded = model.forward_interpret(
@@ -343,7 +343,7 @@ def extract_integrated_gradient_scores(
         end_logit = end_logits[:, end_index].sum()
         end_logit.backward(retain_graph=False)
         embedded_end_grad = embedded.grad
-        model.clear_grad()
+        model.clear_gradients()
 
         embedded_grad = (embedded_start_grad + embedded_end_grad) / 2
         embedded_grads_list.append(embedded_grad)

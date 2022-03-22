@@ -97,7 +97,7 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
              title_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
         t_grad_output = t_gradients / t_gradients.sum(-1, keepdim=True)
 
-        model.clear_grad()
+        model.clear_gradients()
         for query_id, title_id in zip(query_ids.numpy().tolist(),
                                       title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]

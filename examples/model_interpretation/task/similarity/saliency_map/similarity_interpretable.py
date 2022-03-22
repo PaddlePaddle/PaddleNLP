@@ -405,7 +405,7 @@ def extract_integrated_gradient_scores(args, result, sub_word_id_dict_query,
             t_embedded_grad = t_embedded.grad
             q_embedded_grads_list.append(q_embedded_grad)
             t_embedded_grads_list.append(t_embedded_grad)
-        model.clear_grad()
+        model.clear_gradients()
         if i == 0:
             baseline_pred_confidence = probs.tolist()[0][pred_label]  # scalar
             baseline_embedded = embedded  # Tensor(1, seq_len, embed_size)

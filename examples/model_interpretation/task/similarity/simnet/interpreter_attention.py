@@ -80,7 +80,7 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
         query_att = attention[0]
         title_att = attention[1]
 
-        model.clear_grad()
+        model.clear_gradients()
         for query_id, title_id in zip(query_ids.numpy().tolist(),
                                       title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]

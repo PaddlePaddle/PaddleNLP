@@ -310,7 +310,7 @@ def extract_integrated_gradient_scores(
         predicted_class_prob = probs[0][pred_label]
         predicted_class_prob.backward(retain_graph=False)
         embedded_grad = embedded.grad
-        model.clear_grad()
+        model.clear_gradients()
         embedded_grads_list.append(embedded_grad)
 
         if i == 0:
