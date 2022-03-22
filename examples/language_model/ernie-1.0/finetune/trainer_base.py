@@ -1,3 +1,4 @@
+# Copyright 2020-present the HuggingFace Inc. team.
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,9 +43,15 @@ import numpy as np
 from trainer_args import (TrainingArguments, )
 # from trainer_callback import TrainerState, TrainerControl
 
-from trainer_utils import (IntervalStrategy, EvaluationStrategy, EvalPrediction,
-                           PredictionOutput, EvalLoopOutput, speed_metrics,
-                           OptimizerNames)
+from trainer_utils import (
+    IntervalStrategy,
+    EvaluationStrategy,
+    TrainOutput,
+    EvalPrediction,
+    PredictionOutput,
+    EvalLoopOutput,
+    speed_metrics,
+    OptimizerNames, )
 
 from trainer_callback import (
     CallbackHandler,
@@ -206,6 +213,7 @@ class Trainer:
           in `train`)
 
     """
+    from trainer_utils import log_metrics, metrics_format, save_metrics, save_state
 
     def __init__(
             self,
@@ -273,6 +281,7 @@ class Trainer:
 
         self.state = TrainerState()
         self.control = TrainerControl()
+
         callbacks = DEFAULT_CALLBACKS
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
@@ -298,26 +307,51 @@ class Trainer:
                                "QusetionAnswering" in type(self.model).__name__
                                else ["labels"])
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+
+        self.control = self.callback_handler.on_init_end(self.args, self.state,
+                                                         self.control)
         self.print_config()
 
     def add_callback(self, callback):
         """
-        Add a callback to the current list of [`~transformer.TrainerCallback`].
+        Add a callback to the current list of [`~TrainerCallback`].
 
         Args:
-           callback (`type` or [`~transformer.TrainerCallback`]):
-               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+           callback (`type` or [`~TrainerCallback`]):
+               A [`~TrainerCallback`] class or an instance of a [`~TrainerCallback`]. In the
                first case, will instantiate a member of that class.
         """
         self.callback_handler.add_callback(callback)
+
+    def pop_callback(self, callback):
+        """
+        Remove a callback from the current list of [`~transformer.TrainerCallback`] and returns it.
+        If the callback is not found, returns `None` (and no error is raised).
+        Args:
+           callback (`type` or [`~transformer.TrainerCallback`]):
+               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+               first case, will pop the first member of that class found in the list of callbacks.
+        Returns:
+            [`~transformer.TrainerCallback`]: The callback removed, if found.
+        """
+        return self.callback_handler.pop_callback(callback)
+
+    def remove_callback(self, callback):
+        """
+        Remove a callback from the current list of [`~transformer.TrainerCallback`].
+        Args:
+           callback (`type` or [`~transformer.TrainerCallback`]):
+               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+               first case, will remove the first member of that class found in the list of callbacks.
+        """
+        self.callback_handler.remove_callback(callback)
 
     def train(
             self,
             resume_from_checkpoint: Optional[Union[str, bool]]=None,
             ignore_keys_for_eval: Optional[List[str]]=None,
             **kwargs, ):
-        print("training!!!!")
-        logger.info("training!!!!")
+
         train_dataloader = self.get_train_dataloader()
         model = self._wrap_model(self.model_wrapped)
 
@@ -338,11 +372,13 @@ class Trainer:
             num_train_epochs = math.ceil(args.num_train_epochs)
             num_train_samples = len(self.train_dataset) * args.num_train_epochs
 
-        if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
-            exp_step = args.num_training_steps / args.minimum_eval_times
-            exp_step = max(int(exp_step - exp_step % 10), 10)
-            logger.info("Set eval step to %d" % exp_step)
-            args.eval_steps = exp_step
+        if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
+            if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
+                exp_step = args.num_training_steps / args.minimum_eval_times
+                exp_step = max(int(exp_step - exp_step % 10), 10)
+                logger.info("Reset eval step by minimum_eval_times to %d" %
+                            exp_step)
+                args.eval_steps = exp_step
 
         self.create_optimizer_and_scheduler(
             num_training_steps=args.num_training_steps)
@@ -365,15 +401,13 @@ class Trainer:
         self.state.epoch = 0
         self.state.max_steps = int(args.num_training_steps)
         self.state.num_train_epochs = num_train_epochs
-        self.state.is_local_process_zero = 0
-        self.state.is_world_process_zero = 0
+        self.state.is_local_process_zero = self.is_local_process_zero()
+        self.state.is_world_process_zero = self.is_world_process_zero()
 
         start_time = time.time()
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
         steps_trained_progress_bar = None
-
-        self.training_bar = tqdm(total=self.state.max_steps)
 
         epoch_iterator = train_dataloader
         steps_in_epoch = len(epoch_iterator)
@@ -397,26 +431,111 @@ class Trainer:
                 args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                # print(inputs)
-                # print("=="*20)
-                tr_loss_step = self.training_step(model, inputs)
+
+                if step % args.gradient_accumulation_steps == 0:
+                    self.control = self.callback_handler.on_step_begin(
+                        args, self.state, self.control)
+
+                if (((step + 1) % args.gradient_accumulation_steps != 0) and
+                        args.local_rank != -1 and
+                        args._no_sync_in_gradient_accumulation):
+                    # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
+                    with model.no_sync():
+                        tr_loss_step = self.training_step(model, inputs)
+                else:
+                    tr_loss_step = self.training_step(model, inputs)
+
                 # self.scaler.step(self.optimizer)
                 # self.scaler.update()
                 tr_loss += tr_loss_step
-                self.training_bar.update(1)
 
-                self.optimizer.step()
-                self.lr_scheduler.step()
-                self.optimizer.clear_grad()
+                if (step + 1) % args.gradient_accumulation_steps == 0 or (
+                        # last step in epoch but step is always smaller than gradient_accumulation_steps
+                        steps_in_epoch <= args.gradient_accumulation_steps and
+                    (step + 1) == steps_in_epoch):
+                    self.optimizer.step()
+                    self.lr_scheduler.step()
+                    self.optimizer.clear_grad()
 
-                self.state.global_step += 1
-                self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                    self.state.global_step += 1
+                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
 
-                self.control = self.callback_handler.on_step_end(
-                    args, self.state, self.control)
+                    self.control = self.callback_handler.on_step_end(
+                        args, self.state, self.control)
 
-                self._maybe_log_save_evaluate(tr_loss, model, epoch,
-                                              ignore_keys_for_eval)
+                    self._maybe_log_save_evaluate(tr_loss, model, epoch,
+                                                  ignore_keys_for_eval)
+                else:
+                    self.control = self.callback_handler.on_substep_end(
+                        args, self.state, self.control)
+
+                if self.control.should_epoch_stop or self.control.should_training_stop:
+                    break
+
+            if step < 0:
+                logger.warning(
+                    f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
+                    f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
+                    f" num_steps ({max_steps}) higher than the number of available samples."
+                )
+                self.control.should_training_stop = True
+
+            self.control = self.callback_handler.on_epoch_end(args, self.state,
+                                                              self.control)
+            self._maybe_log_save_evaluate(tr_loss, model, epoch,
+                                          ignore_keys_for_eval)
+
+            if self.control.should_training_stop:
+                break
+
+        if args.past_index and hasattr(self, "_past"):
+            # Clean the state at the end of training
+            delattr(self, "_past")
+
+        logger.info(
+            "\n\nTraining completed. Do not forget to share your model on huggingface.co/models =)\n\n"
+        )
+        if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
+            if args.local_rank != -1:
+                dist.barrier()
+
+            logger.info(
+                f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
+            )
+
+            best_model_path = os.path.join(self.state.best_model_checkpoint,
+                                           WEIGHTS_NAME)
+            if os.path.exists(best_model_path):
+                # We load the model state dict on the CPU to avoid an OOM error.
+                state_dict = torch.load(best_model_path, map_location="cpu")
+                # If the model is on the GPU, it still works!
+                self._load_state_dict_in_model(state_dict)
+            else:
+                logger.warning(
+                    f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                    "on multiple nodes, you should activate `--save_on_each_node`."
+                )
+
+        self._total_loss_scalar += tr_loss.item()
+        train_loss = self._total_loss_scalar / self.state.global_step
+
+        metrics = speed_metrics(
+            "train",
+            start_time,
+            num_samples=num_train_samples,
+            num_steps=self.state.max_steps)
+
+        metrics["total_flos"] = self.state.total_flos
+        metrics["train_loss"] = train_loss
+
+        self.is_in_train = False
+
+        self.log(metrics)
+
+        self.control = self.callback_handler.on_train_end(args, self.state,
+                                                          self.control)
+
+        return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def training_step(
             self, model: nn.Layer,
@@ -464,7 +583,7 @@ class Trainer:
             tr_loss_scalar = tr_loss.mean().item()
 
             # reset tr_loss to zero
-            tr_loss -= tr_loss
+            tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (
                 self.state.global_step - self._globalstep_last_logged), 4)
@@ -477,7 +596,6 @@ class Trainer:
 
         metrics = None
         if self.control.should_evaluate:
-            logger.info("evaluating!!!!!")
             metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
@@ -740,21 +858,18 @@ class Trainer:
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
         """
-        if self.criterion is not None:
+        if self.criterion is not None and "labels" in inputs:
             labels = inputs.pop("labels")
         else:
             labels = None
 
-        # print(inputs)
-
         outputs = model(**inputs)
-
-        # outputs = model(*inputs)
 
         if self.criterion is not None:
             # print(outputs)
             loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
+
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
@@ -795,15 +910,14 @@ class Trainer:
             loss = loss.mean(
             )  # mean() to average on multi-gpu parallel training
 
-        # if self.args.gradient_accumulation_steps > 1:
-        #     # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
-        #     loss = loss / self.args.gradient_accumulation_steps
+        if self.args.gradient_accumulation_steps > 1:
+            loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        # print(loss)
+
         return loss.detach()
 
     def save_model(self, output_dir: Optional[str]=None):
@@ -832,7 +946,6 @@ class Trainer:
         self.save_model(output_dir)
 
         if self.args.should_save:
-            # deepspeed.save_checkpoint above saves model/optim/sched
             paddle.save(self.optimizer.state_dict(),
                         os.path.join(output_dir, OPTIMIZER_NAME))
             with warnings.catch_warnings(record=True) as caught_warnings:
@@ -866,6 +979,8 @@ class Trainer:
             "python": random.getstate(),
             "numpy": np.random.get_state(),
         }
+
+        # TODO: ZHUI save paddle, cudnn seed.
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
         # not yet exist.
@@ -1138,9 +1253,13 @@ class Trainer:
         else:
             metrics = {}
 
-        metrics["eval_loss"] = float(np.mean(losses))
+        if losses is not None:
+            metrics[f"{metric_key_prefix}_loss"] = float(np.mean(losses))
 
-        print(metrics)
+        # Prefix all keys with metric_key_prefix + '_'
+        for key in list(metrics.keys()):
+            if not key.startswith(f"{metric_key_prefix}_"):
+                metrics[f"{metric_key_prefix}_{key}"] = metrics.pop(key)
 
         return EvalLoopOutput(
             predictions=all_preds,
@@ -1245,78 +1364,24 @@ class Trainer:
         """
         return len(dataloader.dataset)
 
-    def create_dataloader(self,
-                          dataset,
-                          mode='train',
-                          batch_size=16,
-                          batchify_fn=None,
-                          trans_fn=None,
-                          batched=False):
+    def is_local_process_zero(self) -> bool:
         """
+        Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
+        machines) main process.
         """
-        if trans_fn:
-            dataset = dataset.map(trans_fn, batched=batched)
+        return self.args.local_process_index == 0
 
-        shuffle = True if mode == 'train' else False
-        if mode == 'train':
-            batch_sampler = paddle.io.DistributedBatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-        else:
-            batch_sampler = paddle.io.BatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-
-        return paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
+    def is_world_process_zero(self) -> bool:
+        """
+        Whether or not this process is the global main process (when training in a distributed fashion on several
+        machines, this is only going to be `True` for one process).
+        """
+        return self.args.process_index == 0
 
     def eval(self, *args, **kwargs):
         """
         """
         pass
-
-    def prepare_train_config(self):
-        """
-        """
-        if self.args.max_steps > 0:
-            self.args.num_training_steps = self.args.max_steps
-            self.args.num_train_epochs = math.ceil(
-                self.args.num_training_steps / len(self.train_dl))
-
-        else:
-            self.args.num_training_steps = len(
-                self.train_dl) * self.args.num_train_epochs
-            self.args.num_train_epochs = self.args.num_train_epochs
-
-        if self.args.num_training_steps // self.args.eval_steps < self.args.minimum_eval_times:
-            exp_step = self.args.num_training_steps / self.args.minimum_eval_times
-            exp_step = max(int(exp_step - exp_step % 10), 10)
-            logger.info("Set eval step to %d" % exp_step)
-            self.args.eval_steps = exp_step
-
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
-
-        self.lr_scheduler = LinearDecayWithWarmup(
-            self.args.learning_rate, self.args.num_training_steps, warmup)
-
-        # Generate parameter names needed to perform weight decay.
-        # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in self.model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
-
-        self.optimizer = paddle.optimizer.AdamW(
-            learning_rate=self.lr_scheduler,
-            beta1=0.9,
-            beta2=0.999,
-            epsilon=self.args.adam_epsilon,
-            parameters=self.model.parameters(),
-            weight_decay=self.args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm))
 
     def print_config(self):
         """

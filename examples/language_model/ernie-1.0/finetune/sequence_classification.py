@@ -353,12 +353,7 @@ class SeqTrainer(Trainer):
             metric.update(result)
             accu = metric.accumulate()
             metric.reset()
-            return {"eval_accuracy": accu}
-
-            # return {
-            #     "accuracy": (preds == p.label_ids).astype(np.float32).mean()
-            #     .item()
-            # }
+            return {"accuracy": accu}
 
         super().__init__(
             model,

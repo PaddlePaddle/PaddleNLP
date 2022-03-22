@@ -279,8 +279,23 @@ def do_train(args):
             tokenizer,
             args,
             test_ds=all_ds["test"])
-    trainer.train()
-    trainer.eval()
+
+    train_result = trainer.train(resume_from_checkpoint=None)
+    metrics = train_result.metrics
+
+    # max_train_samples = (
+    #     data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+    # )
+    # metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+
+    trainer.save_model()  # Saves the tokenizer too for easy upload
+
+    trainer.log_metrics("train", metrics)
+    trainer.save_metrics("train", metrics)
+    trainer.save_state()
+
+    # trainer.train()
+    # trainer.eval()
 
 
 def print_arguments(args):
