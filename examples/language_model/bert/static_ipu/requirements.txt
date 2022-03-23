@@ -3,5 +3,4 @@ multiprocess
 numpy
 scipy
 wandb
-torch==1.7.0
-torch-xla@https://storage.googleapis.com/tpu-pytorch/wheels/torch_xla-1.7-cp37-cp37m-linux_x86_64.whl
+h5py

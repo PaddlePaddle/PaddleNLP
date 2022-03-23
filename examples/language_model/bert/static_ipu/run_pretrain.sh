@@ -2,7 +2,7 @@
 
 export RDMAV_FORK_SAFE=1
 python3 run_pretrain.py \
-        --input_files /alleng/dataset/train128wiki \
+        --input_files "path_to_phase1_hdf5_dataset" \
         --output_dir pretrain_128_model \
         --seq_len 128 \
         --hidden_size 768 \

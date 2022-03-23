@@ -13,11 +13,11 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 | `run_squad.py`           | The algorithm script to run SQuAD finetune and validation task.    |
 | `modeling.py`            | The algorithm script to build the Bert-Base model.                 |
 | `dataset_ipu.py`         | The algorithm script to load input data in pretraining.            |
+| `custom_ops/`            | The folder contains custom ops that will be used.                  |
 | `run_pretrain.sh`        | Test script to run pretrain phase 1.                               |
 | `run_pretrain_phase2.sh` | Test script to run pretrain phase 2.                               |
 | `run_squad.sh`           | Test script to run SQuAD finetune.                                 |
 | `run_squad_infer.sh`     | Test script to run SQuAD validation.                               |
-| `LICENSE`                | The license of Apache.                                             |
 
 ## Dataset
 
@@ -27,37 +27,36 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
    The sequence length used in pretraining phase1 and phase2 are: 128 and 384. Following steps are provided for dataset generation.
 
-   ```
-   # Code base：https://github.com/NVIDIA/DeepLearningExamples/tree/88eb3cff2f03dad85035621d041e23a14345999e/TensorFlow/LanguageModeling/BERT
+   ```bash
+   # Here we use a specific commmit, the latest commit should also be fine.
    git clone https://github.com/NVIDIA/DeepLearningExamples.git
    git checkout 88eb3cff2f03dad85035621d041e23a14345999e
 
-   cd DeepLearningExamples/TensorFlow/LanguageModeling/BERT
+   cd DeepLearningExamples/PyTorch/LanguageModeling/BERT
 
+   # Modified the parameters `--max_seq_length 512` to `--max_seq_length 384` at line 50 and
+   # `--max_predictions_per_seq 80` to `--max_predictions_per_seq 56` at line 51.
+   vim data/create_datasets_from_start.sh
+
+   # Build docker image
    bash scripts/docker/build.sh
 
-   cd data/
+   # Use NV's docker to download and generate hdf5 file. This may requires GPU available.
+   # You can Remove `--gpus $NV_VISIBLE_DEVICES` to avoid GPU requirements.
+   bash scripts/docker/launch.sh
 
-   # Modified the parameters `--max_seq_length 512` to `--max_seq_length 384` at line 68, `--max_predictions_per_seq 80` to `--max_predictions_per_seq 56` at line 69.
-   vim create_datasets_from_start.sh
-
-   cd ../
-
-   # Use NV's docker to download and generate tfrecord. This may requires GPU available. Removing `--gpus $NV_VISIBLE_DEVICES` in data_download.sh to avoid GPU requirements.
-   bash scripts/data_download.sh wiki_only
+   # generate dataset with wiki_only
+   bash data/create_datasets_from_start.sh wiki_only
    ```
 
-2. SQuAD 1.1 dataset
+2. SQuAD v1.1 dataset
 
-   ```
-   curl --create-dirs -L https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json -o data/squad/train-v1.1.json
+   paddlenlp will download SQuAD v1.1 dataset automatically. You don't have to download manually.
 
-   curl --create-dirs -L https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json -o data/squad/dev-v1.1.json
-   ```
 
 ## Quick Start Guide
 
-### 1）Prepare Project Environment
+### Prepare Project Environment
 
 PaddlePaddle with IPU implementation, which is provided by Graphcore, is required by this application. User can either download the released package or build it from source.
 
@@ -75,7 +74,7 @@ git clone -b bert_base_sdk_2.3.0 https://github.com/graphcore/Paddle.git
 cd Paddle
 
 # build docker image
-docker build -t paddlepaddle/paddle:dev-ipu-2.3.0 -f tools/dockerfile/Dockerfile.ipu .
+docker build -t paddlepaddle/paddle:ipu-dev-2.3.0 -f tools/dockerfile/Dockerfile.ipu .
 
 # create container
 # The ipuof.conf is required here.
@@ -83,7 +82,7 @@ docker run --ulimit memlock=-1:-1 --net=host --cap-add=IPC_LOCK \
 --device=/dev/infiniband/ --ipc=host --name paddle-ipu-dev \
 -v ${HOST_IPUOF_PATH}:/ipuof \
 -e IPUOF_CONFIG_PATH=/ipuof/ipu.conf \
--it paddlepaddle/paddle:dev-ipu-2.3.0 bash
+-it paddlepaddle/paddle:ipu-dev-2.3.0 bash
 ```
 
 All of later processes are required to be executed in the container.
@@ -104,7 +103,7 @@ cmake --build `pwd`/build --config Release --target paddle_python -j$(nproc)
 pip3.7 install -U build/python/dist/paddlepaddle-0.0.0-cp37-cp37m-linux_x86_64.whl
 ```
 
-### 2) Execution
+### Execution
 
 - Run pretraining phase1 (sequence_length = 128)
 

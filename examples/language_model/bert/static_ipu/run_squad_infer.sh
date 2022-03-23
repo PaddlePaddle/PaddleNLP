@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 python3 run_squad.py \
-        --input_files data/squad/dev-v1.1.json \
         --output_dir squad_model \
         --task "SQUAD" \
         --is_training False \

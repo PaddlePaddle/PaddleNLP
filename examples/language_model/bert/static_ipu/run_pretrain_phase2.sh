@@ -2,7 +2,7 @@
 
 export RDMAV_FORK_SAFE=1
 python3 run_pretrain.py \
-        --input_files /alleng/dataset/train384wiki \
+        --input_files "path_to_phase2_hdf5_dataset" \
         --output_dir pretrain_384_model \
         --seq_len 384 \
         --hidden_size 768 \
@@ -13,7 +13,7 @@ python3 run_pretrain.py \
         --weight_decay 1e-2 \
         --max_steps 2137 \
         --warmup_steps 274 \
-        --logging_steps 20 \
+        --logging_steps 10 \
         --seed 1984 \
         --beta1 0.9 \
         --beta2 0.999 \

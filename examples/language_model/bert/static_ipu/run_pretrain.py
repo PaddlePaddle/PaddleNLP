@@ -25,7 +25,7 @@ import paddle.static
 from paddlenlp.transformers import LinearDecayWithWarmup
 from scipy.stats import truncnorm
 
-from dataset_ipu import PretrainingTfRecordDataLoader
+from dataset_ipu import PretrainingHDF5DataLoader
 from modeling import (
     BertModel, DeviceScope, IpuBertConfig, IpuBertPretrainingMLMAccAndLoss,
     IpuBertPretrainingMLMHeads, IpuBertPretrainingNSPAccAndLoss,
@@ -282,6 +282,9 @@ def main(args):
     ipu_compiler = paddle.static.IpuCompiledProgram(
         main_program, ipu_strategy=ipu_strategy)
     logging.info(f'start compiling, please wait some minutes')
+    logging.info(
+        f'you can run `export POPART_LOG_LEVEL=INFO` before running program to see the compile progress'
+    )
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
@@ -290,30 +293,26 @@ def main(args):
     # Load the training dataset
     input_files = [
         os.path.join(args.input_files, f) for f in os.listdir(args.input_files)
-        if os.path.isfile(os.path.join(args.input_files, f)) and "tfrecord" in f
+        if os.path.isfile(os.path.join(args.input_files, f)) and "training" in f
     ]
     input_files.sort()
 
-    dataset = PretrainingTfRecordDataLoader(
+    dataset = PretrainingHDF5DataLoader(
         input_files=input_files,
         max_seq_length=args.seq_len,
         max_mask_tokens=args.max_predictions_per_seq,
         batch_size=args.batch_size,
-        micro_batch_size=args.micro_batch_size,
-        enable_fp16=True,
-        enable_ipu=True,
-        ignore_index=args.ignore_index,
         shuffle=args.shuffle)
-    logging.info(f"Dataset length: {len(dataset)}")
+    logging.info(f"dataset length: {len(dataset)}")
     total_samples = dataset.total_samples
-    logging.info("Total samples: %d, Total batch_size: %d, Max steps: %d" %
+    logging.info("total samples: %d, total batch_size: %d, max steps: %d" %
                  (total_samples, args.batch_size, args.max_steps))
 
     batch_start = time.time()
     global_step = 0
     for batch in dataset:
         global_step += 1
-        epoch = global_step * args.batch_size / total_samples
+        epoch = global_step * args.batch_size // total_samples
         read_cost = time.time() - batch_start
 
         feed = {
@@ -338,6 +337,7 @@ def main(args):
 
         if args.wandb:
             wandb.log({
+                "epoch": epoch,
                 "global_step": global_step,
                 "loss/MLM": np.mean(loss_return[1]),
                 "loss/NSP": np.mean(loss_return[3]),
@@ -407,4 +407,4 @@ if __name__ == "__main__":
 
     logging.info(args)
     main(args)
-    logging.info("Program Finished")
+    logging.info("program finished")

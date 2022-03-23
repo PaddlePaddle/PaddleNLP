@@ -198,24 +198,26 @@ def load_squad_dataset(args):
     args.max_seq_length = args.seq_len
     args.doc_stride = 128
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    cache_file = f'{args.input_files}.{args.max_seq_length}.cache'
+    if args.is_training:
+        cache_file = f'squad_train_v1.{args.max_seq_length}.cache'
+    else:
+        cache_file = f'squad_dev_v1.{args.max_seq_length}.cache'
     features_fn = prepare_train_features if args.is_training else prepare_validation_features
     if os.path.exists(cache_file):
-        logging.info(f"Loading Cache {cache_file}")
+        logging.info(f"loading cache {cache_file}")
         with open(cache_file, "rb") as f:
             dataset = pickle.load(f)
     else:
+        logging.info(f"loading squad dataset, it will take a few minutes")
         if args.is_training:
-            dataset = load_dataset(
-                'squad', splits='train_v1', data_files=args.input_files)
+            dataset = load_dataset('squad', splits='train_v1')
         else:
-            dataset = load_dataset(
-                'squad', splits='dev_v1', data_files=args.input_files)
+            dataset = load_dataset('squad', splits='dev_v1')
         dataset.map(partial(
             features_fn, tokenizer=tokenizer, args=args),
                     batched=True,
                     num_workers=20)
-        logging.info(f"saving cache {cache_file}")
+        logging.info(f"saving cache to {cache_file}")
         with open(cache_file, "wb") as f:
             pickle.dump(dataset, f)
 
@@ -286,7 +288,7 @@ def main(args):
     # custom_ops
     custom_ops = load_custom_ops()
 
-    logging.info("Building Model")
+    logging.info("building model")
 
     if args.is_training:
         [indices, segments, positions, input_mask, start_labels,
@@ -313,7 +315,7 @@ def main(args):
 
     total_samples = len(data_loader.dataset)
     max_steps = total_samples // args.batch_size * args.epochs
-    logging.info("Total samples: %d, Total batch_size: %d, Max steps: %d" %
+    logging.info("total samples: %d, total batch_size: %d, max steps: %d" %
                  (total_samples, args.batch_size, max_steps))
 
     if args.is_training:
@@ -370,6 +372,9 @@ def main(args):
     ipu_compiler = paddle.static.IpuCompiledProgram(
         main_program, ipu_strategy=ipu_strategy)
     logging.info(f'start compiling, please wait some minutes')
+    logging.info(
+        f'you can run `export POPART_LOG_LEVEL=INFO` before running program to see the compile progress'
+    )
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
@@ -403,11 +408,14 @@ def main(args):
                 tput = args.batch_size / total_cost
                 if args.wandb:
                     wandb.log({
+                        "epoch": epoch,
+                        "global_step": global_step,
                         "loss": np.mean(outputs[0]),
                         "accuracy": np.mean(outputs[1:]),
+                        "train_cost": train_cost,
+                        "total_cost": total_cost,
                         "throughput": tput,
                         "learning_rate": lr_scheduler(),
-                        "global_step": global_step,
                     })
 
                 if global_step % args.logging_steps == 0:
@@ -483,7 +491,10 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        datefmt='%Y-%m-%d %H:%M:%S %a')
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
@@ -500,4 +511,4 @@ if __name__ == "__main__":
 
     logging.info(args)
     main(args)
-    logging.info("Program Finished")
+    logging.info("program finished")
