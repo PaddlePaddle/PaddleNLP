@@ -1184,7 +1184,7 @@ class FTParaConf(object):
         self.word_size = int(
             os.environ.get(
                 "MPI_LOCALNRANKS",  # MPICH
-                os.environ.get("OMPI_COMM_WORLD_SIZE", 0)))  # OpenMPI
+                os.environ.get("OMPI_COMM_WORLD_SIZE", 1)))  # OpenMPI
         assert self.word_size == tensor_para_size * layer_para_size, (
             "tensor_para_size * layer_para_size must be equal to world_size.")
         self.rank = int(
