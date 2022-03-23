@@ -31,7 +31,7 @@ from paddlenlp.transformers import RobertaForMaskedLM, RobertaTokenizer, Roberta
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 import copy
 from tqdm import tqdm
-from collator import DataCollatorMLM
+from utils import DataCollatorMLM
 
 parser = argparse.ArgumentParser()
 IGNORE = -100
