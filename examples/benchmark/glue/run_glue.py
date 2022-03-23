@@ -94,7 +94,7 @@ def parse_args():
         "--tokenizer_name_or_path",
         default=None,
         type=str,
-        required=True,
+        required=False,
         help="Path to tokenizer or shortcut name selected in the list: "
         + ", ".join(
             sum([
@@ -261,7 +261,10 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
+    if args.tokenizer_name_or_path:
+        tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path) 
+    else:
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path) 
 
     trans_func = partial(
         convert_example,
