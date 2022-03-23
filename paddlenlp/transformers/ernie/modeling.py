@@ -186,6 +186,84 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "rocketqa-zh-dureader-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-zh-dureader-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "rocketqa-zh-dureader-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -200,6 +278,18 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+            "rocketqa-zh-dureader-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_query_encoder.pdparams",
+            "rocketqa-zh-dureader-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_para_encoder.pdparams",
+            "rocketqa-v1-marco-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_query_encoder.pdparams",
+            "rocketqa-v1-marco-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_para_encoder.pdparams",
+            "rocketqa-zh-dureader-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_cross_encoder.pdparams",
+            "rocketqa-v1-marco-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_cross_encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"

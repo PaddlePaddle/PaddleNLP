@@ -13,9 +13,9 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2022-03-21] PaddleNLP**一键预测工具**[Taskflow](./docs/model_zoo/taskflow.md)全新升级！🚀欢迎体验更丰富的功能、更便捷的使用方式；新推出适合不同场景的中文分词、命名实体识别模式！
 * [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 * [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
-* [2021-12-12] 飞桨新产品**端到端问答工具**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA)全新发布！:tada:
 
 ## 简介
 
@@ -33,8 +33,9 @@ PaddleNLP是飞桨自然语言处理开发库，具备**易用的文本领域API
 微信扫描下方二维码加入官方交流群，与各行各业开发者充分交流，期待您的加入⬇️
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/157790710-cfad5c8a-0edd-49d7-9711-eb1c683a687c.png" width="188" height="188" />
+  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
 </div>
+
 
 ## 安装
 
