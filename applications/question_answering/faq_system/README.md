@@ -53,7 +53,8 @@
 | ------------ | ------------ |------------ | ------------ | ------------ |
 |  召回 |  SimCSE  |  4000 | 1000 | 5000 |
 
-其中评估集的问题对的构造使用了中英文回译的方法，使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)
+其中评估集的问题对的构造使用了中英文回译的方法，总共有1000条评估集，其中500条数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)，另外500条数据使用了SimBERT模型生成的同义句。
+
 
 ```
 ├── data  # 数据集
@@ -62,6 +63,7 @@
     ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
     ├── qa_pair.csv # 问答对，问题对应的答案
 ```
+数据集的下载链接为: [faq_data](https://paddlenlp.bj.bcebos.com/applications/faq_data.zip)
 
 ### 3.3 代码说明
 
@@ -96,10 +98,12 @@
 
 ### 3.3 效果评估
 
-|  模型 |  Recall@1 | Recall@5 |Recall@10 |
-| ------------ | ------------ | ------------ |--------- |
-|  SimCSE |  81.882     | 94.094| 96.296|
-|  SimCSE + WR |  84.785 | 95.896| 97.197|
+|  模型 |  Recall@1 |Recall@10 |
+| ------------ | ------------ |--------- |
+|  ERNIE1.0 + SimCSE |  68.068     | 85.686|
+|  RocketQA  |  81.381 | 96.997|
+|  RocketQA + SimCSE  |  83.283 | 97.297|
+|  RocketQA  |  **83.584** | **97.497**|
 
 <a name="动手实践——搭建自己的端到端检索式问答系统"></a>
 
@@ -171,7 +175,7 @@ python -u -m paddle.distributed.launch --gpus "4" --log_dir "recall_log/" \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_50/model_state.pdparams" \
+        --params_path "checkpoints/model_150/model_state.pdparams" \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -216,9 +220,9 @@ sh scripts/evaluate.sh
 输出如下的结果：
 
 ```
-recall@1=85.385
-recall@5=95.996
-recall@10=97.197
+recall@1=83.784
+recall@5=94.995
+recall@10=96.997
 ```
 
 参数含义说明

@@ -103,13 +103,13 @@ def do_train():
     set_seed(args.seed)
     train_ds = load_dataset(
         read_simcse_text, data_path=args.train_set_file, lazy=False)
-
+    model_name_or_path='rocketqa-zh-dureader-query-encoder'
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-       'ernie-1.0',
+       model_name_or_path,
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(model_name_or_path)
 
     trans_func = partial(
         convert_example,

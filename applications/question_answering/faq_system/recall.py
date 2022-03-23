@@ -59,8 +59,9 @@ if __name__ == "__main__":
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model_name_or_path = 'rocketqa-zh-dureader-query-encoder'
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        model_name_or_path)
 
     trans_func = partial(
         convert_example_test,
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     ): [data for data in fn(samples)]
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+        model_name_or_path)
 
     model = SimCSE(pretrained_model, output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
