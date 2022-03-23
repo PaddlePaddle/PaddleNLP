@@ -723,8 +723,9 @@ def convert_params(faster_model,
                 # NOTE: Assignment to parameter 'weight' should be of type
                 # Parameter or None, thus delete first in case of param is
                 # a tensor.
-                # TODO(guosheng): make slice_weight use `output_param=True`
-                # and remove delattr.
+                # TODO(guosheng): Make slice_weight use `output_param=True`
+                # and remove delattr. Currently, if `param` is Tensor rather
+                # than Parameter, it would not be in state_dict.
                 delattr(layer, attr)
                 setattr(layer, attr, param)
             else:
@@ -1156,6 +1157,21 @@ class InferTransformerDecoding(nn.Layer):
 
 # Patch for parallel inference to save memory
 class FTParaConf(object):
+    r"""
+    Configurations for model parallel in FasterTransformer. Currently only
+    support GPT. Please refer to  `Megatron <https://arxiv.org/pdf/2104.04473.pdf>`__
+    for details.
+
+    Args:
+        tensor_para_size (int, optional): The size for tensor parallel. If it is
+            1, tensor parallel would not be used. Default to 1.
+        layer_para_size (int, optional): The size for layer parallel. If it is
+            1, layer parallel would not be used. Default to 1.
+        layer_para_batch_size (int, optional): The local batch size for pipeline
+            parallel. It is suggested to use `batch_size // layer_para_size`.
+            Default to 1.
+    """
+
     def __init__(self,
                  tensor_para_size=1,
                  layer_para_size=1,
@@ -1165,16 +1181,42 @@ class FTParaConf(object):
         self.layer_para_size = layer_para_size
         self.layer_para_batch_size = layer_para_batch_size
         # Maybe we should import mpi4py later.
+        self.word_size = int(
+            os.environ.get(
+                "MPI_LOCALNRANKS",  # MPICH
+                os.environ.get("OMPI_COMM_WORLD_SIZE", 0)))  # OpenMPI
+        assert self.word_size == tensor_para_size * layer_para_size, (
+            "tensor_para_size * layer_para_size must be equal to world_size.")
         self.rank = int(
             os.environ.get(
                 "MPI_LOCALRANKID",  # MPICH
                 os.environ.get("OMPI_COMM_WORLD_RANK", 0)))  # OpenMPI
         self.tensor_para_rank = self.rank % self.tensor_para_size
         self.layer_para_rank = self.rank // self.tensor_para_size
-        # Should be set in `from_pretrained`
         self.is_partial_model = False
 
+    def is_last_group(self):
+        r"""
+        For layer parallel, only the process corresponding to the last layer
+        group can get the predict results. It is used to check whether this is
+        the process corresponding to the last layer group.
+        """
+        return self.layer_para_rank == self.layer_para_size - 1
+
     def is_load(self, i, num_layer):
+        r"""
+        Whether or not the given transformer layer of should be loaded to the
+        current parallel model. For layer parallel, there is no need not to load
+        other layer groups.
+
+        Args:
+            i (int): The index of Transformer layer.
+            num_layer (int): The number of Transformer layers.
+        
+        Returns:
+            bool: Indicate whether or not the given transformer layer of should
+                be loaded to the current parallel model.
+        """
         if self.no_para: return True
         # Take into account model only including partial weights.
         if self.is_partial_model: return True
@@ -1183,6 +1225,22 @@ class FTParaConf(object):
                 ) and i < layers_per_device * (self.layer_para_rank + 1)
 
     def slice_weight(self, weight, axis, phase=1, out_param=False):
+        r"""
+        Get the weight slice for tensor parallel.
+
+        Args:
+            weight (Tensor or ndarray): The weight or bias to be sliced.
+            axis (int): The axis to perform slice.
+            phase (int, optional): 0 is used for creating partial model when
+                initializing and `from_pretrained`. While 1 is used in converting
+                parameters to FasterTransformer. No slice would be performed if
+                it is 1, since parameters have been sliced in `phase=0`.
+            out_param (bool, optional): If true, `weight` should be a Parameter
+                and force the output to be a Parameter.
+        
+        Returns:
+            Tensor or ndarray: The sliced weight.
+        """
         # weight can be parameter/tensor/ndarray
         if self.no_para: return weight
         # Take into account model only including partial weights.
@@ -1190,6 +1248,10 @@ class FTParaConf(object):
             if phase == 1:
                 # 0 for init
                 # 1 for convert param to FT
+                # TODO(guosheng): Maybe we can remove slice_weight in converting
+                # parameters to FT if we have sliced parameters at phase 0, while
+                # we allow to use non-partial model when converting parameters
+                # to FT currently.
                 return weight
         if len(weight.shape) == 1: axis = 0
         local_size = weight.shape[axis] // self.tensor_para_size
@@ -1217,9 +1279,30 @@ class FTParaConf(object):
             return w_slice
 
     def set_partial_model(self, is_partial_model):
+        r"""
+        This is used to set whether or not the current model has complete
+        parameters.
+
+        Args:
+            is_partial_model (bool): It is used to set whether or not the
+                current model has complete parameters.
+        """
         self.is_partial_model = is_partial_model
 
     def fit_partial_model(self, model, state_to_load):
+        r"""
+        Slice every values included in `state_to_load` according to the shape
+        of corresponding parameters in `model`. This is used in `from_pratrained`
+        to get sliced parameter values.
+
+        Args:
+            model (PretrainedModel): The model to use.
+            state_to_load (dict): The state dict including complete parameter
+                values of model.
+        
+        Returns:
+            dict: The state dict contains adjusted values.
+        """
         if self.no_para or not self.is_partial_model: return state_to_load
 
         def fit_param(p, v):
@@ -1230,7 +1313,8 @@ class FTParaConf(object):
             return v
 
         for k, v in model.state_dict().items():
-            state_to_load[k] = fit_param(v, state_to_load[k])
+            if k in state_to_load:
+                state_to_load[k] = fit_param(v, state_to_load[k])
         return state_to_load
 
 
@@ -1239,6 +1323,12 @@ _ft_para_conf = FTParaConf()
 
 
 def get_ft_para_conf():
+    r"""
+    Get settings for model parallel.
+
+    Returns:
+        FTParaConf: The settings for model parallel.
+    """
     return _ft_para_conf
 
 
@@ -1246,6 +1336,20 @@ def get_ft_para_conf():
 def enable_ft_para(tensor_para_size=1,
                    layer_para_size=1,
                    layer_para_batch_size=1):
+    r"""
+    Enable model parallel with the given settings in FasterTransformer. Currently only
+    support GPT. Please refer to `Megatron <https://arxiv.org/pdf/2104.04473.pdf>`__ 
+    for details.
+
+    Args:
+        tensor_para_size (int, optional): The size for tensor parallel. If it is
+            1, tensor parallel would not be used. Default to 1.
+        layer_para_size (int, optional): The size for layer parallel. If it is
+            1, layer parallel would not be used. Default to 1.
+        layer_para_batch_size (int, optional): The local batch size for pipeline
+            parallel. It is suggested to use `batch_size // layer_para_size`.
+            Default to 1.
+    """
     global _ft_para_conf
     _ft_para_conf = FTParaConf(tensor_para_size, layer_para_size,
                                layer_para_batch_size)
