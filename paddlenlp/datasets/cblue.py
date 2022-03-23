@@ -344,11 +344,16 @@ class CBLUE(DatasetBuilder):
                     if data.get('entities', None):
                         labels = [['O' for _ in range(text_len)],
                                   ['O' for _ in range(text_len)]]
+                        idx_dict = [{}, {}]
                         for entity in data['entities']:
                             start_idx = entity['start_idx']
                             end_idx = entity['end_idx']
                             etype = entity['type']
                             ltype = int(etype == 'sym')
+                            if start_idx in idx_dict[ltype]:
+                                if idx_dict[ltype][start_idx] >= end_idx:
+                                    continue
+                            idx_dict[ltype][start_idx] = end_idx
                             if start_idx == end_idx:
                                 labels[ltype][start_idx] = 'S-' + etype
                             else:
