@@ -2,7 +2,7 @@
  # This file contains script to generate saliency map of all baseline models and languages on given input data
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ### 
-export CUDA_VISIBLE_DEVICES=7
+export CUDA_VISIBLE_DEVICES=4
 export PYTHONPATH=./:$PYTHONPATH
 
 START_ID=0

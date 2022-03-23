@@ -347,14 +347,11 @@ def extract_integrated_gradient_scores(
                   sum_gradient, err, np.average(err_total))
     log.debug(print_str % print_vals)
 
-    inter_score = inter_score.abs()  # Tensor(1, seq_len)
     inter_score.stop_gradient = True
 
     char_attribution_dict = {}
     if args.base_model.startswith('roberta'):
         inter_score = inter_score[0][1:-1]
-        length = (inter_score > 0).cast('int32').sum(-1).tolist()[0]
-        assert len(tokens) == length, f"{len(tokens) } != {length}"
         if args.language == 'en':
             sub_word_count = 0
             for i in range(len(sub_word_id_dict)):
@@ -373,8 +370,6 @@ def extract_integrated_gradient_scores(
 
     elif args.base_model == 'lstm':
         inter_score = inter_score[0]
-        length = (inter_score > 0).cast('int32').sum(-1).tolist()[0]
-        assert len(tokens) == length, f"{len(tokens) } != {length}"
         idx = 0
         for word, sub_word_score in zip(tokens, inter_score.tolist()):
             char_attribution_dict[idx] = (word, sub_word_score)
@@ -438,7 +433,7 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
                     char_attribution_dict.append((idx, t, attribution))
                     break
         char_attribution_dict = sorted(
-            char_attribution_dict, key=lambda x: abs(x[2]), reverse=True)
+            char_attribution_dict, key=lambda x: x[2], reverse=True)
 
         result['char_attri'] = collections.OrderedDict()
         for s in char_attribution_dict:

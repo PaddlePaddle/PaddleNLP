@@ -3,7 +3,7 @@
  # The result of this script will be used to evaluate the performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=4
 export PYTHONPATH=./:$PYTHONPATH
 
 for BASE_MODEL in "roberta_base" "roberta_large";
@@ -35,7 +35,7 @@ do
             fi
         fi
 
-        OUTPUT=./output/MRC_${LANGUAGE}.${BASE_MODEL}
+        OUTPUT=./output/mrc_${LANGUAGE}.${BASE_MODEL}
         [ -d $OUTPUT ] || mkdir -p $OUTPUT
         set -x
 

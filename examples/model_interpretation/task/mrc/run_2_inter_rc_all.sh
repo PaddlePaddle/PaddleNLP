@@ -3,7 +3,7 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=6
 export PYTHONPATH=./:$PYTHONPATH
 
 START=0
@@ -35,7 +35,7 @@ do
             fi
 
 
-            OUTPUT=./output/MRC_${LANGUAGE}.${BASE_MODEL}
+            OUTPUT=./output/mrc_${LANGUAGE}.${BASE_MODEL}
             [ -d $OUTPUT ] || mkdir -p $OUTPUT
             set -x
 

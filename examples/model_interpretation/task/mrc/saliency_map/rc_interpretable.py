@@ -23,7 +23,6 @@ from pathlib import Path
 import logging
 import argparse
 
-from LAC import LAC
 import paddle
 from paddle.io import DataLoader
 from paddlenlp.data import Stack, Pad, Dict
@@ -367,7 +366,6 @@ def extract_integrated_gradient_scores(
     inter_score = (pred_embedded - baseline_embedded
                    ) * integral_grads  # Tensor(1, seq_len, embed_size)
     inter_score = inter_score.sum(-1)  # Tensor(1, seq_len)
-    inter_score = inter_score.abs()
     inter_score.stop_gradient = True
 
     context_score = inter_score[0, SEP_idx + add_idx:-1]

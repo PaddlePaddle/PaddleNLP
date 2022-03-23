@@ -27,7 +27,6 @@ import numpy as np
 import logging
 import argparse
 
-from LAC import LAC
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
@@ -350,7 +349,6 @@ def IG_roberta_inter_score(
                   sum_gradient, err, np.average(err_total))
     print(print_str % print_vals)
 
-    inter_score = inter_score.abs()  # Tensor(1, seq_len)
     inter_score.stop_gradient = True
     q_inter_score = inter_score[0][1:SEP_idx]  # remove CLS and SEP
     t_inter_score = inter_score[0][SEP_idx + add_idx:-1]  # remove CLS and SEP
@@ -373,7 +371,7 @@ def IG_lstm_inter_score(q_embedded_grads_list, pred_embedded, baseline_embedded,
         0]  # Tensor(1, seq_len, embed_size)
     q_inter_score = (pred_embedded[idx] - baseline_embedded[idx]
                      ) * q_integral_grads  # Tensor(1, seq_len, embed_size)
-    q_inter_score = q_inter_score.sum(-1).abs()  # Tensor(1, seq_len)
+    q_inter_score = q_inter_score.sum(-1)  # Tensor(1, seq_len)
     q_inter_score.stop_gradient = True
     q_inter_score = q_inter_score[0]
 
@@ -423,13 +421,6 @@ def extract_integrated_gradient_scores(args, result, sub_word_id_dict_query,
                                             pred_embedded, baseline_embedded, 0)
         t_inter_score = IG_lstm_inter_score(t_embedded_grads_list,
                                             pred_embedded, baseline_embedded, 1)
-
-    q_length = (q_inter_score > 0).cast('int32').sum(-1)[0]
-    t_length = (t_inter_score > 0).cast('int32').sum(-1)[0]
-    assert len(
-        q_tokens) == q_length, f"{len(q_tokens)} != {q_length.tolist()[0]}"
-    assert len(
-        t_tokens) == t_length, f"{len(t_tokens)} != {t_length.tolist()[0]}"
 
     q_char_attribution_dict, t_char_attribution_dict = {}, {}
     if args.language == 'en' and args.base_model.startswith('roberta'):
@@ -501,7 +492,7 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
                     char_attribution_dict.append((idx, t, attribution))
                     break
     char_attribution_dict = sorted(
-        char_attribution_dict, key=lambda x: abs(x[2]), reverse=True)
+        char_attribution_dict, key=lambda x: x[2], reverse=True)
     result['query_char_attri'] = collections.OrderedDict()
     for s in char_attribution_dict:
         result['query_char_attri'][s[0]] = (s[1], s[2])
@@ -516,7 +507,7 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
                     char_attribution_dict.append((idx, t, attribution))
                     break
     char_attribution_dict = sorted(
-        char_attribution_dict, key=lambda x: abs(x[2]), reverse=True)
+        char_attribution_dict, key=lambda x: x[2], reverse=True)
     result['title_char_attri'] = collections.OrderedDict()
     for s in char_attribution_dict:
         result['title_char_attri'][s[0]] = (s[1], s[2])
@@ -544,7 +535,6 @@ def LIME_error_evaluation(exp_q, pred_label, probs, lime_score_total,
     return lime_score_total, lime_relative_err_total, lime_err_total
 
 
-g_lac = LAC(mode='seg')
 g_splitter = re.compile(r'([\u4e00-\u9fa5])')
 
 if __name__ == "__main__":
