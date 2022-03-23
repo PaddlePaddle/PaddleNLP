@@ -101,6 +101,10 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
             "rocketqa-v1-marco-para-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "rocketqa-zh-dureader-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-v1-marco-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -141,6 +145,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rocketqa-v1-marco-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-dureader-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-v1-marco-cross-encoder": {
             "do_lower_case": True
         },
     }
