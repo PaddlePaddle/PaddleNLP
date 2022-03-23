@@ -44,12 +44,6 @@ def create_dataloader(dataset,
         return_list=True)
 
 
-def is_integer(number):
-    if sys.version > '3':
-        return isinstance(number, int)
-    return isinstance(number, (int, long))
-
-
 class LinearDecayWithWarmup(LambdaDecay):
     def __init__(self,
                  learning_rate,
@@ -57,6 +51,33 @@ class LinearDecayWithWarmup(LambdaDecay):
                  warmup,
                  last_epoch=-1,
                  verbose=False):
+        """
+        Creates a learning rate scheduler, which increases learning rate linearly
+        from 0 to given `learning_rate`, after this warmup period learning rate
+        would be decreased linearly from the base learning rate to 0.
+
+        Args:
+            learning_rate (float):
+                The base learning rate. It is a python float number.
+            total_steps (int):
+                The number of training steps.
+            warmup (int or float):
+                If int, it means the number of steps for warmup. If float, it means
+                the proportion of warmup in total training steps.
+            last_epoch (int, optional):
+                The index of last epoch. It can be set to restart training. If
+                None, it means initial learning rate. 
+                Defaults to -1.
+            verbose (bool, optional):
+                If True, prints a message to stdout for each update.
+                Defaults to False.
+        """
+
+        def is_integer(number):
+            if sys.version > '3':
+                return isinstance(number, int)
+            return isinstance(number, (int, long))
+
         warmup_steps = warmup if is_integer(warmup) else int(
             math.floor(warmup * total_steps))
 
@@ -136,6 +157,38 @@ def convert_example_ner(example,
                         tokenizer,
                         max_seq_length=512,
                         pad_label_id=-100):
+    """
+    Builds model inputs from a sequence. And create labels for named-
+    entity recognition task CMeEE.
+
+    For example, a sample should be:
+
+    - input_ids:      ``[CLS]  x1   x2 [SEP] [PAD]``
+    - token_type_ids: ``  0    0    0    0     0``
+    - position_ids:   ``  0    1    2    3     0``
+    - attention_mask: ``  1    1    1    1     0``
+    - label_oth:      `` 32    3   32   32    32`` (optional, label ids of others)
+    - label_sym:      ``  4    4    4    4     4`` (optional, label ids of symptom)
+
+    Args:
+        example (obj:`dict`):
+            A dictionary of input data, containing text and label if it has.
+        tokenizer (obj:`PretrainedTokenizer`):
+            A tokenizer inherits from :class:`paddlenlp.transformers.PretrainedTokenizer`.
+            Users can refer to the superclass for more information.
+        max_seq_length (obj:`int`):
+            The maximum total input sequence length after tokenization.
+            Sequences longer will be truncated, and the shorter will be padded.
+        is_test (obj:`bool`, default to `False`):
+            Whether the example contains label or not.
+
+    Returns:
+        encoded_output (obj: `dict[str, list|np.array]`):
+            The sample dictionary including `input_ids`, `token_type_ids`,
+            `position_ids`, `attention_mask`, `label_oth` (optional), 
+            `label_sym` (optional)
+    """
+
     encoded_inputs = {}
     text = example['text']
     if len(text) > max_seq_length - 2:
@@ -192,6 +245,83 @@ def create_batch_label(ent_labels, spo_labels, num_classes, max_batch_len):
     pad_ent_labels = paddle.to_tensor(pad_ent_labels)
     pad_spo_labels = paddle.to_tensor(pad_spo_labels)
     return pad_ent_labels, pad_spo_labels
+
+
+class NEREvaluator(paddle.metric.Metric):
+    def __init__(self, label_list):
+        super(NEREvaluator, self).__init__()
+        self.id2label = [dict(enumerate(x)) for x in label_list]
+        self.num_classes = [len(x) for x in label_list]
+        self.num_infer = 0
+        self.num_label = 0
+        self.num_correct = 0
+
+    def compute(self, lengths, predictions, labels):
+        assert len(predictions) == len(labels)
+        assert len(predictions) == len(self.id2label)
+        preds = [x.numpy() for x in predictions]
+        labels = [x.numpy() for x in labels]
+
+        preds_chunk = set()
+        label_chunk = set()
+        for idx, (pred, label) in enumerate(zip(preds, labels)):
+            for i, case in enumerate(pred):
+                case = [self.id2label[idx][x] for x in case[:lengths[i]]]
+                preds_chunk |= self.extract_chunk(case, i)
+            for i, case in enumerate(label):
+                case = [self.id2label[idx][x] for x in case[:lengths[i]]]
+                label_chunk |= self.extract_chunk(case, i)
+
+        num_infer = len(preds_chunk)
+        num_label = len(label_chunk)
+        num_correct = len(preds_chunk & label_chunk)
+        return num_infer, num_label, num_correct
+
+    def update(self, correct):
+        num_infer, num_label, num_correct = correct
+        self.num_infer += num_infer
+        self.num_label += num_label
+        self.num_correct += num_correct
+
+    def accumulate(self):
+        precision = self.num_correct / (self.num_infer + 1e-6)
+        recall = self.num_correct / (self.num_label + 1e-6)
+        f1 = 2 * precision * recall / (precision + recall + 1e-6)
+        return precision, recall, f1
+
+    def reset(self):
+        self.num_infer = 0
+        self.num_label = 0
+        self.num_correct = 0
+
+    def name(self):
+        return 'precision', 'recall', 'f1'
+
+    def extract_chunk(self, sequence, cid=0):
+        chunks = set()
+
+        start_idx, cur_idx = 0, 0
+        while cur_idx < len(sequence):
+            if sequence[cur_idx][0] == 'B':
+                start_idx = cur_idx
+                cur_idx += 1
+                while cur_idx < len(sequence) and sequence[cur_idx][0] == 'I':
+                    if sequence[cur_idx][2:] == sequence[start_idx][2:]:
+                        cur_idx += 1
+                    else:
+                        break
+                if cur_idx < len(sequence) and sequence[cur_idx][0] == 'E':
+                    if sequence[cur_idx][2:] == sequence[start_idx][2:]:
+                        chunks.add(
+                            (cid, sequence[cur_idx][2:], start_idx, cur_idx))
+                        cur_idx += 1
+            elif sequence[cur_idx][0] == 'S':
+                chunks.add((cid, sequence[cur_idx][2:], cur_idx, cur_idx))
+                cur_idx += 1
+            else:
+                cur_idx += 1
+
+        return chunks
 
 
 class SPOEvaluator(paddle.metric.Metric):
