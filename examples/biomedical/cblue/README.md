@@ -43,11 +43,6 @@ cblue/
 
 #### 医疗文本分类任务
 
-```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
-```
-
 **训练参数设置（Training setup）及结果**
 
 | Task      | epochs | batch_size | learning_rate | max_seq_length | results |
@@ -58,7 +53,12 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py -
 | KUAKE-QQR |   16   |     32     |      6e-5     |       64       | 0.82364 |
 | KUAKE-QTR |   12   |     32     |      6e-5     |       64       | 0.69653 |
 | KUAKE-QIC |    4   |     32     |      6e-5     |      128       | 0.81176 |
+| CMeEE     |    2   |     32     |      6e-5     |      128       | 0.66167 |
 
+```shell
+$ unset CUDA_VISIBLE_DEVICES
+$ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
+```
 
 可支持配置的参数：
 
