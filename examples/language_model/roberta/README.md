@@ -3,7 +3,7 @@
 ## 简介
 本目录下包含:
 
-collator.py: 数据采样class
+utils.py: 数据采样函数DataCollatorMLM
 
 create_data.py: tokenize数据（使用HF datasets导入和预处理wikipedia数据）
 
