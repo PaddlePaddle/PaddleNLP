@@ -225,22 +225,22 @@ pip3 install paddlepaddle-gpu
    <tr>
       <td>LSTM + IG</td>
       <td>56.8</td>
-      <td>39.4</td>
-      <td>67.4</td>
-      <td>36</td>
+      <td>36.8</td>
+      <td>59.8</td>
+      <td>91.4</td>
    </tr>
    <tr>
       <td>RoBERTa-base + IG</td>
       <td>62.4</td>
-      <td>40.2</td>
-      <td>46.3</td>
-      <td>29.8</td>
+      <td>36.4</td>
+      <td>48.7</td>
+      <td>48.9</td>
    </tr>
    <tr>
       <td>RoBERTa-large + IG</td>
       <td>65.3</td>
-      <td>39.2</td>
-      <td>42.4</td>
-      <td>26.8</td>
+      <td>38.3</td>
+      <td>41.9</td>
+      <td>37.8</td>
    </tr>
 </table>
