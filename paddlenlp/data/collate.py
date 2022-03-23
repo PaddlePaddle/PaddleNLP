@@ -354,10 +354,10 @@ def default_data_collator(data):
 
 class DataCollatorWithPadding:
     """
-    Data collator that will dynamically pad the inputs received.
+    Data collator that will dynamically pad the inputs to the longest sequence in the batch.
 
     Args:
-        tokenizer (`paddlenlp.transformers.PreTrainedTokenizer`):
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
             The tokenizer used for encoding the data.
     """
 
@@ -394,10 +394,10 @@ class DataCollatorWithPadding:
 
 class DataCollatorForTokenClassification:
     """
-    Data collator that will dynamically pad the inputs received, as well as the labels.
+    Data collator that will dynamically pad the inputs to longest sequence in the batch, as well as the labels.
 
     Args:
-        tokenizer (`paddlenlp.transformers.PreTrainedTokenizer`):
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
             The tokenizer used for encoding the data.
         label_pad_token_id (int, optional):
             The id to use when padding the labels. Defaults to -100.
