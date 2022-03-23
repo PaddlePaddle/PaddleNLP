@@ -18,7 +18,7 @@ import paddle
 import paddle.nn as nn
 import numpy as np
 
-from roberta.model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from roberta.transformer import TransformerEncoderLayer, TransformerEncoder
 
 __all__ = [
@@ -263,6 +263,7 @@ class RobertaModel(RobertaPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  initializer_range=0.02,
+                 layer_norm_eps=1e-12,
                  pad_token_id=0):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
