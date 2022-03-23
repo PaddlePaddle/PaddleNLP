@@ -1,5 +1,5 @@
 # RoBERTa预训练（Masked Language Modeling）
-本项目是RoBERTa模型在 Paddle 2.0上的开源实现，包含了数据tokenization和预训练代码。本项目旨在用简练清晰的代码完成基本预训练任务（仅Masked Language Model）。该代码易于理解，便于修改和定制。
+本项目是RoBERTa模型在 Paddle 2.0上的开源实现，包含了数据tokenization和预训练代码。本项目旨在用简练清晰的代码完成基本预训练任务（仅Masked Language Modeling）。该代码易于理解，便于修改和定制。
 ## 简介
 本目录下包含:
 
@@ -115,10 +115,13 @@ Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/m
 
 ### 运行速度
 
-| 6 eopch | Hugging Face | Paddle |
+| 6 eopch | Hugging Face | PaddleNLP |
 |---------|--------------|--------|
 | FP16    |     90 h     |  72 h  | 
 | FP32    |     154 h    |  139 h | 
+
+FP32精度下，PaddleNLP较Hugging Face快11%左右。
+FP16混合精度下，PaddleNLP较Hugging Face快25%左右
 
 ### GLUE任务结果
 总训练tokens：512(seq_len）* 32(batch_size) * 780000(iteration)，约RoBERTa训练量10%，在GLUE validation set表现：
@@ -128,3 +131,5 @@ Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/m
 | RoBERTa paper      |  68.0 |  96.4  |  90.9  |  92.4  |  92.2  |  90.2  |  94.7  |  86.6  |
 |Hugging Face 6-epoch| 36.6  | 89.6   | 87.7   | 85.8   | 88.7   | 80.3   | 88.8   | 54.2   |
 | PaddleNLP 6-epoch  | 36.9  | 89.5   | 84.3   | 86.2   | 88.6   | 80.5   | 88.4   | 58.1   |
+
+整体来说，PaddleNLP和Hugging Face在Masked Language Modeling预训练中表现相似，因训练量较小，结果比原paper普遍低10%。另外，MRPC和RTE数据集validation set较小，结果波动幅度比较大，故PaddleNLP和Hugging Face二者结果有一定diff。
