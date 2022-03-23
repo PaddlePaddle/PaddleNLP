@@ -10,10 +10,9 @@ import paddle
 from paddlenlp.data import Pad, Dict
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ElectraTokenizer
-from paddlenlp.metrics import ChunkEvaluator
 
 from model import ElectraForBinaryTokenClassification
-from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup
+from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup, NEREvaluator
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -44,35 +43,31 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metrics, data_loader):
+def evaluate(model, criterion, metric, data_loader):
     model.eval()
-    metrics[0].reset()
+    metric.reset()
     losses = []
     for batch in data_loader:
         input_ids, token_type_ids, position_ids, masks, label_oth, label_sym = batch
-        logits = model(input_ids, token_type_ids, position_ids)
-        loss_oth = criterion(logits[0], paddle.unsqueeze(label_oth, 2))
-        loss_oth = paddle.mean(loss_oth * paddle.unsqueeze(masks, 2))
-        loss_sym = criterion(logits[1], paddle.unsqueeze(label_sym, 2))
-        loss_sym = paddle.mean(loss_sym * paddle.unsqueeze(masks, 2))
+        att_mask = paddle.scale(
+            masks, scale=10000.0, bias=-1.0, bias_after_scale=False)
+        logits = model(input_ids, token_type_ids, position_ids, att_mask)
 
-        losses.append([loss_oth.numpy(), loss_sym.numpy()])
+        loss_mask = masks.unsqueeze(2)
+        loss = [(criterion(x, y.unsqueeze(2)) * loss_mask).mean()
+                for x, y in zip(logits, [label_oth, label_sym])]
+        losses.append([x.numpy() for x in loss])
 
         lengths = paddle.sum(masks, axis=1)
-        pred_oth = paddle.argmax(logits[0], axis=2)
-        pred_sym = paddle.argmax(logits[1], axis=2)
-        correct_oth = metrics[0].compute(lengths, pred_oth, label_oth)
-        correct_sym = metrics[1].compute(lengths, pred_sym, label_sym)
-        correct_oth = [x.numpy() for x in correct_oth]
-        correct_sym = [x.numpy() for x in correct_sym]
-        metrics[0].update(*correct_oth)
-        metrics[0].update(*correct_sym)
-        _, _, result = metrics[0].accumulate()
+        preds = [paddle.argmax(x, axis=2) for x in logits]
+        correct = metric.compute(lengths, preds, [label_oth, label_sym])
+        metric.update(correct)
+        _, _, result = metric.accumulate()
     loss = np.mean(losses, axis=0)
-    print('eval loss symptom: %.5f, loss others: %.5f, f1: %.5f' %
-          (loss[1], loss[0], result))
+    print('eval loss symptom: %.5f, loss others: %.5f, loss: %.5f, f1: %.5f' %
+          (loss[1], loss[0], loss.sum(), result))
     model.train()
-    metrics[0].reset()
+    metric.reset()
 
 
 def do_train():
@@ -148,7 +143,7 @@ def do_train():
 
     criterion = paddle.nn.functional.softmax_with_cross_entropy
 
-    metrics = [ChunkEvaluator(label_list[0]), ChunkEvaluator(label_list[1])]
+    metric = NEREvaluator(label_list)
 
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
@@ -162,29 +157,21 @@ def do_train():
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
-                lengths = paddle.sum(masks, axis=1)
-                loss_masks = paddle.unsqueeze(masks, 2)
-                masks = paddle.scale(
+                att_mask = paddle.scale(
                     masks, scale=10000.0, bias=-1.0, bias_after_scale=False)
-                logits = model(input_ids, token_type_ids, position_ids, masks)
+                logits = model(input_ids, token_type_ids, position_ids,
+                               att_mask)
 
-                loss_oth = criterion(logits[0], paddle.unsqueeze(label_oth, 2))
-                loss_sym = criterion(logits[1], paddle.unsqueeze(label_sym, 2))
+                loss_mask = paddle.unsqueeze(masks, 2)
+                losses = [(criterion(x, y.unsqueeze(2)) * loss_mask).mean()
+                          for x, y in zip(logits, [label_oth, label_sym])]
+                loss = losses[0] + losses[1]
 
-                loss_oth = paddle.mean(loss_oth * loss_masks)
-                loss_sym = paddle.mean(loss_sym * loss_masks)
-
-                loss = loss_oth + loss_sym
-
-                pred_oth = paddle.argmax(logits[0], axis=-1)
-                pred_sym = paddle.argmax(logits[1], axis=-1)
-                correct_oth = metrics[0].compute(lengths, pred_oth, label_oth)
-                correct_sym = metrics[1].compute(lengths, pred_sym, label_sym)
-                correct_oth = [x.numpy() for x in correct_oth]
-                correct_sym = [x.numpy() for x in correct_sym]
-                metrics[0].update(*correct_oth)
-                metrics[0].update(*correct_sym)
-                _, _, f1 = metrics[0].accumulate()
+                lengths = paddle.sum(masks, axis=1)
+                preds = [paddle.argmax(x, axis=-1) for x in logits]
+                correct = metric.compute(lengths, preds, [label_oth, label_sym])
+                metric.update(correct)
+                _, _, f1 = metric.accumulate()
 
                 if args.use_amp:
                     scaler.scale(loss).backward()
@@ -201,13 +188,13 @@ def do_train():
                     total_train_time += time_diff
                     print(
                         'global step %d, epoch: %d, batch: %d, loss: %.5f, loss symptom: %.5f, loss others: %.5f, f1: %.5f, speed: %.2f step/s, learning_rate: %f'
-                        % (global_step, epoch, step, loss, loss_sym, loss_oth,
+                        % (global_step, epoch, step, loss, losses[1], losses[0],
                            f1, args.logging_steps / time_diff,
                            lr_scheduler.get_lr()))
                     tic_train = time.time()
 
                 if global_step % args.valid_steps == 0 and rank == 0:
-                    evaluate(model, criterion, metrics, dev_data_loader)
+                    evaluate(model, criterion, metric, dev_data_loader)
                     tic_train = time.time()
 
                 if global_step % args.save_steps == 0 and rank == 0:
