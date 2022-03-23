@@ -69,7 +69,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_pretrain_roberta.py \
 - `amp` 指示是否启用自动混合精度训练。
 
 注：
-paddle.Dataloader需2.3rc版本才支持HF datasets类，现行版本可以直接在paddle库中的reader.py中注释掉：
+paddle.Dataloader需2.3rc版本才支持HF datasets类，现行版本可以直接在python paddle库中的reader.py中注释掉：
 ```
 assert isinstance(dataset, Dataset)
 ```
@@ -101,7 +101,7 @@ python -u ./run_glue.py \
 
 ```
 
-# 速度对比Hugging Face
+## 对比Hugging Face
 
 Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/master/examples/pytorch/language-modeling)和本目录下run_pretrain_roberta.py速度对比如下：
 
@@ -113,14 +113,18 @@ Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/m
 
 训练GPU：Tesla V100 32G * 2
 
-| 训练时长 | Hugging Face | Paddle |
-|---------|--------------|--------|
-| 6 eopch |     90 h     |  72 h  | 
+### 运行速度
 
-在GLUE eval表现：
+| 6 eopch | Hugging Face | Paddle |
+|---------|--------------|--------|
+| FP16    |     90 h     |  72 h  | 
+| FP32    |     154 h    |  139 h | 
+
+### GLUE任务结果
+总训练tokens：512(seq_len）* 32(batch_size) * 780000(iteration)，约RoBERTa训练量10%，在GLUE validation set表现：
 
 | Model GLUE Score   | CoLA  | SST-2  | MRPC   | STS-B  | QQP    | MNLI   | QNLI   | RTE    |
 |--------------------|-------|--------|--------|--------|--------|--------|--------|--------|
 | RoBERTa paper      |  68.0 |  96.4  |  90.9  |  92.4  |  92.2  |  90.2  |  94.7  |  86.6  |
-|Hugging Face 6-epoch| 40.0  | 89.6   | 87.7   | 85.8   | ---   | ---   | ---   | ---   |
-| PaddleNLP 6-epoch  | 37.6  | 89.5   | 82.9   | 86.2   | ---   | ---   | ---   | ---   |
+|Hugging Face 6-epoch| 36.6  | 89.6   | 87.7   | 85.8   | 88.7   | 80.3   | 88.8   | 54.2   |
+| PaddleNLP 6-epoch  | 36.9  | 89.5   | 84.3   | 86.2   | 88.6   | 80.5   | 88.4   | 58.1   |
