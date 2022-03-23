@@ -55,13 +55,14 @@ class RobertaEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.padding_idx = pad_token_id
         self.cls_token_id = cls_token_id
-        
+
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
-            if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
+            if self.cls_token_id == 0 or input_ids[0][
+                    0] == 0:  # postion_ids for RobertaBPETokenizer
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
                 position_ids = seq_length - ones
@@ -273,7 +274,8 @@ class RobertaModel(RobertaPretrainedModel):
         self.layer_norm_eps = layer_norm_eps
         self.embeddings = RobertaEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, cls_token_id)
+            max_position_embeddings, type_vocab_size, pad_token_id,
+            cls_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -290,7 +292,8 @@ class RobertaModel(RobertaPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -360,17 +363,26 @@ class RobertaModel(RobertaPretrainedModel):
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
-        attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
 
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = []
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+            return encoder_outputs, pooled_output
+        else:
+            sequence_output = self.encoder(embedding_output, attention_mask)
+            pooled_output = self.pooler(sequence_output)
+            return sequence_output, pooled_output
 
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
@@ -381,19 +393,21 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
     Args:
         roberta (:class:`RobertaModel`):
             An instance of RobertaModel.
-        dropout (float, optional):
-            The dropout probability for output of Roberta.
-            If None, use the same value as `hidden_dropout_prob` of `RobertaModel`
-            instance `roberta`. Defaults to `None`.
     """
 
-    def __init__(self, roberta, dropout=None):
+    def __init__(self, roberta):
         super(RobertaForQuestionAnswering, self).__init__()
         self.roberta = roberta  # allow roberta to be config
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None):
+    def forward(
+            self,
+            input_ids,
+            token_type_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            output_hidden_states=False, ):
         r"""
         Args:
             input_ids (Tensor):
@@ -432,17 +446,22 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.roberta(
+        encoder_outputs, _ = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=None,
-            attention_mask=None)
-
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=output_hidden_states, )
+        sequence_output = encoder_outputs[
+            -1] if output_hidden_states else encoder_outputs
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        if output_hidden_states:
+            return start_logits, end_logits, encoder_outputs
+        else:
+            return start_logits, end_logits
 
 
 class RobertaForSequenceClassification(RobertaPretrainedModel):
