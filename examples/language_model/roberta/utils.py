@@ -17,11 +17,11 @@
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 class DataCollatorMLM():
-    def __init__(self, mask_token_id, pad_token_id, token_len, batch_pad=None):
+    def __init__(self, tokenizer, batch_pad=None):
         self.batch_pad = batch_pad
-        self.mask_token_id = mask_token_id
-        self.pad_token_id = pad_token_id
-        self.token_len = token_len
+        self.mask_token_id = tokenizer.mask_token_id
+        self.pad_token_id = tokenizer.pad_token_id
+        self.token_len = tokenizer.vocab_size
         if batch_pad is None:
             self.batch_pad = lambda samples, fn=Dict({
                 'input_ids': Pad(axis=0, pad_val=self.pad_token_id, dtype='int64'),  # input
