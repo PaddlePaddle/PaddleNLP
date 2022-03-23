@@ -103,8 +103,9 @@ python -u ./run_glue.py \
 
 ## 对比Hugging Face
 
-Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/master/examples/pytorch/language-modeling)和本目录下run_pretrain_roberta.py速度对比如下：
+Hugging Face[预训练代码](https://github.com/huggingface/transformers/tree/master/examples/pytorch/language-modeling)和本目录下run_pretrain_roberta.py对比如下：
 
+### 参数环境
 二者使用的数据、超参、GPU保持一致：
 
 训练数据：wikipedia-en
