@@ -15,7 +15,7 @@
   <a href=#QuickStart> QuickStart </a> |
   <a href=#社区交流> 社区交流 </a> |
   <a href=#详细使用> 一键预测&定制训练 </a> |
-  <a href=#FAQ> FAQ </a> |
+  <a href=#FAQ> FAQ </a>
 </h4>
 
 
@@ -614,23 +614,23 @@ nptag(["糖醋排骨", "红曲霉菌"])
 ## PART Ⅱ &emsp; 定制化训练
 
 <details><summary>适配任务列表</summary><div>
-
+  
 如果你有自己的业务数据集，可以对模型效果进一步调优，支持定制化训练的任务如下：
 
-|                           任务名称                           |                           默认路径                           |                                                              |
-| :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|         `Taskflow("word_segmentation", mode="base")`         |      `$HOME/.paddlenlp/taskflow/word_segmentation/lac`       | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|       `Taskflow("word_segmentation", mode="accurate")`       |    `$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`     | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/ner/lac`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|              `Taskflow("ner", mode="accurate")`              |           `$HOME/.paddlenlp/taskflow/ner/wordtag`            | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|     `Taskflow("text_correction", model="csc-ernie-1.0")`     |  `$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
-|      `Taskflow("dependency_parsing", model="ddparser")`      |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`    | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
-|       `Taskflow("knowledge_mining", model="wordtag")`        |     `$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag`     | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
-|                       </div></details>                       |                                                              |                                                              |
+|任务名称|默认路径||
+| :---: | :---: | :---: |
+|`Taskflow("word_segmentation", mode="base")`|`$HOME/.paddlenlp/taskflow/word_segmentation/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
+|`Taskflow("word_segmentation", mode="accurate")`|`$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("ner", mode="fast")`|`$HOME/.paddlenlp/taskflow/ner/lac`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis)|
+|`Taskflow("ner", mode="accurate")`|`$HOME/.paddlenlp/taskflow/ner/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("text_correction", model="csc-ernie-1.0")`|`$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc)|
+|`Taskflow("dependency_parsing", model="ddparser")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("dependency_parsing", model="ddparser-ernie-1.0")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")`|`$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser)|
+|`Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")`|`$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep)|
+|`Taskflow("knowledge_mining", model="wordtag")`|`$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)|
+|`Taskflow("knowledge_mining", model="nptag")`|`$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`|[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag)|
+</div></details>
 
 <details><summary>定制化训练示例</summary><div>
 
@@ -664,6 +664,7 @@ from paddlenlp import Taskflow
 my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
 ```
 </div></details>
+
 
 ## FAQ
 
