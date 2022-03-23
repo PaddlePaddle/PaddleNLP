@@ -108,7 +108,7 @@ def do_train(args):
     tokenizer = AutoTokenizer.from_pretrained('roberta-base')
     
     # Prepare data for training
-    collator_func = DataCollatorMLM(mask_token_id=tokenizer.mask_token_id, pad_token_id=tokenizer.pad_token_id, token_len=tokenizer.vocab_size) # data collator
+    collator_func = DataCollatorMLM(tokenizer=tokenizer) # data collator
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
     train_data_loader = DataLoader(
