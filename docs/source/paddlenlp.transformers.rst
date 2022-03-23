@@ -28,17 +28,25 @@ paddlenlp.transformers
    paddlenlp.transformers.ernie_doc
    paddlenlp.transformers.ernie_gen
    paddlenlp.transformers.ernie_gram
+   paddlenlp.transformers.ernie_m
+   paddlenlp.transformers.fnet
+   paddlenlp.transformers.funnel
    paddlenlp.transformers.gpt
    paddlenlp.transformers.layoutlm
    paddlenlp.transformers.layoutlmv2
    paddlenlp.transformers.layoutxlm
+   paddlenlp.transformers.luke
    paddlenlp.transformers.mbart
+   paddlenlp.transformers.megatronbert
    paddlenlp.transformers.mobilebert
    paddlenlp.transformers.mpnet
    paddlenlp.transformers.nezha
+   paddlenlp.transformers.ppminilm
+   paddlenlp.transformers.prophetnet
    paddlenlp.transformers.reformer
    paddlenlp.transformers.roberta
    paddlenlp.transformers.roformer
+   paddlenlp.transformers.semantic_indexing
    paddlenlp.transformers.skep
    paddlenlp.transformers.squeezebert
    paddlenlp.transformers.t5
