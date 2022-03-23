@@ -35,7 +35,7 @@ python create_data.py \
 ## 预训练
 
 ```
-python -m paddle.distributed.launch --gpus "0,1" run_pretrain_roberta.py \
+python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
 --model_name_or_path roberta-en-base \
 --batch_size 16 \
 --learning_rate 1e-4 \
