@@ -26,7 +26,12 @@ import time
 import paddlenlp
 import datasets
 
-import paddle.distributed as dist
+try:
+    import paddle.distributed as dist
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
+
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url, _get_unique_endpoints
@@ -59,7 +64,7 @@ datasets.load_dataset = load_from_ppnlp
 class DatasetTuple:
     def __init__(self, splits):
         self.tuple_cls = namedtuple('datasets', splits)
-        self.tuple = self.tuple_cls(* [None for _ in splits])
+        self.tuple = self.tuple_cls(*[None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
