@@ -1255,7 +1255,7 @@ def enable_ft_para(tensor_para_size=1,
         param = getattr(layer, attr)
         # NOTE: Assignment to parameter 'weight' should be of type Parameter or
         # None. Additionaly, we cannot delattr and setattr which would remove
-        # the param from layer._parameters and state_dict.
+        # the param from layer._parameters and state_dict, thus cannot fit_partial_model
         param = _ft_para_conf.slice_weight(param, axis, phase=0, out_param=True)
         setattr(layer, attr, param)
 
@@ -1279,21 +1279,57 @@ def enable_ft_para(tensor_para_size=1,
         @functools.wraps(func)
         def _impl(self, *args, **kwargs):
             init_dict = fn_args_to_dict(func, *((self, ) + args), **kwargs)
-            d_model = init_dict["d_model"]
-            nhead = init_dict["nhead"]
-            dim_feedforward = init_dict["dim_feedforward"]
-            func(self, *args, **kwargs)
+            init_dict.pop("self")
+            num_layers = init_dict["num_hidden_layers"]
+            init_dict["num_hidden_layers"] //= _ft_para_conf.layer_para_size
+            func(self, **init_dict)
+            self.num_layers = num_layers
+            self.config["num_hidden_layers"] = num_layers
+
+        return _impl
+
+    def block_state_wrapper(func):
+        # TODO(guosheng): Uset state hook instead of block_state_wrapper.
+        # self.register_state_dict_hook(reidx_state_layer)
+        @functools.wraps(func)
+        def _impl(self, *args, **kwargs):
+            state_dict = func(self, *args, **kwargs)
+
+            def reidx_state_layer(state_dict):
+                prfix_len = len("decoder.layers.")
+                for name, param in list(state_dict.items()):
+                    if name.startswith("decoder.layers."):
+                        layer_idx_len = 0
+                        for i in name[prfix_len:]:
+                            if i == ".":
+                                break
+                            else:
+                                layer_idx_len += 1
+                        layer_idx = int(name[prfix_len:prfix_len +
+                                             layer_idx_len])
+                        new_name = name[:prfix_len] + str(
+                            _ft_para_conf.layer_para_rank * len(
+                                self.decoder.layers) + layer_idx) + name[
+                                    prfix_len + layer_idx_len:]
+                        state_dict[new_name] = state_dict.pop(name)
+
+            reidx_state_layer(state_dict)
+            return state_dict
 
         return _impl
 
     layer_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__
     paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__ = layer_init_wrapper(
         layer_init_fn)
+    # Note that Transformer block in GPT is not created in TransformerDecoder
+    # but in GPTModel.
+    block_init_fn = paddlenlp.transformers.gpt.modeling.GPTModel.__init__
+    paddlenlp.transformers.gpt.modeling.GPTModel.__init__ = block_init_wrapper(
+        block_init_fn)
+    block_state_fn = paddlenlp.transformers.gpt.modeling.GPTModel.state_dict
+    paddlenlp.transformers.gpt.modeling.GPTModel.state_dict = block_state_wrapper(
+        block_state_fn)
     _ft_para_conf.set_partial_model(True)
-    # Transformer block in GPT is not created in TransformerDecoder.
-    # block_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__
-    # paddlenlp.transformers.gpt.modeling.TransformerDecoder.__init__ = block_init_wrapper(
-    #     block_init_fn)
     # yield
 
 
