@@ -26,7 +26,7 @@ import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-from trainer_base import TrainerBase, Trainer
+from paddlenlp.trainer.trainer_base import TrainerBase, Trainer
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
@@ -331,11 +331,11 @@ class SeqTrainer2(ClueTrainer):
 
 
 class SeqTrainer(Trainer):
-    def __init__(self, train_ds, dev_ds, model, tokenizer, args, *arg,
-                 **kwargs):
+    def __init__(self, train_ds, dev_ds, model, tokenizer, data_args,
+                 training_args, *arg, **kwargs):
 
-        trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=args)
-        batchify_fn = clue_batchify_fn_dict(tokenizer, args)
+        trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
+        batchify_fn = clue_batchify_fn_dict(tokenizer, data_args)
 
         train_ds = train_ds.map(trans_fn)
         dev_ds = dev_ds.map(trans_fn)
@@ -346,10 +346,14 @@ class SeqTrainer(Trainer):
         def compute_metrics(p):
             preds = p.predictions[0] if isinstance(p.predictions,
                                                    tuple) else p.predictions
+
+            preds = paddle.to_tensor(preds)
+            label = paddle.to_tensor(p.label_ids)
+
             probs = F.softmax(preds, axis=1)
             metric = Accuracy()
             metric.reset()
-            result = metric.compute(preds, p.label_ids)
+            result = metric.compute(preds, label)
             metric.update(result)
             accu = metric.accumulate()
             metric.reset()
@@ -358,7 +362,7 @@ class SeqTrainer(Trainer):
         super().__init__(
             model,
             loss_fct,
-            args,
+            training_args,
             batchify_fn,
             train_ds,
             dev_ds,

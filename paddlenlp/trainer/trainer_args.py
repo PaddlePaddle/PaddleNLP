@@ -23,19 +23,18 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from utils import logging
-from trainer_utils import (SchedulerType, IntervalStrategy, EvaluationStrategy,
-                           OptimizerNames)
+from .utils import logging
+from .trainer_utils import (
+    SchedulerType,
+    IntervalStrategy,
+    EvaluationStrategy,
+    OptimizerNames, )
 
 logger = logging.get_logger(__name__)
 log_levels = logging.get_log_levels_dict().copy()
 trainer_log_levels = dict(**log_levels, passive=-1)
 
 import paddle
-
-# logger = logging.get_logger(__name__)
-log_levels = logging.get_log_levels_dict().copy()
-trainer_log_levels = dict(**log_levels, passive=-1)
 
 
 def default_logdir() -> str:
@@ -450,6 +449,17 @@ class TrainingArguments:
             ("For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. "
              "See details at https://nvidia.github.io/apex/amp.html")
         }, )
+
+    scale_loss: float = field(
+        default=2**15, metadata={"help": "The value of scale_loss for fp16."})
+
+    minimum_eval_times: int = field(
+        default=None,
+        metadata={
+            "help":
+            "If under eval_steps, the valid time is less then minimum_eval_times, the config of override eval_steps."
+        })
+
     local_rank: int = field(
         default=-1, metadata={"help": "For distributed training: local_rank"})
 
@@ -551,12 +561,6 @@ class TrainingArguments:
             "The path to a folder with a valid checkpoint for your model."
         }, )
 
-    gradient_checkpointing: bool = field(
-        default=False,
-        metadata={
-            "help":
-            "If True, use gradient checkpointing to save memory at the expense of slower backward pass."
-        }, )
     _n_gpu: int = field(init=False, repr=False, default=-1)
 
     def __post_init__(self):

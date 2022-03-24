@@ -22,6 +22,8 @@ import yaml
 from functools import partial
 import distutils.util
 import os.path as osp
+from dataclasses import dataclass, field
+from typing import Optional
 
 import numpy as np
 import paddle
@@ -29,11 +31,15 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 import paddlenlp
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    TrainingArguments, )
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-from paddlenlp.transformers import AutoModelForTokenClassification
-from paddlenlp.transformers import AutoModelForQuestionAnswering
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoModelForTokenClassification,
+    AutoModelForQuestionAnswering,
+    AutoTokenizer, )
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
@@ -208,6 +214,84 @@ def parse_args():
     return args
 
 
+@dataclass
+class DataTrainingArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training and eval.
+    Using `PdArgumentParser` we can turn this class
+    into argparse arguments to be able to specify them on
+    the command line.
+    """
+
+    dataset: str = field(
+        default=None,
+        metadata={
+            "help": "The name of the dataset to use (via the datasets library)."
+        })
+
+    max_seq_length: int = field(
+        default=128,
+        metadata={
+            "help":
+            "The maximum total input sequence length after tokenization. Sequences longer "
+            "than this will be truncated, sequences shorter will be padded."
+        }, )
+
+    # Additional configs for QA task.
+    doc_stride: int = field(
+        default=128,
+        metadata={
+            "help":
+            "When splitting up a long document into chunks, how much stride to take between chunks."
+        }, )
+
+    n_best_size: int = field(
+        default=20,
+        metadata={
+            "help":
+            "The total number of n-best predictions to generate in the nbest_predictions.json output file."
+        }, )
+
+    max_query_length: int = field(
+        default=64,
+        metadata={"help": "Max query length."}, )
+
+    max_answer_length: int = field(
+        default=30,
+        metadata={"help": "Max answer length."}, )
+
+    do_lower_case: bool = field(
+        default=False,
+        metadata={
+            "help":
+            "Whether to lower case the input text. Should be True for uncased models and False for cased models."
+        }, )
+
+
+@dataclass
+class ModelArguments:
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
+    """
+
+    model_name_or_path: str = field(metadata={
+        "help":
+        "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+    })
+    config_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help":
+            "Pretrained config name or path if not the same as model_name"
+        })
+    tokenizer_name: Optional[str] = field(
+        default=None,
+        metadata={
+            "help":
+            "Pretrained tokenizer name or path if not the same as model_name"
+        })
+
+
 def set_seed(args):
     # Use the same data seed(for data shuffle) for all procs to guarantee data
     # consistency after sharding.
@@ -218,77 +302,84 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def do_train(args):
-    paddle.set_device(args.device)
+def do_train():
+    parser = PdArgumentParser(
+        (ModelArguments, DataTrainingArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    paddle.set_device(training_args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    set_seed(args)
-    args.dataset = args.dataset.strip()
+    # set_seed(args)
+    data_args.dataset = data_args.dataset.strip()
 
-    if args.dataset not in ALL_DATASETS:
-        raise ValueError("Not found {}".format(args.dataset))
+    if data_args.dataset not in ALL_DATASETS:
+        raise ValueError("Not found {}".format(data_args.dataset))
 
-    config = ALL_DATASETS[args.dataset]
-    for arg in vars(args):
-        if getattr(args, arg) is None:
+    config = ALL_DATASETS[data_args.dataset]
+    for args in (model_args, data_args, training_args):
+        for arg in vars(args):
+            # if getattr(args, arg) is None:
             if arg in config.keys():
                 setattr(args, arg, config[arg])
 
-    dataset_config = args.dataset.split(" ")
+    training_args.per_device_train_batch_size = config["batch_size"]
+    training_args.per_device_eval_batch_size = config["batch_size"]
+
+    dataset_config = data_args.dataset.split(" ")
     all_ds = load_dataset(
         dataset_config[0],
         None if len(dataset_config) <= 1 else dataset_config[1],
         # lazy=False
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    args.label_list = getattr(all_ds['train'], "label_list", None)
+    data_args.label_list = getattr(all_ds['train'], "label_list", None)
 
     num_classes = 1 if all_ds["train"].label_list == None else len(all_ds[
         'train'].label_list)
 
     model = getattr(paddlenlp.transformers, config["model"]).from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+        model_args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     if "SequenceClassification" in config["model"]:
-        if 'clue' in args.dataset:
+        if 'clue' in data_args.dataset:
             trainer = ClueTrainer(all_ds["train"], all_ds["dev"], model,
-                                  tokenizer, args)
+                                  tokenizer, training_args)
         else:
             trainer = SeqTrainer(
                 all_ds["train"],
                 all_ds["dev"],
                 model,
                 tokenizer,
-                args,
+                data_args,
+                training_args,
                 test_ds=all_ds["test"])
+
     elif "QuestionAnswering" in config["model"]:
         trainer = MrcTrainer(all_ds["train"], all_ds["dev"], model, tokenizer,
-                             args)
+                             training_args)
     elif 'TokenClassification' in config["model"]:
         trainer = NerTrainer(
             all_ds["train"],
             all_ds["dev"],
             model,
             tokenizer,
-            args,
+            training_args,
             test_ds=all_ds["test"])
 
     train_result = trainer.train(resume_from_checkpoint=None)
     metrics = train_result.metrics
 
-    # max_train_samples = (
-    #     data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
-    # )
-    # metrics["train_samples"] = min(max_train_samples, len(train_dataset))
-
     trainer.save_model()  # Saves the tokenizer too for easy upload
+
+    # trainer.save_infer_model() -> 部署, onnx, slim, 量化后可否加速
 
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
@@ -307,6 +398,7 @@ def print_arguments(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    # args = parse_args()
+
     # print_arguments(args)
-    do_train(args)
+    do_train()

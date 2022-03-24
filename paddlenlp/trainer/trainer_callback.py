@@ -23,9 +23,9 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 from tqdm.auto import tqdm
 
-from trainer_utils import IntervalStrategy
-from trainer_args import TrainingArguments
-from utils import logging
+from .trainer_utils import IntervalStrategy, has_length
+from .trainer_args import TrainingArguments
+from .utils import logging
 
 logger = logging.get_logger(__name__)
 

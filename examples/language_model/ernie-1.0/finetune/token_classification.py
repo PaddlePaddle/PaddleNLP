@@ -30,7 +30,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.utils.log import logger
 
-from trainer_base import TrainerBase
+from paddlenlp.trainer.trainer_base import TrainerBase
 
 
 @paddle.no_grad()

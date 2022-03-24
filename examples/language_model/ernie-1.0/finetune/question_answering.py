@@ -22,7 +22,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
-from trainer_base import TrainerBase
+from paddlenlp.trainer.trainer_base import TrainerBase
 from paddlenlp.utils.log import logger
 
 

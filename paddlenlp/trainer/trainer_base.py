@@ -37,13 +37,14 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddle.io import DataLoader, DistributedBatchSampler
+import paddle.amp.auto_cast as autocast
 
 import numpy as np
 
-from trainer_args import (TrainingArguments, )
+from .trainer_args import (TrainingArguments, )
 # from trainer_callback import TrainerState, TrainerControl
 
-from trainer_utils import (
+from .trainer_utils import (
     IntervalStrategy,
     EvaluationStrategy,
     TrainOutput,
@@ -53,7 +54,7 @@ from trainer_utils import (
     speed_metrics,
     OptimizerNames, )
 
-from trainer_callback import (
+from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
     PrinterCallback,
@@ -64,7 +65,9 @@ from trainer_callback import (
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 
-from utils import logging
+from .utils import logging
+from .utils.helper import (distributed_concat, nested_concat, nested_detach,
+                           nested_numpify, nested_truncate)
 
 from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -75,59 +78,13 @@ from paddle.io import Dataset
 
 
 class DataCollator:
-    pass
+    def __init__(self, *args, **kwargs):
+        pass
 
 
 class DataCollatorWithPadding:
     def __init__(self, *args, **kwargs):
         pass
-
-
-def paddle_pad_and_concatenate(tensor1, tensor2, padding_index=-100):
-    """Concatenates `tensor1` and `tensor2` on first axis, applying padding on the second if necessary."""
-    if len(tensor1.shape) == 1 or tensor1.shape[1] == tensor2.shape[1]:
-        return paddle.concat((tensor1, tensor2), axis=0)
-
-    raise ValueError("pass")
-    # Let's figure out the new shape
-    new_shape = (tensor1.shape[0] + tensor2.shape[0], max(
-        tensor1.shape[1], tensor2.shape[1])) + tensor1.shape[2:]
-
-    # Now let's fill the result tensor
-    result = tensor1.new_full(new_shape, padding_index)
-    result[:tensor1.shape[0], :tensor1.shape[1]] = tensor1
-    result[tensor1.shape[0]:, :tensor2.shape[1]] = tensor2
-    return result
-
-
-def nested_concat(tensors, new_tensors, padding_index=-100):
-    """
-    Concat the `new_tensors` to `tensors` on the first dim and pad them on the second if needed. Works for tensors or
-    nested list/tuples of tensors.
-    """
-    assert type(tensors) == type(
-        new_tensors
-    ), f"Expected `tensors` and `new_tensors` to have the same type but found {type(tensors)} and {type(new_tensors)}."
-    if isinstance(tensors, (list, tuple)):
-        return type(tensors)(nested_concat(
-            t, n, padding_index=padding_index)
-                             for t, n in zip(tensors, new_tensors))
-    elif isinstance(tensors, paddle.Tensor):
-        return paddle_pad_and_concatenate(
-            tensors, new_tensors, padding_index=padding_index)
-    elif isinstance(tensors, np.ndarray):
-        return numpy_pad_and_concatenate(
-            tensors, new_tensors, padding_index=padding_index)
-    else:
-        raise TypeError(
-            f"Unsupported type for concatenation: got {type(tensors)}")
-
-
-def nested_detach(tensors):
-    "Detach `tensors` (even if it's a nested list/tuple of tensors)."
-    if isinstance(tensors, (list, tuple)):
-        return type(tensors)(nested_detach(t) for t in tensors)
-    return tensors.detach()
 
 
 # Name of the files used for checkpointing
@@ -148,6 +105,7 @@ def set_seed(seed):
     # Maybe different op seeds(for dropout) for different procs is better. By:
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(seed)
+    # TODO: cuda state seed 
 
 
 class Trainer:
@@ -213,7 +171,7 @@ class Trainer:
           in `train`)
 
     """
-    from trainer_utils import log_metrics, metrics_format, save_metrics, save_state
+    from .trainer_utils import log_metrics, metrics_format, save_metrics, save_state
 
     def __init__(
             self,
@@ -227,30 +185,12 @@ class Trainer:
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]]=None,
             optimizers: Tuple[paddle.optimizer.Optimizer,
                               paddle.optimizer.lr.LRScheduler]=(None, None), ):
-        logger.info("init!!!!")
-
         if args is None:
             output_dir = "tmp_trainer"
             logger.info(
                 f"No `TrainingArguments` passed, using `output_dir={output_dir}`."
             )
             args = TrainingArguments(output_dir=output_dir)
-
-        output_dir = "tmp_trainer"
-        new_args = TrainingArguments(output_dir=output_dir)
-
-        args.per_device_train_batch_size = args.batch_size
-        args.per_device_eval_batch_size = args.batch_size
-
-        for arg in vars(args):
-            v = getattr(args, arg)
-            if v is not None:
-                try:
-                    setattr(new_args, arg, v)
-                except Exception as e:
-                    print(arg, v)
-                    pass
-        args = new_args
 
         self.args = args
         self.do_grad_scaling = args.fp16
@@ -301,6 +241,8 @@ class Trainer:
             )
 
         if args.fp16:
+            self.scaler = paddle.amp.GradScaler(
+                init_loss_scaling=self.args.scale_loss)
             logger.info(f"Using  half precision")
 
         default_label_names = (["start_positions", "end_positions"] if
@@ -360,15 +302,17 @@ class Trainer:
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
 
+        num_update_steps_per_epoch = len(
+            train_dataloader) // args.gradient_accumulation_steps
+        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+
         if args.max_steps > 0:
             args.num_training_steps = args.max_steps
-            num_train_epochs = math.ceil(args.num_training_steps /
-                                         len(train_dataloader))
+            num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                args.max_steps % num_update_steps_per_epoch > 0)
             num_train_samples = args.max_steps * total_train_batch_size
-
         else:
-            args.num_training_steps = len(
-                train_dataloader) * args.num_train_epochs
+            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
             num_train_epochs = math.ceil(args.num_train_epochs)
             num_train_samples = len(self.train_dataset) * args.num_train_epochs
 
@@ -394,7 +338,9 @@ class Trainer:
         logger.info(
             f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
         )
-        logger.info(f"  Gradient Accumulation steps = {1}")
+        logger.info(
+            f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
+        )
         logger.info(f"  Total optimization steps = {args.num_training_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
 
@@ -445,15 +391,17 @@ class Trainer:
                 else:
                     tr_loss_step = self.training_step(model, inputs)
 
-                # self.scaler.step(self.optimizer)
-                # self.scaler.update()
                 tr_loss += tr_loss_step
 
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
                         steps_in_epoch <= args.gradient_accumulation_steps and
                     (step + 1) == steps_in_epoch):
-                    self.optimizer.step()
+                    if self.do_grad_scaling:
+                        self.scaler.minimize(self.optimizer, tr_loss)
+                    else:
+                        self.optimizer.step()
+
                     self.lr_scheduler.step()
                     self.optimizer.clear_grad()
 
@@ -492,9 +440,7 @@ class Trainer:
             # Clean the state at the end of training
             delattr(self, "_past")
 
-        logger.info(
-            "\n\nTraining completed. Do not forget to share your model on huggingface.co/models =)\n\n"
-        )
+        logger.info("\nTraining completed. \n")
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
             if args.local_rank != -1:
                 dist.barrier()
@@ -507,7 +453,7 @@ class Trainer:
                                            WEIGHTS_NAME)
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = torch.load(best_model_path, map_location="cpu")
+                state_dict = paddle.load(best_model_path, map_location="cpu")
                 # If the model is on the GPU, it still works!
                 self._load_state_dict_in_model(state_dict)
             else:
@@ -525,7 +471,6 @@ class Trainer:
             num_samples=num_train_samples,
             num_steps=self.state.max_steps)
 
-        metrics["total_flos"] = self.state.total_flos
         metrics["train_loss"] = train_loss
 
         self.is_in_train = False
@@ -555,22 +500,18 @@ class Trainer:
             return None
 
         if self.args.world_size <= 1:
-            # return RandomSampler(self.train_dataset)
-            return DistributedBatchSampler(
-                self.train_dataset,
-                # num_replicas=self.args.world_size,
-                # rank=self.args.process_index,
-                batch_size=self.args.train_batch_size,
+            return paddle.io.BatchSampler(
+                dataset=self.train_dataset,
                 shuffle=True,
-                # seed=self.args.seed,
-            )
+                batch_size=self.args.per_device_train_batch_size,
+                drop_last=False)
         else:
             return DistributedBatchSampler(
                 self.train_dataset,
-                # num_replicas=self.args.world_size,
-                # rank=self.args.process_index,
-                # seed=self.args.seed,
-            )
+                batch_size=self.args.per_device_train_batch_size,
+                shuffle=True,
+                num_replicas=self.args.world_size,
+                rank=self.args.process_index, )
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
                                  ignore_keys_for_eval):
@@ -579,15 +520,17 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            # tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-            tr_loss_scalar = tr_loss.mean().item()
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            # tr_loss_scalar = tr_loss.mean().item()
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
+            # tr_loss.zero_()
 
             logs["loss"] = round(tr_loss_scalar / (
                 self.state.global_step - self._globalstep_last_logged), 4)
             logs["learning_rate"] = self._get_learning_rate()
+            logs["global_step"] = int(self.state.global_step)
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -846,7 +789,13 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.args.fp16:
-            ctx_manager = autocast()
+            ctx_manager = autocast(
+                True,
+                custom_black_list=[
+                    "reduce_sum", "c_softmax_with_cross_entropy",
+                    "elementwise_div"
+                ],
+                level=self.args.fp16_opt_level)
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()
@@ -866,7 +815,6 @@ class Trainer:
         outputs = model(**inputs)
 
         if self.criterion is not None:
-            # print(outputs)
             loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
 
@@ -1069,8 +1017,9 @@ class Trainer:
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                unwrap_model(self.model).save_pretrained(
-                    output_dir, state_dict=state_dict)
+                # unwrap_model(self.model).save_pretrained(
+                #     output_dir, state_dict=state_dict)
+                unwrap_model(self.model).save_pretrained(output_dir)
             else:
                 logger.info(
                     "Trainer.model is not a `PretrainedModel`, only saving its state dict."
@@ -1202,7 +1151,7 @@ class Trainer:
 
         model = self._wrap_model(self.model, training=False)
 
-        batch_size = dataloader.batch_size
+        batch_size = dataloader.batch_sampler.batch_size
         num_samples = self.num_examples(dataloader)
         logger.info(f"***** Running {description} *****")
         logger.info(f"  Num examples = {num_samples}")
@@ -1236,12 +1185,50 @@ class Trainer:
             # Prediction step
             loss, logits, labels = self.prediction_step(
                 model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
-            losses.append(loss.numpy())
 
+            # Update containers on host
+            if loss is not None:
+                # losses = self._nested_gather(loss.repeat(batch_size))
+                losses = self._nested_gather(
+                    paddle.tile(
+                        loss, repeat_times=[batch_size, 1]))
+                losses_host = losses if losses_host is None else paddle.concat(
+                    (losses_host, losses), axis=0)
+            if labels is not None:
+                labels = self._pad_across_processes(labels)
+                labels = self._nested_gather(labels)
+                labels_host = labels if labels_host is None else nested_concat(
+                    labels_host, labels, padding_index=-100)
+            if logits is not None:
+                logits = self._pad_across_processes(logits)
+                logits = self._nested_gather(logits)
+                preds_host = logits if preds_host is None else nested_concat(
+                    preds_host, logits, padding_index=-100)
+            self.control = self.callback_handler.on_prediction_step(
+                args, self.state, self.control)
+
+        # Gather all remaining tensors and put them back on the CPU
+        if losses_host is not None:
+            losses = nested_numpify(losses_host)
+            all_losses = losses if all_losses is None else np.concatenate(
+                (all_losses, losses), axis=0)
+        if preds_host is not None:
+            logits = nested_numpify(preds_host)
             all_preds = logits if all_preds is None else nested_concat(
                 all_preds, logits, padding_index=-100)
+        if labels_host is not None:
+            labels = nested_numpify(labels_host)
             all_labels = labels if all_labels is None else nested_concat(
                 all_labels, labels, padding_index=-100)
+
+        # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
+        # samplers has been rounded to a multiple of batch_size, so we truncate.
+        if all_losses is not None:
+            all_losses = all_losses[:num_samples]
+        if all_preds is not None:
+            all_preds = nested_truncate(all_preds, num_samples)
+        if all_labels is not None:
+            all_labels = nested_truncate(all_labels, num_samples)
 
         model.train()
 
@@ -1253,8 +1240,11 @@ class Trainer:
         else:
             metrics = {}
 
-        if losses is not None:
-            metrics[f"{metric_key_prefix}_loss"] = float(np.mean(losses))
+        # if losses is not None:
+        #     metrics[f"{metric_key_prefix}_loss"] = float(np.mean(losses))
+
+        if all_losses is not None:
+            metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
 
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):
@@ -1289,7 +1279,7 @@ class Trainer:
         Args:
             model (`nn.Module`):
                 The model to evaluate.
-            inputs (`Dict[str, Union[torch.Tensor, Any]]`):
+            inputs (`Dict[str, Union[paddle.Tensor, Any]]`):
                 The inputs and targets of the model.
 
                 The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
@@ -1301,7 +1291,7 @@ class Trainer:
                 gathering predictions.
 
         Return:
-            Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]: A tuple with the loss,
+            Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]: A tuple with the loss,
             logits and labels (each being optional).
         """
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
@@ -1358,7 +1348,7 @@ class Trainer:
 
     def num_examples(self, dataloader: DataLoader) -> int:
         """
-        Helper to get number of samples in a [`~torch.utils.data.DataLoader`] by accessing its dataset.
+        Helper to get number of samples in a [`~paddle.io.DataLoader`] by accessing its dataset.
 
         Will raise an exception if the underlying dataset does not implement method `__len__`
         """
@@ -1378,6 +1368,57 @@ class Trainer:
         """
         return self.args.process_index == 0
 
+    def _nested_gather(self, tensors, name=None):
+        """
+        Gather value of `tensors` (tensor or list/tuple of nested tensors) and convert them to numpy before
+        concatenating them to `gathered`
+        """
+        if tensors is None:
+            return
+        if self.args.local_rank != -1:
+            tensors = distributed_concat(tensors)
+        return tensors
+
+        # Copied from Accelerate.
+    def _pad_across_processes(self, tensor, pad_index=-100):
+        """
+        Recursively pad the tensors in a nested list/tuple/dictionary of tensors from all devices to the same size so
+        they can safely be gathered.
+        """
+        if isinstance(tensor, (list, tuple)):
+            return type(tensor)(self._pad_across_processes(
+                t, pad_index=pad_index) for t in tensor)
+        elif isinstance(tensor, dict):
+            return type(tensor)({
+                k: self._pad_across_processes(
+                    v, pad_index=pad_index)
+                for k, v in tensor.items()
+            })
+        elif not isinstance(tensor, paddle.Tensor):
+            raise TypeError(
+                f"Can't pad the values of type {type(tensor)}, only of nested list/tuple/dicts of tensors."
+            )
+
+        if len(tensor.shape) < 2:
+            return tensor
+        # Gather all sizes
+        size = paddle.to_tensor(tensor.shape)[None]
+        sizes = self._nested_gather(size).cpu()
+
+        max_size = max(s[1] for s in sizes)
+        if tensor.shape[1] == max_size:
+            return tensor
+
+        # Then pad to the maximum size
+        old_size = tensor.shape
+        new_size = list(old_size)
+        new_size[1] = max_size
+        # new_tensor = tensor.new_zeros(tuple(new_size)) + pad_index
+        new_tensor = paddle.zeros(
+            tuple(new_size), dtype=tensor.dtype) + pad_index
+        new_tensor[:, :old_size[1]] = tensor
+        return new_tensor
+
     def eval(self, *args, **kwargs):
         """
         """
@@ -1386,11 +1427,13 @@ class Trainer:
     def print_config(self):
         """
         """
+        logger.info("==" * 40)
         logger.info('{:^40}'.format("Configuration Arguments"))
         logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
         for arg in vars(self.args):
             logger.info('{:30}:{}'.format(arg, getattr(self.args, arg)))
+        logger.info("==" * 40)
 
 
 class TrainerBase(object):
