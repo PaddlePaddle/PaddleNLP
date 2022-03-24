@@ -3,7 +3,7 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=1
 export PYTHONPATH=./:$PYTHONPATH
 START_ID=0
 FROM_PRETRAIN='test'

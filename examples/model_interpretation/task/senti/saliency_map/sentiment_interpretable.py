@@ -41,6 +41,9 @@ from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBP
 from ernie.tokenizing_ernie import ErnieTokenizer
 
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.append('../../..')
+from model_interpretation.utils import convert_tokenizer_res_to_old_version
+sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -162,6 +165,7 @@ def map_fn_senti(examples, tokenizer):
     log.debug('load data %d' % len(examples))
     contexts = [example['context'] for example in examples]
     tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
+    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
 
     return tokenized_examples
 

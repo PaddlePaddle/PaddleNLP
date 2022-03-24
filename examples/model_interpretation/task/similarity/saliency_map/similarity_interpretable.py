@@ -38,6 +38,9 @@ from roberta.modeling import RobertaForSequenceClassification
 from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet
 from LIME.lime_text import LimeTextExplainer
+sys.path.append('../../..')
+from model_interpretation.utils import convert_tokenizer_res_to_old_version
+sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -142,6 +145,7 @@ def map_fn_senti(examples, tokenizer, language):
     titles = [example[t_name] for example in examples]
     tokenized_examples = tokenizer(
         queries, titles, max_seq_len=args.max_seq_len)
+    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
 
     return tokenized_examples
 

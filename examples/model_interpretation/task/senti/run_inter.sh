@@ -7,7 +7,7 @@ export CUDA_VISIBLE_DEVICES=4
 export PYTHONPATH=./:$PYTHONPATH
 
 LANGUAGE=en                         # LANGUAGE choose in [ch, en]
-BASE_MODEL=lstm            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
+BASE_MODEL=roberta_base            # BASE_MODEL choose in [roberta_base, roberta_large, lstm]
 INTER_MODE=attention                     # INTER_MODE choice in [attention, integrated_gradient, lime]
 TASK=senti_${LANGUAGE}
 DATA=../../data/${TASK}
@@ -19,11 +19,11 @@ if [[ $LANGUAGE == "en" ]]; then
 
     if [[ $BASE_MODEL == "roberta_base" ]]; then
         FROM_PRETRAIN='roberta-base'
-        CKPT=pretrained_models/saved_model_en/roberta_base_20220318_185322/model_10000/model_state.pdparams
+        CKPT=pretrained_models/saved_model_en/roberta_base_20211105_135732/model_10000/model_state.pdparams
         #CKPT=pretrained_models/saved_model_en/roberta_base_20211206_164443/model_10000/model_state.pdparams
     elif [[ $BASE_MODEL == "roberta_large" ]]; then
         FROM_PRETRAIN='roberta-large'
-        CKPT=pretrained_models/saved_model_en/roberta_large_20220318_183813/model_4000/model_state.pdparams
+        CKPT=pretrained_models/saved_model_en/roberta_large_20211105_160323/model_4000/model_state.pdparams
         #CKPT=pretrained_models/saved_model_en/roberta_large_20211207_174631/model_4000/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
         VOCAB_PATH='rnn/vocab.sst2_train'

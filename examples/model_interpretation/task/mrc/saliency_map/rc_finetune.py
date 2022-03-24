@@ -30,6 +30,9 @@ import paddle
 from squad import DuReaderChecklist
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
 from roberta.modeling import RobertaForQuestionAnswering
+sys.path.append('../../..')
+from model_interpretation.utils import convert_tokenizer_res_to_old_version
+sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -108,6 +111,7 @@ def map_fn_DuCheckList_finetune(examples):
         contexts,
         stride=args.doc_stride,
         max_seq_len=args.max_seq_len)
+    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
 
     for i, tokenized_example in enumerate(tokenized_examples):
 

@@ -42,7 +42,9 @@ from saliency_map.squad import DuReaderChecklist, RCInterpret, compute_predictio
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
 from roberta.modeling import RobertaForQuestionAnswering
 sys.path.remove('../task/mrc')
-
+sys.path.append('../..')
+from model_interpretation.utils import convert_tokenizer_res_to_old_version
+sys.path.remove('../..')
 
 def get_args():
     parser = argparse.ArgumentParser('mrc predict with roberta')
@@ -125,6 +127,7 @@ def map_fn_DuCheckList(examples, args, tokenizer):
         contexts,
         stride=args.doc_stride,
         max_seq_len=args.max_seq_len)
+    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
