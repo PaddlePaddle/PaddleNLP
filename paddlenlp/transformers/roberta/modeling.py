@@ -333,7 +333,7 @@ class RobertaModel(RobertaPretrainedModel):
                 Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`) if output_hidden_states is `False` by default.
+            tuple: Returns tuple (`sequence_output`, `pooled_output`) by default.
             Returns (`encoder_outputs`, `pooled_output`) if output_hidden_states is `True`.
 
             With the fields:
@@ -383,7 +383,7 @@ class RobertaModel(RobertaPretrainedModel):
 
         if output_hidden_states:
             output = embedding_output
-            encoder_outputs = []
+            encoder_outputs = [embedding_output]
             for mod in self.encoder.layers:
                 output = mod(output, src_mask=attention_mask)
                 encoder_outputs.append(output)
