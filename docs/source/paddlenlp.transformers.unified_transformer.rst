@@ -10,5 +10,6 @@ unified\_transformer
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.unified_transformer.convert
    paddlenlp.transformers.unified_transformer.modeling
    paddlenlp.transformers.unified_transformer.tokenizer

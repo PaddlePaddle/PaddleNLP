@@ -1,0 +1,7 @@
+{
+  "model_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset-roberta-base-squad2/model_config.json",
+  "model_state": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset-roberta-base-squad2/model_state.pdparams",
+  "tokenizer_config_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset-roberta-base-squad2/tokenizer_config.json",
+  "vocab_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset-roberta-base-squad2/vocab.json",
+  "merges_file": "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset-roberta-base-squad2/merges.txt"
+}

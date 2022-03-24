@@ -4,24 +4,6 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--task_name",
-        default=None,
-        type=str,
-        required=True,
-        help="The name of the task.")
-    parser.add_argument(
-        "--train_file",
-        type=str,
-        required=False,
-        default=None,
-        help="Train data path.")
-    parser.add_argument(
-        "--predict_file",
-        type=str,
-        required=False,
-        default=None,
-        help="Predict data path.")
-    parser.add_argument(
         "--model_type",
         default=None,
         type=str,

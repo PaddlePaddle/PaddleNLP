@@ -49,7 +49,8 @@ def quant_post(args):
             batch_data[1].append(data[1])
             if len(batch_data[0]) == args.batch_size:
                 input_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[0])
-                segment_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[1])
+                segment_ids = Pad(axis=0, pad_val=0,
+                                  dtype="int64")(batch_data[1])
                 yield [input_ids, segment_ids]
                 batch_data = [[], []]
 

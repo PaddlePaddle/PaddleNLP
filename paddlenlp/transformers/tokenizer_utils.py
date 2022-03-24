@@ -21,6 +21,7 @@ import json
 import os
 import six
 import unicodedata
+from collections import OrderedDict, UserDict
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
@@ -41,8 +42,31 @@ from collections import OrderedDict
 
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
-    'is_chinese_char'
+    'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
 ]
+
+
+class BatchEncoding(UserDict):
+    def __init__(self, data=None):
+        super().__init__(data)
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self.data[item]
+        else:
+            raise KeyError(
+                "Indexing with integers is not available when using tokenizer.__call__()"
+                " with return_dict=True. Please set return_dict to False to use integer indexing."
+            )
+
+    def keys(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
+
+    def items(self):
+        return self.data.items()
 
 
 def convert_to_unicode(text):
@@ -139,6 +163,79 @@ def is_chinese_char(cp):
         return True
 
     return False
+
+
+def _is_nonnormalized_char(char):
+    """Check whther `chars` is a non-normalized character."""
+    cp = ord(char)
+    if ((0xFF00 <= cp <= 0xFFEF) or  # Halfwidth and Fullwidth Forms
+        (0xFE50 <= cp <= 0xFE6B) or  # Small Form Variants
+        (0x3358 <= cp <= 0x33FF) or  # CJK Compatibility
+        (0x249C <= cp <= 0x24E9)):  # Enclosed Alphanumerics: Ⓛ ⒰
+        return True
+
+    return False
+
+
+def _is_nonnormalized_numeric(char):
+    """Check whether `chars` is a non-normalized numeric character."""
+    cp = ord(char)
+    if ((0x2460 <= cp <= 0x249B) or  #
+        (0x24EA <= cp <= 0x24FF) or  #
+        (0x2776 <= cp <= 0x2793) or  # Enclosed Alphanumerics
+        (0x2160 <= cp <= 0x217F)):  # Number Forms
+        return True
+
+    return False
+
+
+def normalize_chars(text):
+    """
+    Normalize the text for multiligual and chinese models. Unicode range:
+    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
+    """
+    output = []
+    for char in text:
+        if _is_nonnormalized_char(char):
+            for c in unicodedata.normalize("NFKC", char):
+                output.append(c)
+        elif _is_nonnormalized_numeric(char):
+            output.append(" ")
+            for c in str(int(unicodedata.numeric(char))):
+                output.append(c)
+            output.append(" ")
+        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
+            output.append("凉")
+        else:
+            output.append(char)
+    return "".join(output)
+
+
+def _is_symbol(char):
+    """Check whether CP is the codepoint of a Symbol character."""
+    cp = ord(char)
+    if unicodedata.category(char).startswith('S') or (
+            cp in
+        [0x00ad, 0x00b2, 0x00ba, 0x3007, 0x00b5, 0x00d8, 0x014b, 0x01b1]):
+        return True
+    return False
+
+
+def tokenize_special_chars(text):
+    """Adds whitespace around any special character."""
+    output = []
+    for char in text:
+        cp = ord(char)
+        if ((0x3040 <= cp <= 0x30FF) or  # Japanese
+            (0x0370 <= cp <= 0x04FF) or  # Greek/Coptic & Cyrillic
+            (0x0250 <= cp <= 0x02AF) or  # IPA
+                _is_symbol(char)):
+            output.append(" ")
+            output.append(char)
+            output.append(" ")
+        else:
+            output.append(char)
+    return "".join(output)
 
 
 @dataclass(frozen=True, eq=True)
@@ -486,7 +583,8 @@ class PretrainedTokenizer(object):
                  return_attention_mask=False,
                  return_length=False,
                  return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+                 return_special_tokens_mask=False,
+                 return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
@@ -616,20 +714,21 @@ class PretrainedTokenizer(object):
                 stride=stride,
                 is_split_into_words=is_split_into_words,
                 pad_to_max_seq_len=pad_to_max_seq_len,
-                truncation_strategy="longest_first",
+                truncation_strategy=truncation_strategy,
                 return_position_ids=return_position_ids,
                 return_token_type_ids=return_token_type_ids,
                 return_attention_mask=return_attention_mask,
                 return_length=return_length,
                 return_overflowing_tokens=return_overflowing_tokens,
-                return_special_tokens_mask=return_special_tokens_mask)
+                return_special_tokens_mask=return_special_tokens_mask,
+                return_dict=return_dict)
         else:
             return self.encode(
                 text=text,
                 text_pair=text_pair,
                 max_seq_len=max_seq_len,
                 pad_to_max_seq_len=pad_to_max_seq_len,
-                truncation_strategy="longest_first",
+                truncation_strategy=truncation_strategy,
                 return_position_ids=return_position_ids,
                 return_token_type_ids=return_token_type_ids,
                 return_attention_mask=return_attention_mask,
@@ -1461,7 +1560,8 @@ class PretrainedTokenizer(object):
                      return_attention_mask=False,
                      return_length=False,
                      return_overflowing_tokens=False,
-                     return_special_tokens_mask=False):
+                     return_special_tokens_mask=False,
+                     return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
@@ -1571,6 +1671,7 @@ class PretrainedTokenizer(object):
                     "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
                 )
 
+        batch_outputs = {}
         batch_encode_inputs = []
         for example_id, tokens_or_pair_tokens in enumerate(
                 batch_text_or_text_pairs):
@@ -1691,27 +1792,41 @@ class PretrainedTokenizer(object):
                             range(len(encoded_inputs["input_ids"])))
 
                     encoded_inputs['overflow_to_sample'] = example_id
-                    batch_encode_inputs.append(encoded_inputs)
+                    if return_dict:
+                        for key, value in encoded_inputs.items():
+                            if key not in batch_outputs:
+                                batch_outputs[key] = []
+                            batch_outputs[key].append(value)
+                    else:
+                        batch_encode_inputs.append(encoded_inputs)
                     if offset + length == len(second_ids):
                         break
                     offset += min(length, stride)
 
             else:
-                batch_encode_inputs.append(
-                    self.encode(
-                        first_ids,
-                        second_ids,
-                        max_seq_len=max_seq_len,
-                        pad_to_max_seq_len=pad_to_max_seq_len,
-                        truncation_strategy=truncation_strategy,
-                        return_position_ids=return_position_ids,
-                        return_token_type_ids=return_token_type_ids,
-                        return_attention_mask=return_attention_mask,
-                        return_length=return_length,
-                        return_overflowing_tokens=return_overflowing_tokens,
-                        return_special_tokens_mask=return_special_tokens_mask))
+                encoded_inputs = self.encode(
+                    text,
+                    text_pair,
+                    max_seq_len=max_seq_len,
+                    pad_to_max_seq_len=pad_to_max_seq_len,
+                    truncation_strategy=truncation_strategy,
+                    return_position_ids=return_position_ids,
+                    return_token_type_ids=return_token_type_ids,
+                    return_attention_mask=return_attention_mask,
+                    return_length=return_length,
+                    return_overflowing_tokens=return_overflowing_tokens,
+                    return_special_tokens_mask=return_special_tokens_mask)
 
-        return batch_encode_inputs
+                if return_dict:
+                    for key, value in encoded_inputs.items():
+                        if key not in batch_outputs:
+                            batch_outputs[key] = []
+                        batch_outputs[key].append(value)
+                else:
+                    batch_encode_inputs.append(encoded_inputs)
+
+        return BatchEncoding(
+            batch_outputs) if return_dict else batch_encode_inputs
 
     def get_offset_mapping(self, text):
         """
