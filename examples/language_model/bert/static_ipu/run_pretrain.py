@@ -154,7 +154,7 @@ def create_ipu_strategy(args):
         "exchange.streamBufferOverlap": "hostRearrangeOnly",
     }
 
-    options['enable_engine_caching'] = False
+    options['enable_engine_caching'] = args.enable_engine_caching
 
     ipu_strategy.set_options(options)
 

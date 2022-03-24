@@ -33,5 +33,6 @@ python3 run_pretrain.py \
         --hidden_dropout_prob 0.1 \
         --attention_probs_dropout_prob 0.1 \
         --shuffle True \
-        --wandb True \
+        --wandb False \
+        --enable_engine_caching False \
         --save_steps 500

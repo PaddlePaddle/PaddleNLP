@@ -441,7 +441,8 @@ def main(args):
         all_start_logits = []
         all_end_logits = []
         for step, batch in enumerate(data_loader):
-            logging.info(f'running step: {step}')
+            if step % args.logging_steps == 0:
+                logging.info(f'running step: {step}')
 
             real_len = np.array(batch[0]).shape[0]
             # padding zeros if needed

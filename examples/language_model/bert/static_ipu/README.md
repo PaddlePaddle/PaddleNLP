@@ -171,6 +171,7 @@ pip3.7 install -U build/python/dist/paddlepaddle-0.0.0-cp37-cp37m-linux_x86_64.w
 - `available_mem_proportion` The available proportion of memory used by conv or matmul.
 - `shuffle` Shuffle Dataset.
 - `wandb` Enable logging to Weights and Biases.
+- `enable_engine_caching` Enable engine caching or not.
 - `enable_load_params` Load paddle params or not.
 - `tf_checkpoint` Path to Tensorflow Checkpoint to initialise the model.
 

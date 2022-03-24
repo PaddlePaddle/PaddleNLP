@@ -76,7 +76,7 @@ class PretrainingHDF5DataLoader:
             multiprocessing.Manager().Queue(10) for _ in range(num_workers)
         ]
         self.split_files = np.array_split(self.files, self.num_workers)
-        # feed_worker will load data frm h5py files, and do remask process
+        # feed_worker will load data from h5py files, and do remask process
         self.feed_workers = [
             multiprocessing.Process(
                 target=self.fill_buffer_loop,

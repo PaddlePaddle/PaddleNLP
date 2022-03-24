@@ -33,5 +33,6 @@ python3 run_squad.py \
         --attention_probs_dropout_prob 0.0 \
         --shuffle False \
         --wandb False \
+        --enable_engine_caching False \
         --enable_load_params True \
         --load_params_path "squad_model/Final_model.pdparams"

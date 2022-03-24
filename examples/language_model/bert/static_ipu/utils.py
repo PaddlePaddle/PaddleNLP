@@ -248,5 +248,10 @@ def parse_args():
         "--tf_checkpoint",
         type=str,
         help="Path to Tensorflow Checkpoint to initialise the model.")
+    parser.add_argument(
+        "--enable_engine_caching",
+        type=str_to_bool,
+        default=True,
+        help="enable engine caching or not")
     args = parser.parse_args()
     return args
