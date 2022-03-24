@@ -37,6 +37,29 @@ function func_sed_params(){
     eval $cmd
 }
 
+function func_parse_amp(){
+    filename=$1
+    line=$2
+    param_value=$3
+
+    if [ ${param_value} = "fp16" ]; then
+        param_value="True"
+    else
+        param_value="False"
+    fi
+
+    params=`sed -n "${line}p" $filename`
+    IFS=":"
+    array=(${params})
+    key=${array[0]}
+    value=${array[1]}
+
+    new_params="${key}:${param_value}"
+    IFS=";"
+    cmd="sed -i '${line}s/.*/${new_params}/' '${filename}'"
+    eval $cmd
+}
+
 function set_gpu_id(){
     string=$1
     _str=${string:1:6}
@@ -125,7 +148,7 @@ if  [ ! -n "$PARAMS" ] ;then
     IFS="|"
     batch_size_list=(${batch_size})
     fp_items_list=(${fp_items})
-    device_num_list=(N1C1)
+    device_num_list=(N1C4)
     run_mode="DP"
 else
     # parser params from input: modeltype_bs${bs_item}_${fp_item}_${run_mode}_${device_num}
@@ -153,7 +176,7 @@ for batch_size in ${batch_size_list[*]}; do
     for precision in ${fp_items_list[*]}; do
         for device_num in ${device_num_list[*]}; do
             # sed batchsize and precision
-            func_sed_params "$FILENAME" "${line_precision}" "$precision"
+            func_parse_amp "$FILENAME" "${line_precision}" "$precision"
             func_sed_params "$FILENAME" "${line_batchsize}" "$MODE=$batch_size"
             func_sed_params "$FILENAME" "${line_epoch}" "$MODE=$epoch"
             gpu_id=$(set_gpu_id $device_num)

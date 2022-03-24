@@ -72,6 +72,30 @@ def parse_args():
         default=None,
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--batch_size",
+        default=None,
+        type=int,
+        help="The maximum tokens per batch. ")
+    parser.add_argument(
+        "--use_amp",
+        default=None,
+        type=str,
+        choices=['true', 'false', 'True', 'False'],
+        help="Whether to use amp to train Transformer. ")
+    parser.add_argument(
+        "--amp_level",
+        default=None,
+        type=str,
+        choices=['O1', 'O2'],
+        help="The amp level if --use_amp is on. Can be one of [O1, O2]. ")
+    # For benchmark.
+    parser.add_argument(
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     return args
 
@@ -332,6 +356,16 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    if ARGS.batch_size:
+        args.batch_size = ARGS.batch_size
+    if ARGS.use_amp:
+        ARGS.use_amp = ARGS.use_amp.lower()
+        if ARGS.use_amp == "true":
+            args.use_amp = True
+        else:
+            args.use_amp = False
+    if ARGS.amp_level:
+        args.use_pure_fp16 = ARGS.amp_level == 'O2'
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
     args.vocab_file = ARGS.vocab_file
