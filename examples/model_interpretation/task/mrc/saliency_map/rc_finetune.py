@@ -274,7 +274,7 @@ if __name__ == "__main__":
                     loss = scaler.scale(loss)
                     loss.backward()
                     scaler.minimize(opt, loss)
-                    model.clear_gradients()
+                    opt.clear_grad()
                     lr_scheduler.step()
 
                     if step % 100 == 0:

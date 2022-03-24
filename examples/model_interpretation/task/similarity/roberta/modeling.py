@@ -14,12 +14,15 @@
 """
  This script defines the model structure of roberta
 """
+import sys
 import paddle
 import paddle.nn as nn
 import numpy as np
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
-from roberta.transformer import TransformerEncoderLayer, TransformerEncoder
+sys.path.append('../..')
+from task.transformer import TransformerEncoderLayer, TransformerEncoder
+sys.path.remove('../..')
 
 __all__ = [
     'RobertaModel',

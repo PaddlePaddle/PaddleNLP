@@ -1,12 +1,4 @@
 ###
- # @Author: your name
- # @Date: 2022-03-24 14:01:10
- # @LastEditTime: 2022-03-24 14:01:11
- # @LastEditors: your name
- # @Description: In User Settings Edit
- # @FilePath: /shenyaozong/github_open_source/PaddleNLP/examples/model_interpretation/task/similarity/run_inter.sh
-### 
-###
  # This file contains script to generate saliency map of a specific baseline model and language on given input data
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
