@@ -99,6 +99,7 @@ def do_train(args):
             places = paddle.static.cuda_places()
         elif args.device == "xpu":
             places = paddle.static.xpu_places()
+            paddle.set_device("xpu")
         else:
             places = paddle.static.cpu_places()
             paddle.set_device("cpu")
