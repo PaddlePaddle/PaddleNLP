@@ -6,8 +6,8 @@
 export CUDA_VISIBLE_DEVICES=7
 export PYTHONPATH=./:$PYTHONPATH
 
-LANGUAGE=en                 # LANGUAGE choose in [en, ch]
-BASE_MODEL=roberta_large     # BASE_MODEL choose in [roberta_base, roberta_large]
+LANGUAGE=ch                 # LANGUAGE choose in [en, ch]
+BASE_MODEL=roberta_base     # BASE_MODEL choose in [roberta_base, roberta_large]
 
 if [[ $LANGUAGE == "ch" ]]; then
     if [[ $BASE_MODEL == "roberta_base" ]]; then
@@ -34,7 +34,7 @@ elif [[ $LANGUAGE == "en" ]]; then
     fi
 fi
 
-OUTPUT=./output/MRC_${LANGUAGE}.${BASE_MODEL}
+OUTPUT=./output/mrc_${LANGUAGE}.${BASE_MODEL}
 [ -d $OUTPUT ] || mkdir -p $OUTPUT
 set -x
 python3 ./saliency_map/rc_prediction.py \

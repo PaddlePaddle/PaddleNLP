@@ -7,8 +7,8 @@ export CUDA_VISIBLE_DEVICES=3
 export PYTHONPATH=./:$PYTHONPATH
 
 TASK=mrc
-LANGUAGE=en                 # LANGUAGE choose in [ch, en]
-BASE_MODEL=roberta_large            # BASE_MODEL choose in [roberta_base, roberta_large]
+LANGUAGE=ch                 # LANGUAGE choose in [ch, en]
+BASE_MODEL=roberta_base            # BASE_MODEL choose in [roberta_base, roberta_large]
 INTER_MODE=integrated_gradient      # INTER_MODE choice in [attention, integrated_gradient]
 START=0
 
@@ -33,7 +33,7 @@ elif [[ $LANGUAGE == "en" ]]; then
 fi
 
 
-OUTPUT=./output/MRC_${LANGUAGE}.${BASE_MODEL}
+OUTPUT=./output/mrc_${LANGUAGE}.${BASE_MODEL}
 [ -d $OUTPUT ] || mkdir -p $OUTPUT
 set -x
 python3 ./saliency_map/rc_interpretable.py \
