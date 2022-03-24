@@ -398,13 +398,9 @@ def do_train(args):
     model.train()
     global_step = 0
     best_acc = 0.0
-    reader_time = 0.0
-
     tic_train = time.time()
-    tic_reader = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            reader_time += time.time() - tic_reader
             input_ids, segment_ids, labels = batch
             logits = model(input_ids=input_ids, token_type_ids=segment_ids)
             loss = loss_fct(logits, labels)
@@ -415,10 +411,9 @@ def do_train(args):
             global_step += 1
             if global_step % args.logging_steps == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s, reader: %.2f step/s"
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss,
-                       args.logging_steps / (time.time() - tic_train),
-                       args.logging_steps / reader_time))
+                       args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
@@ -433,8 +428,10 @@ def do_train(args):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
-
-            tic_reader = time.time()
+            if global_step >= num_training_steps:
+                print("best_acc: ", best_acc)
+                return
+    print("best_acc: ", best_acc)
 
 
 def print_arguments(args):
