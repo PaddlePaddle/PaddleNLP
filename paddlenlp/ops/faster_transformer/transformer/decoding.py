@@ -1434,6 +1434,9 @@ def enable_ft_para(tensor_para_size=1,
     paddlenlp.transformers.gpt.modeling.GPTModel.state_dict = block_state_wrapper(
         block_state_fn)
     _ft_para_conf.set_partial_model(True)
+    # TODO(guosheng): Should we set device here, sometimes we want to create
+    # models on CPU first to save memory.
+    # paddle.set_device("gpu:" + str(_ft_para_conf.rank))
     # yield
 
 
