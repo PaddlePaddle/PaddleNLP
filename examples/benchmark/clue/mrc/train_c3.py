@@ -1,3 +1,18 @@
+# coding: utf-8
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import time
 import random
@@ -52,7 +67,7 @@ def parse_args():
         help="The  path of the checkpoints .", )
     parser.add_argument(
         "--num_train_epochs",
-        default=10,
+        default=8,
         type=int,
         help="Total number of training epochs to perform.", )
     parser.add_argument(
@@ -83,7 +98,7 @@ def parse_args():
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--learning_rate",
-        default=2e-4,
+        default=2e-5,
         type=float,
         help="The initial learning rate for Adam.")
     parser.add_argument(
@@ -93,10 +108,9 @@ def parse_args():
         default=1.0,
         type=float,
         help="The max value of grad norm.")
-
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=4,
         type=int,
         help="Batch size per GPU/CPU for training.", )
     parser.add_argument(
@@ -126,7 +140,6 @@ def set_seed(args):
 
 @paddle.no_grad()
 def evaluate(model, loss_fct, dev_data_loader, metric):
-    all_loss = []
     metric.reset()
     criterion = paddle.nn.loss.CrossEntropyLoss()
     model.eval()
@@ -136,25 +149,23 @@ def evaluate(model, loss_fct, dev_data_loader, metric):
         loss = loss_fct(logits, label_id)
         correct = metric.compute(logits, label_id)
         metric.update(correct)
-        all_loss.append(loss.numpy())
-
     acc = metric.accumulate()
     model.train()
-    return np.mean(all_loss), acc
+    return acc
 
 
 def do_train(args):
-    n_class = 4
     max_seq_length = args.max_seq_length
     max_num_choices = 4
 
     def preprocess_function(examples):
         def _truncate_seq_tuple(tokens_a, tokens_b, tokens_c, max_length):
             """Truncates a sequence tuple in place to the maximum length."""
-            # This is a simple heuristic which will always truncate the longer sequence
-            # one token at a time. This makes more sense than truncating an equal percent
-            # of tokens from each, since if one sequence is very short then each token
-            # that's truncated likely contains more information than a longer sequence.
+            # This is a simple heuristic which will always truncate the longer
+            # sequence one token at a time. This makes more sense than
+            # truncating an equal percent of tokens from each, since if one
+            # sequence is very short then each token that's truncated likely
+            # contains more information than a longer sequence.
             while True:
                 total_length = len(tokens_a) + len(tokens_b) + len(tokens_c)
                 if total_length <= max_length:
@@ -174,6 +185,7 @@ def do_train(args):
             text = '\n'.join(examples.data["context"][idx]).lower()
             question = examples.data["question"][idx].lower()
             choice_list = examples.data["choice"][idx]
+            choice_list = [choice.lower() for choice in choice_list]
             answer = examples.data["answer"][idx].lower()
             label = choice_list.index(answer)
 
@@ -182,6 +194,11 @@ def do_train(args):
 
             tokens_t_list = []
             tokens_c_list = []
+
+            # Pad each new example for axis=1, [batch_size, num_choices, seq_len]
+            while len(choice_list) < max_num_choices:
+                choice_list.append('无效答案')
+
             for choice in choice_list:
                 tokens_c = tokenizer.tokenize(choice.lower())
                 _truncate_seq_tuple(tokens_t, tokens_q, tokens_c,
@@ -195,11 +212,21 @@ def do_train(args):
                 tokens_t_list,
                 text_pair=tokens_c_list,
                 is_split_into_words=True)
-            result["input_ids"].append(new_data["input_ids"])
-            result["token_type_ids"].append(new_data["token_type_ids"])
+
+            # Pad each new example for axis=2 of [batch_size, num_choices, seq_len],
+            # because length of each choice could be different.
+            input_ids = Pad(
+                axis=0, pad_val=tokenizer.pad_token_id)(new_data["input_ids"])
+            token_type_ids = Pad(
+                axis=0,
+                pad_val=tokenizer.pad_token_id)(new_data["token_type_ids"])
+
+            # Final shape of input_ids: [batch_size, num_choices, seq_len]
+            result["input_ids"].append(input_ids)
+            result["token_type_ids"].append(token_type_ids)
             result["labels"].append([label])
-            if (idx + 1) % 100 == 0:
-                break
+            if (idx + 1) % 1000 == 0:
+                print(idx + 1, "samples has been processed.")
         return result
 
     paddle.set_device(args.device)
@@ -209,29 +236,22 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     model = model_class.from_pretrained(
         args.model_name_or_path, num_choices=max_num_choices)
-
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     train_ds = load_dataset("clue", "c3", split="train")
     column_names = train_ds.column_names
-
-    time1 = time.time()
     train_ds = train_ds.map(preprocess_function,
                             batched=True,
                             batch_size=len(train_ds),
-                            num_proc=1,
+                            num_proc=8,
                             remove_columns=column_names)
-
-    print("train dataset has been converted to ids.")
-    print(time.time() - time1)
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
         'labels': Stack(dtype="int64")  # label
     }): fn(samples)
 
@@ -244,31 +264,24 @@ def do_train(args):
         num_workers=0,
         return_list=True)
 
-    for data in train_data_loader:
-        print(data)
-        import pdb
-        pdb.set_trace()
-
-    print("Train dataloader has been created.")
     dev_ds = load_dataset("clue", "c3", split="validation")
     dev_ds = dev_ds.map(preprocess_function,
                         batched=True,
                         batch_size=len(dev_ds),
                         remove_columns=column_names,
-                        num_proc=1)
-
+                        num_proc=8)
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_ds, batch_size=args.batch_size, shuffle=False)
-
     dev_data_loader = paddle.io.DataLoader(
         dataset=dev_ds,
         batch_sampler=dev_batch_sampler,
         collate_fn=batchify_fn,
         return_list=True)
-    print("Dev dataloader has been created.")
+
     num_training_steps = len(train_data_loader) * args.num_train_epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          0)
+
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
@@ -284,39 +297,45 @@ def do_train(args):
         grad_clip=grad_clip)
     loss_fct = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
+
     model.train()
     global_step = 0
-    tic_train = time.time()
     best_acc = 0.0
+    tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            print("666")
-            input_ids, segment_ids, label_id = batch
-            logits = model(input_ids=input_ids, token_type_ids=segment_ids)
-            loss = loss_fct(logits, label_id)
             global_step += 1
+            input_ids, segment_ids, label = batch
+            logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+            loss = loss_fct(logits, label)
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            args.logging_steps = 1
             if global_step % args.logging_steps == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
+                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                    % (global_step, num_training_steps, epoch, step,
+                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
-                loss, acc = evaluate(model, loss_fct, dev_data_loader, metric)
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                tic_eval = time.time()
+                acc = evaluate(model, loss_fct, dev_data_loader, metric)
+                print("eval acc: %.5f, eval done total : %s s" %
+                      (acc, time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0 and acc > best_acc:
+                    best_acc = acc
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     if not os.path.exists(args.output_dir):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
-                    best_acc = acc
-
-        print("epoch: %d,  eval loss: %.5f, eval acc: %.2f" %
-              (epoch, loss, acc))
+                    tokenizer.save_pretrained(args.output_dir)
+            if global_step >= num_training_steps:
+                print("best_acc: ", best_acc)
+                return
+    print("best_acc: ", best_acc)
 
 
 def print_arguments(args):

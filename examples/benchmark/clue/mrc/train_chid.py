@@ -1,3 +1,18 @@
+# coding: utf-8
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import time
 import argparse
@@ -86,7 +101,7 @@ def parse_args():
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--learning_rate",
-        default=1e-4,
+        default=2e-5,
         type=float,
         help="The initial learning rate for Adam.")
     parser.add_argument(
@@ -98,12 +113,12 @@ def parse_args():
         help="The max value of grad norm.")
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=4,
         type=int,
         help="Batch size per GPU/CPU for training.", )
     parser.add_argument(
         "--max_seq_length",
-        default=128,
+        default=64,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
@@ -233,6 +248,7 @@ def do_train(args):
             candidate = 0
             options = examples.data['candidates'][idx]
             result = {"input_ids": [], "token_type_ids": [], "labels": []}
+            # Each content may have several sentences.
             for context in examples.data['content'][idx]:
                 context = context.replace("“", "\"").replace("”", "\"").replace("——", "--"). \
                     replace("—", "-").replace("―", "-").replace("…", "...").replace("‘", "\'").replace("’", "\'")
@@ -259,7 +275,8 @@ def do_train(args):
                         all_doc_tokens.append(sub_token)
                 tags = [blank for blank in doc_tokens if '#idiom' in blank]
 
-                for tag_index, tag in enumerate(tags):  # 一个content可能有多个tag
+                # Each sentence may have several tags
+                for tag_index, tag in enumerate(tags):
                     pos = all_doc_tokens.index(tag)
 
                     tmp_l, tmp_r = add_tokens_for_around(all_doc_tokens, pos,
@@ -269,7 +286,9 @@ def do_train(args):
                     tokens_l = []
                     for token in tmp_l:
                         if '#idiom' in token and token != tag:
-                            tokens_l.extend(['[MASK]'] * 4)  # 不是本轮要预测的Tag就mask掉
+                            # Mask tag which is not considered in this new sample.
+                            # Each idiom has four words, so 4 mask tokens are used.
+                            tokens_l.extend(['[MASK]'] * 4)
                         else:
                             tokens_l.append(token)
                     tokens_l = tokens_l[-num_l:]
@@ -285,13 +304,17 @@ def do_train(args):
                     del tmp_r
 
                     tokens_list = []
-                    for i, elem in enumerate(options):  # 多个可能的tag都组成一个样本
+                    # Each tag has ten choices, and the shape of each new
+                    # example is [num_choices, seq_len]
+                    for i, elem in enumerate(options):
                         option = tokenizer.tokenize(elem)
                         tokens = ['[CLS]'] + option + ['[SEP]'] + tokens_l + [
                             '[unused1]'
                         ] + tokens_r + ['[SEP]']
                         tokens_list.append(tokens)
                     new_data = tokenizer(tokens_list, is_split_into_words=True)
+
+                    # Final shape of input_ids: [batch_size, num_choices, seq_len]
                     result["input_ids"].append(new_data["input_ids"])
                     result["token_type_ids"].append(new_data["token_type_ids"])
                     label = examples.data["answers"][idx]["candidate_id"][
@@ -299,8 +322,7 @@ def do_train(args):
                     result["labels"].append(label)
                     candidate += 1
             if (idx + 1) % 1000 == 0:
-                print("processed ", idx + 1, "samples")
-        print("tokenization is finished.")
+                print(idx + 1, "samples has been processed.")
         return result
 
     if paddle.distributed.get_world_size() > 1:
@@ -318,18 +340,14 @@ def do_train(args):
 
     train_ds = load_dataset("clue", "chid", split="train")
     column_names = train_ds.column_names
-    print("train dataset has been loaded.")
-    time1 = time.time()
     train_ds = train_ds.map(preprocess_function,
                             batched=True,
                             batch_size=len(train_ds),
                             num_proc=8,
                             remove_columns=column_names)
-    print("train dataset has been converted to ids.")
-    print(time.time() - time1)
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
         'labels': Stack(dtype="int64")  # label
     }): fn(samples)
 
@@ -357,7 +375,6 @@ def do_train(args):
         batch_sampler=dev_batch_sampler,
         collate_fn=batchify_fn,
         return_list=True)
-    print("Dev dataloader has been created.")
 
     num_training_steps = len(train_data_loader) * args.num_train_epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -378,14 +395,13 @@ def do_train(args):
     loss_fct = nn.CrossEntropyLoss()
     metric = Accuracy()
 
-    print("train dataloader has been generated, and training starts.")
     model.train()
     global_step = 0
-    tic_train = time.time()
     best_acc = 0.0
-    tic_reader = time.time()
     reader_time = 0.0
-    print("start training")
+
+    tic_train = time.time()
+    tic_reader = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             reader_time += time.time() - tic_reader
@@ -404,14 +420,20 @@ def do_train(args):
                        args.logging_steps / (time.time() - tic_train),
                        args.logging_steps / reader_time))
                 tic_train = time.time()
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                tic_eval = time.time()
                 acc = evaluate(model, loss_fct, metric, dev_data_loader)
+                print("eval acc: %.5f, eval done total : %s s" %
+                      (acc, time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0 and acc > best_acc:
+                    best_acc = acc
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     if not os.path.exists(args.output_dir):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
-                    best_acc = acc
+                    tokenizer.save_pretrained(args.output_dir)
+
             tic_reader = time.time()
 
 
