@@ -145,7 +145,8 @@ def map_fn_senti(examples, tokenizer, language):
     titles = [example[t_name] for example in examples]
     tokenized_examples = tokenizer(
         queries, titles, max_seq_len=args.max_seq_len)
-    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
+    tokenized_examples = convert_tokenizer_res_to_old_version(
+        tokenized_examples)
 
     return tokenized_examples
 

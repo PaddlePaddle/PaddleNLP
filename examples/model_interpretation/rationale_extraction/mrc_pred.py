@@ -46,6 +46,7 @@ sys.path.append('../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
 sys.path.remove('../..')
 
+
 def get_args():
     parser = argparse.ArgumentParser('mrc predict with roberta')
     parser.add_argument(
@@ -127,7 +128,8 @@ def map_fn_DuCheckList(examples, args, tokenizer):
         contexts,
         stride=args.doc_stride,
         max_seq_len=args.max_seq_len)
-    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
+    tokenized_examples = convert_tokenizer_res_to_old_version(
+        tokenized_examples)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):

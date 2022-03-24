@@ -14,18 +14,21 @@
 """This file contains some public functions
 """
 
+
 def convert_tokenizer_res_to_old_version(tokenized_res):
     if isinstance(tokenized_res, list):
         return tokenized_res
     if isinstance(tokenized_res, dict):
-        if len(tokenized_res['input_ids']) == 0 or not isinstance(tokenized_res['input_ids'][0], list):
+        if len(tokenized_res['input_ids']) == 0 or not isinstance(
+                tokenized_res['input_ids'][0], list):
             return tokenized_res
         else:
             res = []
             for idx in range(len(tokenized_res['input_ids'])):
                 temp_dict = {}
                 temp_dict['input_ids'] = tokenized_res['input_ids'][idx]
-                temp_dict['token_type_ids'] = tokenized_res['token_type_ids'][idx]
+                temp_dict['token_type_ids'] = tokenized_res['token_type_ids'][
+                    idx]
                 res.apend(temp_dict)
             return res
     else:

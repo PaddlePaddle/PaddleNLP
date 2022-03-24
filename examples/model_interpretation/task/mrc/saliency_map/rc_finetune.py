@@ -111,7 +111,8 @@ def map_fn_DuCheckList_finetune(examples):
         contexts,
         stride=args.doc_stride,
         max_seq_len=args.max_seq_len)
-    tokenized_examples = convert_tokenizer_res_to_old_version(tokenized_examples)
+    tokenized_examples = convert_tokenizer_res_to_old_version(
+        tokenized_examples)
 
     for i, tokenized_example in enumerate(tokenized_examples):
 
