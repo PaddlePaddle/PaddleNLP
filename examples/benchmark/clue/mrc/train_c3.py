@@ -1,25 +1,18 @@
-import json
-import numpy as np
-from tqdm import tqdm
 import os
-import pickle
-import logging
 import time
 import random
-import pandas as pd
 import argparse
 import numpy as np
 
-from paddlenlp.transformers import ErnieForMultipleChoice, ErnieTokenizer
-from paddlenlp.transformers import RobertaForMultipleChoice, RobertaTokenizer
 import paddle
-from paddle.io import TensorDataset
-import paddlenlp as ppnlp
+import paddle.nn as nn
+
+from datasets import load_dataset
+
 from paddlenlp.data import Stack, Dict, Pad, Tuple
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieForMultipleChoice, ErnieTokenizer
 from paddlenlp.transformers import RobertaForMultipleChoice, RobertaTokenizer
-from C3_preprocess import c3Processor, convert_examples_to_features
 
 MODEL_CLASSES = {
     "ernie": (ErnieForMultipleChoice, ErnieTokenizer),
@@ -131,103 +124,16 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def process_validation_data(data_dir, processor, tokenizer, n_class,
-                            max_seq_length):
-
-    label_list = processor.get_labels()
-    eval_examples = processor.get_dev_examples()
-    feature_dir = os.path.join(data_dir,
-                               'dev_features{}.pkl'.format(max_seq_length))
-
-    if os.path.exists(feature_dir):
-        eval_features = pickle.load(open(feature_dir, 'rb'))
-    else:
-        eval_features = convert_examples_to_features(eval_examples, label_list,
-                                                     max_seq_length, tokenizer)
-        with open(feature_dir, 'wb') as w:
-            pickle.dump(eval_features, w)
-
-    input_ids = []
-    input_mask = []
-    segment_ids = []
-    label_id = []
-
-    for f in eval_features:
-        input_ids.append([])
-        input_mask.append([])
-        segment_ids.append([])
-        for i in range(n_class):
-            input_ids[-1].append(f[i].input_ids)
-            input_mask[-1].append(f[i].input_mask)
-            segment_ids[-1].append(f[i].segment_ids)
-        label_id.append(f[0].label_id)
-
-    all_input_ids = paddle.to_tensor(input_ids, dtype='int64')
-    all_input_mask = paddle.to_tensor(input_mask, dtype='int64')
-    all_segment_ids = paddle.to_tensor(segment_ids, dtype='int64')
-    all_label_ids = paddle.to_tensor(label_id, dtype='int64')
-
-    dev_data = TensorDataset(
-        [all_input_ids, all_input_mask, all_segment_ids, all_label_ids])
-
-    return dev_data
-
-
-def process_train_data(data_dir, processor, tokenizer, n_class, max_seq_length):
-
-    label_list = processor.get_labels()
-    train_examples = processor.get_train_examples()
-
-    feature_dir = os.path.join(data_dir,
-                               'train_features{}.pkl'.format(max_seq_length))
-    if os.path.exists(feature_dir):
-        train_features = pickle.load(open(feature_dir, 'rb'))
-    else:
-        train_features = convert_examples_to_features(
-            train_examples, label_list, max_seq_length, tokenizer)
-        with open(feature_dir, 'wb') as w:
-            pickle.dump(train_features, w)
-
-    input_ids = []
-    input_mask = []
-    segment_ids = []
-    label_id = []
-    for f in train_features:
-        input_ids.append([])
-        input_mask.append([])
-        segment_ids.append([])
-        for i in range(n_class):
-            input_ids[-1].append(f[i].input_ids)
-            input_mask[-1].append(f[i].input_mask)
-            segment_ids[-1].append(f[i].segment_ids)
-        label_id.append(f[0].label_id)
-
-    all_input_ids = paddle.to_tensor(input_ids, dtype='int64')
-    all_input_mask = paddle.to_tensor(input_mask, dtype='int64')
-    all_segment_ids = paddle.to_tensor(segment_ids, dtype='int64')
-    all_label_ids = paddle.to_tensor(label_id, dtype='int64')
-
-    train_data = TensorDataset(
-        [all_input_ids, all_input_mask, all_segment_ids, all_label_ids])
-
-    return train_data
-
-
 @paddle.no_grad()
-def evaluate(model, dev_data_loader, metric):
+def evaluate(model, loss_fct, dev_data_loader, metric):
     all_loss = []
     metric.reset()
     criterion = paddle.nn.loss.CrossEntropyLoss()
     model.eval()
     for step, batch in enumerate(dev_data_loader):
-
-        input_ids, input_mask, segment_ids, label_id = batch
-        logits = model(
-            input_ids=input_ids,
-            token_type_ids=segment_ids,
-            attention_mask=input_mask)
-
-        loss = criterion(logits, label_id)
+        input_ids, segment_ids, label_id = batch
+        logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+        loss = loss_fct(logits, label_id)
         correct = metric.compute(logits, label_id)
         metric.update(correct)
         all_loss.append(loss.numpy())
@@ -237,35 +143,170 @@ def evaluate(model, dev_data_loader, metric):
     return np.mean(all_loss), acc
 
 
-def do_train(args, model, metric, criterion, train_data_loader,
-             dev_data_loader):
+def do_train(args):
+    n_class = 4
+    max_seq_length = args.max_seq_length
+    max_num_choices = 4
+
+    def preprocess_function(examples):
+        def _truncate_seq_tuple(tokens_a, tokens_b, tokens_c, max_length):
+            """Truncates a sequence tuple in place to the maximum length."""
+            # This is a simple heuristic which will always truncate the longer sequence
+            # one token at a time. This makes more sense than truncating an equal percent
+            # of tokens from each, since if one sequence is very short then each token
+            # that's truncated likely contains more information than a longer sequence.
+            while True:
+                total_length = len(tokens_a) + len(tokens_b) + len(tokens_c)
+                if total_length <= max_length:
+                    break
+                if len(tokens_a) >= len(tokens_b) and len(tokens_a) >= len(
+                        tokens_c):
+                    tokens_a.pop()
+                elif len(tokens_b) >= len(tokens_a) and len(tokens_b) >= len(
+                        tokens_c):
+                    tokens_b.pop()
+                else:
+                    tokens_c.pop()
+
+        num_examples = len(examples.data["question"])
+        result = {"input_ids": [], "token_type_ids": [], "labels": []}
+        for idx in range(num_examples):
+            text = '\n'.join(examples.data["context"][idx]).lower()
+            question = examples.data["question"][idx].lower()
+            choice_list = examples.data["choice"][idx]
+            answer = examples.data["answer"][idx].lower()
+            label = choice_list.index(answer)
+
+            tokens_t = tokenizer.tokenize(text)
+            tokens_q = tokenizer.tokenize(question)
+
+            tokens_t_list = []
+            tokens_c_list = []
+            for choice in choice_list:
+                tokens_c = tokenizer.tokenize(choice.lower())
+                _truncate_seq_tuple(tokens_t, tokens_q, tokens_c,
+                                    max_seq_length - 4)
+
+                tokens_c = tokens_q + ["[SEP]"] + tokens_c
+                tokens_t_list.append(tokens_t)
+                tokens_c_list.append(tokens_c)
+
+            new_data = tokenizer(
+                tokens_t_list,
+                text_pair=tokens_c_list,
+                is_split_into_words=True)
+            result["input_ids"].append(new_data["input_ids"])
+            result["token_type_ids"].append(new_data["token_type_ids"])
+            result["labels"].append([label])
+            if (idx + 1) % 100 == 0:
+                break
+        return result
+
+    paddle.set_device(args.device)
+    set_seed(args)
+
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
+
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_choices=max_num_choices)
+
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
+    train_ds = load_dataset("clue", "c3", split="train")
+    column_names = train_ds.column_names
+
+    time1 = time.time()
+    train_ds = train_ds.map(preprocess_function,
+                            batched=True,
+                            batch_size=len(train_ds),
+                            num_proc=1,
+                            remove_columns=column_names)
+
+    print("train dataset has been converted to ids.")
+    print(time.time() - time1)
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        'labels': Stack(dtype="int64")  # label
+    }): fn(samples)
+
+    train_batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_data_loader = paddle.io.DataLoader(
+        dataset=train_ds,
+        batch_sampler=train_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
+
+    for data in train_data_loader:
+        print(data)
+        import pdb
+        pdb.set_trace()
+
+    print("Train dataloader has been created.")
+    dev_ds = load_dataset("clue", "c3", split="validation")
+    dev_ds = dev_ds.map(preprocess_function,
+                        batched=True,
+                        batch_size=len(dev_ds),
+                        remove_columns=column_names,
+                        num_proc=1)
+
+    dev_batch_sampler = paddle.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
+
+    dev_data_loader = paddle.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+    print("Dev dataloader has been created.")
+    num_training_steps = len(train_data_loader) * args.num_train_epochs
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         0)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        grad_clip=grad_clip)
+    loss_fct = paddle.nn.loss.CrossEntropyLoss()
+    metric = paddle.metric.Accuracy()
     model.train()
     global_step = 0
     tic_train = time.time()
     best_acc = 0.0
     for epoch in range(args.num_train_epochs):
-        metric.reset()
         for step, batch in enumerate(train_data_loader):
-            input_ids, input_mask, segment_ids, label_id = batch
-            logits = model(
-                input_ids=input_ids,
-                token_type_ids=segment_ids,
-                attention_mask=input_mask)
-            loss = criterion(logits, label_id)
-
+            print("666")
+            input_ids, segment_ids, label_id = batch
+            logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+            loss = loss_fct(logits, label_id)
             global_step += 1
-
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
+            args.logging_steps = 1
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss,
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
-                loss, acc = evaluate(model, dev_data_loader, metric)
+                loss, acc = evaluate(model, loss_fct, dev_data_loader, metric)
                 if paddle.distributed.get_rank() == 0 and acc > best_acc:
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
@@ -274,7 +315,8 @@ def do_train(args, model, metric, criterion, train_data_loader,
                     model_to_save.save_pretrained(args.output_dir)
                     best_acc = acc
 
-        print("epoch: %d,  eval loss: %.5f" % (epoch, loss))
+        print("epoch: %d,  eval loss: %.5f, eval acc: %.2f" %
+              (epoch, loss, acc))
 
 
 def print_arguments(args):
@@ -288,63 +330,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-
-    paddle.set_device(args.device)
-    set_seed(args)
-
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    data_dir = '../data/c3'
-    processor = c3Processor(data_dir)
-
-    n_class = 4
-    max_num_choices = 4
-
-    output_dir = args.output_dir
-    os.makedirs(output_dir, exist_ok=True)
-
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_choices=max_num_choices)
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    train_data = process_train_data(output_dir, processor, tokenizer, n_class,
-                                    args.max_seq_length)
-
-    train_data_loader = paddle.io.DataLoader(
-        dataset=train_data, batch_size=args.batch_size, num_workers=0)
-
-    dev_data = process_validation_data(output_dir, processor, tokenizer,
-                                       n_class, args.max_seq_length)
-
-    dev_data_loader = paddle.io.DataLoader(
-        dataset=dev_data, batch_size=args.batch_size, num_workers=0)
-
-    num_training_steps = len(train_data_loader) * args.num_train_epochs
-
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         0)
-
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
-    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
-
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=grad_clip)
-
-    criterion = paddle.nn.loss.CrossEntropyLoss()
-    metric = paddle.metric.Accuracy()
-    do_train(args, model, metric, criterion, train_data_loader, dev_data_loader)
+    do_train(args)

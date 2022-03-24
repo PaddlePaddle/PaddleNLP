@@ -1,22 +1,20 @@
 import os
 import time
-import inspect
-from functools import partial
 import argparse
-import collections
-import json
+import random
 
 import numpy as np
-import random
-import paddle
-from paddle.io import TensorDataset, DataLoader
 
+import paddle
+from paddle.metric import Accuracy
+import paddle.nn as nn
+
+from datasets import load_dataset
+
+from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import ErnieForMultipleChoice, ErnieTokenizer
 from paddlenlp.transformers import RobertaForMultipleChoice, RobertaTokenizer
-from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.transformers import LinearDecayWithWarmup
-from CHID_preprocess import RawResult, get_final_predictions, write_predictions, generate_input, evaluate
 
 MODEL_CLASSES = {
     "ernie": (ErnieForMultipleChoice, ErnieTokenizer),
@@ -128,143 +126,272 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def process_train_data(input_dir, tokenizer, max_seq_length, max_num_choices):
-
-    train_file = '../data/chid/train.json'
-    train_ans_file = '../data/chid/train_answer.json'
-
-    train_example_file = os.path.join(
-        input_dir, 'train_examples_{}.pkl'.format(str(max_seq_length)))
-    train_feature_file = os.path.join(
-        input_dir, 'train_features_{}.pkl'.format(str(max_seq_length)))
-
-    train_features = generate_input(
-        train_file,
-        train_ans_file,
-        train_example_file,
-        train_feature_file,
-        tokenizer,
-        max_seq_length=max_seq_length,
-        max_num_choices=max_num_choices,
-        is_training=True)
-
-    print("loaded train dataset")
-    print("Num generate examples = {}".format(len(train_features)))
-
-    all_input_ids = paddle.to_tensor(
-        [f.input_ids for f in train_features], dtype='int64')
-    all_input_masks = paddle.to_tensor(
-        [f.input_masks for f in train_features], dtype='int64')
-    all_segment_ids = paddle.to_tensor(
-        [f.segment_ids for f in train_features], dtype='int64')
-    all_choice_masks = paddle.to_tensor(
-        [f.choice_masks for f in train_features], dtype='int64')
-    all_labels = paddle.to_tensor(
-        [f.label for f in train_features], dtype='int64')
-
-    train_data = TensorDataset([
-        all_input_ids, all_input_masks, all_segment_ids, all_choice_masks,
-        all_labels
-    ])
-
-    return train_data
-
-
-def process_validation_data(input_dir, tokenizer, max_seq_length,
-                            max_num_choices):
-    predict_file = '../data/chid/dev.json'
-    dev_example_file = os.path.join(
-        input_dir, 'dev_examples_{}.pkl'.format(str(max_seq_length)))
-    dev_feature_file = os.path.join(
-        input_dir, 'dev_features_{}.pkl'.format(str(max_seq_length)))
-
-    eval_features = generate_input(
-        predict_file,
-        None,
-        dev_example_file,
-        dev_feature_file,
-        tokenizer,
-        max_seq_length=max_seq_length,
-        max_num_choices=max_num_choices,
-        is_training=False)
-
-    all_example_ids = [f.example_id for f in eval_features]
-    all_tags = [f.tag for f in eval_features]
-    all_input_ids = paddle.to_tensor(
-        [f.input_ids for f in eval_features], dtype="int64")
-    all_input_masks = paddle.to_tensor(
-        [f.input_masks for f in eval_features], dtype="int64")
-    all_segment_ids = paddle.to_tensor(
-        [f.segment_ids for f in eval_features], dtype="int64")
-    all_choice_masks = paddle.to_tensor(
-        [f.choice_masks for f in eval_features], dtype="int64")
-    all_example_index = paddle.arange(all_input_ids.shape[0], dtype="int64")
-
-    eval_data = TensorDataset([
-        all_input_ids, all_input_masks, all_segment_ids, all_choice_masks,
-        all_example_index
-    ])
-
-    return eval_data, all_example_ids, all_tags, eval_features
-
-
 @paddle.no_grad()
-def do_evaluate(model, dev_data_loader, all_example_ids, all_tags,
-                eval_features):
-    all_results = []
+def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
-    output_dir = '../data'
-    for step, batch in enumerate(dev_data_loader):
-        input_ids, input_masks, segment_ids, choice_masks, example_indices = batch
-        batch_logits = model(
-            input_ids=input_ids,
-            token_type_ids=segment_ids,
-            attention_mask=input_masks)
-
-        for i, example_index in enumerate(example_indices):
-            logits = batch_logits[i].numpy().tolist()
-            eval_feature = eval_features[example_index.item()]
-            unique_id = int(eval_feature.unique_id)
-            all_results.append(
-                RawResult(
-                    unique_id=unique_id,
-                    example_id=all_example_ids[unique_id],
-                    tag=all_tags[unique_id],
-                    logit=logits))
-
-    predict_file = 'dev_predictions.json'
-    predict_ans_file = '../data/chid/dev_answer.json'
-    print('decoder raw results')
-    tmp_predict_file = os.path.join(output_dir, "raw_predictions.pkl")
-    output_prediction_file = os.path.join(output_dir, predict_file)
-    results = get_final_predictions(all_results, tmp_predict_file, g=True)
-    write_predictions(results, output_prediction_file)
-    print('predictions saved to {}'.format(output_prediction_file))
-
-    acc = evaluate(predict_ans_file, output_prediction_file)
-    print('{predict_file} eval acc：{acc}')
+    metric.reset()
+    for step, batch in enumerate(data_loader):
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+        loss = loss_fct(logits, labels)
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+    res = metric.accumulate()
+    print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
+    res = metric.accumulate()
     model.train()
-    return acc
+    return res
 
 
-def do_train(args, model, train_data_loader, dev_data_loader, all_example_ids,
-             all_tags, eval_features):
+def do_train(args):
+    paddle.set_device(args.device)
+    set_seed(args)
+
+    max_seq_length = args.max_seq_length
+    max_num_choices = 10
+
+    def preprocess_function(examples):
+        SPIECE_UNDERLINE = '▁'
+
+        def _is_chinese_char(cp):
+            if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
+                (cp >= 0x3400 and cp <= 0x4DBF) or  #
+                (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+                (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+                (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+                (cp >= 0x2B820 and cp <= 0x2CEAF) or
+                (cp >= 0xF900 and cp <= 0xFAFF) or  #
+                (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+                return True
+
+            return False
+
+        def is_fuhao(c):
+            if c == '。' or c == '，' or c == '！' or c == '？' or c == '；' or c == '、' or c == '：' or c == '（' or c == '）' \
+                    or c == '－' or c == '~' or c == '「' or c == '《' or c == '》' or c == ',' or c == '」' or c == '"' or c == '“' or c == '”' \
+                    or c == '$' or c == '『' or c == '』' or c == '—' or c == ';' or c == '。' or c == '(' or c == ')' or c == '-' or c == '～' or c == '。' \
+                    or c == '‘' or c == '’':
+                return True
+            return False
+
+        def _tokenize_chinese_chars(text):
+            """Adds whitespace around any CJK character."""
+            output = []
+            is_blank = False
+            for index, char in enumerate(text):
+                cp = ord(char)
+                if is_blank:
+                    output.append(char)
+                    if context[index - 12:index + 1].startswith("#idiom"):
+                        is_blank = False
+                        output.append(SPIECE_UNDERLINE)
+                else:
+                    if text[index:index + 6] == "#idiom":
+                        is_blank = True
+                        if len(output) > 0 and output[-1] != SPIECE_UNDERLINE:
+                            output.append(SPIECE_UNDERLINE)
+                        output.append(char)
+                    elif _is_chinese_char(cp) or is_fuhao(char):
+                        if len(output) > 0 and output[-1] != SPIECE_UNDERLINE:
+                            output.append(SPIECE_UNDERLINE)
+                        output.append(char)
+                        output.append(SPIECE_UNDERLINE)
+                    else:
+                        output.append(char)
+            return "".join(output)
+
+        def is_whitespace(c):
+            if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(
+                    c) == 0x202F or c == SPIECE_UNDERLINE:
+                return True
+            return False
+
+        def add_tokens_for_around(tokens, pos, num_tokens):
+            num_l = num_tokens // 2
+            num_r = num_tokens - num_l
+
+            if pos >= num_l and (len(tokens) - 1 - pos) >= num_r:
+                tokens_l = tokens[pos - num_l:pos]
+                tokens_r = tokens[pos + 1:pos + 1 + num_r]
+            elif pos <= num_l:
+                tokens_l = tokens[:pos]
+                right_len = num_tokens - len(tokens_l)
+                tokens_r = tokens[pos + 1:pos + 1 + right_len]
+            elif (len(tokens) - 1 - pos) <= num_r:
+                tokens_r = tokens[pos + 1:]
+                left_len = num_tokens - len(tokens_r)
+                tokens_l = tokens[pos - left_len:pos]
+            else:
+                raise ValueError('impossible')
+
+            return tokens_l, tokens_r
+
+        max_tokens_for_doc = max_seq_length - 3
+        num_tokens = max_tokens_for_doc - 5
+        num_examples = len(examples.data["candidates"])
+        for idx in range(num_examples):
+            candidate = 0
+            options = examples.data['candidates'][idx]
+            result = {"input_ids": [], "token_type_ids": [], "labels": []}
+            for context in examples.data['content'][idx]:
+                context = context.replace("“", "\"").replace("”", "\"").replace("——", "--"). \
+                    replace("—", "-").replace("―", "-").replace("…", "...").replace("‘", "\'").replace("’", "\'")
+                context = _tokenize_chinese_chars(context)
+                paragraph_text = context.strip()
+                doc_tokens = []
+                prev_is_whitespace = True
+                for c in paragraph_text:
+                    if is_whitespace(c):
+                        prev_is_whitespace = True
+                    else:
+                        if prev_is_whitespace:
+                            doc_tokens.append(c)
+                        else:
+                            doc_tokens[-1] += c
+                        prev_is_whitespace = False
+                all_doc_tokens = []
+                for (i, token) in enumerate(doc_tokens):
+                    if '#idiom' in token:
+                        sub_tokens = [str(token)]
+                    else:
+                        sub_tokens = tokenizer.tokenize(token)
+                    for sub_token in sub_tokens:
+                        all_doc_tokens.append(sub_token)
+                tags = [blank for blank in doc_tokens if '#idiom' in blank]
+
+                for tag_index, tag in enumerate(tags):  # 一个content可能有多个tag
+                    pos = all_doc_tokens.index(tag)
+
+                    tmp_l, tmp_r = add_tokens_for_around(all_doc_tokens, pos,
+                                                         num_tokens)
+                    num_l = len(tmp_l)
+                    num_r = len(tmp_r)
+                    tokens_l = []
+                    for token in tmp_l:
+                        if '#idiom' in token and token != tag:
+                            tokens_l.extend(['[MASK]'] * 4)  # 不是本轮要预测的Tag就mask掉
+                        else:
+                            tokens_l.append(token)
+                    tokens_l = tokens_l[-num_l:]
+                    del tmp_l
+
+                    tokens_r = []
+                    for token in tmp_r:
+                        if '#idiom' in token and token != tag:
+                            tokens_r.extend(['[MASK]'] * 4)
+                        else:
+                            tokens_r.append(token)
+                    tokens_r = tokens_r[:num_r]
+                    del tmp_r
+
+                    tokens_list = []
+                    for i, elem in enumerate(options):  # 多个可能的tag都组成一个样本
+                        option = tokenizer.tokenize(elem)
+                        tokens = ['[CLS]'] + option + ['[SEP]'] + tokens_l + [
+                            '[unused1]'
+                        ] + tokens_r + ['[SEP]']
+                        tokens_list.append(tokens)
+                    new_data = tokenizer(tokens_list, is_split_into_words=True)
+                    result["input_ids"].append(new_data["input_ids"])
+                    result["token_type_ids"].append(new_data["token_type_ids"])
+                    label = examples.data["answers"][idx]["candidate_id"][
+                        candidate]
+                    result["labels"].append(label)
+                    candidate += 1
+            if (idx + 1) % 1000 == 0:
+                print("processed ", idx + 1, "samples")
+        print("tokenization is finished.")
+        return result
+
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
+
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_choices=max_num_choices)
+
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
+    train_ds = load_dataset("clue", "chid", split="train")
+    column_names = train_ds.column_names
+    print("train dataset has been loaded.")
+    time1 = time.time()
+    train_ds = train_ds.map(preprocess_function,
+                            batched=True,
+                            batch_size=len(train_ds),
+                            num_proc=8,
+                            remove_columns=column_names)
+    print("train dataset has been converted to ids.")
+    print(time.time() - time1)
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        'labels': Stack(dtype="int64")  # label
+    }): fn(samples)
+
+    train_batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_data_loader = paddle.io.DataLoader(
+        dataset=train_ds,
+        batch_sampler=train_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
+
+    dev_ds = load_dataset("clue", "chid", split="validation")
+    dev_ds = dev_ds.map(preprocess_function,
+                        batched=True,
+                        batch_size=len(dev_ds),
+                        remove_columns=column_names,
+                        num_proc=8)
+
+    dev_batch_sampler = paddle.io.BatchSampler(
+        dev_ds, batch_size=args.batch_size, shuffle=False)
+
+    dev_data_loader = paddle.io.DataLoader(
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+    print("Dev dataloader has been created.")
+
+    num_training_steps = len(train_data_loader) * args.num_train_epochs
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         0)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        grad_clip=grad_clip)
+    loss_fct = nn.CrossEntropyLoss()
+    metric = Accuracy()
+
+    print("train dataloader has been generated, and training starts.")
     model.train()
     global_step = 0
     tic_train = time.time()
     best_acc = 0.0
     tic_reader = time.time()
     reader_time = 0.0
+    print("start training")
     for epoch in range(args.num_train_epochs):
-        metric.reset()
         for step, batch in enumerate(train_data_loader):
             reader_time += time.time() - tic_reader
-            input_ids, input_masks, segment_ids, choice_masks, labels = batch
-            logits = model(
-                input_ids=input_ids,
-                token_type_ids=segment_ids,
-                attention_mask=input_masks)
-            loss = criterion(logits, labels)
+            input_ids, segment_ids, labels = batch
+            logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+            loss = loss_fct(logits, labels)
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
@@ -277,8 +404,7 @@ def do_train(args, model, train_data_loader, dev_data_loader, all_example_ids,
                        args.logging_steps / (time.time() - tic_train),
                        args.logging_steps / reader_time))
                 tic_train = time.time()
-                acc = do_evaluate(model, dev_data_loader, all_example_ids,
-                                  all_tags, eval_features)
+                acc = evaluate(model, loss_fct, metric, dev_data_loader)
                 if paddle.distributed.get_rank() == 0 and acc > best_acc:
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
@@ -300,57 +426,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    set_seed(args)
-    paddle.set_device(args.device)
-
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    os.makedirs(args.output_dir, exist_ok=True)
-    max_num_choices = 10
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-
-    train_data = process_train_data(args.output_dir, tokenizer,
-                                    args.max_seq_length, max_num_choices)
-    train_data_loader = DataLoader(
-        dataset=train_data, batch_size=args.batch_size, num_workers=0)
-
-    eval_data, all_example_ids, all_tags, eval_features = process_validation_data(
-        args.output_dir, tokenizer, args.max_seq_length, max_num_choices)
-
-    # Run prediction for full data
-    dev_data_loader = DataLoader(eval_data, batch_size=args.batch_size)
-
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_choices=max_num_choices)
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    num_training_steps = len(train_data_loader) * args.num_train_epochs
-
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         0)
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
-    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
-
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=grad_clip)
-
-    criterion = paddle.nn.loss.CrossEntropyLoss()
-
-    metric = paddle.metric.Accuracy()
-
-    do_train(args, model, train_data_loader, dev_data_loader, all_example_ids,
-             all_tags, eval_features)
+    do_train(args)
