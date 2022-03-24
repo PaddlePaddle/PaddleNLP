@@ -24,26 +24,26 @@ import shutil
 import sys
 import time
 import warnings
+import types
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from tqdm.auto import tqdm
-
+import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddle.io import DataLoader, DistributedBatchSampler
 import paddle.amp.auto_cast as autocast
-
-import numpy as np
+from paddle.io import (
+    Dataset,
+    DataLoader,
+    DistributedBatchSampler, )
+from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from paddlenlp.utils.log import logger
 
 from .trainer_args import (TrainingArguments, )
-# from trainer_callback import TrainerState, TrainerControl
-
 from .trainer_utils import (
     IntervalStrategy,
     EvaluationStrategy,
@@ -52,8 +52,9 @@ from .trainer_utils import (
     PredictionOutput,
     EvalLoopOutput,
     speed_metrics,
-    OptimizerNames, )
-
+    OptimizerNames,
+    PREFIX_CHECKPOINT_DIR,
+    get_last_checkpoint, )
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -62,19 +63,16 @@ from .trainer_callback import (
     TrainerCallback,
     TrainerControl,
     TrainerState, )
-
-DEFAULT_CALLBACKS = [DefaultFlowCallback]
-
-from .utils import logging
-from .utils.helper import (distributed_concat, nested_concat, nested_detach,
-                           nested_numpify, nested_truncate)
-
-from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
-from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
-
+from .utils.helper import (
+    distributed_concat,
+    nested_concat,
+    nested_detach,
+    nested_numpify,
+    nested_truncate, )
+# from .utils import logging
 # logger = logging.get_logger(__name__)
 
-from paddle.io import Dataset
+DEFAULT_CALLBACKS = [DefaultFlowCallback]
 
 
 class DataCollator:
@@ -94,7 +92,8 @@ OPTIMIZER_NAME = "optimizer.pdparams"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 
-PREFIX_CHECKPOINT_DIR = "training"
+WEIGHTS_NAME = "model_state.pdparams"
+CONFIG_NAME = "model_config.json"
 
 
 def set_seed(seed):
@@ -113,13 +112,13 @@ class Trainer:
     Trainer is a simple but feature-complete training and eval loop for PyTorch, optimized for 🤗 Transformers.
 
     Args:
-        model ([`PretrainedModel`] or `paddle.nn.Module`, *optional*):
+        model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
             The model to train, evaluate or use for predictions. If not provided, a `model_init` must be passed.
 
             <Tip>
 
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
-            your own models defined as `paddle.nn.Module` as long as they work the same way as the 🤗 Transformers
+            your own models defined as `paddle.nn.Layer` as long as they work the same way as the 🤗 Transformers
             models.
 
             </Tip>
@@ -294,10 +293,39 @@ class Trainer:
             ignore_keys_for_eval: Optional[List[str]]=None,
             **kwargs, ):
 
+        args = self.args
+        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+
+        model_reloaded = False
+
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(
+                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                )
+
+        if resume_from_checkpoint is not None:
+            if not os.path.isfile(
+                    os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
+                raise ValueError(
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            # We load the model state dict on the CPU to avoid an OOM error.
+            state_dict = paddle.load(
+                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            # If the model is on the GPU, it still works!
+            self._set_state_dict_in_model(state_dict)
+
+            # release memory
+            del state_dict
+
         train_dataloader = self.get_train_dataloader()
         model = self._wrap_model(self.model_wrapped)
 
-        args = self.args
         self.state = TrainerState()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
@@ -326,6 +354,9 @@ class Trainer:
 
         self.create_optimizer_and_scheduler(
             num_training_steps=args.num_training_steps)
+
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         num_examples = len(self.train_dataset)
 
@@ -455,7 +486,7 @@ class Trainer:
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, map_location="cpu")
                 # If the model is on the GPU, it still works!
-                self._load_state_dict_in_model(state_dict)
+                self._set_state_dict_in_model(state_dict)
             else:
                 logger.warning(
                     f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
@@ -511,7 +542,11 @@ class Trainer:
                 batch_size=self.args.per_device_train_batch_size,
                 shuffle=True,
                 num_replicas=self.args.world_size,
-                rank=self.args.process_index, )
+                rank=self.args.process_index,
+                drop_last=False)
+
+    def _set_state_dict_in_model(self, state_dict):
+        load_result = self.model.set_state_dict(state_dict)
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
                                  ignore_keys_for_eval):
@@ -743,9 +778,6 @@ class Trainer:
         if unwrap_model(model) is not model:
             return model
 
-        if self.args.n_gpu > 1:
-            model = nn.DistributedDataParallel(model)
-
         # Note: in paddle.distributed mode, there's no point in wrapping the model
         # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
         if not training:
@@ -837,7 +869,7 @@ class Trainer:
         Subclass and override to inject custom behavior.
 
         Args:
-            model (`nn.Module`):
+            model (`nn.Layer`):
                 The model to train.
             inputs (`Dict[str, Union[paddle.Tensor, Any]]`):
                 The inputs and targets of the model.
@@ -853,10 +885,6 @@ class Trainer:
 
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
-
-        if self.args.n_gpu > 1:
-            loss = loss.mean(
-            )  # mean() to average on multi-gpu parallel training
 
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
@@ -1045,18 +1073,16 @@ class Trainer:
                     os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
             map_location = self.args.device
-            self.optimizer.load_state_dict(
-                paddle.load(
-                    os.path.join(checkpoint, OPTIMIZER_NAME),
-                    map_location=map_location))
-            with warnings.catch_warnings(record=True) as caught_warnings:
-                self.lr_scheduler.load_state_dict(
-                    paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
-            reissue_pt_warnings(caught_warnings)
+            self.optimizer.set_state_dict(
+                paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
+            self.lr_scheduler.set_state_dict(
+                paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(
                     os.path.join(checkpoint, SCALER_NAME)):
                 self.scaler.load_state_dict(
-                    paddle.load(os.path.join(checkpoint, SCALER_NAME)))
+                    paddle.load(
+                        os.path.join(checkpoint, SCALER_NAME),
+                        return_numpy=True))
 
     def log(self, logs: Dict[str, float]) -> None:
         """
@@ -1155,7 +1181,9 @@ class Trainer:
         num_samples = self.num_examples(dataloader)
         logger.info(f"***** Running {description} *****")
         logger.info(f"  Num examples = {num_samples}")
-        logger.info(f"  Batch size = {batch_size}")
+        logger.info(f"  Pre device batch size = {batch_size}")
+        logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
+        logger.info(f"  Total prediction steps = {len(dataloader)}")
 
         model.eval()
 
@@ -1167,7 +1195,7 @@ class Trainer:
             self._past = None
 
         # Initialize containers
-        # losses/preds/labels on GPU/TPU (accumulated for eval_accumulation_steps)
+        # losses/preds/labels on GPU (accumulated for eval_accumulation_steps)
         losses_host = None
         preds_host = None
         labels_host = None
@@ -1261,7 +1289,52 @@ class Trainer:
                 test_dataset: Dataset,
                 ignore_keys: Optional[List[str]]=None,
                 metric_key_prefix: str="test") -> PredictionOutput:
-        pass
+        """
+        Run prediction and returns predictions and potential metrics.
+        Depending on the dataset and your use case, your test dataset may contain labels. In that case, this method
+        will also return metrics, like in `evaluate()`.
+        Args:
+            test_dataset (`Dataset`):
+                Dataset to run the predictions on. If it is an `datasets.Dataset`, columns not accepted by the
+                `model.forward()` method are automatically removed. Has to implement the method `__len__`
+            ignore_keys (`Lst[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"test"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "test_bleu" if the prefix is "test" (default)
+        <Tip>
+        If your predictions or labels have different sequence length (for instance because you're doing dynamic padding
+        in a token classification task) the predictions will be padded (on the right) to allow for concatenation into
+        one array. The padding index is -100.
+        </Tip>
+        Returns: *NamedTuple* A namedtuple with the following keys:
+            - predictions (`np.ndarray`): The predictions on `test_dataset`.
+            - label_ids (`np.ndarray`, *optional*): The labels (if the dataset contained some).
+            - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
+              labels).
+        """
+        test_dataloader = self.get_test_dataloader(test_dataset)
+        start_time = time.time()
+
+        eval_loop = self.evaluation_loop
+        output = eval_loop(
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix)
+        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        output.metrics.update(
+            speed_metrics(
+                metric_key_prefix,
+                start_time,
+                num_samples=output.num_samples,
+                num_steps=math.ceil(output.num_samples / total_batch_size), ))
+
+        return PredictionOutput(
+            predictions=output.predictions,
+            label_ids=output.label_ids,
+            metrics=output.metrics)
 
     def prediction_step(
             self,
@@ -1277,7 +1350,7 @@ class Trainer:
         Subclass and override to inject custom behavior.
 
         Args:
-            model (`nn.Module`):
+            model (`nn.Layer`):
                 The model to evaluate.
             inputs (`Dict[str, Union[paddle.Tensor, Any]]`):
                 The inputs and targets of the model.
@@ -1427,13 +1500,18 @@ class Trainer:
     def print_config(self):
         """
         """
-        logger.info("==" * 40)
+        logger.info("=" * 60)
         logger.info('{:^40}'.format("Configuration Arguments"))
         logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
-        for arg in vars(self.args):
-            logger.info('{:30}:{}'.format(arg, getattr(self.args, arg)))
-        logger.info("==" * 40)
+
+        for a in dir(self.args):
+            if (a[:2] != "__"):  #don't print double underscore methods
+                v = getattr(self.args, a)
+                if not isinstance(v, types.MethodType):
+                    logger.info('{:30}:{}'.format(a, v))
+
+        logger.info("=" * 60)
 
 
 class TrainerBase(object):

@@ -374,7 +374,10 @@ def do_train():
             training_args,
             test_ds=all_ds["test"])
 
-    train_result = trainer.train(resume_from_checkpoint=None)
+    resume_from_checkpoint = training_args.resume_from_checkpoint
+    if training_args.resume_from_checkpoint is None:
+        resume_from_checkpoint = True
+    train_result = trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     metrics = train_result.metrics
 
     trainer.save_model()  # Saves the tokenizer too for easy upload

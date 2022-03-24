@@ -561,8 +561,6 @@ class TrainingArguments:
             "The path to a folder with a valid checkpoint for your model."
         }, )
 
-    _n_gpu: int = field(init=False, repr=False, default=-1)
-
     def __post_init__(self):
         # Handle --use_env option in paddle.distributed.launch (local_rank not passed as an arg then).
         # This needs to happen before any call to self.device or self.n_gpu.
@@ -672,7 +670,7 @@ class TrainingArguments:
         """
         The actual batch size for training.
         """
-        train_batch_size = self.per_device_train_batch_size * max(1, self.n_gpu)
+        train_batch_size = self.per_device_train_batch_size
         return train_batch_size
 
     @property
@@ -680,21 +678,8 @@ class TrainingArguments:
         """
         The actual batch size for evaluation.
         """
-        eval_batch_size = self.per_device_eval_batch_size * max(1, self.n_gpu)
+        eval_batch_size = self.per_device_eval_batch_size
         return eval_batch_size
-
-    @property
-    def n_gpu(self):
-        """
-        The number of GPUs used by this process.
-
-        Note:
-            This will only be greater than one when you have multiple GPUs available but are not using distributed
-            training. For distributed training, it will always be 1.
-        """
-        # Make sure `self._n_gpu` is properly setup.
-        # _ = self._setup_devices
-        return self._n_gpu
 
     @property
     def device(self) -> "paddle.device":
