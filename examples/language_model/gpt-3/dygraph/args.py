@@ -239,6 +239,13 @@ def parse_args(MODEL_CLASSES):
         const=False,
         help="sharding stage2/3 cpu offload strategy.")
 
+    parser.add_argument(
+        "--eager_mode",
+        type=str2bool,
+        nargs='?',
+        const=False,
+        help="Enable training in eager mode.")
+
     # Pure FP16 config
     parser.add_argument(
         "--use_pure_fp16",

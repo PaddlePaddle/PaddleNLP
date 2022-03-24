@@ -37,6 +37,8 @@ import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
+from paddle.fluid.framework import _test_eager_guard, core
+from paddle.fluid.dygraph import ParallelEnv
 
 # add sharding stage2/3
 from paddle.distributed.sharding import group_sharded_parallel
@@ -121,6 +123,14 @@ def get_train_data_file(args):
 
 
 def do_train(args):
+    if args.eager_mode:
+        with _test_eager_guard():
+            train_func(args)
+    else:
+        train_func(args)
+
+
+def train_func(args):
     paddle.set_device(args.device)
     nranks = paddle.distributed.get_world_size()
     strategy = fleet.DistributedStrategy()
@@ -247,7 +257,7 @@ def do_train(args):
             grad_clip=clip,
             apply_decay_param_fun=lambda x: x in decay_params)
     else:
-        optimizer = paddle.optimizer.AdamW(
+        optimizer = paddle.optimizer.Adam(
             learning_rate=lr_scheduler
             if lr_scheduler is not None else args.max_lr,
             beta1=args.adam_beta1,
@@ -256,7 +266,7 @@ def do_train(args):
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
+            # apply_decay_param_fun=lambda x: x in decay_params,
             # TODO: remove 'multi_precision' in definition of optimizer
             # and add it to 'paddle.amp.decorate'
             multi_precision=args.use_pure_fp16)
@@ -277,8 +287,17 @@ def do_train(args):
                                                      args.sharding_offload)
 
     elif paddle.distributed.get_world_size() > 1:
-        model = fleet.distributed_model(model)
-        optimizer = fleet.distributed_optimizer(optimizer)
+        if args.eager_mode:
+            nranks = ParallelEnv().nranks
+            rank = ParallelEnv().local_rank
+            is_master = True if rank == 0 else False
+            store = paddle.fluid.core.TCPStore("127.0.0.1", 6175, is_master,
+                                               nranks)
+            group = core.ProcessGroupNCCL(store, rank, nranks)
+            model = paddle.DataParallel(model, process_group=group)
+        else:
+            model = fleet.distributed_model(model)
+            optimizer = fleet.distributed_optimizer(optimizer)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)

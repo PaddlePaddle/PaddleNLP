@@ -1,3 +1,5 @@
+export PYTHONPATH=$PYTHONPATH:../../../../
+
 log_dir=dp2_pp2_mp2
 rm -rf $log_dir
 
@@ -17,11 +19,12 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --scale_loss 32768\
     --global_batch_size 16\
     --micro_batch_size 2\
-    --dp_degree 2\
-    --mp_degree 2\
-    --pp_degree 2\
+    --dp_degree 8\
+    --mp_degree 1\
+    --pp_degree 1\
     --sharding_degree 1\
-    --use_pure_fp16 True\
+    --eager_mode False\
+    --use_pure_fp16 False\
     --use_recompute False\
-    --sharding_stage 2\
+    --sharding_stage 1\
     --sharding_offload False
