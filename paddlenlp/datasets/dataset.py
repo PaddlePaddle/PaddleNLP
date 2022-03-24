@@ -26,7 +26,12 @@ import time
 import paddlenlp
 import datasets
 
-import paddle.distributed as dist
+try:
+    import paddle.distributed as dist
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
+
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url, _get_unique_endpoints
@@ -45,13 +50,15 @@ from datasets import load_dataset as origin_load_dataset
 
 def load_from_ppnlp(path, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
-    path = os.path.split(path)[-1]
-    path = os.path.join(ppnlp_path, path + '.py')
-    return origin_load_dataset(path, **kwargs)
+    new_path = os.path.split(path)[-1]
+    new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
+    if os.path.exists(new_path):
+        return origin_load_dataset(new_path, **kwargs)
+    else:
+        return origin_load_dataset(path, **kwargs)
 
 
-if os.environ.get('ISINTRANET', '0') == '1':
-    datasets.load_dataset = load_from_ppnlp
+datasets.load_dataset = load_from_ppnlp
 
 
 class DatasetTuple:
