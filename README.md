@@ -15,7 +15,6 @@
 
 * [2022-03-21] PaddleNLP**一键预测工具**[Taskflow](./docs/model_zoo/taskflow.md)全新升级！🚀欢迎体验更丰富的功能、更便捷的使用方式；新推出适合不同场景的中文分词、命名实体识别模式！
 * [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
-* [2021-12-12] PaddleNLP v2.2版本已发布！:tada: 欢迎体验更快的文本处理[FasterTokenizer](./examples/faster/faster_ernie)、更快的预训练模型[FasterERNIE](./examples/faster/faster_ernie)、更快的文本生成[FasterGeneration](./examples/faster/faster_generation)；新推出『解语』名词短语标注工具[NPTag](./examples/text_to_knowledge/nptag)、超快中文小模型[PP-MiniLM](./examples/model_compression/pp-minilm)！ 更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.1.0)。
 
 ## 简介
 
@@ -58,39 +57,8 @@ pip install --upgrade paddlenlp
 
 Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
 
-```python
-from paddlenlp import Taskflow
+![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
-# 中文分词
-seg = Taskflow("word_segmentation")
-seg("第十四届全运会在西安举办")
->>> ['第十四届', '全运会', '在', '西安', '举办']
-
-# 词性标注
-tag = Taskflow("pos_tagging")
-tag("第十四届全运会在西安举办")
->>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
-
-# 命名实体识别
-ner = Taskflow("ner")
-ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
->>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
-
-# 『解语』- 名词短语标注
-nptag = Taskflow("knowledge_mining", model="nptag")
-nptag("红曲霉菌")
->>> [{'text': '红曲霉菌', 'label': '微生物'}]
-
-# 句法分析
-ddp = Taskflow("dependency_parsing")
-ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
->>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
-
-# 情感分析
-senta = Taskflow("sentiment_analysis")
-senta("这个产品用起来真的很流畅，我非常喜欢")
->>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
-```
 更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
 ### Transformers API: 强大的预训练模型生态底座
