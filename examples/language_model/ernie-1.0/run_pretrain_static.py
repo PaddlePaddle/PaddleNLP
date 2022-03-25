@@ -61,12 +61,14 @@ def create_pretrained_dataset(
         max_seq_len,
         places,
         data_holders,
+        binary_head=True,
         current_step=0, ):
 
     train_valid_test_num_samples = [
-        args.global_batch_size * args.max_steps, args.micro_batch_size *
-        (args.max_steps // args.eval_freq + 1) * args.eval_iters *
-        data_world_size, args.micro_batch_size * args.test_iters
+        args.global_batch_size * args.max_steps,
+        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
+        args.eval_iters * data_world_size,
+        args.micro_batch_size * args.test_iters * data_world_size
     ]
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=data_file,
@@ -79,7 +81,7 @@ def create_pretrained_dataset(
         short_seq_prob=args.short_seq_prob,
         seed=args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
 
@@ -153,6 +155,7 @@ def create_data_holder(args=None):
         name="masked_lm_positions", shape=[-1], dtype="int32")
     masked_lm_labels = paddle.static.data(
         name="masked_lm_labels", shape=[-1, 1], dtype="int64")
+
     next_sentence_labels = paddle.static.data(
         name="next_sentence_labels", shape=[-1, 1], dtype="int64")
 
@@ -235,12 +238,26 @@ def dist_optimizer(args, topo):
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -254,36 +271,41 @@ def run_evaluate(data_loader,
                  is_last,
                  eval_fetch,
                  task_name="valid"):
-    all_loss, all_lm_loss, all_sop_loss = [], [], []
+    all_ret = collections.defaultdict(list)
+    average_ret = collections.defaultdict(float)
+
     local_time = time.time()
 
     for eval_step, batch in enumerate(data_loader):
-        ret = exe.run(program, feed=batch, fetch_list=eval_fetch)
-        loss_return, lm_loss_return, sop_loss_return = ret
+        ret = exe.run(program, feed=batch, fetch_list=list(eval_fetch.values()))
         if is_last:
-            all_loss.append(float(loss_return[0]))
-            all_lm_loss.append(float(lm_loss_return[0]))
-            all_sop_loss.append(float(sop_loss_return[0]))
+            for k, v in zip(list(eval_fetch.keys()), ret):
+                all_ret[k].append(float(v[0]))
 
         if eval_step >= iter_steps - 1:
             if not is_last:
                 break
-            average_loss = sum(all_loss) / len(all_loss)
-            average_lm_loss = sum(all_lm_loss) / len(all_lm_loss)
-            average_sop_loss = sum(all_sop_loss) / len(all_sop_loss)
-            logger.info(
-                "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f tokens/s"
-                % (task_name, global_step, eval_step, average_loss,
-                   average_lm_loss, average_sop_loss,
-                   iter_steps * args.micro_batch_size * args.max_seq_len /
-                   (time.time() - local_time)))
 
-            log_writer.add_scalar(task_name + "_loss", average_loss,
-                                  global_step)
-            log_writer.add_scalar(task_name + "_lm_loss", average_lm_loss,
-                                  global_step)
-            log_writer.add_scalar(task_name + "_sop_loss", average_sop_loss,
-                                  global_step)
+            for k in list(eval_fetch.keys()):
+                average_ret[k] = sum(all_ret[k]) / len(all_ret[k])
+
+            speed = iter_steps / (time.time() - local_time)
+            speed_tokens = speed * args.micro_batch_size * args.max_seq_len
+            ips = speed * args.micro_batch_size
+
+            loss_info = ", ".join([
+                "{}: {:.6f}".format(k, average_ret[k])
+                for k in eval_fetch.keys()
+            ])
+
+            logger.info(
+                "%s step %d, batch: %d, %s, speed: %.0f tokens/s, ips: %.2f seqs/s"
+                % (task_name, global_step, eval_step + 1, loss_info,
+                   speed_tokens, ips))
+
+            for k in list(eval_fetch.keys()):
+                log_writer.add_scalar("%s_%s" % (task_name, k), average_ret[k],
+                                      global_step)
 
             break
 
@@ -410,10 +432,15 @@ def do_train(args):
             attention_mask=input_mask,
             masked_positions=masked_lm_positions)
 
-        criterion = criterion_class()
-        lm_loss, sop_loss = criterion(prediction_scores, seq_relationship_score,
-                                      masked_lm_labels, next_sentence_labels)
-        loss = lm_loss + sop_loss
+        criterion = criterion_class(with_nsp_loss=args.binary_head)
+        if args.binary_head:
+            lm_loss, sop_loss = criterion(
+                prediction_scores, seq_relationship_score, masked_lm_labels,
+                next_sentence_labels)
+            loss = lm_loss + sop_loss
+        else:
+            loss = criterion(prediction_scores, seq_relationship_score,
+                             masked_lm_labels)
 
         # Create the learning_rate sheduler and optimizer
         if args.decay_steps is None:
@@ -516,17 +543,20 @@ def do_train(args):
         if not flag_loaded:
             logger.error("No checkpoint load.")
 
-    # load checkpoint vars 
+    # load checkpoint vars
     if os.path.exists(checkpoint_dir):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
             paddle.static.load(main_program,
                                os.path.join(checkpoint_dir, "static_vars"), exe)
 
-    fetch_vars = collections.OrderedDict()
-    fetch_vars["loss"] = loss
-    fetch_vars["lm_loss"] = lm_loss
-    fetch_vars["sop_loss"] = sop_loss
-    fetch_vars["learning_rate"] = main_program.global_block().vars[
+    fetch_loss_vars = collections.OrderedDict()
+    fetch_other_vars = collections.OrderedDict()
+    fetch_loss_vars["loss"] = loss
+    if args.binary_head:
+        fetch_loss_vars["lm_loss"] = lm_loss
+        fetch_loss_vars["sop_loss"] = sop_loss
+
+    fetch_other_vars["learning_rate"] = main_program.global_block().vars[
         "learning_rate_0"]
 
     additional_vars = collections.OrderedDict()
@@ -539,8 +569,10 @@ def do_train(args):
         fetchs = []
         fetchs_keys = []
         if topo.is_last:
-            fetchs = list(fetch_vars.values()) + list(additional_vars.values())
-            fetchs_keys = list(fetch_vars.keys()) + list(additional_vars.keys())
+            fetchs = list(fetch_loss_vars.values()) + list(
+                fetch_other_vars.values()) + list(additional_vars.values())
+            fetchs_keys = list(fetch_loss_vars.keys()) + list(
+                fetch_other_vars.keys()) + list(additional_vars.keys())
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
@@ -561,15 +593,22 @@ def do_train(args):
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
-                    res = {}
+                    res = collections.defaultdict(float)
                     for k, v in zip(fetchs_keys, ret):
                         res[k] = v[0]
 
                     speed = args.logging_freq / (time.time() - tic_train)
-                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, res["loss"], res["lm_loss"],
-                        res["sop_loss"], speed, speed * args.global_batch_size,
-                        res["learning_rate"])
+
+                    loss_info = "loss: %.6f, lm_loss: %.6f, sop_loss: %.6f"
+
+                    loss_info = ", ".join([
+                        "{}: {:.6f}".format(k, res[k])
+                        for k in fetch_loss_vars.keys()
+                    ])
+
+                    common_loginfo = "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                        global_step, loss_info, speed,
+                        speed * args.global_batch_size, res["learning_rate"])
                     additional_loginfo = ", ".join([
                         "{}: {}".format(k, res[k])
                         for k in additional_vars.keys()
@@ -590,9 +629,12 @@ def do_train(args):
 
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
-                eval_fetch = []
+                eval_fetch = collections.OrderedDict()
                 if topo.is_last:
-                    eval_fetch = [loss, lm_loss, sop_loss]
+                    eval_fetch["loss"] = loss
+                    if args.binary_head:
+                        eval_fetch["lm_loss"] = lm_loss
+                        eval_fetch["sop_loss"] = sop_loss
 
                 run_evaluate(valid_data_loader, exe, test_program,
                              args.eval_iters, log_writer, global_step, args,
@@ -657,9 +699,12 @@ def do_train(args):
                                       main_program)
 
             if global_step >= args.max_steps:
-                eval_fetch = []
+                eval_fetch = collections.OrderedDict()
                 if topo.is_last:
-                    eval_fetch = [loss, lm_loss, sop_loss]
+                    eval_fetch["loss"] = loss
+                    if args.binary_head:
+                        eval_fetch["lm_loss"] = lm_loss
+                        eval_fetch["sop_loss"] = sop_loss
 
                 run_evaluate(test_data_loader, exe, test_program,
                              args.test_iters, log_writer, global_step, args,
