@@ -852,12 +852,16 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self):
+    def __init__(self, with_nsp_loss=True):
         super(ErniePretrainingCriterion, self).__init__()
+        self.with_nsp_loss = with_nsp_loss
         #self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
 
-    def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels):
+    def forward(self,
+                prediction_scores,
+                seq_relationship_score,
+                masked_lm_labels,
+                next_sentence_labels=None):
         """
         Args:
             prediction_scores(Tensor):
@@ -888,6 +892,10 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 masked_lm_labels,
                 ignore_index=-1,
                 reduction='none')
+
+            if not self.with_nsp_loss:
+                return paddle.mean(masked_lm_loss)
+
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
             return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)
