@@ -215,19 +215,27 @@ def convert_example_ner(example,
 
 
 def convert_example_spo(example, tokenizer, max_seq_length=512, is_test=False):
+    encoded_inputs = {}
     text = example['text']
-    text = tokenize_special_chars(normalize_chars(text))
-    encoded_inputs = tokenizer(
-        text=text, max_seq_len=max_seq_length, return_position_ids=True)
-    input_len = len(encoded_inputs['input_ids'])
-    encoded_inputs['mask'] = np.ones(input_len)
+    if len(text) > max_seq_length - 2:
+        text = text[:max_seq_length - 2]
+    text = ['[CLS]'] + [x.lower() for x in text] + ['[SEP]']
+    input_len = len(text)
+    encoded_inputs['input_ids'] = tokenizer.convert_tokens_to_ids(text)
+    encoded_inputs['token_type_ids'] = np.zeros(input_len)
+    encoded_inputs['position_ids'] = list(range(input_len))
+    encoded_inputs['attention_mask'] = np.ones(input_len)
     if not is_test:
         encoded_inputs['ent_label'] = example['ent_label']
         encoded_inputs['spo_label'] = example['spo_label']
     return encoded_inputs
 
 
-def create_batch_label(ent_labels, spo_labels, num_classes, max_batch_len):
+def create_batch_label(ent_labels,
+                       spo_labels,
+                       num_classes,
+                       max_batch_len,
+                       shift=1):
     batch_size = len(ent_labels)
     pad_ent_labels = np.zeros([batch_size, max_batch_len, 2], dtype=np.float32)
     pad_spo_labels = np.zeros(
@@ -235,13 +243,17 @@ def create_batch_label(ent_labels, spo_labels, num_classes, max_batch_len):
         dtype=np.float32)
     for idx, ent_idxs in enumerate(ent_labels):
         for x, y in ent_idxs:
+            x += shift
+            y += shift
             if x > 0 and x < max_batch_len and y < max_batch_len:
                 pad_ent_labels[idx, x, 0] = 1
                 pad_ent_labels[idx, y, 1] = 1
     for idx, spo_idxs in enumerate(spo_labels):
-        for x, y, z in spo_idxs:
-            if x > 0 and x < max_batch_len and y < max_batch_len:
-                pad_spo_labels[idx, z, x, y] = 1
+        for s, o, p in spo_idxs:
+            s += shift
+            o += shift
+            if s > 0 and s < max_batch_len and o < max_batch_len:
+                pad_spo_labels[idx, p, s, o] = 1
     pad_ent_labels = paddle.to_tensor(pad_ent_labels)
     pad_spo_labels = paddle.to_tensor(pad_spo_labels)
     return pad_ent_labels, pad_spo_labels

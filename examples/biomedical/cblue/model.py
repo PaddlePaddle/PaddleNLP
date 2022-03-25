@@ -65,7 +65,7 @@ class MultiHeadAttentionForSPO(nn.Layer):
 
     def forward(self, query, key):
         q = self.q_proj(query)
-        k = self.k_proj(query)
+        k = self.k_proj(key)
         q = paddle.reshape(q, shape=[0, 0, self.num_heads, self.embed_dim])
         k = paddle.reshape(k, shape=[0, 0, self.num_heads, self.embed_dim])
         q = paddle.transpose(q, perm=[0, 2, 1, 3])
@@ -95,6 +95,7 @@ class ElectraForSPO(ElectraPretrainedModel):
     def __init__(self, electra, num_classes, dropout=None):
         super(ElectraForSPO, self).__init__()
         self.num_classes = num_classes
+        self.layer_norm_eps = 1e-5
         self.electra = electra
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.electra.config['hidden_dropout_prob'])
@@ -102,6 +103,8 @@ class ElectraForSPO(ElectraPretrainedModel):
         self.span_attention = MultiHeadAttentionForSPO(
             self.electra.config['hidden_size'], num_classes)
         self.sigmoid = paddle.nn.Sigmoid()
+        self.init_weights()
+        self.electra.embeddings.layer_norm._epsilon = self.layer_norm_eps
 
     def forward(self,
                 input_ids=None,
