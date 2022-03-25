@@ -168,6 +168,9 @@ pip3 install paddlepaddle-gpu
 
 使用paddlenlp框架自动缓存模型文件。
 
+### 其他数据下载
+请运行download.sh自动下载
+
 ### 评测数据
 评测数据样例位于/model_interpretation/data/目录下，每一行为一条JSON格式的数据。
 #### 情感分析数据格式：
