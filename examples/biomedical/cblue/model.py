@@ -99,7 +99,6 @@ class ElectraForSPO(ElectraPretrainedModel):
         self.classifier = nn.Linear(self.electra.config['hidden_size'], 2)
         self.span_attention = MultiHeadAttentionForSPO(
             self.electra.config['hidden_size'], num_classes)
-        self.sigmoid = paddle.nn.Sigmoid()
         self.init_weights()
 
     def forward(self,
@@ -122,8 +121,5 @@ class ElectraForSPO(ElectraPretrainedModel):
 
         output_size = self.num_classes + self.electra.config['hidden_size']
         rel_logits = self.span_attention(sequence_outputs, subject_output)
-
-        ent_logits = self.sigmoid(ent_logits)
-        rel_logits = self.sigmoid(rel_logits)
 
         return ent_logits, rel_logits
