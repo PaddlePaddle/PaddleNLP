@@ -293,7 +293,7 @@ class CBLUE(DatasetBuilder):
             if tokens[idx:idx + ent_len] == entity_tokens:
                 if skip_idx is None:
                     return idx
-                elif idx < skip_idx[0] or idx >= skip_idx[1]:
+                elif idx < skip_idx[0] or idx > skip_idx[1]:
                     return idx
         return None
 
@@ -304,11 +304,11 @@ class CBLUE(DatasetBuilder):
         if len(subjects) > len(objects):
             sub_idx = self._search_entity_index(tokens, subjects)
             obj_idx = self._search_entity_index(
-                tokens, objects, (sub_idx, sub_idx + len(subjects)))
+                tokens, objects, (sub_idx, sub_idx + len(subjects) - 1))
         else:
             obj_idx = self._search_entity_index(tokens, objects)
             sub_idx = self._search_entity_index(
-                tokens, subjects, (obj_idx, obj_idx + len(objects)))
+                tokens, subjects, (obj_idx, obj_idx + len(objects) - 1))
         return sub_idx, obj_idx
 
     def _read(self, filename, split):
@@ -332,9 +332,11 @@ class CBLUE(DatasetBuilder):
                         sub_idx, obj_idx = self._search_spo_index(data['text'],
                                                                   sub, obj)
                         if sub_idx is not None and obj_idx is not None:
-                            ent_label.append((sub_idx, sub_idx + len(sub) - 1))
-                            ent_label.append((obj_idx, obj_idx + len(obj) - 1))
-                            spo_label.append((sub_idx, obj_idx, label_map[rel]))
+                            sub = tuple((sub_idx, sub_idx + len(sub) - 1))
+                            obj = tuple((obj_idx, obj_idx + len(obj) - 1))
+                            ent_label.append(sub)
+                            ent_label.append(obj)
+                            spo_label.append((sub, label_map[rel], obj))
 
                         if sub_idx is None or obj_idx is None:
                             print('Error: Can not find entities in tokens.')

@@ -123,8 +123,7 @@ def do_train():
     model = ElectraForSequenceClassification.from_pretrained(
         'ehealth-chinese',
         num_classes=len(train_ds.label_list),
-        activation='tanh',
-        layer_norm_eps=1e-5)
+        activation='tanh')
     tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
 
     trans_func = partial(

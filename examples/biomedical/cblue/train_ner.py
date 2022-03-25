@@ -12,7 +12,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ElectraTokenizer
 
 from model import ElectraForBinaryTokenClassification
-from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup, NEREvaluator
+from utils import create_dataloader, convert_example_ner, LinearDecayWithWarmup, NERChunkEvaluator
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -49,9 +49,7 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in data_loader:
         input_ids, token_type_ids, position_ids, masks, label_oth, label_sym = batch
-        att_mask = paddle.scale(
-            masks, scale=10000.0, bias=-1.0, bias_after_scale=False)
-        logits = model(input_ids, token_type_ids, position_ids, att_mask)
+        logits = model(input_ids, token_type_ids, position_ids)
 
         loss_mask = masks.unsqueeze(2)
         loss = [(criterion(x, y.unsqueeze(2)) * loss_mask).mean()
@@ -143,7 +141,7 @@ def do_train():
 
     criterion = paddle.nn.functional.softmax_with_cross_entropy
 
-    metric = NEREvaluator(label_list)
+    metric = NERChunkEvaluator(label_list)
 
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
@@ -157,10 +155,7 @@ def do_train():
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
-                att_mask = paddle.scale(
-                    masks, scale=10000.0, bias=-1.0, bias_after_scale=False)
-                logits = model(input_ids, token_type_ids, position_ids,
-                               att_mask)
+                logits = model(input_ids, token_type_ids, position_ids)
 
                 loss_mask = paddle.unsqueeze(masks, 2)
                 losses = [(criterion(x, y.unsqueeze(2)) * loss_mask).mean()
@@ -198,7 +193,7 @@ def do_train():
                     tic_train = time.time()
 
                 if global_step % args.save_steps == 0 and rank == 0:
-                    save_dir = os.patj.join(args.save_dir,
+                    save_dir = os.path.join(args.save_dir,
                                             'model_%d' % global_step)
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)

@@ -24,7 +24,6 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
         assert (len(num_classes) == 2)
         self.num_classes_oth = num_classes[0]
         self.num_classes_sym = num_classes[1]
-        self.layer_norm_eps = 1e-5
         self.electra = electra
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.electra.config['hidden_dropout_prob'])
@@ -33,7 +32,6 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
         self.classifier_sym = nn.Linear(self.electra.config['hidden_size'],
                                         self.num_classes_sym)
         self.init_weights()
-        self.electra.embeddings.layer_norm._epsilon = self.layer_norm_eps
 
     def forward(self,
                 input_ids=None,
@@ -95,7 +93,6 @@ class ElectraForSPO(ElectraPretrainedModel):
     def __init__(self, electra, num_classes, dropout=None):
         super(ElectraForSPO, self).__init__()
         self.num_classes = num_classes
-        self.layer_norm_eps = 1e-5
         self.electra = electra
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.electra.config['hidden_dropout_prob'])
@@ -104,7 +101,6 @@ class ElectraForSPO(ElectraPretrainedModel):
             self.electra.config['hidden_size'], num_classes)
         self.sigmoid = paddle.nn.Sigmoid()
         self.init_weights()
-        self.electra.embeddings.layer_norm._epsilon = self.layer_norm_eps
 
     def forward(self,
                 input_ids=None,
