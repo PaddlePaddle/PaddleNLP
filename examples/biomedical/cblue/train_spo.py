@@ -83,9 +83,10 @@ def evaluate(model, criterion, metric, data_loader):
             ent_idx, spo_idx, metric.num_classes, max_batch_len)
 
         logits = model(input_ids, token_type_ids, position_ids)
+        loss_logits = [F.sigmoid(x) for x in logits]
 
-        ent_loss = criterion(logits[0], ent_label, weight=ent_mask)
-        spo_loss = criterion(logits[1], spo_label, weight=spo_mask)
+        ent_loss = criterion(loss_logits[0], ent_label, weight=ent_mask)
+        spo_loss = criterion(loss_logits[1], spo_label, weight=spo_mask)
         loss = ent_loss + spo_loss
         losses.append(loss.numpy())
         lengths = paddle.sum(masks, axis=-1)
@@ -190,6 +191,7 @@ def do_train():
                 logits = model(input_ids, token_type_ids, position_ids)
                 ent_label, spo_label = create_batch_label(
                     ent_idx, spo_idx, metric.num_classes, max_batch_len)
+                logits = [F.sigmoid(x) for x in logits]
                 ent_loss = criterion(logits[0], ent_label, weight=ent_mask)
                 spo_loss = criterion(logits[1], spo_label, weight=spo_mask)
 

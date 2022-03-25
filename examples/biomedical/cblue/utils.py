@@ -263,10 +263,10 @@ def create_batch_label(ent_labels,
                 pad_ent_labels[idx, y, 1] = 1
     for idx, spo_idxs in enumerate(spo_labels):
         for s, p, o in spo_idxs:
-            s[0] += shift
-            o[0] += shift
-            if s[0] > 0 and s[0] < max_batch_len and o[0] < max_batch_len:
-                pad_spo_labels[idx, p, s[0], o[0]] = 1
+            s_id = s[0] + shift
+            o_id = o[0] + shift
+            if s_id > 0 and s_id < max_batch_len and o_id < max_batch_len:
+                pad_spo_labels[idx, p, s_id, o_id] = 1
     pad_ent_labels = paddle.to_tensor(pad_ent_labels)
     pad_spo_labels = paddle.to_tensor(pad_spo_labels)
     return pad_ent_labels, pad_spo_labels
