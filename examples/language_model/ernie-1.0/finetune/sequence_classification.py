@@ -158,7 +158,7 @@ class Dict(object):
         return ret
 
 
-def clue_batchify_fn_dict(tokenizer, args):
+def defaut_batchify_fn(tokenizer, args):
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -316,7 +316,7 @@ class ClueTrainer(TrainerBase):
             best_dev_acc, corr_test_acc))
 
 
-class SeqTrainer2(ClueTrainer):
+class SeqTrainer(ClueTrainer):
     def dataloader_inner(self):
         trans_fn = partial(
             seq_trans_fn, tokenizer=self.tokenizer, args=self.args)
@@ -328,47 +328,3 @@ class SeqTrainer2(ClueTrainer):
             self.dev_ds, "dev", self.args.batch_size, batchify_fn, trans_fn)
         self.test_dl = self.create_dataloader(
             self.test_ds, "dev", self.args.batch_size, batchify_fn, trans_fn)
-
-
-class SeqTrainer(Trainer):
-    def __init__(self, train_ds, dev_ds, model, tokenizer, data_args,
-                 training_args, *arg, **kwargs):
-
-        trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
-        batchify_fn = clue_batchify_fn_dict(tokenizer, data_args)
-
-        train_ds = train_ds.map(trans_fn)
-        dev_ds = dev_ds.map(trans_fn)
-
-        if "test_ds" in kwargs.keys():
-            test_ds = kwargs["test_ds"]
-            self.test_ds = test_ds.map(trans_fn)
-
-        loss_fct = paddle.nn.loss.CrossEntropyLoss(
-        ) if train_ds.label_list else paddle.nn.loss.MSELoss()
-
-        def compute_metrics(p):
-            preds = p.predictions[0] if isinstance(p.predictions,
-                                                   tuple) else p.predictions
-
-            preds = paddle.to_tensor(preds)
-            label = paddle.to_tensor(p.label_ids)
-
-            probs = F.softmax(preds, axis=1)
-            metric = Accuracy()
-            metric.reset()
-            result = metric.compute(preds, label)
-            metric.update(result)
-            accu = metric.accumulate()
-            metric.reset()
-            return {"accuracy": accu}
-
-        super().__init__(
-            model,
-            loss_fct,
-            training_args,
-            batchify_fn,
-            train_ds,
-            dev_ds,
-            tokenizer,
-            compute_metrics=compute_metrics)

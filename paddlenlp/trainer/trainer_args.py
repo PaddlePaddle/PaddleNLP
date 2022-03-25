@@ -498,6 +498,13 @@ class TrainingArguments:
             "An optional descriptor for the run. Notably used for wandb logging."
         })
 
+    device: Optional[str] = field(
+        default="gpu",
+        metadata={
+            "help":
+            "An optional descriptor for the run. Notably used for wandb logging."
+        })
+
     disable_tqdm: Optional[bool] = field(
         default=None,
         metadata={"help": "Whether or not to disable the tqdm progress bars."})
@@ -677,7 +684,7 @@ class TrainingArguments:
         return eval_batch_size
 
     @property
-    def device(self) -> "paddle.device":
+    def current_device(self) -> "paddle.device":
         """
         The device used by this process.
         """

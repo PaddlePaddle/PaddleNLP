@@ -34,6 +34,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.amp.auto_cast as autocast
+import paddle.distributed as dist
 from paddle.io import (
     Dataset,
     DataLoader,
@@ -785,7 +786,7 @@ class Trainer:
         elif isinstance(data, (tuple, list)):
             return type(data)(self._prepare_input(v) for v in data)
         elif isinstance(data, paddle.Tensor):
-            kwargs = dict(device=self.args.device)
+            kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
             return data
             # return data.to(**kwargs)
@@ -1295,9 +1296,6 @@ class Trainer:
                     predictions=all_preds, label_ids=all_labels))
         else:
             metrics = {}
-
-        # if losses is not None:
-        #     metrics[f"{metric_key_prefix}_loss"] = float(np.mean(losses))
 
         if all_losses is not None:
             metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
