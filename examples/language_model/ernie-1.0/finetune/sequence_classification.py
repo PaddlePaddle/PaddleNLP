@@ -340,6 +340,10 @@ class SeqTrainer(Trainer):
         train_ds = train_ds.map(trans_fn)
         dev_ds = dev_ds.map(trans_fn)
 
+        if "test_ds" in kwargs.keys():
+            test_ds = kwargs["test_ds"]
+            self.test_ds = test_ds.map(trans_fn)
+
         loss_fct = paddle.nn.loss.CrossEntropyLoss(
         ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 

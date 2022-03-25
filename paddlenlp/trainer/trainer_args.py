@@ -280,8 +280,6 @@ class TrainingArguments:
             The list of integrations to report the results and logs to. Supported platforms are `"azure_ml"`,
             `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
             installed, `"none"` for no integrations.
-        dataloader_pin_memory (`bool`, *optional*, defaults to `True`):
-            Whether you want to pin memory in data loaders or not. Will default to `True`.
         skip_memory_metrics (`bool`, *optional*, defaults to `True`):
             Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
             down the training and evaluation speed.
@@ -544,9 +542,6 @@ class TrainingArguments:
             "The list of integrations to report the results and logs to."
         })
 
-    dataloader_pin_memory: bool = field(
-        default=True,
-        metadata={"help": "Whether or not to pin memory for DataLoader."})
     skip_memory_metrics: bool = field(
         default=True,
         metadata={

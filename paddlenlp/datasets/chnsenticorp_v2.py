@@ -60,7 +60,7 @@ class ChnSentiCorpV2(DatasetBuilder):
     def _read(self, filename, split):
         """Reads data."""
         with open(filename, 'r', encoding='utf-8') as f:
-            head = None
+            head = True
             for line in f:
                 data = line.strip().split("\t")
                 if not head:

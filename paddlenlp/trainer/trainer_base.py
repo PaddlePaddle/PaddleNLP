@@ -484,7 +484,7 @@ class Trainer:
                                            WEIGHTS_NAME)
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path, map_location="cpu")
+                state_dict = paddle.load(best_model_path)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
@@ -535,7 +535,7 @@ class Trainer:
                 dataset=self.train_dataset,
                 shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
-                drop_last=False)
+                drop_last=self.args.dataloader_drop_last)
         else:
             return DistributedBatchSampler(
                 self.train_dataset,
@@ -543,7 +543,7 @@ class Trainer:
                 shuffle=True,
                 num_replicas=self.args.world_size,
                 rank=self.args.process_index,
-                drop_last=False)
+                drop_last=self.args.dataloader_drop_last)
 
     def _set_state_dict_in_model(self, state_dict):
         load_result = self.model.set_state_dict(state_dict)
@@ -556,11 +556,9 @@ class Trainer:
 
             # all_gather + mean() to get average loss over all processes
             tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-            # tr_loss_scalar = tr_loss.mean().item()
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
-            # tr_loss.zero_()
 
             logs["loss"] = round(tr_loss_scalar / (
                 self.state.global_step - self._globalstep_last_logged), 4)
@@ -602,29 +600,25 @@ class Trainer:
 
         return DataLoader(
             train_dataset,
-            # batch_size=self.args.train_batch_size,
             batch_sampler=train_sampler,
             collate_fn=self.data_collator,
-            # drop_last=self.args.dataloader_drop_last,
-            num_workers=self.args.dataloader_num_workers,
-            # pin_memory=self.args.dataloader_pin_memory,
-        )
+            num_workers=self.args.dataloader_num_workers, )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if self.args.world_size <= 1:
-            return DistributedBatchSampler(
+            return paddle.io.BatchSampler(
                 eval_dataset,
-                # num_replicas=self.args.world_size,
-                # rank=self.args.process_index,
                 batch_size=self.args.eval_batch_size,
                 shuffle=False,
-                # seed=self.args.seed,
-            )
+                drop_last=False, )
         else:
             return DistributedBatchSampler(
                 eval_dataset,
+                num_replicas=self.args.world_size,
+                rank=self.args.process_index,
                 batch_size=self.args.eval_batch_size,
-                shuffle=False)
+                shuffle=False,
+                drop_last=False, )
 
     def get_eval_dataloader(self,
                             eval_dataset: Optional[Dataset]=None) -> DataLoader:
@@ -646,13 +640,9 @@ class Trainer:
 
         return DataLoader(
             eval_dataset,
-            # batch_size=self.args.train_batch_size,
             batch_sampler=eval_sampler,
             collate_fn=self.data_collator,
-            # drop_last=self.args.dataloader_drop_last,
-            num_workers=self.args.dataloader_num_workers,
-            # pin_memory=self.args.dataloader_pin_memory,
-        )
+            num_workers=self.args.dataloader_num_workers, )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
         """
@@ -671,11 +661,9 @@ class Trainer:
         # We use the same batch_size as for eval.
         return DataLoader(
             test_dataset,
-            sampler=test_sampler,
-            batch_size=self.args.eval_batch_size,
+            batch_sampler=test_sampler,
             collate_fn=self.data_collator,
-            drop_last=self.args.dataloader_drop_last,
-            pin_memory=self.args.dataloader_pin_memory, )
+            drop_last=self.args.dataloader_drop_last, )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
@@ -909,6 +897,47 @@ class Trainer:
         if self.args.should_save:
             self._save(output_dir)
 
+    def export_model(self,
+                     input_spec=None,
+                     load_best_model=False,
+                     output_dir: Optional[str]=None):
+
+        if output_dir is None:
+            output_dir = self.args.output_dir
+
+        if load_best_model and self.state.best_model_checkpoint is not None:
+            if self.args.local_rank != -1:
+                dist.barrier()
+
+            logger.info(
+                f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
+            )
+
+            best_model_path = os.path.join(self.state.best_model_checkpoint,
+                                           WEIGHTS_NAME)
+            if os.path.exists(best_model_path):
+                # We load the model state dict on the CPU to avoid an OOM error.
+                state_dict = paddle.load(best_model_path)
+                # If the model is on the GPU, it still works!
+                self._set_state_dict_in_model(state_dict)
+            else:
+                logger.warning(
+                    f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                    "on multiple nodes, you should activate `--save_on_each_node`."
+                )
+
+        model = unwrap_model(self.model)
+        model.eval()
+
+        # Convert to static graph with specific input description
+        model = paddle.jit.to_static(model, input_spec=input_spec)
+
+        # Save in static graph model.
+        save_path = os.path.join(output_dir, "inference", "infer")
+        logger.info("Exporting inference model to %s" % save_path)
+        paddle.jit.save(model, save_path)
+        logger.info("Inference model exported.")
+
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
 
@@ -1072,7 +1101,6 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
                     os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
-            map_location = self.args.device
             self.optimizer.set_state_dict(
                 paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
             self.lr_scheduler.set_state_dict(
@@ -1491,11 +1519,6 @@ class Trainer:
             tuple(new_size), dtype=tensor.dtype) + pad_index
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
-
-    def eval(self, *args, **kwargs):
-        """
-        """
-        pass
 
     def print_config(self):
         """
