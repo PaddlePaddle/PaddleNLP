@@ -110,9 +110,20 @@ def parse_args():
         help="The max value of grad norm.")
     parser.add_argument(
         "--batch_size",
-        default=4,
+        default=24,
         type=int,
         help="Batch size per GPU/CPU for training.", )
+    parser.add_argument(
+        "--eval_batch_size",
+        default=32,
+        type=int,
+        help="Batch size per GPU/CPU for training.", )
+    parser.add_argument(
+        '--gradient_accumulation_steps',
+        type=int,
+        default=4,
+        help="Number of updates steps to accumualte before performing a backward/update pass."
+    )
     parser.add_argument(
         "--max_seq_length",
         default=512,
@@ -141,7 +152,6 @@ def set_seed(args):
 @paddle.no_grad()
 def evaluate(model, loss_fct, dev_data_loader, metric):
     metric.reset()
-    criterion = paddle.nn.loss.CrossEntropyLoss()
     model.eval()
     for step, batch in enumerate(dev_data_loader):
         input_ids, segment_ids, label_id = batch
@@ -232,6 +242,8 @@ def do_train(args):
     paddle.set_device(args.device)
     set_seed(args)
 
+    args.batch_size = int(args.batch_size / args.gradient_accumulation_steps)
+
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -247,7 +259,7 @@ def do_train(args):
     train_ds = train_ds.map(preprocess_function,
                             batched=True,
                             batch_size=len(train_ds),
-                            num_proc=8,
+                            num_proc=1,
                             remove_columns=column_names)
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
@@ -263,22 +275,22 @@ def do_train(args):
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
-
     dev_ds = load_dataset("clue", "c3", split="validation")
     dev_ds = dev_ds.map(preprocess_function,
                         batched=True,
                         batch_size=len(dev_ds),
                         remove_columns=column_names,
-                        num_proc=8)
+                        num_proc=1)
     dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
+        dev_ds, batch_size=args.eval_batch_size, shuffle=False)
     dev_data_loader = paddle.io.DataLoader(
         dataset=dev_ds,
         batch_sampler=dev_batch_sampler,
         collate_fn=batchify_fn,
         return_list=True)
-
-    num_training_steps = len(train_data_loader) * args.num_train_epochs
+    num_training_steps = int(
+        len(train_data_loader) * args.num_train_epochs /
+        args.gradient_accumulation_steps)
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          0)
 
@@ -297,44 +309,43 @@ def do_train(args):
         grad_clip=grad_clip)
     loss_fct = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
-
     model.train()
     global_step = 0
     best_acc = 0.0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            global_step += 1
             input_ids, segment_ids, label = batch
             logits = model(input_ids=input_ids, token_type_ids=segment_ids)
             loss = loss_fct(logits, label)
+            if args.gradient_accumulation_steps > 1:
+                loss = loss / args.gradient_accumulation_steps
             loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                tic_eval = time.time()
-                acc = evaluate(model, loss_fct, dev_data_loader, metric)
-                print("eval acc: %.5f, eval done total : %s s" %
-                      (acc, time.time() - tic_eval))
-                if paddle.distributed.get_rank() == 0 and acc > best_acc:
-                    best_acc = acc
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    if not os.path.exists(args.output_dir):
-                        os.makedirs(args.output_dir)
-                    model_to_save.save_pretrained(args.output_dir)
-                    tokenizer.save_pretrained(args.output_dir)
-            if global_step >= num_training_steps:
-                print("best_acc: ", best_acc)
-                return
+            if (step + 1) % args.gradient_accumulation_steps == 0:
+                global_step += 1
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+                if global_step % args.logging_steps == 0:
+                    print(
+                        "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                        % (global_step, num_training_steps, epoch, step + 1,
+                           paddle.distributed.get_rank(), loss,
+                           optimizer.get_lr(),
+                           args.logging_steps / (time.time() - tic_train)))
+                    tic_train = time.time()
+        tic_eval = time.time()
+        acc = evaluate(model, loss_fct, dev_data_loader, metric)
+        print("eval acc: %.5f, eval done total : %s s" %
+              (acc, time.time() - tic_eval))
+        if paddle.distributed.get_rank() == 0 and acc > best_acc:
+            best_acc = acc
+            model_to_save = model._layers if isinstance(
+                model, paddle.DataParallel) else model
+            if not os.path.exists(args.output_dir):
+                os.makedirs(args.output_dir)
+            model_to_save.save_pretrained(args.output_dir)
+            tokenizer.save_pretrained(args.output_dir)
     print("best_acc: ", best_acc)
 
 

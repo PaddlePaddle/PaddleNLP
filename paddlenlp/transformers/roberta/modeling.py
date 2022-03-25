@@ -55,13 +55,14 @@ class RobertaEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.padding_idx = pad_token_id
         self.cls_token_id = cls_token_id
-        
+
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
-            if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
+            if self.cls_token_id == 0 or input_ids[0][
+                    0] == 0:  # postion_ids for RobertaBPETokenizer
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
                 position_ids = seq_length - ones
@@ -273,7 +274,8 @@ class RobertaModel(RobertaPretrainedModel):
         self.layer_norm_eps = layer_norm_eps
         self.embeddings = RobertaEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, cls_token_id)
+            max_position_embeddings, type_vocab_size, pad_token_id,
+            cls_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -602,19 +604,18 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None):
-
         num_choices = input_ids.shape[1]
 
         flat_input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1])) if input_ids is not None else None
         flat_position_ids = position_ids.reshape(
-            (-1, position_ids.shape(-1))) if position_ids is not None else None
+            (-1, position_ids.shape[-1])) if position_ids is not None else None
         flat_token_type_ids = token_type_ids.reshape(
             (-1,
-             token_type_ids.shape(-1))) if token_type_ids is not None else None
+             token_type_ids.shape[-1])) if token_type_ids is not None else None
         flat_attention_mask = attention_mask.reshape(
             (-1,
-             attention_mask.shape(-1))) if attention_mask is not None else None
+             attention_mask.shape[-1])) if attention_mask is not None else None
 
         outputs = self.roberta(
             flat_input_ids,
