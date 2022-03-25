@@ -20,7 +20,6 @@
 </h4>
 
 
-
 ------------------------------------------------------------------------------------------
 
 ## 特性
@@ -66,7 +65,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 
 可进入 Jupyter Notebook 环境，在线体验 👉🏻  [进入在线运行环境](https://aistudio.baidu.com/aistudio/projectdetail/3494205)
 
-Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://wenjuan.baidu-int.com/manage/?r=survey/pageEdit&sid=85827)反馈给我们。
+Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
 ## PART Ⅰ &emsp; 一键预测
 
@@ -80,19 +79,17 @@ Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调
 from paddlenlp import Taskflow
 
 # 默认模式————实体粒度分词，在精度和速度上的权衡，基于百度LAC
-# 单句平均耗时：1.67ms
 >>> seg = Taskflow("word_segmentation")
 >>> seg("近日国家卫健委发布第九版新型冠状病毒肺炎诊疗方案")
 ['近日', '国家卫健委', '发布', '第九版', '新型', '冠状病毒肺炎', '诊疗', '方案']
 
 # 快速模式————最快：实现文本快速切分，基于jieba中文分词工具
-# 单句平均耗时：0.37ms
 >>> seg_fast = Taskflow("word_segmentation", mode="fast")
 >>> seg_fast("近日国家卫健委发布第九版新型冠状病毒肺炎诊疗方案")
 ['近日', '国家', '卫健委', '发布', '第九版', '新型', '冠状病毒', '肺炎', '诊疗', '方案']
 
 # 精确模式————最准：实体粒度切分准确度最高，基于百度解语
-# 单句平均耗时：258.06ms（精确模式基于预训练模型，更适合实体粒度分词需求，适用于知识图谱构建、企业搜索Query分析等场景中，可通过模型压缩等方式提升预测性能）
+# 精确模式基于预训练模型，更适合实体粒度分词需求，适用于知识图谱构建、企业搜索Query分析等场景中
 >>> seg_accurate = Taskflow("word_segmentation", mode="accurate")
 >>> seg_accurate("近日国家卫健委发布第九版新型冠状病毒肺炎诊疗方案")
 ['近日', '国家卫健委', '发布', '第九版', '新型冠状病毒肺炎', '诊疗', '方案']
@@ -213,7 +210,7 @@ from paddlenlp import Taskflow
 >>> ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
 [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
 
->>> ner = Taskflow("ner", mode="accurate", entity_only=True)  # 只返回实体/概念词
+>>> ner = Taskflow("ner", entity_only=True)  # 只返回实体/概念词
 >>> ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
 [('孤女', '作品类_实体'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('小说', '作品类_概念'), ('作者', '人物类_概念'), ('余兼羽', '人物类_实体')]
 
@@ -300,6 +297,7 @@ from paddlenlp import Taskflow
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `user_dict`：用户自定义词典文件，默认为None。
 * `task_path`：自定义任务路径，默认为None。
+* `entity_only`：只返回实体/概念词及其对应标签。
 </div></details>
 
 
@@ -313,8 +311,8 @@ from paddlenlp import Taskflow
 ```python
 >>> from paddlenlp import Taskflow
 >>> ddp = Taskflow("dependency_parsing")
->>> ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
-[{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
+>>> ddp("2月8日谷爱凌夺得北京冬奥会第三金")
+[{'word': ['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金'], 'head': [3, 3, 0, 5, 3], 'deprel': ['ADV', 'SBV', 'HED', 'ATT', 'VOB']}]
 
 ```
 
@@ -322,16 +320,16 @@ from paddlenlp import Taskflow
 
 ```python
 >>> ddp = Taskflow("dependency_parsing")
->>> ddp.from_segments([['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫']])
-[{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
+>>> ddp.from_segments([['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金']])
+[{'word': ['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金'], 'head': [3, 3, 0, 5, 3], 'deprel': ['ADV', 'SBV', 'HED', 'ATT', 'VOB']}]
 ```
 
 #### 批量样本输入，平均速度更快
 
 ```python
 >>> from paddlenlp import Taskflow
->>> ddp(["9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫", "他送了一本书"])
-[{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+>>> ddp(["2月8日谷爱凌夺得北京冬奥会第三金", "他送了一本书"])
+[{'word': ['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金'], 'head': [3, 3, 0, 5, 3], 'deprel': ['ADV', 'SBV', 'HED', 'ATT', 'VOB']}, {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
 ```
 
 #### 多种模型选择，满足精度、速度需求
@@ -340,20 +338,20 @@ from paddlenlp import Taskflow
 
 ```python
 >>> ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
->>> ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
-[{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
+>>> ddp("2月8日谷爱凌夺得北京冬奥会第三金")
+[{'word': ['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金'], 'head': [3, 3, 0, 5, 3], 'deprel': ['ADV', 'SBV', 'HED', 'ATT', 'VOB']}]
 ```
 
-除ERNIE 1.0外，还可使用LSTM、ERNIE-Gram模型，其中`model=ddparser`（LSTM模型）速度最快，`model=ddparser-ernie-gram-zh`和`model=ddparser-ernie-1.0`效果更优（两者效果相当）。
+除ERNIE 1.0外，还可使用ERNIE-Gram预训练模型，其中`model=ddparser`（基于LSTM Encoder）速度最快，`model=ddparser-ernie-gram-zh`和`model=ddparser-ernie-1.0`效果更优（两者效果相当）。
 
-#### 输出
+#### 输出方式
 
 输出概率值和词性标签:
 
 ```python
 >>> ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
->>> ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
-[{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什', '球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 7, 7, 6, 6, 7, 0, 9, 10, 7], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ATT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB'], 'postag': ['TIME', 'TIME', 'PER', 'p', 'PER', 'n', 'v', 'LOC', 'n', 'PER'], 'prob': [0.79, 0.98, 1.0, 0.49, 0.97, 0.86, 1.0, 0.85, 0.97, 0.99]}]
+>>> ddp("2月8日谷爱凌夺得北京冬奥会第三金")
+[{'word': ['2月8日', '谷爱凌', '夺得', '北京冬奥会', '第三金'], 'head': [3, 3, 0, 5, 3], 'deprel': ['ADV', 'SBV', 'HED', 'ATT', 'VOB'], 'postag': ['TIME', 'PER', 'v', 'ORG', 'n'], 'prob': [0.97, 1.0, 1.0, 0.99, 0.99]}]
 ```
 
 依存关系可视化
