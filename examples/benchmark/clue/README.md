@@ -38,11 +38,11 @@ export LR=3e-5
 export BS=16
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=roberta-wwm-ext-large
 
 cd classification
 python -u ./run_clue_classifier.py \
-    --model_type ernie  \
+    --model_type roberta  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
     --max_seq_length ${MAX_SEQ_LEN} \
@@ -72,11 +72,11 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=roberta-wwm-ext-large
 
 cd classification
 python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
-    --model_type ernie  \
+    --model_type roberta  \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
     --max_seq_length ${MAX_SEQ_LEN} \
@@ -94,7 +94,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_clue_classifier.py \
 
 ```
 其中参数释义如下：
-- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie、bert 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
+- `model_type` 指示了 Fine-tuning 使用的预训练模型类型，如：ernie、bert、roberta 等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
 - `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型，可以选择 `model_type` 在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的中文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如 model_type 配置的是 ernie，则 model_name_or_path 只能选择 ernie 相关的模型。另，clue 任务应选择中文预训练权重。
 
 - `task_name` 表示 Fine-tuning 的任务，当前支持 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL、CLUEWSC2020。
@@ -132,7 +132,7 @@ OUTPUT_DIR=results
 mkdir ${OUTPUT_DIR}
 
 python predict_clue_classifier.py \
-    --model_type ernie \
+    --model_type roberta \
     --task_name TNEWS \
     --model_name_or_path ${TNEWS_MODEL}  \
     --output_dir ${OUTPUT_DIR} \

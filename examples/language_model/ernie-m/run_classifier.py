@@ -345,17 +345,17 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, test_data_loader,
                              language)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                    if paddle.distributed.get_rank() == 0:
-                        output_dir = os.path.join(
-                            args.output_dir,
-                            "ernie_m_ft_model_%d.pdparams" % (global_step))
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # Need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
+                if paddle.distributed.get_rank() == 0:
+                    output_dir = os.path.join(args.output_dir,
+                                              "ernie_m_ft_model_%d.pdparams" %
+                                              (global_step))
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # Need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 break
         if global_step >= num_training_steps:

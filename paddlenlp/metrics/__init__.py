@@ -16,6 +16,6 @@ from .perplexity import Perplexity
 from .chunk import ChunkEvaluator
 from .bleu import BLEU, BLEUForDuReader
 from .rouge import RougeL, RougeLForDuReader, RougeN, Rouge1, Rouge2
-from .glue import AccuracyAndF1, Mcc, PearsonAndSpearman
+from .glue import AccuracyAndF1, Mcc, PearsonAndSpearman, MultiLabelsMetric
 from .distinct import Distinct
 from .sighan import DetectionF1, CorrectionF1
