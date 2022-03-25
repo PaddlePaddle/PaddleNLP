@@ -42,7 +42,7 @@ do
         if [[ ! -f ${OUTPUT}/predict_feature_index ]]; then
             python3 ./saliency_map/rc_prediction.py \
                 --base_model $BASE_MODEL \
-                --data_dir ../../data/MRC_${LANGUAGE} \
+                --data_dir ../../data/mrc_${LANGUAGE} \
                 --from_pretrained $FROM_PRETRAIN \
                 --init_checkpoint $CKPT \
                 --output_dir $OUTPUT \

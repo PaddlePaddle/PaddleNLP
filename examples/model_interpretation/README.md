@@ -162,7 +162,7 @@ pip3 install paddlepaddle-gpu
 
 #### 阅读理解中英文：
 
-中文推荐使用[DuReader_Checklist](https://dataset-bj.cdn.bcebos.com/lic2021/dureader_checklist.dataset.tar.gz)，英文推荐使用[SQUDA2](https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v2.0.json)。请将阅读理解训练数据放置在/model_interpretation/task/MRC/data目录下。
+中文推荐使用[DuReader_Checklist](https://dataset-bj.cdn.bcebos.com/lic2021/dureader_checklist.dataset.tar.gz)，英文推荐使用[SQUDA2](https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v2.0.json)。请将阅读理解训练数据放置在/model_interpretation/task/mrc/data目录下。
 
 ### 下载预训练模型
 

@@ -12,11 +12,11 @@ do
         do
             echo ${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}
             
-            GOLDEN_PATH=../golden/MRC_${LANGUAGE}.tsv
+            GOLDEN_PATH=../golden/mrc_${LANGUAGE}.tsv
             if [[ $LANGUAGE == "ch" ]]; then
                 PRED_FILE=../../rationale_extraction/evaluation_data/mrc/${BASE_MODEL}_${INTER_MODE}_${LANGUAGE}
             else
-                PRED_FILE=../../task/mrc/output/MRC_en.${BASE_MODEL}/predict_ans
+                PRED_FILE=../../task/mrc/output/mrc_en.${BASE_MODEL}/predict_ans
             fi
 
             python3 mrc_f1_evaluate.py \

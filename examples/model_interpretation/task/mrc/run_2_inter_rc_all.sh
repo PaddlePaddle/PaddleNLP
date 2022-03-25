@@ -44,7 +44,7 @@ do
                     --ans_path ./output/${TASK}_${LANGUAGE}.${BASE_MODEL}/predict_ans\
                     --ans_idx_path ./output/${TASK}_${LANGUAGE}.${BASE_MODEL}/predict_feature_index\
                     --base_model $BASE_MODEL \
-                    --data_dir ../../data/MRC_${LANGUAGE} \
+                    --data_dir ../../data/mrc_${LANGUAGE} \
                     --from_pretrained $FROM_PRETRAIN \
                     --batch_size 1 \
                     --init_checkpoint $CKPT \

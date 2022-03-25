@@ -3,11 +3,11 @@
  # The result of this script will be used to evaluate the interpretive performance of the baseline model
 ###
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=4
 export PYTHONPATH=./:$PYTHONPATH
 
 TASK=mrc
-LANGUAGE=ch                 # LANGUAGE choose in [ch, en]
+LANGUAGE=en                 # LANGUAGE choose in [ch, en]
 BASE_MODEL=roberta_base            # BASE_MODEL choose in [roberta_base, roberta_large]
 INTER_MODE=integrated_gradient      # INTER_MODE choice in [attention, integrated_gradient]
 START=0
@@ -40,7 +40,7 @@ python3 ./saliency_map/rc_interpretable.py \
     --ans_path ./output/${TASK}_${LANGUAGE}.${BASE_MODEL}/predict_ans\
     --ans_idx_path ./output/${TASK}_${LANGUAGE}.${BASE_MODEL}/predict_feature_index\
     --base_model $BASE_MODEL \
-    --data_dir ../../data/MRC_${LANGUAGE} \
+    --data_dir ../../data/mrc_${LANGUAGE} \
     --from_pretrained $FROM_PRETRAIN \
     --batch_size 1 \
     --init_checkpoint $CKPT \
