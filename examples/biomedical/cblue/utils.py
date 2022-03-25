@@ -73,13 +73,8 @@ class LinearDecayWithWarmup(LambdaDecay):
                 Defaults to False.
         """
 
-        def is_integer(number):
-            if sys.version > '3':
-                return isinstance(number, int)
-            return isinstance(number, (int, long))
-
-        warmup_steps = warmup if is_integer(warmup) else int(
-            math.floor(warmup * total_steps))
+        warmup_steps = warmup if isinstance(
+            warmup, int) else int(math.floor(warmup * total_steps))
 
         def lr_lambda(current_step):
             if current_step < warmup_steps:
@@ -236,6 +231,24 @@ def create_batch_label(ent_labels,
                        num_classes,
                        max_batch_len,
                        shift=1):
+    """
+    Convert the entity labels and spo labels into one-hot representations.
+
+    Args:
+        ent_labels (list[list|tuple]):
+            The entities in the input text in the form of [start_index, end_index].
+        spo_labels (list[list|tuple]):
+            The (subject, predicate, object) in the input text in the form of
+            [(subject_start_index, subject_end_index),
+             (predicate_id),
+             (object_start_index, object_end_index)].
+        num_classes (int):
+            The number of predicates.
+        max_batch_len (int):
+            The length of the padded text in the batch.
+        shift (int):
+            When the input text starts with '[CLS]', shift label index by 1.
+    """
     batch_size = len(ent_labels)
     pad_ent_labels = np.zeros([batch_size, max_batch_len, 2], dtype=np.float32)
     pad_spo_labels = np.zeros(
@@ -249,19 +262,36 @@ def create_batch_label(ent_labels,
                 pad_ent_labels[idx, x, 0] = 1
                 pad_ent_labels[idx, y, 1] = 1
     for idx, spo_idxs in enumerate(spo_labels):
-        for s, o, p in spo_idxs:
-            s += shift
-            o += shift
-            if s > 0 and s < max_batch_len and o < max_batch_len:
-                pad_spo_labels[idx, p, s, o] = 1
+        for s, p, o in spo_idxs:
+            s[0] += shift
+            o[0] += shift
+            if s[0] > 0 and s[0] < max_batch_len and o[0] < max_batch_len:
+                pad_spo_labels[idx, p, s[0], o[0]] = 1
     pad_ent_labels = paddle.to_tensor(pad_ent_labels)
     pad_spo_labels = paddle.to_tensor(pad_spo_labels)
     return pad_ent_labels, pad_spo_labels
 
 
-class NEREvaluator(paddle.metric.Metric):
+class NERChunkEvaluator(paddle.metric.Metric):
+    """
+    NERChunkEvaluator computes the precision, recall and F1-score for chunk detection.
+    It is often used in sequence tagging tasks, such as Named Entity Recognition (NER).
+
+    Args:
+        label_list (list):
+            The label list.
+
+    Note:
+        Difference from `paddlenlp.metric.ChunkEvaluator`:
+
+        - `paddlenlp.metric.ChunkEvaluator`
+           All sequences with non-'O' labels are taken as chunks when computing num_infer.
+        - `NERChunkEvaluator`
+           Only complete sequences are taken as chunks, namely `B- I- E-` or `S-`. 
+    """
+
     def __init__(self, label_list):
-        super(NEREvaluator, self).__init__()
+        super(NERChunkEvaluator, self).__init__()
         self.id2label = [dict(enumerate(x)) for x in label_list]
         self.num_classes = [len(x) for x in label_list]
         self.num_infer = 0
@@ -269,6 +299,26 @@ class NEREvaluator(paddle.metric.Metric):
         self.num_correct = 0
 
     def compute(self, lengths, predictions, labels):
+        """
+        Computes the prediction, recall and F1-score for chunk detection.
+
+        Args:
+            lengths (Tensor):
+                The valid length of every sequence, a tensor with shape `[batch_size]`.
+            predictions (Tensor):
+                The predictions index, a tensor with shape `[batch_size, sequence_length]`.
+            labels (Tensor):
+                The labels index, a tensor with shape `[batch_size, sequence_length]`.
+
+        Returns:
+            tuple: Returns tuple (`num_infer_chunks, num_label_chunks, num_correct_chunks`).
+
+            With the fields:
+
+            - `num_infer_chunks` (Tensor): The number of the inference chunks.
+            - `num_label_chunks` (Tensor): The number of the label chunks.
+            - `num_correct_chunks` (Tensor): The number of the correct chunks.
+        """
         assert len(predictions) == len(labels)
         assert len(predictions) == len(self.id2label)
         preds = [x.numpy() for x in predictions]
@@ -336,9 +386,18 @@ class NEREvaluator(paddle.metric.Metric):
         return chunks
 
 
-class SPOEvaluator(paddle.metric.Metric):
+class SPOChunkEvaluator(paddle.metric.Metric):
+    """
+    SPOChunkEvaluator computes the precision, recall and F1-score for multiple
+    chunk detections, including Named Entity Recognition (NER) and SPO Prediction.
+
+    Args:
+        num_classes (int):
+            The number of predicates.
+    """
+
     def __init__(self, num_classes=None):
-        super(SPOEvaluator, self).__init__()
+        super(SPOChunkEvaluator, self).__init__()
         self.num_classes = num_classes
         self.num_infer_ent = 0
         self.num_infer_spo = 1e-10
@@ -348,29 +407,58 @@ class SPOEvaluator(paddle.metric.Metric):
         self.num_correct_spo = 0
 
     def compute(self, lengths, ent_preds, spo_preds, ent_labels, spo_labels):
+        """
+        Computes the prediction, recall and F1-score for NER and SPO prediction.
+
+        Args:
+            lengths (Tensor):
+                The valid length of every sequence, a tensor with shape `[batch_size]`.
+            ent_preds (Tensor):
+                The predictions of entities.
+                A tensor with shape `[batch_size, sequence_length, 2]`.
+                `ent_preds[:, :, 0]` denotes the start indexes of entities.
+                `ent_preds[:, :, 1]` denotes the end indexes of entities.
+            spo_preds (Tensor):
+                The predictions of predicates between all possible entities.
+                A tensor with shape `[batch_size, num_classes, sequence_length, sequence_length]`.
+            ent_labels (list[list|tuple]):
+                The entity labels' indexes. A list of pair `[start_index, end_index]`.
+            spo_labels (list[list|tuple]):
+                The SPO labels' indexes. A list of triple `[[subject_start_index, subject_end_index], 
+                predicate_id, [object_start_index, object_end_index]]`.
+
+        Returns:
+            tuple:
+                Returns tuple (`num_infer_chunks, num_label_chunks, num_correct_chunks`).
+                The `ent` denotes results of NER and the `spo` denotes results of SPO prediction.
+
+            With the fields:
+
+            - `num_infer_chunks` (dict): The number of the inference chunks.
+            - `num_label_chunks` (dict): The number of the label chunks.
+            - `num_correct_chunks` (dict): The number of the correct chunks.
+        """
         ent_preds = ent_preds.numpy()
         spo_preds = spo_preds.numpy()
-        ent_labels = self._unpadded_labels(ent_labels)
-        spo_labels = self._unpadded_labels(spo_labels)
 
         ent_pred_list = []
         ent_idxs_list = []
         for idx, ent_pred in enumerate(ent_preds):
-            seq_len = lengths[idx]
+            seq_len = lengths[idx] - 2
             start = np.where(ent_pred[:, 0] > 0.5)[0]
             end = np.where(ent_pred[:, 1] > 0.5)[0]
             ent_pred = []
             ent_idxs = {}
             for x in start:
                 y = end[end >= x]
-                if x == 0 or x > seq_len:
+                if (x == 0) or (x > seq_len):
                     continue
                 if len(y) > 0:
                     y = y[0]
                     if y > seq_len:
                         continue
-                    ent_idxs[x] = (x - 1, y)
-                    ent_pred.append((x - 1, y))
+                    ent_idxs[x] = (x - 1, y - 1)
+                    ent_pred.append((x - 1, y - 1))
             ent_pred_list.append(ent_pred)
             ent_idxs_list.append(ent_idxs)
 
@@ -390,11 +478,13 @@ class SPOEvaluator(paddle.metric.Metric):
         infer = {'ent': 0, 'spo': 0}
         label = {'ent': 0, 'spo': 0}
         for ent_pred, ent_true in zip(ent_pred_list, ent_labels):
+            ent_true = [tuple(x) for x in ent_true]
             infer['ent'] += len(set(ent_pred))
             label['ent'] += len(set(ent_true))
             correct['ent'] += len(set(ent_pred) & set(ent_true))
 
         for spo_pred, spo_true in zip(spo_pred_list, spo_labels):
+            spo_true = [(tuple(s), p, tuple(o)) for s, p, o in spo_true]
             infer['spo'] += len(set(spo_pred))
             label['spo'] += len(set(spo_true))
             correct['spo'] += len(set(spo_pred) & set(spo_true))
@@ -431,17 +521,6 @@ class SPOEvaluator(paddle.metric.Metric):
             'entity': (ent_precision, ent_recall, ent_f1),
             'spo': (spo_precision, spo_recall, spo_f1)
         }
-
-    def _unpadded_labels(self, labels):
-        unpads = []
-        for label in labels.numpy():
-            unpad = []
-            for x in label:
-                if (x < 0).any():
-                    break
-                unpad.append(tuple(x.tolist()))
-            unpads.append(unpad)
-        return unpads
 
     def _is_number_or_matrix(self, var):
         def _is_number_(var):
