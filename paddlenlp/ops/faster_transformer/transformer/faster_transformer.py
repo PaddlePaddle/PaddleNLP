@@ -1028,9 +1028,11 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, token_type_ids,
                                       attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
-        input_ids = paddle.cast(input_ids, dtype="int32")
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, dtype="int32")
 
-        token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        if token_type_ids.dtype == paddle.int64:
+            token_type_ids = paddle.cast(token_type_ids, dtype="int32")
         decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
 
@@ -1040,12 +1042,13 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             dtype="float16" if self._use_fp16_decoding else "float32")
 
         seq_len = kwargs.get("seq_len") - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
 
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
-            "use_cache": True,
             "seq_len": seq_len,
             "decoder_type_ids": decoder_type_ids
         }
@@ -1072,7 +1075,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
     def forward(self,
                 input_ids,
                 token_type_ids,
-                position_ids,
                 attention_mask,
                 seq_len=None,
                 max_length=128,
@@ -1090,6 +1092,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 length_penalty=0.6,
                 early_stopping=False,
                 forced_eos_token_id=None,
+                position_ids=None,
                 **model_kwargs):
 
         if seq_len is None:
@@ -1097,7 +1100,6 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             seq_len = paddle.sum(paddle.cast(
                 input_ids != self.pad_token_id, dtype="int32"),
                                  axis=-1,
-                                 keepdim=True,
                                  dtype="int32")
         if decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(

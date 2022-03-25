@@ -30,7 +30,7 @@ function _set_params(){
 
     log_with_profiler=$log_file
     profiler_path=$log_profile
-    keyword="ips:" 
+    keyword="ips_per_card:" 
     keyword_loss="loss:"
     skip_steps=20
     model_mode=-1

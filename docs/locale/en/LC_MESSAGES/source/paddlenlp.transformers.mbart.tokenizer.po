@@ -1,0 +1,91 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.mbart.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size:1
+msgid "Return the size of vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.tokenize:1
+msgid "Tokenize a string."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.convert_ids_to_string:1
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.convert_tokens_to_string:1
+msgid "Converts a sequence of tokens (strings for sub-words) in a single string."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.get_special_tokens_mask:1
+msgid "Retrieve sequence ids from a token list that has no special tokens added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens. An MBART"
+" sequence has the following format, where ``X`` represents the sequence:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.build_inputs_with_special_tokens:4
+msgid "``input_ids`` (for encoder) ``X [eos, src_lang_code]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.build_inputs_with_special_tokens:5
+msgid "``decoder_input_ids``: (for decoder) ``X [eos, tgt_lang_code]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.build_inputs_with_special_tokens:7
+msgid ""
+"BOS is never used. Pairs of sequences are not the expected use case, but "
+"they will be handled without a separator."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.as_target_tokenizer:1
+msgid ""
+"Temporarily sets the tokenizer for encoding the targets. Useful for "
+"tokenizer associated to sequence-to-sequence models that need a slightly "
+"different processing for the labels."
+msgstr ""
+

@@ -1,0 +1,523 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.rst:2
+msgid "faster\\_transformer"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:1
+msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:1
+msgid ""
+"FasterTransformer is a faster version for generation with the Transformer"
+" model. It uses a custom op based on and enhancing NV FasterTransformer "
+"to do fast generation."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:5
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:5
+msgid "The size of source vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:7
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:7
+msgid "The size of target vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:9
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:9
+msgid "The maximum length of input sequences."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:11
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:11
+msgid "The number of sub-layers to be stacked in the encoder."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:13
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:13
+msgid "The number of sub-layers to be stacked in the decoder."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:15
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:15
+msgid "The number of head used in multi-head attention."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:17
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:17
+msgid ""
+"The dimension for word embeddings, which is also the last dimension of "
+"the input and output of multi-head attention, position-wise feed-forward "
+"networks, encoder and decoder."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:21
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:21
+msgid "Size of the hidden layer in position-wise feed-forward networks."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:23
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:23
+msgid "Dropout rates. Used for pre-process, activation and inside attention."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:25
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:25
+msgid "Whether to use weight sharing."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:27
+msgid ""
+"The dropout probability used in MHA to drop some attention target. If "
+"None, use the value of dropout. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:30
+msgid ""
+"The dropout probability used after FFN activition. If None, use the value"
+" of dropout. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:33
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:27
+msgid "The start token id and also is used as padding id. Defaults to 0."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:35
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:29
+msgid "The end token id. Defaults to 1."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:37
+msgid ""
+"Indicating the strategy of decoding. It can be 'beam_search', "
+"'beam_search_v2', 'topk_sampling' and 'topp_sampling'. For beam search "
+"strategies, 'v2' would select the top `beam_size * 2` beams and process "
+"the top `beam_size` alive and finish beams in them separately, while 'v1'"
+" would only select the top `beam_size` beams and mix up the alive and "
+"finish beams. 'v2' always searchs more and get better results, since the "
+"alive beams would always be `beam_size` while the number of alive beams "
+"in `v1` might decrease when meeting the end token. However, 'v2' always "
+"generates longer results thus might do more calculation and be slower."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:48
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:31
+msgid "The beam width for beam search. Defaults to 4."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:50
+msgid ""
+"The number of highest probability tokens to keep for top-k sampling. "
+"Defaults to 4."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:53
+msgid ""
+"The most probable tokens whose cumulative probability is not less than "
+"`topp` are kept for top-p sampling. Defaults to 4."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:56
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:33
+msgid "The maximum output length. Defaults to 256."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:58
+msgid ""
+"Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation"
+" <https://arxiv.org/abs/1611.08562>`_ for details. Bigger "
+"`diversity_rate` would lead to more diversity. if `diversity_rate == 0` "
+"is equivalent to naive BeamSearch. Default to 0 if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:63
+msgid "Whether to use fp16 for decoding."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:65
+msgid ""
+"Whether to use the faster version of encoder. This is experimental option"
+" for now. Defaults to False."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:68
+msgid ""
+"Whether to use fp16 for encoder. Only works when enable_faster_encoder is"
+" True. Defaults to False."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:71
+msgid ""
+"Indicating whether `max_out_len` in is the length relative to that of "
+"source text. Only works in `v2` temporarily. It is suggest to set a small"
+" `max_out_len` and use `rel_len=True`. Default to False if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:76
+msgid ""
+"The power number in length penalty calculation. Only works in `v2` "
+"temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_. "
+"Default to 0.6 if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:1
+msgid ""
+"The Transformer forward methods. The input are source/target sequences, "
+"and returns logits."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:4
+msgid ""
+"The ids of source sequences words. It is a tensor with shape "
+"`[batch_size, source_sequence_length]` and its data type can be int or "
+"int64."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:8
+msgid ""
+"The ids of target sequences words. It is a tensor with shape "
+"`[batch_size, target_sequence_length]` and its data type can be int or "
+"int64."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:13
+msgid ""
+"Output tensor of the final layer of the model whose data type can be "
+"float32 or float64 with shape `[batch_size, sequence_length, "
+"vocab_size]`."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:10
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:19
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:21
+msgid "示例"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:1
+msgid ""
+"This method is used for load static graph from dygraph checkpoint or "
+"export inference model using static graph."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:4
+msgid "The path to dygraph checkpoint."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:6
+msgid "The place to execute static graph."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:1
+msgid ""
+"The Transformer model for auto-regressive generation with beam search. It"
+" wraps `FasterTransformer` and `InferTransformerModel`, and automatically"
+" chioces using `FasterTransformer` (with jit building) or the slower "
+"verison `InferTransformerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:35
+msgid ""
+"The key word arguments can be `output_time_major`, `use_ft`, "
+"`use_fp16_decoding`, `rel_len`, `alpha`:  - `output_time_major(bool, "
+"optional)`: Indicate the data layout of predicted Tensor. If `False`, the"
+" data layout would be batch major with shape `[batch_size, seq_len, "
+"beam_size]`. If  `True`, the data layout would be time major with shape "
+"`[seq_len, batch_size, beam_size]`. Default to `False`.  - `use_ft(bool, "
+"optional)`: Whether to use FasterTransformer for decoding. Default to "
+"True if not set.  - `use_fp16_decoding(bool, optional)`: Whether to use "
+"fp16 for decoding.  Only works when using FasterTransformer.  - "
+"`beam_search_version(str, optional)`: Indicating the strategy of beam "
+"search. It can be 'v1' or 'v2'. 'v2' would select the top `beam_size * 2`"
+" beams and process the top `beam_size` alive and finish beams in them "
+"separately, while 'v1' would only select the top `beam_size` beams and "
+"mix up the alive and finish beams. 'v2' always searchs more and get "
+"better results, since the alive beams would always be `beam_size` while "
+"the number of alive beams in `v1` might decrease when meeting the end "
+"token. However, 'v2' always generates longer results thus might do more "
+"calculation and be slower.  - `rel_len(bool, optional)`: Indicating "
+"whether `max_out_len` in is the length relative to that of source text. "
+"Only works in `v2` temporarily. It is suggest to set a small "
+"`max_out_len` and use `rel_len=True`. Default to False if not set.  - "
+"`alpha(float, optional)`: The power number in length penalty calculation."
+" Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_. Only works in "
+"`v2` temporarily. Default to 0.6 if not set.  - diversity_rate(float, "
+"optional): Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural"
+" Generation <https://arxiv.org/abs/1611.08562>`_ for details. Bigger "
+"`diversity_rate` would lead to more diversity. if `diversity_rate == 0` "
+"is equivalent to naive BeamSearch. Default to 0 if not set. **NOTE**: "
+"Only works when using FasterTransformer temporarily."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:35
+msgid ""
+"The key word arguments can be `output_time_major`, `use_ft`, "
+"`use_fp16_decoding`, `rel_len`, `alpha`:"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:38
+msgid "`output_time_major(bool, optional)`: Indicate the data layout of predicted"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:39
+msgid ""
+"Tensor. If `False`, the data layout would be batch major with shape "
+"`[batch_size, seq_len, beam_size]`. If  `True`, the data layout would be "
+"time major with shape `[seq_len, batch_size, beam_size]`. Default to "
+"`False`."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:44
+msgid "`use_ft(bool, optional)`: Whether to use FasterTransformer"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:45
+msgid "for decoding. Default to True if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:47
+msgid "`use_fp16_decoding(bool, optional)`: Whether to use fp16"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:48
+msgid "for decoding.  Only works when using FasterTransformer."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:50
+msgid "`beam_search_version(str, optional)`: Indicating the strategy of"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:51
+msgid ""
+"beam search. It can be 'v1' or 'v2'. 'v2' would select the top `beam_size"
+" * 2` beams and process the top `beam_size` alive and finish beams in "
+"them separately, while 'v1' would only select the top `beam_size` beams "
+"and mix up the alive and finish beams. 'v2' always searchs more and get "
+"better results, since the alive beams would always be `beam_size` while "
+"the number of alive beams in `v1` might decrease when meeting the end "
+"token. However, 'v2' always generates longer results thus might do more "
+"calculation and be slower."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:60
+msgid "`rel_len(bool, optional)`: Indicating whether `max_out_len` in is"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:61
+msgid ""
+"the length relative to that of source text. Only works in `v2` "
+"temporarily. It is suggest to set a small `max_out_len` and use "
+"`rel_len=True`. Default to False if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:65
+msgid "`alpha(float, optional)`: The power number in length penalty"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:66
+msgid ""
+"calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_. "
+"Only works in `v2` temporarily. Default to 0.6 if not set."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:69
+msgid "diversity_rate(float, optional): Refer to `A Simple, Fast Diverse"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:70
+msgid ""
+"Decoding Algorithm for Neural Generation "
+"<https://arxiv.org/abs/1611.08562>`_ for details. Bigger `diversity_rate`"
+" would lead to more diversity. if `diversity_rate == 0` is equivalent to "
+"naive BeamSearch. Default to 0 if not set. **NOTE**: Only works when "
+"using FasterTransformer temporarily."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:1
+msgid "Performs decoding for transformer model."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:3
+msgid ""
+"The ids of source sequence words. It is a tensor with shape `[batch_size,"
+" source_sequence_length]` and its data type can be int or int64."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:7
+msgid ""
+"The ids of target sequence words. Normally, it should NOT be given. If "
+"it's given, force decoding with previous output token will be trigger. "
+"Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:12
+msgid ""
+"An int64 tensor shaped indicating the predicted ids. Its shape is "
+"`[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]` "
+"according to `output_time_major`. While, when using FasterTransformer and"
+" beam search v2, the beam dimension would be doubled to include both the "
+"top `beam_size` alive and finish beams, thus the tensor shape is "
+"`[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, "
+"beam_size * 2]`."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT:1
+msgid "基类：:class:`paddlenlp.transformers.gpt.modeling.GPTPretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART.forward:1
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT.forward:1
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART.forward:1
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText.forward:1
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART.forward:4
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT.forward:4
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART.forward:4
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText.forward:4
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART.forward:6
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT.forward:6
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART.forward:6
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText.forward:6
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer:1
+msgid "基类：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText:1
+msgid "基类：:class:`paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART:1
+msgid "基类：:class:`paddlenlp.transformers.bart.modeling.BartPretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART:1
+msgid "基类：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
+msgstr ""
+

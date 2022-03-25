@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 import argparse
 import numpy as np
 from pprint import pprint
@@ -31,7 +30,7 @@ def setup_args():
         "--inference_model_dir",
         default="./infer_model/",
         type=str,
-        help="Path to save inference model of gpt. ")
+        help="Path to save inference model of PLATO. ")
     parser.add_argument(
         "--use_role",
         action="store_true",
@@ -92,8 +91,9 @@ def infer(args):
         input_handles[name] = predictor.get_input_handle(name)
         if name == "attention_mask":
             input_handles[name].copy_from_cpu(
-                np.asarray(
-                    data[name], dtype="float32").reshape([1, 1, 41, 41]))
+                np.expand_dims(
+                    np.asarray(
+                        data[name], dtype="float32"), axis=(0, 1)))
         else:
             input_handles[name].copy_from_cpu(
                 np.asarray(
