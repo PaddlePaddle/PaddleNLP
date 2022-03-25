@@ -38,7 +38,9 @@ from LIME.lime_text import LimeTextExplainer
 from rnn.model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
 from rnn.utils import CharTokenizer, convert_example
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+sys.path.append('..')
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.remove('..')
 sys.path.remove('../task/senti')
 sys.path.append('../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version

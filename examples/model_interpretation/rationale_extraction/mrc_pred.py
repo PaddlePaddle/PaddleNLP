@@ -40,7 +40,9 @@ sys.path.append('../task/mrc')
 from saliency_map.squad import compute_prediction
 from saliency_map.squad import DuReaderChecklist, RCInterpret, compute_prediction_checklist
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+sys.path.append('..')
 from roberta.modeling import RobertaForQuestionAnswering
+sys.path.remove('..')
 sys.path.remove('../task/mrc')
 sys.path.append('../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
@@ -244,7 +246,7 @@ if __name__ == "__main__":
 
     with paddle.amp.auto_cast(enable=args.use_amp):
 
-        sd = P.load(args.init_checkpoint)
+        sd = paddle.load(args.init_checkpoint)
         model.set_dict(sd)
         print('load model from %s' % args.init_checkpoint)
 

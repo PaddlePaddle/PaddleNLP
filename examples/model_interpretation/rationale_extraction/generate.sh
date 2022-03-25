@@ -1,11 +1,11 @@
-TASK=senti
+TASK=similarity
 
 if [[ $TASK == "mrc" ]]; then
     MODELS=("roberta_base" "roberta_large")
     MODES=("attention" "integrated_gradient")
 else
     MODELS=("roberta_large" "roberta_base" "lstm")
-    MODES=("attention" "integrated_gradient" "lime")
+    MODES=("lime" "attention" "integrated_gradient")
 fi
 
 for BASE_MODEL in ${MODELS[*]};
@@ -19,7 +19,7 @@ do
                     RATIO_DIC="[0.311]"
                 elif [[ $TASK == "similarity" ]]; then
                     RATIO_DIC="[0.701,0.709]"
-                elif [[ $TASK == "MRC" ]]; then
+                elif [[ $TASK == "mrc" ]]; then
                     RATIO_DIC="[0.096]"
                 fi
             elif [[ $LANGUAGE == "en" ]]; then
@@ -27,7 +27,7 @@ do
                     RATIO_DIC="[0.192]"
                 elif [[ $TASK == "similarity" ]]; then
                     RATIO_DIC="[0.511,0.505]"
-                elif [[ $TASK == "MRC" ]]; then
+                elif [[ $TASK == "mrc" ]]; then
                     RATIO_DIC="[0.102]"
                 fi
             fi

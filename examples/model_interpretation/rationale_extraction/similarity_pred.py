@@ -34,7 +34,9 @@ from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBP
 
 sys.path.append('../task/similarity')
 from LIME.lime_text import LimeTextExplainer
+sys.path.append('..')
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.remove('..')
 from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet
 sys.path.remove('../task/similarity')
