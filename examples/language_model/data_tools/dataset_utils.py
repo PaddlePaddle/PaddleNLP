@@ -33,13 +33,115 @@ def get_local_rank():
 
 print_rank_0 = print
 
-#from megatron.data.indexed_dataset import make_dataset as make_indexed_dataset
 COMPILED = False
 DSET_TYPE_BERT = 'standard_bert'
 DSET_TYPE_T5 = 't5'
 DSET_TYPE_ERNIE = 'ernie'
 
 DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5, DSET_TYPE_ERNIE]
+
+
+def compile_helper():
+    """Compile helper function ar runtime. Make sure this
+    is invoked on a single process."""
+    import os
+    import subprocess
+    path = os.path.abspath(os.path.dirname(__file__))
+    ret = subprocess.run(['make', '-C', path])
+    if ret.returncode != 0:
+        print("Making C++ dataset helpers module failed, exiting.")
+        import sys
+        sys.exit(1)
+
+
+class BlendableDataset(paddle.io.Dataset):
+    """
+    The BlendableDataset is a wrapper which used to mix different dataset.
+    
+    The input is a list of dataset and corresponding weights for each dataset.
+    """
+
+    def __init__(self, datasets, weights):
+
+        self.datasets = datasets
+        num_datasets = len(datasets)
+        assert num_datasets == len(weights)
+
+        self.size = 0
+        for dataset in self.datasets:
+            self.size += len(dataset)
+
+        # Normalize weights.
+        weights = np.array(weights, dtype=np.float64)
+        sum_weights = np.sum(weights)
+        assert sum_weights > 0.0
+        weights /= sum_weights
+
+        # Build indecies.
+        start_time = time.time()
+        assert num_datasets < 255
+        self.dataset_index = np.zeros(self.size, dtype=np.uint8)
+        self.dataset_sample_index = np.zeros(self.size, dtype=np.int64)
+
+        local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(
+        ))
+
+        while True:
+            try:
+                import data_tools.helpers as helpers
+                break
+            except Exception as e:
+                if local_rank == 0:
+                    compile_helper()
+                print_rank_0('> wait for hepers to be compiled!')
+                time.sleep(1)
+
+        import data_tools.helpers as helpers
+        helpers.build_blending_indices(self.dataset_index,
+                                       self.dataset_sample_index, weights,
+                                       num_datasets, self.size, local_rank == 0)
+        print_rank_0('> elapsed time for building blendable dataset indices: '
+                     '{:.2f} (sec)'.format(time.time() - start_time))
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        dataset_idx = self.dataset_index[idx]
+        sample_idx = self.dataset_sample_index[idx]
+        return self.datasets[dataset_idx][sample_idx]
+
+
+def get_datasets_weights_and_num_samples(data_prefix,
+                                         train_valid_test_num_samples):
+
+    # The data prefix should be in the format of:
+    #   weight-1, data-prefix-1, weight-2, data-prefix-2, ..
+    assert len(data_prefix) % 2 == 0
+    num_datasets = len(data_prefix) // 2
+    weights = [0] * num_datasets
+    prefixes = [0] * num_datasets
+    for i in range(num_datasets):
+        weights[i] = float(data_prefix[2 * i])
+        prefixes[i] = (data_prefix[2 * i + 1]).strip()
+    # Normalize weights
+    weight_sum = 0.0
+    for weight in weights:
+        weight_sum += weight
+    assert weight_sum > 0.0
+    weights = [weight / weight_sum for weight in weights]
+
+    # Add 0.5% (the 1.005 factor) so in case the bleding dataset does
+    # not uniformly distribute the number of samples, we still have
+    # samples left to feed to the network.
+    datasets_train_valid_test_num_samples = []
+    for weight in weights:
+        datasets_train_valid_test_num_samples.append([
+            int(math.ceil(val * weight * 1.005))
+            for val in train_valid_test_num_samples
+        ])
+
+    return prefixes, weights, datasets_train_valid_test_num_samples
 
 
 class MMapIndexedDataset(paddle.io.Dataset):
@@ -58,7 +160,9 @@ class MMapIndexedDataset(paddle.io.Dataset):
             path + "_ids.npy", mmap_mode="r", allow_pickle=True)
         process_datas = np.load(path + "_idx.npz")
         self._sizes = process_datas["lens"]
-        self._pointers = process_datas["sents"]
+        self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
+        self._pointers[0] = 0
+        np.cumsum(self._sizes, out=self._pointers[1:])
         self._doc_idx = process_datas["docs"]
 
     def __getstate__(self):
@@ -120,19 +224,6 @@ class MMapIndexedDataset(paddle.io.Dataset):
 
 def make_indexed_dataset(data_prefix, data_impl=None, skip_warmup=False):
     return MMapIndexedDataset(data_prefix)
-
-
-def compile_helper():
-    """Compile helper function ar runtime. Make sure this
-    is invoked on a single process."""
-    import os
-    import subprocess
-    path = os.path.abspath(os.path.dirname(__file__))
-    ret = subprocess.run(['make', '-C', path])
-    if ret.returncode != 0:
-        print("Making C++ dataset helpers module failed, exiting.")
-        import sys
-        sys.exit(1)
 
 
 def get_a_and_b_segments(sample, np_rng):
@@ -527,6 +618,52 @@ def build_train_valid_test_datasets(data_prefix,
             binary_head,
             max_seq_length_dec,
             dataset_type=dataset_type)
+
+    # Blending dataset.
+    # Parse the values.
+    output = get_datasets_weights_and_num_samples(data_prefix,
+                                                  train_valid_test_num_samples)
+    prefixes, weights, datasets_train_valid_test_num_samples = output
+
+    # Build individual datasets.
+    train_datasets = []
+    valid_datasets = []
+    test_datasets = []
+    for i in range(len(prefixes)):
+        train_ds, valid_ds, test_ds = _build_train_valid_test_datasets(
+            prefixes[i],
+            args,
+            tokenizer,
+            splits_string,
+            datasets_train_valid_test_num_samples[i],
+            max_seq_length,
+            masked_lm_prob,
+            short_seq_prob,
+            seed,
+            skip_warmup,
+            binary_head,
+            max_seq_length_dec,
+            dataset_type=dataset_type)
+        if train_ds:
+            train_datasets.append(train_ds)
+        if valid_ds:
+            valid_datasets.append(valid_ds)
+        if test_ds:
+            test_datasets.append(test_ds)
+
+        # Blend.
+    blending_train_dataset = None
+    if train_datasets:
+        blending_train_dataset = BlendableDataset(train_datasets, weights)
+    blending_valid_dataset = None
+    if valid_datasets:
+        blending_valid_dataset = BlendableDataset(valid_datasets, weights)
+    blending_test_dataset = None
+    if test_datasets:
+        blending_test_dataset = BlendableDataset(test_datasets, weights)
+
+    return (blending_train_dataset, blending_valid_dataset,
+            blending_test_dataset)
 
 
 def _build_train_valid_test_datasets(data_prefix,
