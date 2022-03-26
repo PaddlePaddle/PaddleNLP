@@ -41,8 +41,6 @@ cblue/
 
 我们按照任务类别划分，同时提供了8个任务的样例代码。可以运行下边的命令，在训练集上进行训练，并在开发集上进行验证。
 
-#### 医疗文本分类任务
-
 **训练参数设置（Training setup）及结果**
 
 | Task      | epochs | batch_size | learning_rate | max_seq_length | results |
@@ -54,6 +52,9 @@ cblue/
 | KUAKE-QTR |   12   |     32     |      6e-5     |       64       | 0.69653 |
 | KUAKE-QIC |    4   |     32     |      6e-5     |      128       | 0.81176 |
 | CMeEE     |    2   |     32     |      6e-5     |      128       | 0.66167 |
+| CMeIE     |  100   |     12     |      6e-5     |      300       | 0.61385 |
+
+#### 医疗文本分类任务
 
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
@@ -82,8 +83,15 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py -
 #### 医疗命名实体识别任务
 
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train_ner.py --batch_size 32 --max_seq_length 128 --learning_rate 6e-5 --epochs 12
+$ export CUDA_VISIBLE_DEVICES=0
+$ python train_ner.py --batch_size 32 --max_seq_length 128 --learning_rate 6e-5 --epochs 12
+```
+
+#### 医疗关系抽取任务
+
+```shell
+$ export CUDA_VISIBLE_DEVICES=0
+$ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 --epochs 100
 ```
 
 ### 依赖安装
