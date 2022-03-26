@@ -429,7 +429,7 @@ class DataCollatorForTokenClassification:
         batch = {}
 
         for k, v in first.items():
-            if k not in ("label", "label_ids"
+            if k not in ("label", "label_ids", "labels"
                          ) and v is not None and not isinstance(v, str):
                 if k == 'token_type_ids':
                     batch[k] = Pad(axis=0,
