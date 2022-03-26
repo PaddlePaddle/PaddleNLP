@@ -170,7 +170,7 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader, raw_dataset, args):
+def evaluate(model, data_loader, raw_dataset, features, args):
     model.eval()
 
     all_start_logits = []
@@ -193,7 +193,7 @@ def evaluate(model, data_loader, raw_dataset, args):
             all_end_logits.append(end_logits_tensor.numpy()[idx])
 
     all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
-        raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
+        raw_dataset, features, (all_start_logits, all_end_logits),
         args.version_2_with_negative, args.n_best_size, args.max_answer_length,
         args.null_score_diff_threshold)
 
@@ -337,16 +337,17 @@ def run(args):
                                   num_proc=4)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
-
+        dev_ds_for_model = dev_ds.remove_columns(
+            ["example_id", "offset_mapping"])
         dev_batchify_fn = DataCollatorWithPadding(tokenizer)
 
         dev_data_loader = DataLoader(
-            dataset=dev_ds,
+            dataset=dev_ds_for_model,
             batch_sampler=dev_batch_sampler,
             collate_fn=dev_batchify_fn,
             return_list=True)
 
-        evaluate(model, dev_data_loader, dev_examples, args)
+        evaluate(model, dev_data_loader, dev_examples, dev_ds, args)
 
 
 if __name__ == "__main__":
