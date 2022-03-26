@@ -186,7 +186,7 @@ class DataUtil():
 
 class BertTensorizer():
     def __init__(self,max_length:int,pad_to_max=True):
-        self.tokenizer = BertTokenizer
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.max_length = max_length
         self.pad_to_max = pad_to_max
 

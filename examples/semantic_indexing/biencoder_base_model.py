@@ -83,8 +83,3 @@ class BiEncoderNllLoss(object):
             loss.mul_(loss_scale)#对照paddle
 
         return loss,correct_predictions_count
-
-
-
-
-
