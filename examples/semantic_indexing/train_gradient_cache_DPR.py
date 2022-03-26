@@ -5,6 +5,7 @@ from biencoder_base_model import BiEncoder, BiEncoderNllLoss
 from NQdataset import BiEncoderPassage, BiEncoderSample, BiENcoderBatch, BertTensorizer, NQdataSetForDPR, DataUtil
 from paddlenlp.transformers.bert.modeling import BertModel
 import numpy as np
+import os
 
 global batch_size
 global learning_rate
@@ -16,6 +17,7 @@ global dataset
 global chunk_numbers
 global global_step
 global save_steps
+global save_direc
 
 global_step = 0
 
@@ -176,6 +178,16 @@ def train():
                 # 梯度更新
 
                 if (global_step % save_steps == 0):
+                    state = model.state_dict()
+                    paddle.save()
+                    save_dir = os.path.join(save_direc,
+                                            "model_%d" % global_step)
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    save_param_path = os.path.join(save_dir,
+                                                   'model_state.pdparams')
+                    paddle.save(model.state_dict(), save_param_path)
+                    #tokenizer.save_pretrained(save_dir)
                     pass
                     #save models
 
