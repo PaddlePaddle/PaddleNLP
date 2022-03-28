@@ -145,14 +145,14 @@ python run_clue_classifier.py \
 
 ### 阅读理解任务
 
-以 C<sup>3</sup> 为例，直接使用 `mrc/run_chid.py`对该任务进行预测，注意脚本启动时需要传入参数 `--do_predict`。假设 C<sup>3</sup> 模型所在路径为 `${C3_MODEL}`，可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/c311_predict.json`：
+以 C<sup>3</sup> 为例，直接使用 `mrc/run_c3.py`对该任务进行预测，注意脚本启动时需要传入参数 `--do_predict`。假设 C<sup>3</sup> 模型所在路径为 `${C3_MODEL}`，可以运行如下脚本得到模型在测试集上的预测结果，并将预测结果写入地址 `${OUTPUT_DIR}/c311_predict.json`：
 
 ```shell
 cd mrc
 OUTPUT_DIR=results
 mkdir ${OUTPUT_DIR}
 
-python run_chid.py \
+python run_c3.py \
     --model_name_or_path ${C3_MODEL} \
     --output_dir ${OUTPUT_DIR} \
     --do_predict \
