@@ -1,16 +1,20 @@
 # 使用医疗领域预训练模型Fine-tune完成中文医疗语言理解任务
 
-近年来，预训练语言模型（Pre-trained Language Model，PLM）逐渐成为自然语言处理（Natural Language Processing，NLP）的主流方法。这类模型可以利用大规模的未标注语料进行训练，得到的模型在下游NLP任务上效果明显提升，在通用领域和特定领域均有广泛应用。在医疗领域，早期的做法是在预先训练好的通用语言模型上进行Fine-tune。后来的研究发现直接使用医疗相关语料学习到的预训练语言模型在医疗文本任务上的效果更好，采用的模型结构也从早期的BERT演变为更新的RoBERTa、ALBERT和ELECTRA。
+医疗领域存在大量的专业知识和医学术语，人类经过长时间的学习才能成为一名优秀的医生。那机器如何才能“读懂”医疗文献呢？尤其是面对电子病历、生物医疗文献中存在的大量非结构化、非标准化文本，计算机是无法直接使用、处理的。这就需要自然语言处理（Natural Language Processing，NLP）技术大展身手了。近年来，预训练语言模型（Pre-trained Language Model，PLM）逐渐成为自然语言处理的主流方法。这类模型可以利用大规模的未标注语料进行训练，得到的模型在下游NLP任务上效果明显提升，在通用领域和特定领域均有广泛应用。在医疗领域，早期的做法是在预先训练好的通用语言模型上进行 Fine-tune。后来的研究发现直接使用医疗相关语料学习到的预训练语言模型在医疗文本任务上的效果更好，采用的模型结构也从早期的BERT演变为更新的 RoBERTa、ALBERT和ELECTRA。
 
-本示例展示了中文医疗预训练模型eHealth（[Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/abs/2110.07244)）如何Fine-tune完成中文医疗语言理解任务。
+本示例展示了中文医疗预训练模型 ERNIE-Health（[Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/abs/2110.07244)）如何 Fine-tune完成中文医疗语言理解任务。
 
 ## 模型介绍
 
-本项目针对中文医疗语言理解任务，开源了中文医疗预训练模型eHealth（简写`chinese-ehealth`）。eHealth使用了医患对话、科普文章、病历档案、临床病理学教材等脱敏中文语料进行预训练，通过预训练任务设计来学习词级别和句级别的文本信息。该模型的整体结构与ELECTRA相似，包括生成器和判别器两部分。 而Fine-tune过程只用到了判别器模块，由12层Transformer网络组成。
+本项目针对中文医疗语言理解任务，开源了中文医疗预训练模型 ERNIE-Health（模型名称`ernie-health-chinese`）。ERNIE-Health模型依托于百度知识增强语义理解框架 ERNIE，以超越人类医学专家水平的成绩登顶中文医疗信息处理权威榜单 CBLUE 冠军, 验证了 ERNIE 在医疗行业应用的重要价值。
+
+![avatar](https://paddlenlp.bj.bcebos.com/figures/cblue/cblue_rank.png)
+
+ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型打造, 通过医疗知识增强技术进一步学习海量的医疗数据, 精准地掌握了专业的医学知识。ERNIE-Health 利用医疗实体掩码策略对专业术语等实体级知识学习, 学会了海量的医疗实体知识。同时，通过医疗问答匹配任务学习病患病状描述与医生专业治疗方案的对应关系，获得了医疗实体知识之间的内在联系。ERNIE-Health 共学习了 60 多万的医疗专业术语和 4000 多万的医疗专业问答数据，大幅提升了对医疗专业知识的理解和建模能力。此外，ERNIE-Health 还探索了多级语义判别预训练任务，提升了模型对医疗知识的学习效率。该模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。 而 Fine-tune 过程只用到了判别器模块，由 12 层 Transformer 网络组成。
 
 ## 数据集介绍
 
-本项目使用了中文医学语言理解测评（[Chinese Biomedical Language Understanding Evaluation，CBLUE](https://github.com/CBLUEbenchmark/CBLUE)）数据集，其包括医学文本信息抽取（实体识别、关系抽取）、医学术语归一化、医学文本分类、医学句子关系判定和医学问答共5大类任务8个子任务。
+本项目使用了中文医学语言理解测评（[Chinese Biomedical Language Understanding Evaluation，CBLUE](https://github.com/CBLUEbenchmark/CBLUE)）1.0 版本数据集，这是国内首个面向中文医疗文本处理的多任务榜单，涵盖了医学文本信息抽取（实体识别、关系抽取）、医学术语归一化、医学文本分类、医学句子关系判定和医学问答共5大类任务8个子任务。其数据来源分布广泛，包括医学教材、电子病历、临床试验公示以及互联网用户真实查询等。该榜单一经推出便受到了学界和业界的广泛关注，已逐渐发展成为检验AI系统中文医疗信息处理能力的“金标准”。
 
 * CMeEE：中文医学命名实体识别
 * CMeIE：中文医学文本实体关系抽取
@@ -21,7 +25,7 @@
 * KUAKE-QTR：医疗搜索查询词-页面标题相关性
 * KUAKE-QQR：医疗搜索查询词-查询词相关性
 
-更多信息可参考CBLUE的[github](https://github.com/CBLUEbenchmark/CBLUE/blob/main/README_ZH.md)。其中对于临床术语标准化任务（CHIP-CDN），我们按照eHealth中的方法通过检索将原多分类任务转换为了二分类任务，即给定一诊断原词和一诊断标准词，要求判定后者是否是前者对应的诊断标准词。本项目提供了检索处理后的CHIP-CDN数据集（简写`CHIP-CDN-2C`），且构建了基于该数据集的example代码。
+更多信息可参考CBLUE的[github](https://github.com/CBLUEbenchmark/CBLUE/blob/main/README_ZH.md)。其中对于临床术语标准化任务（CHIP-CDN），我们按照 ERNIE-Health 中的方法通过检索将原多分类任务转换为了二分类任务，即给定一诊断原词和一诊断标准词，要求判定后者是否是前者对应的诊断标准词。本项目提供了检索处理后的 CHIP-CDN 数据集（简写`CHIP-CDN-2C`），且构建了基于该数据集的example代码。
 
 ## 快速开始
 
@@ -34,7 +38,11 @@ cblue/
 ├── README.md # 使用说明
 ├── train_classification.py # 分类任务训练评估脚本
 ├── train_ner.py # 实体识别任务训练评估脚本
-└── train_spo.py # 关系抽取任务训练评估脚本
+├── train_spo.py # 关系抽取任务训练评估脚本
+└── export_model #动态图参数导出静态图参数脚本
+    ├── export_classification.py # 分类模型导出静态图脚本
+    ├── export_ner.py # 实体识别模型导出静态图脚本
+    └── export_spo.py # 关系抽取模型导出静态图脚本
 ```
 
 ### 模型训练
@@ -43,16 +51,16 @@ cblue/
 
 **训练参数设置（Training setup）及结果**
 
-| Task      | epochs | batch_size | learning_rate | max_seq_length | results |
-| --------- | :----: | :--------: | :-----------: | :------------: | :-----: |
-| CHIP-STS  |   16   |     32     |      1e-4     |       96       | 0.88550 |
-| CHIP-CTC  |   16   |     32     |      3e-5     |      160       | 0.82790 |
-| CHIP-CDN  |   16   |    256     |      3e-5     |       32       | 0.76979 |
-| KUAKE-QQR |   16   |     32     |      6e-5     |       64       | 0.82364 |
-| KUAKE-QTR |   12   |     32     |      6e-5     |       64       | 0.69653 |
-| KUAKE-QIC |    4   |     32     |      6e-5     |      128       | 0.81176 |
-| CMeEE     |    2   |     32     |      6e-5     |      128       | 0.66167 |
-| CMeIE     |  100   |     12     |      6e-5     |      300       | 0.61385 |
+| Task      | epochs | batch_size | learning_rate | max_seq_length |  metrics  |
+| --------- | :----: | :--------: | :-----------: | :------------: | :-------: |
+| CHIP-STS  |   16   |     32     |      1e-4     |       96       |  0.88550  |
+| CHIP-CTC  |   16   |     32     |      3e-5     |      160       |  0.82790  |
+| CHIP-CDN  |   16   |    256     |      3e-5     |       32       |  0.76979  |
+| KUAKE-QQR |   16   |     32     |      6e-5     |       64       |  0.82364  |
+| KUAKE-QTR |   12   |     32     |      6e-5     |       64       |  0.69653  |
+| KUAKE-QIC |    4   |     32     |      6e-5     |      128       |  0.81176  |
+| CMeEE     |    2   |     32     |      6e-5     |      128       |  0.66167  |
+| CMeIE     |  100   |     12     |      6e-5     |      300       |  0.61385  |
 
 #### 医疗文本分类任务
 

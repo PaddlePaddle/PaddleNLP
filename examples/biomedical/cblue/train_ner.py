@@ -79,8 +79,9 @@ def do_train():
     train_ds, dev_ds = load_dataset('cblue', 'CMeEE', splits=['train', 'dev'])
 
     model = ElectraForBinaryTokenClassification.from_pretrained(
-        'ehealth-chinese', num_classes=[len(x) for x in train_ds.label_list])
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+        'ernie-health-chinese',
+        num_classes=[len(x) for x in train_ds.label_list])
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     label_list = train_ds.label_list
     pad_label_id = [len(label_list[0]) - 1, len(label_list[1]) - 1]
