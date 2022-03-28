@@ -54,6 +54,7 @@ def create_pretrained_dataset(
         max_seq_len,
         places=None,
         data_holders=None,
+        binary_head=True,
         current_step=0, ):
 
     train_valid_test_num_samples = [
@@ -73,7 +74,7 @@ def create_pretrained_dataset(
         short_seq_prob=args.short_seq_prob,
         seed=args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
 
@@ -135,12 +136,26 @@ def create_pretrained_dataset(
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -455,6 +470,13 @@ def do_train(args):
                     addition_info = " loss_scaling: %.1f, incr_count: %d, decr_count: %d" % (
                         scaler._scale.numpy(), scaler._incr_count,
                         scaler._decr_count)
+                    log_writer.add_scalar("loss_scaling",
+                                          scaler._scale.numpy(), global_step)
+                    log_writer.add_scalar("incr_count", scaler._incr_count,
+                                          global_step)
+                    log_writer.add_scalar("decr_count", scaler._decr_count,
+                                          global_step)
+
                 logger.info(common_loginfo + addition_info)
                 log_writer.add_scalar("loss", loss.item(), global_step)
                 log_writer.add_scalar("lm_loss", lm_loss.item(), global_step)

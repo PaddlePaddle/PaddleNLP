@@ -83,8 +83,7 @@ class BlendableDataset(paddle.io.Dataset):
         self.dataset_index = np.zeros(self.size, dtype=np.uint8)
         self.dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
-        local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(
-        ))
+        local_rank = get_local_rank()
 
         while True:
             try:
