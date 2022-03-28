@@ -9,7 +9,7 @@ parser.add_argument("--batch_size", default=16, type=int, help="Batch size per G
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining or finetuned model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
-parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
+parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
 parser.add_argument("--static_path", default=None, type=str, help="The path which your static model is at or where you want to save after converting.")
 
@@ -25,7 +25,7 @@ if rank == 0:
     if os.path.exists(args.model_name_or_path):
         logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-if os.path.exists(args.static_path):
+if args.static_path and os.path.exists(args.static_path):
     logger.info("will remove the old model")
     os.system("rm -r {}".format(args.static_path))
 

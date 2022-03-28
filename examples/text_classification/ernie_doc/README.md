@@ -5,13 +5,13 @@
 ```shell
 .
 ├── LICENSE										
-├── README.md									#文档 
-├── data.py										#数据处理
-├── export_model.py						#将动态图参数导出成静态图参数
-├── metrics.py								#ERNIE-Doc下游任务指标
-├── modeling.py								#ERNIE-Doc模型实现（针对实现静态图修改）
-├── predict.py								#分类任务预测脚本（包括动态图预测和动转静）
-└── train.py									#分类任务训练脚本（包括数据下载，模型导出和测试集结果导出）
+├── README.md		#文档 
+├── data.py	        #数据处理
+├── export_model.py	#将动态图参数导出成静态图参数
+├── metrics.py          #ERNIE-Doc下游任务指标
+├── modeling.py		#ERNIE-Doc模型实现（针对实现静态图修改）
+├── predict.py		#分类任务预测脚本（包括动态图预测和动转静）
+└── train.py		#分类任务训练脚本（包括数据下载，模型导出和测试集结果导出）
 ```
 
 ## 快速开始
@@ -38,9 +38,9 @@ iflytek的数据示例如下：
 
 ```shell
 python train.py --batch_size 16 \
-								--model_name_or_path ernie-doc-base-zh \
-  							--epoch 5 \
-  							--output_dir ./checkpoints/
+                --model_name_or_path ernie-doc-base-zh \
+                --epoch 5 \
+                --output_dir ./checkpoints/
 ```
 
 根据通用参数释义可自行更改训练超参数和模型保存地址。
@@ -51,23 +51,23 @@ python train.py --batch_size 16 \
 
 ```shell
 python export_model.py --batch_size 16 \
-											 --model_name_or_path finetuned_model \
-											 --max_seq_lenght 512 \
-											 --memory_length 128 \
-											 --static_path ./my_static_model/
+                       --model_name_or_path finetuned_model \
+                       --max_seq_lenght 512 \
+                       --memory_length 128 \
+                       --static_path ./my_static_model/
 ```
 
 也可以直接使用预测脚本将`static_mode`设为True （设置成False则使用动态图预测），直接完成转化静态图和使用静态图预测的步骤：
 
 ```shell
 python predict.py --static_mode True \
-									--dataset iflytek \
-									--batch_size 16 \
-									--model_name_or_path finetuned_model \
-                  --max_seq_lenght 512 \
-                  --memory_length 128 \
-                  --static_path ./my_static_model/
-                  --test_results_file ./test_results.json
+		--dataset iflytek \
+		--batch_size 16 \
+		--model_name_or_path finetuned_model \
+                --max_seq_lenght 512 \
+                --memory_length 128 \
+                --static_path ./my_static_model/ \
+                --test_results_file ./test_results.json
 ```
 
 模型输出的`test_results_file`示例：

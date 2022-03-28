@@ -88,8 +88,8 @@ class LongDocClassifier:
                  max_seq_length=512,
                  memory_len=128,
                  static_mode=False,
-                 dataset = "iflytek",
-                 **kwargs):
+                 dataset="iflytek",
+                 static_path=None):
         self.model_name_or_path = model_name_or_path
         self.batch_size = batch_size
         self.trainer_num = trainer_num
@@ -97,9 +97,7 @@ class LongDocClassifier:
         self.max_seq_length = max_seq_length
         self.memory_len = memory_len
         self.static_mode = static_mode
-        self.kwargs = kwargs
-        self.static_path = self.kwargs[
-            'static_path'] if 'static_path' in self.kwargs and not None else PPNLP_HOME
+        self.static_path = static_path if static_path else PPNLP_HOME
 
         tokenizer_class, test_name, preprocess_text_fn = DATASET_INFO[dataset]
         self._construct_tokenizer(tokenizer_class)
