@@ -139,10 +139,13 @@ class Pad(object):
                  [8, 9, 0, 0]]
                 '''
         """
+
+        # return data itself for rare unexpected cases when 1-D array is passed to Pad
         if not isinstance(data[0], list):
             return np.asarray(
                 data,
                 dtype=self._dtype if self._dtype is not None else np.int64)
+
         arrs = [np.asarray(ele) for ele in data]
         original_length = [ele.shape[self._axis] for ele in arrs]
         max_size = max(original_length)
