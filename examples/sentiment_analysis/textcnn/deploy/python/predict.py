@@ -20,7 +20,6 @@ import paddle.nn.functional as F
 from paddle import inference
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
 
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_file", type=str, required=True,
@@ -38,10 +37,7 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(data, 
-                    tokenizer, 
-                    pad_token_id=0, 
-                    max_ngram_filter_size=3):
+def convert_example(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
     """convert_example"""
     input_ids = tokenizer.encode(data)
     seq_len = len(input_ids)
@@ -94,9 +90,7 @@ class Predictor(object):
         """
         examples = []
         for text in data:
-            input_ids = convert_example(
-                text,
-                tokenizer)
+            input_ids = convert_example(text, tokenizer)
             examples.append(input_ids)
 
         # Seperates data into some batches.
@@ -106,7 +100,8 @@ class Predictor(object):
         ]
 
         batchify_fn = lambda samples, fn=Pad(
-            axis=0, pad_val=pad_token_id
+            axis=0,
+            pad_val=pad_token_id  # input
         ): fn(samples)
 
         results = []
