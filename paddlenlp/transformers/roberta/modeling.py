@@ -684,13 +684,13 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
         flat_input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1])) if input_ids is not None else None
         flat_position_ids = position_ids.reshape(
-            (-1, position_ids.shape(-1))) if position_ids is not None else None
+            (-1, position_ids.shape[-1])) if position_ids is not None else None
         flat_token_type_ids = token_type_ids.reshape(
             (-1,
-             token_type_ids.shape(-1))) if token_type_ids is not None else None
+             token_type_ids.shape[-1])) if token_type_ids is not None else None
         flat_attention_mask = attention_mask.reshape(
             (-1,
-             attention_mask.shape(-1))) if attention_mask is not None else None
+             attention_mask.shape[-1])) if attention_mask is not None else None
 
         encoder_outputs, pooled_output = self.roberta(
             flat_input_ids,
