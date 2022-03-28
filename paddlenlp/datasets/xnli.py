@@ -94,9 +94,9 @@ class XNLI(DatasetBuilder):
     def _read(self, filename, split):
         """Reads data."""
         language = self.name
-        if language is None or language not in ALL_LANGUAGES + [
-                "all_languages"
-        ]:
+        if language is None:
+            language = "all_languages"
+        if language not in ALL_LANGUAGES + ["all_languages"]:
             raise ValueError(
                 f"Name parameter should be specified. Can be one of {ALL_LANGUAGES + ['all_languages']}. "
             )
