@@ -1,5 +1,6 @@
 # coding: utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -351,8 +352,9 @@ def run(args):
                               batch_size=len(test_ds),
                               remove_columns=column_names,
                               num_proc=1)
+        # Serveral samples have more than four choices.
         test_batch_sampler = paddle.io.BatchSampler(
-            test_ds, batch_size=args.eval_batch_size, shuffle=False)
+            test_ds, batch_size=1, shuffle=False)
 
         batchify_fn = lambda samples, fn=Dict({
             'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
