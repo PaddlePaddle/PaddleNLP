@@ -5,13 +5,13 @@
 ```shell
 .
 ├── LICENSE										
-├── README.md		#文档 
-├── data.py	        #数据处理
-├── export_model.py	#将动态图参数导出成静态图参数
-├── metrics.py          #ERNIE-Doc下游任务指标
-├── modeling.py		#ERNIE-Doc模型实现（针对实现静态图修改）
-├── predict.py		#分类任务预测脚本（包括动态图预测和动转静）
-└── train.py		#分类任务训练脚本（包括数据下载，模型导出和测试集结果导出）
+├── README.md             #文档 
+├── data.py               #数据处理
+├── export_model.py       #将动态图参数导出成静态图参数
+├── metrics.py            #ERNIE-Doc下游任务指标
+├── modeling.py           #ERNIE-Doc模型实现（针对实现静态图修改）
+├── predict.py            #分类任务预测脚本（包括动态图预测和动转静）
+└── train.py              #分类任务训练脚本（包括数据下载，模型导出和测试集结果导出）
 ```
 
 ## 快速开始
@@ -61,13 +61,13 @@ python export_model.py --batch_size 16 \
 
 ```shell
 python predict.py --static_mode True \
-		--dataset iflytek \
-		--batch_size 16 \
-		--model_name_or_path finetuned_model \
-                --max_seq_lenght 512 \
-                --memory_length 128 \
-                --static_path ./my_static_model/ \
-                --test_results_file ./test_results.json
+        --dataset iflytek \
+        --batch_size 16 \
+        --model_name_or_path finetuned_model \
+        --max_seq_lenght 512 \
+        --memory_length 128 \
+        --static_path ./my_static_model/ \
+        --test_results_file ./test_results.json
 ```
 
 模型输出的`test_results_file`示例：
