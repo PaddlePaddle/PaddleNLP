@@ -13,399 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import json
 from paddle.utils import try_import
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer, AddedToken
 from ..gpt.tokenizer import bytes_to_unicode
-
-__all__ = ['RobertaTokenizer']
-
-
-class RobertaTokenizer(PretrainedTokenizer):
-    """
-    Constructs a RoBerta tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
-
-    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
-    which contains most of the main methods. For more information regarding those methods,
-    please refer to this superclass.
-
-    Args:
-        vocab_file (str):
-            The vocabulary file path (ends with '.txt') required to instantiate
-            a `WordpieceTokenizer`.
-        do_lower_case (bool):
-            Whether or not to lowercase the input when tokenizing.
-            Defaults to`True`.
-        unk_token (str):
-            A special token representing the *unknown (out-of-vocabulary)* token.
-            An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to "[UNK]".
-        sep_token (str):
-            A special token separating two different sentences in the same input.
-            Defaults to "[SEP]".
-        pad_token (str):
-            A special token used to make arrays of tokens the same size for batching purposes.
-            Defaults to "[PAD]".
-        cls_token (str):
-            A special token used for sequence classification. It is the last token
-            of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str):
-            A special token representing a masked token. This is the token used
-            in the masked language modeling task which the model tries to predict the original unmasked ones.
-            Defaults to "[MASK]".
-
-    Examples:
-        .. code-block::
-
-            from paddlenlp.transformers import RobertaTokenizer
-            tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-
-            tokens = tokenizer('He was a puppeteer')
-            #{'input_ids': [101, 9245, 9947, 143, 11227, 9586, 8418, 8854, 8180, 102],
-            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}、
-
-    """
-
-    # resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
-    resource_files_names = {
-        "vocab_file": "vocab.txt",
-        "merges_file": "merges.txt"
-    }
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "roberta-wwm-ext":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/vocab.txt",
-            "roberta-wwm-ext-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/vocab.txt",
-            "rbt3":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
-            "rbtl3":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
-            "roberta-base-ft-chinanews-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
-            "roberta-base-ft-cluener2020-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
-            "roberta-base-chn-extractive-qa":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
-        },
-        "merges_file": {
-            "roberta-wwm-ext": None,
-            "roberta-wwm-ext-large": None,
-            "rbt3": None,
-            "rbtl3": None,
-            "roberta-base-ft-chinanews-chn": None,
-            "roberta-base-ft-cluener2020-chn": None,
-            "roberta-base-chn-extractive-qa": None,
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
-        }
-    }
-    pretrained_init_configuration = {
-        "roberta-wwm-ext": {
-            "do_lower_case": True
-        },
-        "roberta-wwm-ext-large": {
-            "do_lower_case": True
-        },
-        "rbt3": {
-            "do_lower_case": True
-        },
-        "rbtl3": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-chinanews-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-cluener2020-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-chn-extractive-qa": {
-            "do_lower_case": True
-        },
-        "roberta-en-base": {},
-        "roberta-en-large": {},
-        "roberta-base-squad2": {},
-        "tiny-distilroberta-base": {},
-    }
-
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
-
-        self.do_lower_case = do_lower_case
-        self.vocab_file = vocab_file
-        self.merges_file = merges_file
-
-        if vocab_file is not None and merges_file is not None:
-            self.tokenizer = RobertaBPETokenizer(
-                vocab_file=vocab_file, merges_file=merges_file, **kwargs)
-        elif vocab_file is not None:
-            self.tokenizer = RobertaChineseTokenizer(
-                vocab_file=vocab_file, do_lower_case=True, **kwargs)
-            self.basic_tokenizer = self.tokenizer.basic_tokenizer
-            self.wordpiece_tokenizer = self.tokenizer.wordpiece_tokenizer
-            self.vocab = self.tokenizer.vocab
-        else:
-            raise ValueError(
-                "You should specify both of 'vocal_file'"
-                "and 'merges_file' to construct an roberta BPE tokenizer."
-                "Specify 'vocal_file' for Chinese tokenizer")
-
-    def __getattr__(self, name):
-        return self.tokenizer.__getattr__(name)
-
-    @property
-    def vocab_size(self):
-        """
-        Return the size of vocabulary.
-
-        Returns:
-            int: The size of vocabulary.
-        """
-
-        return self.tokenizer.vocab_size
-
-    def _tokenize(self, text):
-        """
-        End-to-end tokenization for RoBERTa models.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            list: A list of string representing converted tokens.
-        """
-        return self.tokenizer._tokenize(text)
-
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RobertaTokenizer
-
-                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-        """
-
-        return self.tokenizer.tokenize(text)
-
-    def convert_tokens_to_string(self, tokens):
-        """
-        Converts a sequence of tokens (list of string) to a single string. Since
-        the usage of WordPiece introducing `##` to concat subwords, also removes
-        `##` when converting.
-
-        Args:
-            tokens (list): A list of string representing tokens to be converted.
-
-        Returns:
-            str: Converted string from tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RobertaTokenizer
-
-                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-                strings = tokenizer.convert_tokens_to_string(tokens)
-                '''
-                he was a puppeteer
-                '''
-
-        """
-        return self.tokenizer.convert_tokens_to_string(tokens)
-
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a sequence of tokens (list of string) to a list of ids.
-
-        Args:
-            tokens (list): A list of string representing tokens to be converted.
-
-        Returns:
-            list: Converted ids from tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RobertaTokenizer
-
-                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-                tokens = tokenizer.tokenize('He was a puppeteer')
-                #['he', 'was', 'a', 'pu', '##pp', '##et', '##ee', '##r']
-
-                ids = tokenizer.convert_tokens_to_ids(tokens)
-                #[9245, 9947, 143, 11227, 9586, 8418, 8854, 8180]
-        """
-        return self.tokenizer.convert_tokens_to_ids(tokens)
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        """
-        Converts a sequence of tokens (list of string) to a list of ids.
-
-        Args:
-            ids (list): A list of ids to be converted.
-            skip_special_tokens (bool, optional):
-                Whether or not to skip specical tokens. Defaults to `False`.
-
-        Returns:
-            list: A list of converted tokens.
-        """
-        return self.tokenizer.convert_ids_to_tokens(
-            ids, skip_special_tokens=skip_special_tokens)
-
-    def num_special_tokens_to_add(self, pair=False):
-        """
-        Returns the number of added tokens when encoding a sequence with special tokens.
-
-        Args:
-            pair(bool):
-                Whether the input is a sequence pair or a single sequence.
-                Defaults to `False` and the input is a single sequence.
-
-        Returns:
-            int: Number of tokens added to sequences.
-        """
-        return self.tokenizer.num_special_tokens_to_add(pair=pair)
-
-    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
-        """
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens.
-
-        A RoBERTa sequence has the following format:
-
-        - single sequence:       ``[CLS] X [SEP]``
-        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
-
-        Args:
-            token_ids_0 (List[int]):
-                List of IDs to which the special tokens will be added.
-            token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs.
-                Defaults to `None`.
-
-        Returns:
-            List[int]: List of input_id with the appropriate special tokens.
-        """
-        return self.tokenizer.build_inputs_with_special_tokens(
-            token_ids_0, token_ids_1=token_ids_1)
-
-    def _convert_token_to_id(self, token):
-        return self.tokenizer._convert_token_to_id(token)
-
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
-        """
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
-
-        A RoBERTa offset_mapping has the following format:
-
-        - single sequence:      ``(0,0) X (0,0)``
-        - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
-
-        Args:
-            offset_mapping_ids_0 (List[tuple]):
-                List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (List[tuple], optional):
-                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
-
-        Returns:
-            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
-        """
-        return self.tokenizer.build_offset_mapping_with_special_tokens(
-            offset_mapping_0, offset_mapping_1=offset_mapping_1)
-
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
-        """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
-
-        A RoBERTa sequence pair mask has the following format:
-        ::
-
-            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-            | first sequence    | second sequence |
-
-        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
-
-        Args:
-            token_ids_0 (List[int]):
-                A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to None.
-
-        Returns:
-            List[int]: List of token_type_id according to the given sequence(s).
-        """
-        return self.tokenizer.create_token_type_ids_from_sequences(
-            token_ids_0, token_ids_1=token_ids_1)
-
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
-        """
-        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
-        special tokens using the tokenizer ``encode`` methods.
-
-        Args:
-            token_ids_0 (List[int]):
-                A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optinal):
-                Optional second list of IDs for sequence pairs. Defaults to None.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already
-                formatted with special tokens for the model. Defaults to None.
-
-        Returns:
-            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
-        """
-
-        return self.tokenizer.get_special_tokens_mask(
-            token_ids_0,
-            token_ids_1=token_ids_1,
-            already_has_special_tokens=already_has_special_tokens)
-
-    def save_resources(self, save_directory):
-        return self.tokenizer.save_resources(save_directory)
+from ...utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from ...utils.env import MODEL_HOME
+from ...utils.log import logger
+
+__all__ = ['RobertaTokenizer', 'RobertaChineseTokenizer', 'RobertaBPETokenizer']
 
 
 class RobertaChineseTokenizer(PretrainedTokenizer):
@@ -466,12 +85,6 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
-            "roberta-base-ft-chinanews-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_chinanews_chinese/vocab.txt",
-            "roberta-base-ft-cluener2020-chn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_finetuned_cluener2020_chinese/vocab.txt",
-            "roberta-base-chn-extractive-qa":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/uer_roberta_base_chinese_extractive_qa/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -485,15 +98,6 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rbtl3": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-chinanews-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-ft-cluener2020-chn": {
-            "do_lower_case": True
-        },
-        "roberta-base-chn-extractive-qa": {
             "do_lower_case": True
         },
     }
@@ -631,9 +235,9 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
 
         Args:
-            offset_mapping_ids_0 (List[tuple]):
+            offset_mapping_0 (List[tuple]):
                 List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (List[tuple], optional):
+            offset_mapping_1 (List[tuple], optional):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
@@ -745,42 +349,15 @@ class RobertaBPETokenizer(GPTTokenizer):
 
             tokens = tokenizer('This is a simple Paddle')
             #{'input_ids': [0, 713, 16, 10, 2007, 221, 33151, 2],
-            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}、
-
+            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}
     """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
 
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/vocab.json",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/vocab.json",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/vocab.json",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/vocab.json"
-        },
-        "merges_file": {
-            "roberta-en-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_base/merges.txt",
-            "roberta-en-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/roberta_en_large/merges.txt",
-            "roberta-base-squad2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/deepset_roberta_base_squad2/merges.txt",
-            "tiny-distilroberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/community/nosaydomore/sshleifer_tiny_distilroberta_base/merges.txt"
-        }
-    }
-    pretrained_init_configuration = {
-        "roberta-en-base": {},
-        "roberta-en-large": {},
-        "roberta-base-squad2": {},
-        "tiny-distilroberta-base": {}
-    }
+    pretrained_resource_files_map = {}
+    pretrained_init_configuration = {}
 
     def __init__(self,
                  vocab_file,
@@ -879,8 +456,9 @@ class RobertaBPETokenizer(GPTTokenizer):
 
         return offset_mapping
 
-    def build_offset_mapping_with_special_tokens(self, offset_mapping_0,
-                                                 offset_mapping_1):
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -890,9 +468,9 @@ class RobertaBPETokenizer(GPTTokenizer):
         - pair of sequences:        ``(0,0) A (0,0) (0,0) B (0,0)``
 
         Args:
-            offset_mapping_ids_0 (List[tuple]):
+            offset_mapping_0 (List[tuple]):
                 List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (List[tuple], optional):
+            offset_mapping_1 (List[tuple], optional):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
@@ -935,7 +513,9 @@ class RobertaBPETokenizer(GPTTokenizer):
         return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
                                                           ) + [1]
 
-    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1):
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -966,3 +546,79 @@ class RobertaBPETokenizer(GPTTokenizer):
         return len(
             self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
                                                   if pair else None))
+
+
+class RobertaTokenizer:
+    """
+    RobertaTokenizer is a generic tokenizer class that will be instantiated as either
+    RobertaChineseTokenizer or RobertaBPETokenizer when created with the RobertaTokenizer.from_pretrained() class method.
+    """
+    chinese_model_names = RobertaChineseTokenizer.pretrained_init_configuration.keys(
+    )
+    english_model_names = RobertaBPETokenizer.pretrained_init_configuration.keys(
+    )
+    tokenizer_config_file = "tokenizer_config.json"
+
+    def __init__(self, *args, **kwargs):
+        raise EnvironmentError(
+            f"{self.__class__.__name__} is designed to be instantiated "
+            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
+        )
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+                        **kwargs):
+        # From built-in pretrained models
+        if pretrained_model_name_or_path in cls.chinese_model_names:
+            return RobertaChineseTokenizer.from_pretrained(
+                pretrained_model_name_or_path, *model_args, **kwargs)
+        elif pretrained_model_name_or_path in cls.english_model_names:
+            return RobertaBPETokenizer.from_pretrained(
+                pretrained_model_name_or_path, *model_args, **kwargs)
+        # From local dir path
+        elif os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path,
+                                       cls.tokenizer_config_file)
+            if os.path.exists(config_file):
+                with io.open(config_file, encoding="utf-8") as f:
+                    init_kwargs = json.load(f)
+                # class name corresponds to this configuration
+                init_class = init_kwargs.pop("init_class", None)
+                if init_class == "RobertaBPETokenizer":
+                    return RobertaBPETokenizer.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+                if init_class == "RobertaChineseTokenizer" or init_class == "BertTokenizer":
+                    return RobertaChineseTokenizer.from_pretrained(
+                        pretrained_model_name_or_path, *model_args, **kwargs)
+            return RobertaBPETokenizer.from_pretrained(
+                pretrained_model_name_or_path, *model_args, **kwargs)
+        else:
+            # Assuming from community-contributed pretrained models
+            config_file = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                       pretrained_model_name_or_path,
+                                       cls.tokenizer_config_file)
+            default_root = os.path.join(MODEL_HOME,
+                                        pretrained_model_name_or_path)
+            try:
+                resolved_config_file = get_path_from_url(config_file,
+                                                         default_root)
+            except RuntimeError as err:
+                logger.error(err)
+                raise RuntimeError(
+                    f"Can't find load tokenizer_config_file for '{pretrained_model_name_or_path}'.\n"
+                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                    "a correct model-identifier of community-contributed pretrained models.\n"
+                )
+            with io.open(resolved_config_file, encoding="utf-8") as f:
+                init_kwargs = json.load(f)
+
+            init_class = init_kwargs.pop("init_class", None)
+            if init_class == "RobertaBPETokenizer":
+                return RobertaBPETokenizer.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
+            elif init_class == "RobertaChineseTokenizer" or init_class == "BertTokenizer":
+                return RobertaChineseTokenizer.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                return RobertaBPETokenizer.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
