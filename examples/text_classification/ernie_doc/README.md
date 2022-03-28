@@ -3,8 +3,8 @@
 本示例将使用ERNIE-DOC模型，演示如何在长文本数据集上（e.g. iflytek）完成分类任务的训练，预测以及动转静过程。以下是本例的简要目录结构及说明:
 ```shell
 .
-├── LICENSE										
-├── README.md             #文档 
+├── LICENSE
+├── README.md             #文档
 ├── data.py               #数据处理
 ├── export_model.py       #将动态图参数导出成静态图参数
 ├── metrics.py            #ERNIE-Doc下游任务指标
