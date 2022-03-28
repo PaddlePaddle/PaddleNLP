@@ -1,7 +1,7 @@
 # Ernie_doc 在iflytek数据集上的使用
 
 ## 简介
-本示例将使用ERNIE-DOC模型，演示如何在长文本数据集上（e.g. iflytek）完成分类任务的训练，预测以及动转静过程。以下是本例的简要目录结构及说明：
+本示例将使用ERNIE-DOC模型，演示如何在长文本数据集上（e.g. iflytek）完成分类任务的训练，预测以及动转静过程。以下是本例的简要目录结构及说明:
 ```shell
 .
 ├── LICENSE										
@@ -82,7 +82,3 @@ python predict.py --static_mode True \
 {"id": "2596", "label": "59"}
 {"id": "2597", "label": "22"}
 ```
-
-
-
- 
