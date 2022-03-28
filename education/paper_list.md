@@ -74,7 +74,7 @@ https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/be
 
 简介：本文提出的ERNIE 分为抽取知识信息与训练语言模型两大步骤，作者首先识别文本中的命名实体，然后将实体与知识图谱中的实体进行匹配。通过知识嵌入算法（例如 TransE）编码 KG 的图结构，并将多信息实体嵌入作为ERNIE的输入。ERNIE 将知识模块的实体表征整合到语义模块的隐藏层中。为了更好地融合文本和知识特征，作者设计了一种新型预训练目标，即随机 Mask 掉一些命名实体，并要求模型从知识图谱中选择合适的实体以完成对齐。
 
-代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie)
+代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie-1.0)
 
 **DistilBERT**（2019）
 

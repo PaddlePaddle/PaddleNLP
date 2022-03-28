@@ -21,6 +21,7 @@ import json
 import os
 import six
 import unicodedata
+from collections import OrderedDict, UserDict
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
@@ -43,6 +44,29 @@ __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
     'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
 ]
+
+
+class BatchEncoding(UserDict):
+    def __init__(self, data=None):
+        super().__init__(data)
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self.data[item]
+        else:
+            raise KeyError(
+                "Indexing with integers is not available when using tokenizer.__call__()"
+                " with return_dict=True. Please set return_dict to False to use integer indexing."
+            )
+
+    def keys(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
+
+    def items(self):
+        return self.data.items()
 
 
 def convert_to_unicode(text):
@@ -559,7 +583,8 @@ class PretrainedTokenizer(object):
                  return_attention_mask=False,
                  return_length=False,
                  return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+                 return_special_tokens_mask=False,
+                 return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
@@ -626,35 +651,48 @@ class PretrainedTokenizer(object):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
+            return_dict (bool, optional):
+                Decide the format for returned encoded batch inputs. Only works when
+                input is a batch of data.
+                ::
+                    - If True, encoded inputs would be a dictionary like: 
+                        {'input_ids': [[1, 4444, 4385, 1545, 6712],[1, 4444, 4385]],
+                        'token_type_ids': [[0, 0, 0, 0, 0], [0, 0, 0]]}
+                    - If False, encoded inputs would be a list like:
+                        [{'input_ids': [1, 4444, 4385, 1545, 6712],
+                          'token_type_ids': [0, 0, 0, 0, 0]},
+                         {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
 
+                Defaults to `True`.
+                 
         Returns:
             dict or list[dict] (for batch input):
                 The dict has the following optional items:
 
-                - **input_ids** (list[int]): List of token ids to be fed to a model.
-                - **position_ids** (list[int], optional): List of token position ids to be
+                - **input_ids** (list[int] or list[list[int]]): List of token ids to be fed to a model.
+                - **position_ids** (list[int] or list[list[int]], optional): List of token position ids to be
                   fed to a model. Included when `return_position_ids` is `True`
-                - **token_type_ids** (list[int], optional): List of token type ids to be
+                - **token_type_ids** (list[int] or list[list[int]], optional): List of token type ids to be
                   fed to a model. Included when `return_token_type_ids` is `True`.
-                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
+                - **attention_mask** (list[int] or list[list[int]], optional): List of integers valued 0 or 1,
                   where 0 specifies paddings and should not be attended to by the
                   model. Included when `return_attention_mask` is `True`.
-                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
+                - **seq_len** (int or list[int], optional): The input_ids length. Included when `return_length`
                   is `True`.
-                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
+                - **overflowing_tokens** (list[int] or list[list[int]], optional): List of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
+                - **num_truncated_tokens** (int or list[int], optional): The number of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
+                - **special_tokens_mask** (list[int] or list[list[int]], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - **offset_mapping** (list[int], optional): list of pair preserving the
+                - **offset_mapping** (list[int] or list[list[int]], optional): list of pair preserving the
                   index of start and end char in original input for each token.
                   For a special token, the index pair is `(0, 0)`. Included when
                   `stride` works.
-                - **overflow_to_sample** (int, optional): Index of example from which this
+                - **overflow_to_sample** (int or list[int], optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
         # Input type checking for clearer error
@@ -695,7 +733,8 @@ class PretrainedTokenizer(object):
                 return_attention_mask=return_attention_mask,
                 return_length=return_length,
                 return_overflowing_tokens=return_overflowing_tokens,
-                return_special_tokens_mask=return_special_tokens_mask)
+                return_special_tokens_mask=return_special_tokens_mask,
+                return_dict=return_dict)
         else:
             return self.encode(
                 text=text,
@@ -1534,7 +1573,8 @@ class PretrainedTokenizer(object):
                      return_attention_mask=False,
                      return_length=False,
                      return_overflowing_tokens=False,
-                     return_special_tokens_mask=False):
+                     return_special_tokens_mask=False,
+                     return_dict=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
@@ -1765,10 +1805,13 @@ class PretrainedTokenizer(object):
                             range(len(encoded_inputs["input_ids"])))
 
                     encoded_inputs['overflow_to_sample'] = example_id
-                    for key, value in encoded_inputs.items():
-                        if key not in batch_outputs:
-                            batch_outputs[key] = []
-                        batch_outputs[key].append(value)
+                    if return_dict:
+                        for key, value in encoded_inputs.items():
+                            if key not in batch_outputs:
+                                batch_outputs[key] = []
+                            batch_outputs[key].append(value)
+                    else:
+                        batch_encode_inputs.append(encoded_inputs)
                     if offset + length == len(second_ids):
                         break
                     offset += min(length, stride)
@@ -1787,12 +1830,16 @@ class PretrainedTokenizer(object):
                     return_overflowing_tokens=return_overflowing_tokens,
                     return_special_tokens_mask=return_special_tokens_mask)
 
-                for key, value in encoded_inputs.items():
-                    if key not in batch_outputs:
-                        batch_outputs[key] = []
-                    batch_outputs[key].append(value)
+                if return_dict:
+                    for key, value in encoded_inputs.items():
+                        if key not in batch_outputs:
+                            batch_outputs[key] = []
+                        batch_outputs[key].append(value)
+                else:
+                    batch_encode_inputs.append(encoded_inputs)
 
-        return batch_outputs
+        return BatchEncoding(
+            batch_outputs) if return_dict else batch_encode_inputs
 
     def get_offset_mapping(self, text):
         """

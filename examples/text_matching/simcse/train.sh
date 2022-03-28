@@ -10,6 +10,6 @@ python -u -m paddle.distributed.launch --gpus '4' \
 	--max_seq_length 64 \
 	--dropout 0.3 \
     --output_emb_size 256 \
-    --user_word_reptition \
+    --dup_rate 0.32 \
 	--train_set_file "./senteval_cn/STS-B/train.txt" \
 	--test_set_file "./senteval_cn/STS-B/dev.tsv" 
