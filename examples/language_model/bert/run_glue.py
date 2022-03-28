@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import random
@@ -35,10 +34,6 @@ from paddlenlp.transformers import ElectraForSequenceClassification, ElectraToke
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 METRIC_CLASSES = {
     "cola": Mcc,

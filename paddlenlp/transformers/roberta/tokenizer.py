@@ -176,6 +176,9 @@ class RobertaTokenizer(PretrainedTokenizer):
                 "and 'merges_file' to construct an roberta BPE tokenizer."
                 "Specify 'vocal_file' for Chinese tokenizer")
 
+    def __getattr__(self, name):
+        return self.tokenizer.__getattr__(name)
+
     @property
     def vocab_size(self):
         """
@@ -323,6 +326,9 @@ class RobertaTokenizer(PretrainedTokenizer):
         """
         return self.tokenizer.build_inputs_with_special_tokens(
             token_ids_0, token_ids_1=token_ids_1)
+
+    def _convert_token_to_id(self, token):
+        return self.tokenizer._convert_token_to_id(token)
 
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,

@@ -52,11 +52,6 @@ def parse_args():
     parser.add_argument(
         "--min_out_len", default=1, type=int, help="Minimum output length. ")
     parser.add_argument(
-        "--num_return_sequence",
-        default=1,
-        type=int,
-        help="The number of returned sequence. ")
-    parser.add_argument(
         "--temperature",
         default=1.0,
         type=float,
@@ -95,8 +90,12 @@ def do_predict(args):
     place = "gpu"
     place = paddle.set_device(place)
 
+    if args.use_fp16_decoding and os.getenv("PPFG_QKV_MEM_OPT", "0") == "1":
+        paddle.set_default_dtype("float16")
+
     model_name = 'plato-xl'
-    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
+    model = UnifiedTransformerLMHeadModel.from_pretrained(
+        model_name, load_state_as_np=True)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 
     plato = FasterUnifiedTransformer(

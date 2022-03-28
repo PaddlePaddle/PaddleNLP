@@ -18,7 +18,6 @@ import math
 import six
 
 import numpy as np
-import paddle.distributed as dist
 
 
 class SamplerHelper(object):
@@ -391,6 +390,8 @@ class SamplerHelper(object):
                 print(list(sampler))    # indices of dataset elements
                 # [0, 2]
         """
+        import paddle.distributed as dist
+
         if num_replicas is None:
             num_replicas = dist.get_world_size()
         if rank is None:

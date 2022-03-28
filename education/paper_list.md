@@ -74,7 +74,7 @@ https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/be
 
 简介：本文提出的ERNIE 分为抽取知识信息与训练语言模型两大步骤，作者首先识别文本中的命名实体，然后将实体与知识图谱中的实体进行匹配。通过知识嵌入算法（例如 TransE）编码 KG 的图结构，并将多信息实体嵌入作为ERNIE的输入。ERNIE 将知识模块的实体表征整合到语义模块的隐藏层中。为了更好地融合文本和知识特征，作者设计了一种新型预训练目标，即随机 Mask 掉一些命名实体，并要求模型从知识图谱中选择合适的实体以完成对齐。
 
-代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie)
+代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/ernie-1.0)
 
 **DistilBERT**（2019）
 
@@ -90,7 +90,7 @@ https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/be
 
 简介：ALBERT为了解决模型参数量大以及训练时间过长的问题。ALBERT最小的参数只有十几兆, 效果只比BERT低1-2个点。模型有三个创新点：一是将embedding的参数进行了因式分解，二是跨层的参数共享，三是抛弃了原来的NSP任务，使用SOP任务。
 
-代码链接：[https://github.com/google-research/ALBERT.](https://github.com/google-research/ALBERT.)
+代码链接：[https://github.com/google-research/ALBERT.](https://github.com/google-research/ALBERT)
 
 PaddleNLP代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/albert](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/albert)
 
