@@ -19,6 +19,7 @@ from paddle.utils import try_import
 from paddlenlp.transformers import tokenize_chinese_chars
 from paddlenlp.utils.log import logger
 
+
 def get_related_pos(insts, seq_len, memory_len=128):
     """generate relative postion ids"""
     beg = seq_len + seq_len + memory_len
@@ -199,7 +200,7 @@ class ClassifierIterator(object):
                              ["src_ids", "label_id", "qid", "cal_loss"])
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             tokens = tokens_a[doc_span.start:doc_span.start +
-                                             doc_span.length] + ["[SEP]"] + ["[CLS]"]
+                              doc_span.length] + ["[SEP]"] + ["[CLS]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
             features.append(
                 Feature(
@@ -474,8 +475,8 @@ class MRCIterator(ClassifierIterator):
                     tok_end_position = len(all_doc_tokens) - 1
                 (tok_start_position,
                  tok_end_position) = self._improve_answer_span(
-                    all_doc_tokens, tok_start_position, tok_end_position,
-                    example.orig_answer_text)
+                     all_doc_tokens, tok_start_position, tok_end_position,
+                     example.orig_answer_text)
 
             max_tokens_for_doc = self.max_seq_length - len(query_tokens) - 3
             _DocSpan = namedtuple("DocSpan", ["start", "length"])
@@ -504,7 +505,7 @@ class MRCIterator(ClassifierIterator):
                         doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[i + 1] = is_max_context
                 tokens += all_doc_tokens[doc_span.start:doc_span.start +
-                                                        doc_span.length]
+                                         doc_span.length]
                 tokens.append("[SEP]")
 
                 for token in query_tokens:
@@ -800,7 +801,7 @@ class MCQIterator(MRCIterator):
                     token_type_ids = [0]
 
                     segment_tokens += context_tokens[
-                                      doc_span.start:doc_span.start + doc_span.length]
+                        doc_span.start:doc_span.start + doc_span.length]
                     token_type_ids += [0] * doc_span.length
 
                     segment_tokens += ['[SEP]']
@@ -1171,11 +1172,11 @@ class SequenceLabelingIterator(ClassifierIterator):
                              ["src_ids", "label_ids", "qid", "cal_loss"])
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             curr_tokens = ["[CLS]"] + tokens[doc_span.start:doc_span.start +
-                                                            doc_span.length] + ["[SEP]"]
+                                             doc_span.length] + ["[SEP]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(curr_tokens)
             label = [self.no_entity_id
                      ] + label[doc_span.start:doc_span.start +
-                                              doc_span.length] + [self.no_entity_id]
+                               doc_span.length] + [self.no_entity_id]
 
             features.append(
                 Feature(

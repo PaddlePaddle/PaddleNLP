@@ -50,8 +50,7 @@ args = parser.parse_args()
 # yapf: enable
 
 DATASET_INFO = {
-    "imdb":
-        (ErnieDocBPETokenizer, "test", ImdbTextPreprocessor()),
+    "imdb": (ErnieDocBPETokenizer, "test", ImdbTextPreprocessor()),
     "hyp": (ErnieDocBPETokenizer, "test", HYPTextPreprocessor()),
     "iflytek": (ErnieDocTokenizer, "test", None),
     "thucnews": (ErnieDocTokenizer, "test", None)
@@ -75,8 +74,7 @@ def predict(model,
             logits, memories = model(input_ids, memories, token_type_ids,
                                      position_ids, attn_mask)
             logits, qids = list(
-                map(lambda x: paddle.gather(x, gather_idxs),
-                    [logits, qids]))
+                map(lambda x: paddle.gather(x, gather_idxs), [logits, qids]))
             probs = nn.functional.softmax(logits, axis=1)
             idx = paddle.argmax(probs, axis=1).numpy()
             idx = idx.tolist()
@@ -96,8 +94,7 @@ def predict(model,
             logits = paddle.to_tensor(output_handles[0].copy_to_cpu())
             memories = paddle.to_tensor(output_handles[1].copy_to_cpu())
             logits, qids = list(
-                map(lambda x: paddle.gather(x, gather_idxs),
-                    [logits, qids]))
+                map(lambda x: paddle.gather(x, gather_idxs), [logits, qids]))
             probs = nn.functional.softmax(logits, axis=1)
             idx = paddle.argmax(probs, axis=1).numpy()
             idx = idx.tolist()
@@ -108,9 +105,11 @@ def predict(model,
 
 
 class LongDocClassifier:
-    def __init__(self, model_name_or_path,
+    def __init__(self,
+                 model_name_or_path,
                  trainer_num,
-                 rank, batch_size=16,
+                 rank,
+                 batch_size=16,
                  max_seq_length=512,
                  memory_len=128,
                  static_mode=False,
@@ -127,15 +126,17 @@ class LongDocClassifier:
 
         tokenizer_class, test_name, preprocess_text_fn = DATASET_INFO[dataset]
         self._construct_tokenizer(tokenizer_class)
-        self._input_preparation(args.dataset,
-                                test_name,
-                                preprocess_text_fn)
+        self._input_preparation(args.dataset, test_name, preprocess_text_fn)
         self._construct_model()
         if static_mode:
-            logger.info("Loading the static model from {}".format(self.static_path))
+            logger.info("Loading the static model from {}".format(
+                self.static_path))
             self._load_static_model()
 
-    def _input_preparation(self, dataset="iflytek", test_name="test", preprocess_text_fn=None):
+    def _input_preparation(self,
+                           dataset="iflytek",
+                           test_name="test",
+                           preprocess_text_fn=None):
         test_ds = load_dataset("clue", name=dataset, splits=[test_name])
         self.label_list = test_ds.label_list
         self.num_classes = len(test_ds.label_list)
@@ -151,14 +152,16 @@ class LongDocClassifier:
             preprocess_text_fn=preprocess_text_fn)
         self.test_dataloader = paddle.io.DataLoader.from_generator(
             capacity=70, return_list=True)
-        self.test_dataloader.set_batch_generator(self.test_ds_iter, paddle.get_device())
+        self.test_dataloader.set_batch_generator(self.test_ds_iter,
+                                                 paddle.get_device())
 
     def _construct_tokenizer(self, tokenizer_class):
         """
         Construct the tokenizer for the predictor.
         :return:
         """
-        tokenizer_instance = tokenizer_class.from_pretrained(self.model_name_or_path)
+        tokenizer_instance = tokenizer_class.from_pretrained(
+            self.model_name_or_path)
         self._tokenizer = tokenizer_instance
 
     def _construct_model(self):
@@ -167,8 +170,8 @@ class LongDocClassifier:
         :param model_name_or_path: str
         :return: model instance
         """
-        model_instance = ErnieDocForSequenceClassification.from_pretrained(self.model_name_or_path,
-                                                                           num_classes=self.num_classes)
+        model_instance = ErnieDocForSequenceClassification.from_pretrained(
+            self.model_name_or_path, num_classes=self.num_classes)
         self.model_config = model_instance.ernie_doc.config
         self._model = model_instance
 
@@ -185,7 +188,8 @@ class LongDocClassifier:
                 self._construct_input_spec()
                 self._convert_dygraph_to_static()
         else:
-            logger.info("loading static model from {}".format(inference_model_path))
+            logger.info("loading static model from {}".format(
+                inference_model_path))
         model_file = inference_model_path + ".pdmodel"
         params_file = inference_model_path + ".pdiparams"
         self._config = paddle.inference.Config(model_file, params_file)
@@ -218,21 +222,20 @@ class LongDocClassifier:
         B, T, H, M, N = self.batch_size, self.max_seq_length, self.model_config["hidden_size"], self.memory_len, \
                         self.model_config["num_hidden_layers"]
         self._input_spec = [
-            paddle.static.InputSpec(shape=[B, T, 1],
-                                    dtype="int64",
-                                    name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[N, B, M, H],
-                                    dtype="float32",
-                                    name="memories"),  # memories
-            paddle.static.InputSpec(shape=[B, T, 1],
-                                    dtype="int64",
-                                    name="token_type_ids"),  # token_type_ids
-            paddle.static.InputSpec(shape=[B, 2 * T + M, 1],
-                                    dtype="int64",
-                                    name="position_ids"),  # position_ids
-            paddle.static.InputSpec(shape=[B, T, 1],
-                                    dtype="float32",
-                                    name="attn_mask"),  # attn_mask
+            paddle.static.InputSpec(
+                shape=[B, T, 1], dtype="int64", name="input_ids"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[N, B, M, H], dtype="float32",
+                name="memories"),  # memories
+            paddle.static.InputSpec(
+                shape=[B, T, 1], dtype="int64",
+                name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(
+                shape=[B, 2 * T + M, 1], dtype="int64",
+                name="position_ids"),  # position_ids
+            paddle.static.InputSpec(
+                shape=[B, T, 1], dtype="float32",
+                name="attn_mask"),  # attn_mask
         ]
 
     def _convert_dygraph_to_static(self):
@@ -259,13 +262,8 @@ class LongDocClassifier:
             self.input_handles, self.output_handle = None, None
         else:
             self._prepare_static_mode()
-        predict(self.predictor,
-                self.test_dataloader,
-                file_path,
-                memories,
-                self.label_list,
-                self.static_mode,
-                self.input_handles,
+        predict(self.predictor, self.test_dataloader, file_path, memories,
+                self.label_list, self.static_mode, self.input_handles,
                 self.output_handle)
 
 
@@ -280,14 +278,15 @@ def do_predict(args):
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-    predictor = LongDocClassifier(model_name_or_path=args.model_name_or_path,
-                                  rank=rank,
-                                  trainer_num=trainer_num,
-                                  batch_size=args.batch_size,
-                                  max_seq_length=args.max_seq_length,
-                                  memory_len=args.memory_length,
-                                  static_mode=args.static_mode,
-                                  static_path=args.static_path)
+    predictor = LongDocClassifier(
+        model_name_or_path=args.model_name_or_path,
+        rank=rank,
+        trainer_num=trainer_num,
+        batch_size=args.batch_size,
+        max_seq_length=args.max_seq_length,
+        memory_len=args.memory_length,
+        static_mode=args.static_mode,
+        static_path=args.static_path)
     predictor.run_model(saved_path=args.test_results_file)
 
 

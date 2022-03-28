@@ -37,25 +37,27 @@ parser.add_argument("--static_path", default=None, type=str,
 args = parser.parse_args()
 # yapf: enable
 
-paddle.set_device(args.device)
-trainer_num = paddle.distributed.get_world_size()
-if trainer_num > 1:
-    paddle.distributed.init_parallel_env()
-rank = paddle.distributed.get_rank()
+if __name__ == "__main__":
+    paddle.set_device(args.device)
+    trainer_num = paddle.distributed.get_world_size()
+    if trainer_num > 1:
+        paddle.distributed.init_parallel_env()
+    rank = paddle.distributed.get_rank()
 
-if rank == 0:
-    if os.path.exists(args.model_name_or_path):
-        logger.info("init checkpoint from %s" % args.model_name_or_path)
+    if rank == 0:
+        if os.path.exists(args.model_name_or_path):
+            logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-if args.static_path and os.path.exists(args.static_path):
-    logger.info("will remove the old model")
-    os.system("rm -r {}".format(args.static_path))
+    if args.static_path and os.path.exists(args.static_path):
+        logger.info("will remove the old model")
+        os.system("rm -r {}".format(args.static_path))
 
-predictor = LongDocClassifier(model_name_or_path=args.model_name_or_path,
-                              rank=rank,
-                              trainer_num=trainer_num,
-                              batch_size=args.batch_size,
-                              max_seq_length=args.max_seq_length,
-                              memory_len=args.memory_length,
-                              static_mode=True,
-                              static_path=args.static_path)
+    predictor = LongDocClassifier(
+        model_name_or_path=args.model_name_or_path,
+        rank=rank,
+        trainer_num=trainer_num,
+        batch_size=args.batch_size,
+        max_seq_length=args.max_seq_length,
+        memory_len=args.memory_length,
+        static_mode=True,
+        static_path=args.static_path)

@@ -63,7 +63,7 @@ args = parser.parse_args()
 
 DATASET_INFO = {
     "imdb":
-        (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
+    (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
     "hyp": (ErnieDocBPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
     "iflytek": (ErnieDocTokenizer, "dev", "test", None, Accuracy()),
     "thucnews": (ErnieDocTokenizer, "dev", "test", None, Accuracy())
@@ -81,7 +81,8 @@ def set_seed(args):
 
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
-    return paddle.zeros([n_layers, batch_size, memory_length, d_model], dtype="float32")
+    return paddle.zeros(
+        [n_layers, batch_size, memory_length, d_model], dtype="float32")
 
 
 @paddle.no_grad()
@@ -151,8 +152,7 @@ def predict(model, test_dataloader, file_path, memories, label_list):
         logits, memories = model(input_ids, memories, token_type_ids,
                                  position_ids, attn_mask)
         logits, qids = list(
-            map(lambda x: paddle.gather(x, gather_idxs),
-                [logits, qids]))
+            map(lambda x: paddle.gather(x, gather_idxs), [logits, qids]))
         probs = nn.functional.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
@@ -316,8 +316,7 @@ def do_train(args):
                     if eval_acc > best_acc:
                         logger.info("Save best model......")
                         best_acc = eval_acc
-                        best_model_dir = os.path.join(output_dir,
-                                                      "best_model")
+                        best_model_dir = os.path.join(output_dir, "best_model")
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
@@ -337,8 +336,10 @@ def do_train(args):
                             model_config["num_hidden_layers"])
     # Copy the memory
     memories = create_memory()
-    predict(model, test_dataloader, args.file_path, memories, test_ds.label_list)
-    logger.info("Done Predicting the results has been saved in file: {}".format(args.file_path))
+    predict(model, test_dataloader, args.file_path, memories,
+            test_ds.label_list)
+    logger.info("Done Predicting the results has been saved in file: {}".format(
+        args.file_path))
 
 
 if __name__ == "__main__":

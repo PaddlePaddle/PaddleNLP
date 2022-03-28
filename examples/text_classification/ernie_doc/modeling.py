@@ -135,7 +135,7 @@ class MultiHeadAttention(nn.Layer):
 
         score_t = paddle.matmul(q_t, t, transpose_y=True)
         score = score_w + score_r + score_t
-        score = score * (self.d_key ** -0.5)
+        score = score * (self.d_key**-0.5)
 
         if attn_mask is not None:
             score += attn_mask
@@ -160,8 +160,7 @@ class MultiHeadAttention(nn.Layer):
 
     def forward(self, queries, keys, values, rel_pos, rel_task, memory,
                 attn_mask):
-        sign = memory is not None and len(
-            memory.shape) > 1
+        sign = memory is not None and len(memory.shape) > 1
         if sign:
             cat = paddle.concat([memory, queries], 1)
         else:
@@ -279,7 +278,7 @@ class ErnieDocEncoder(nn.Layer):
         self.layers = nn.LayerList([(
             encoder_layer
             if i == 0 else type(encoder_layer)(**encoder_layer._config))
-            for i in range(num_layers)])
+                                    for i in range(num_layers)])
         self.num_layers = num_layers
         self.normalize_before = self.layers[0].normalize_before
         self.mem_len = mem_len
@@ -304,16 +303,22 @@ class ErnieDocEncoder(nn.Layer):
             enc_input = encoder_layer(enc_input, memories[0], rel_pos, rel_task,
                                       attn_mask)
             if new_mem is None:
-                new_mem = paddle.unsqueeze(self._cache_mem(enc_input, memories[0]), axis=0)
+                new_mem = paddle.unsqueeze(
+                    self._cache_mem(enc_input, memories[0]), axis=0)
             else:
-                new_mem = paddle.concat([new_mem, paddle.unsqueeze(self._cache_mem(enc_input, memories[0]), axis=0)],
-                                        axis=0)
+                new_mem = paddle.concat(
+                    [
+                        new_mem, paddle.unsqueeze(
+                            self._cache_mem(enc_input, memories[0]), axis=0)
+                    ],
+                    axis=0)
             sign = memories.shape[0]
             if sign > 1:
                 axis = [0]
                 start = [1]
                 end = [memories.shape[0]]
-                memories = paddle.slice(memories, axes=axis, starts=start, ends=end)
+                memories = paddle.slice(
+                    memories, axes=axis, starts=start, ends=end)
             else:
                 memories = None
         return enc_input, new_mem
@@ -366,9 +371,9 @@ class ErnieDocPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-doc-base-en":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
             "ernie-doc-base-zh":
-                "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
         }
     }
     base_model_prefix = "ernie_doc"
