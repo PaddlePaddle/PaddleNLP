@@ -20,6 +20,7 @@ from paddle.utils import try_import
 from paddle.metric import Metric
 from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_best_indexes
 
+
 # Metric for ERNIE-DOCs
 
 
@@ -89,7 +90,7 @@ class EM_AND_F1(object):
             else:
                 temp_str += char
 
-        #Handling last part
+        # Handling last part
         if temp_str != "":
             ss = self.nltk.word_tokenize(temp_str)
             segs_out.extend(ss)

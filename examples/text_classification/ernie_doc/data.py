@@ -11,17 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import itertools
-import numpy as np
+import json
 from collections import namedtuple
 
-import paddle
-from paddle.io import IterableDataset
+import numpy as np
 from paddle.utils import try_import
-
-from paddlenlp.utils.log import logger
 from paddlenlp.transformers import tokenize_chinese_chars
+from paddlenlp.utils.log import logger
 
 __all__ = [
     'ClassifierIterator', 'MRCIterator', 'MCQIterator', 'ImdbTextPreProcessor',
@@ -209,7 +206,7 @@ class ClassifierIterator(object):
                              ["src_ids", "label_id", "qid", "cal_loss"])
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             tokens = tokens_a[doc_span.start:doc_span.start +
-                              doc_span.length] + ["[SEP]"] + ["[CLS]"]
+                                             doc_span.length] + ["[SEP]"] + ["[CLS]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
             features.append(
                 Feature(
@@ -272,7 +269,7 @@ class ClassifierIterator(object):
             final_cls=True, return_input_mask=True)
         padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
         padded_position_ids = get_related_pos(padded_token_ids, \
-            self.max_seq_length, self.memory_len)
+                                              self.max_seq_length, self.memory_len)
 
         return_list = [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
@@ -484,8 +481,8 @@ class MRCIterator(ClassifierIterator):
                     tok_end_position = len(all_doc_tokens) - 1
                 (tok_start_position,
                  tok_end_position) = self._improve_answer_span(
-                     all_doc_tokens, tok_start_position, tok_end_position,
-                     example.orig_answer_text)
+                    all_doc_tokens, tok_start_position, tok_end_position,
+                    example.orig_answer_text)
 
             max_tokens_for_doc = self.max_seq_length - len(query_tokens) - 3
             _DocSpan = namedtuple("DocSpan", ["start", "length"])
@@ -514,7 +511,7 @@ class MRCIterator(ClassifierIterator):
                         doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[i + 1] = is_max_context
                 tokens += all_doc_tokens[doc_span.start:doc_span.start +
-                                         doc_span.length]
+                                                        doc_span.length]
                 tokens.append("[SEP]")
 
                 for token in query_tokens:
@@ -535,7 +532,7 @@ class MRCIterator(ClassifierIterator):
                         start_position = 0
                         end_position = 0
                     else:
-                        doc_offset = 1  #len(query_tokens) + 2
+                        doc_offset = 1  # len(query_tokens) + 2
                         start_position = tok_start_position - doc_start + doc_offset
                         end_position = tok_end_position - doc_start + doc_offset
 
@@ -785,7 +782,7 @@ class MCQIterator(MRCIterator):
             # nums = 4
             question_choice_pairs = \
                 [self._truncate_seq_pair(question_tokens, choice_tokens, self.max_query_length - 2)
-                for choice_tokens in choice_tokens_lst]
+                 for choice_tokens in choice_tokens_lst]
             total_qc_num = sum(
                 [(len(q) + len(c)) for q, c in question_choice_pairs])
             max_tokens_for_doc = self.max_seq_length - total_qc_num - 4
@@ -810,7 +807,7 @@ class MCQIterator(MRCIterator):
                     token_type_ids = [0]
 
                     segment_tokens += context_tokens[
-                        doc_span.start:doc_span.start + doc_span.length]
+                                      doc_span.start:doc_span.start + doc_span.length]
                     token_type_ids += [0] * doc_span.length
 
                     segment_tokens += ['[SEP]']
@@ -1123,8 +1120,8 @@ class SemanticMatchingIterator(MRCIterator):
             need_cal_loss = np.array([0]).astype("int64")
 
         return_list = self._create_pad_ids(batch_records) \
-                    + self._create_pad_ids(batch_records, "pair_") \
-                    + [batch_labels, batch_qids, batch_gather_idx, need_cal_loss]
+                      + self._create_pad_ids(batch_records, "pair_") \
+                      + [batch_labels, batch_qids, batch_gather_idx, need_cal_loss]
         return return_list
 
 
@@ -1181,11 +1178,11 @@ class SequenceLabelingIterator(ClassifierIterator):
                              ["src_ids", "label_ids", "qid", "cal_loss"])
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             curr_tokens = ["[CLS]"] + tokens[doc_span.start:doc_span.start +
-                                             doc_span.length] + ["[SEP]"]
+                                                            doc_span.length] + ["[SEP]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(curr_tokens)
             label = [self.no_entity_id
                      ] + label[doc_span.start:doc_span.start +
-                               doc_span.length] + [self.no_entity_id]
+                                              doc_span.length] + [self.no_entity_id]
 
             features.append(
                 Feature(
@@ -1234,7 +1231,7 @@ class SequenceLabelingIterator(ClassifierIterator):
                 pad_max_len=self.max_seq_length)
         padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
         padded_position_ids = get_related_pos(padded_token_ids, \
-            self.max_seq_length, self.memory_len)
+                                              self.max_seq_length, self.memory_len)
 
         return_list = [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask,

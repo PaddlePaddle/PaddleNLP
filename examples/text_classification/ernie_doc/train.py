@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append('/home/aistudio/external-libraries')
 import argparse
 from collections import defaultdict
@@ -19,31 +20,37 @@ from paddlenlp.ops.optimizer import AdamWDL
 from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
 from metrics import F1
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
-parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh",
+                    help="Pretraining model name or path")
+parser.add_argument("--max_seq_length", type=int, default=512,
+                    help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=1.5e-4, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for training.")
-parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
+parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"],
+                    help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
-parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
+parser.add_argument("--warmup_proportion", default=0.1, type=float,
+                    help="Linear warmup proption over the training process.")
+parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
+                    help="The training dataset")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
-parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-parser.add_argument("--test_results_file", default="./test_restuls.json", type=str, help="The file path you would like to save the model ouputs on test dataset.")
+parser.add_argument("--max_steps", default=-1, type=int,
+                    help="If > 0: set total number of training steps to perform. Override num_train_epochs.", )
+parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
+                    help="The file path you would like to save the model ouputs on test dataset.")
 
 args = parser.parse_args()
 
 DATASET_INFO = {
     "imdb":
-    (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
+        (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
     "hyp": (ErnieDocBPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
     "iflytek": (ErnieDocTokenizer, "dev", "test", None, Accuracy()),
     "thucnews": (ErnieDocTokenizer, "dev", "test", None, Accuracy())
@@ -59,8 +66,10 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
+
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return paddle.zeros([n_layers, batch_size, memory_length, d_model], dtype="float32")
+
 
 @paddle.no_grad()
 def evaluate(model, metric, data_loader, memories):
@@ -75,7 +84,7 @@ def evaluate(model, metric, data_loader, memories):
     global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
         input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
-            gather_idxs, need_cal_loss = batch
+        gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids,
                                  position_ids, attn_mask)
         logits, labels, qids = list(
@@ -119,6 +128,7 @@ def evaluate(model, metric, data_loader, memories):
     model.train()
     return acc_or_f1
 
+
 def predict(model, test_dataloader, file_path, memories, label_list):
     label_dict = dict()
     model.eval()
@@ -137,6 +147,7 @@ def predict(model, test_dataloader, file_path, memories, label_list):
         for i, qid in enumerate(qids.numpy().flatten()):
             label_dict[str(qid)] = labels[i]
     to_json_file("iflytek", label_dict, file_path)
+
 
 def do_train(args):
     set_seed(args)
@@ -193,7 +204,6 @@ def do_train(args):
         mode="test",
         preprocess_text_fn=preprocess_text_fn)
 
-
     train_dataloader = paddle.io.DataLoader.from_generator(
         capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
@@ -210,11 +220,10 @@ def do_train(args):
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
     logger.info("Num warmup steps: %d" % int(num_training_steps *
-                                                args.warmup_proportion))
+                                             args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                            args.warmup_proportion)
-
+                                         args.warmup_proportion)
 
     decay_params = [
         p.name for n, p in model.named_parameters()
@@ -237,7 +246,6 @@ def do_train(args):
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
-
     global_steps = 0
     best_acc = -1
     create_memory = partial(init_memory, args.batch_size, args.memory_length,
@@ -253,9 +261,9 @@ def do_train(args):
         for step, batch in enumerate(train_dataloader, start=1):
             global_steps += 1
             input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
-                gather_idx, need_cal_loss = batch
+            gather_idx, need_cal_loss = batch
             logits, memories = model(input_ids, memories, token_type_ids,
-                                        position_ids, attn_mask)
+                                     position_ids, attn_mask)
 
             logits, labels = list(
                 map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
@@ -273,8 +281,8 @@ def do_train(args):
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
                     % (global_steps, epoch, mean_loss, metric.accumulate(),
-                        lr_scheduler.get_lr(),
-                        args.logging_steps / (time.time() - tic_train)))
+                       lr_scheduler.get_lr(),
+                       args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
@@ -285,7 +293,7 @@ def do_train(args):
                 # Save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
-                                                "model_%d" % (global_steps))
+                                              "model_%d" % (global_steps))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
@@ -296,7 +304,7 @@ def do_train(args):
                         logger.info("Save best model......")
                         best_acc = eval_acc
                         best_model_dir = os.path.join(output_dir,
-                                                        "best_model")
+                                                      "best_model")
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
@@ -318,6 +326,7 @@ def do_train(args):
     memories = create_memory()
     predict(model, test_dataloader, args.file_path, memories, test_ds.label_list)
     logger.info("Done Predicting the results has been saved in file: {}".format(args.file_path))
+
 
 if __name__ == "__main__":
     do_train(args)

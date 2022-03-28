@@ -13,24 +13,33 @@ from functools import partial
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for predicting (In static mode, it should be the same as in model training process.)")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining or finetuned model name or path")
-parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
+parser.add_argument("--batch_size", default=16, type=int,
+                    help="Batch size per GPU/CPU for predicting (In static mode, it should be the same as in model training process.)")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh",
+                    help="Pretraining or finetuned model name or path")
+parser.add_argument("--max_seq_length", type=int, default=512,
+                    help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
-parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
-parser.add_argument("--test_results_file", default="./test_restuls.json", type=str, help="The file path you would like to save the model ouputs on test dataset.")
-parser.add_argument("--static_mode", default=False, type=bool, help="Whether you would like to perform predicting by static model or dynamic model.")
-parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
-parser.add_argument("--static_path", default=None, type=str, help="The path which your static model is at or where you want to save after converting.")
+parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"],
+                    help="Select cpu, gpu devices to train model.")
+parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
+                    help="The file path you would like to save the model ouputs on test dataset.")
+parser.add_argument("--static_mode", default=False, type=bool,
+                    help="Whether you would like to perform predicting by static model or dynamic model.")
+parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
+                    help="The training dataset")
+parser.add_argument("--static_path", default=None, type=str,
+                    help="The path which your static model is at or where you want to save after converting.")
 
 args = parser.parse_args()
 DATASET_INFO = {
     "imdb":
-    (ErnieDocBPETokenizer, "test", ImdbTextPreprocessor()),
+        (ErnieDocBPETokenizer, "test", ImdbTextPreprocessor()),
     "hyp": (ErnieDocBPETokenizer, "test", HYPTextPreprocessor()),
     "iflytek": (ErnieDocTokenizer, "test", None),
     "thucnews": (ErnieDocTokenizer, "test", None)
 }
+
 
 def predict(model,
             test_dataloader,
@@ -40,7 +49,6 @@ def predict(model,
             static_mode,
             input_handles=None,
             output_handles=None):
-
     label_dict = dict()
     if not static_mode:
         model.eval()
@@ -81,6 +89,7 @@ def predict(model,
                 label_dict[str(qid)] = labels[i]
     to_json_file("iflytek", label_dict, file_path)
 
+
 class LongDocClassifier:
     def __init__(self, model_name_or_path,
                  trainer_num,
@@ -114,15 +123,15 @@ class LongDocClassifier:
         self.label_list = test_ds.label_list
         self.num_classes = len(test_ds.label_list)
         self.test_ds_iter = ClassifierIterator(
-                        test_ds,
-                        self.batch_size,
-                        self._tokenizer,
-                        self.trainer_num,
-                        trainer_id=self.rank,
-                        memory_len=self.memory_len,
-                        max_seq_length=self.max_seq_length,
-                        mode="eval",
-                        preprocess_text_fn=preprocess_text_fn)
+            test_ds,
+            self.batch_size,
+            self._tokenizer,
+            self.trainer_num,
+            trainer_id=self.rank,
+            memory_len=self.memory_len,
+            max_seq_length=self.max_seq_length,
+            mode="eval",
+            preprocess_text_fn=preprocess_text_fn)
         self.test_dataloader = paddle.io.DataLoader.from_generator(
             capacity=70, return_list=True)
         self.test_dataloader.set_batch_generator(self.test_ds_iter, paddle.get_device())
@@ -189,7 +198,8 @@ class LongDocClassifier:
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        B, T, H, M, N = self.batch_size, self.max_seq_length, self.model_config["hidden_size"], self.memory_len, self.model_config["num_hidden_layers"]
+        B, T, H, M, N = self.batch_size, self.max_seq_length, self.model_config["hidden_size"], self.memory_len, \
+                        self.model_config["num_hidden_layers"]
         self._input_spec = [
             paddle.static.InputSpec(shape=[B, T, 1],
                                     dtype="int64",
@@ -241,6 +251,7 @@ class LongDocClassifier:
                 self.input_handles,
                 self.output_handle)
 
+
 def do_predict(args):
     # Initialize model
     paddle.set_device(args.device)
@@ -261,6 +272,7 @@ def do_predict(args):
                                   static_mode=args.static_mode,
                                   static_path=args.static_path)
     predictor.run_model(saved_path=args.test_results_file)
+
 
 if __name__ == "__main__":
     do_predict(args)
