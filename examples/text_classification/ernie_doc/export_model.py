@@ -20,9 +20,14 @@ trainer_num = paddle.distributed.get_world_size()
 if trainer_num > 1:
     paddle.distributed.init_parallel_env()
 rank = paddle.distributed.get_rank()
+
 if rank == 0:
     if os.path.exists(args.model_name_or_path):
         logger.info("init checkpoint from %s" % args.model_name_or_path)
+
+if os.path.exists(args.static_path):
+    logger.info("will remove the old model")
+    os.system("rm -r {}".format(args.static_path))
 
 predictor = LongDocClassifier(model_name_or_path=args.model_name_or_path,
                               rank=rank,
