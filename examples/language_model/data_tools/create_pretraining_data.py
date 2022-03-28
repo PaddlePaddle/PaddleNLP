@@ -313,15 +313,15 @@ def main():
     # We use BytesIO to store the ids.
     token_ids_stream = io.BytesIO()
     sentlens_stream = io.BytesIO()
-    # Cumsum on tokens num
-    sent_cumsum_stream = io.BytesIO()
-    sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
+    # # Cumsum on tokens num
+    # sent_cumsum_stream = io.BytesIO()
+    # sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
     # Cunsum on document on every sentence num, type=np.int64
     doc_cumsum_stream = io.BytesIO()
     doc_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
 
     sent_count = 0
-    token_count = 0
+    # token_count = 0
 
     file_paths.sort()
 
@@ -355,10 +355,10 @@ def main():
                 sentlens_stream.write(
                     sentence_len.to_bytes(
                         4, byteorder='little', signed=True))
-                token_count += sentence_len
-                sent_cumsum_stream.write(
-                    token_count.to_bytes(
-                        8, byteorder='little', signed=True))
+                # token_count += sentence_len
+                # sent_cumsum_stream.write(
+                #     token_count.to_bytes(
+                #         8, byteorder='little', signed=True))
                 sent_count += 1
                 token_ids_stream.write(
                     np.array(
@@ -381,10 +381,11 @@ def main():
     print("Saving tokens to files...")
     all_doc_ids = np.frombuffer(token_ids_stream.getbuffer(), dtype=save_dtype)
     lens = np.frombuffer(sentlens_stream.getbuffer(), dtype=np.int32)
-    sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)
+    # sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)
     docs = np.frombuffer(doc_cumsum_stream.getbuffer(), dtype=np.int64)
     np.save(args.output_prefix + "_ids.npy", all_doc_ids)
-    np.savez(args.output_prefix + "_idx.npz", lens=lens, sents=sents, docs=docs)
+    # np.savez(args.output_prefix + "_idx.npz", lens=lens, sents=sents, docs=docs)
+    np.savez(args.output_prefix + "_idx.npz", lens=lens, docs=docs)
 
     print("Total sentences num: %d" % len(lens))
     print("Total documents num: %d" % (len(docs) - 1))

@@ -91,7 +91,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base-en/vocab.txt",
             "ernie-gen-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
-            "ernie-gen-large-430g-en":
+            "ernie-gen-large-en-430g":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
             "rocketqa-zh-dureader-query-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
@@ -100,6 +100,10 @@ class ErnieTokenizer(PretrainedTokenizer):
             "rocketqa-v1-marco-query-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
             "rocketqa-v1-marco-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "rocketqa-zh-dureader-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-v1-marco-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
         }
     }
@@ -125,7 +129,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-gen-large-en": {
             "do_lower_case": True
         },
-        "ernie-gen-large-430g-en": {
+        "ernie-gen-large-en-430g": {
             "do_lower_case": True
         },
         "ppminilm-6l-768h": {
@@ -141,6 +145,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rocketqa-v1-marco-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-dureader-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-v1-marco-cross-encoder": {
             "do_lower_case": True
         },
     }
