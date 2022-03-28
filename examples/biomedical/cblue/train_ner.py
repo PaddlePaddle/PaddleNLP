@@ -30,6 +30,7 @@ parser.add_argument('--use_amp', default=False, type=bool, help='Enable mixed pr
 parser.add_argument('--epochs', default=1, type=int, help='Total number of training epochs.')
 parser.add_argument('--seed', default=1000, type=int, help='Random seed.')
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
+parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
 args = parser.parse_args()
 # yapf: enable
