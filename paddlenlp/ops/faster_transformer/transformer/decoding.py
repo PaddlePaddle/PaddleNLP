@@ -1173,24 +1173,28 @@ class FTParaConf(object):
     """
 
     def __init__(self,
-                 tensor_para_size=1,
-                 layer_para_size=1,
+                 tensor_para_size=None,
+                 layer_para_size=None,
                  layer_para_batch_size=1):
-        self.no_para = tensor_para_size == 1 and layer_para_size == 1
-        self.tensor_para_size = tensor_para_size
-        self.layer_para_size = layer_para_size
-        self.layer_para_batch_size = layer_para_batch_size
         # Maybe we should import mpi4py later.
         self.word_size = int(
             os.environ.get(
                 "MPI_LOCALNRANKS",  # MPICH
                 os.environ.get("OMPI_COMM_WORLD_SIZE", 1)))  # OpenMPI
-        assert self.word_size == tensor_para_size * layer_para_size, (
-            "tensor_para_size * layer_para_size must be equal to world_size.")
         self.rank = int(
             os.environ.get(
                 "MPI_LOCALRANKID",  # MPICH
                 os.environ.get("OMPI_COMM_WORLD_RANK", 0)))  # OpenMPI
+        if tensor_para_size is None: tensor_para_size = 1
+        if layer_para_size is None:
+            layer_para_size = self.word_size // tensor_para_size
+        self.no_para = tensor_para_size == 1 and layer_para_size == 1
+        self.tensor_para_size = tensor_para_size
+        self.layer_para_size = layer_para_size
+        self.layer_para_batch_size = layer_para_batch_size
+
+        assert self.word_size == tensor_para_size * layer_para_size, (
+            "tensor_para_size * layer_para_size must be equal to world_size.")
         self.tensor_para_rank = self.rank % self.tensor_para_size
         self.layer_para_rank = self.rank // self.tensor_para_size
         self.is_partial_model = False

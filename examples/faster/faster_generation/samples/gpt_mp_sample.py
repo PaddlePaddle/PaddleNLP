@@ -16,16 +16,16 @@ import argparse
 import os
 import paddle
 import numpy as np
+from pprint import pprint
 from paddlenlp.ops import enable_ft_para, get_ft_para_conf
 from paddlenlp.transformers import GPTLMHeadModel, GPTChineseTokenizer, GPTTokenizer
-import paddle
 
 MODEL_CLASSES = {
     "gpt-cpm-large-cn": (GPTLMHeadModel, GPTChineseTokenizer),
     "gpt-cpm-small-cn-distill": (GPTLMHeadModel, GPTChineseTokenizer),
+    "gpt2-en": (GPTLMHeadModel, GPTTokenizer),
     "gpt2-medium-en": (GPTLMHeadModel, GPTTokenizer),
-    "gpt3-1.3B-en": (GPTLMHeadModel, GPTTokenizer),
-    "gpt3-13B-en": (GPTLMHeadModel, GPTTokenizer),
+    "gpt2-large-en": (GPTLMHeadModel, GPTTokenizer),
     "gpt2-xl-en": (GPTLMHeadModel, GPTTokenizer),
 }
 
@@ -37,8 +37,7 @@ def parse_args():
         default="gpt2-medium-en",
         type=str,
         help="The model name to specify the gpt to use.")
-    parser.add_argument(
-        "--batch_size", default=4, type=int, help="Batch size. ")
+    parser.add_argument("--batch_size", default=4, type=int, help="Batch size.")
     parser.add_argument(
         "--max_length", default=32, type=int, help="Maximum output length.")
     parser.add_argument(
@@ -50,12 +49,12 @@ def parse_args():
         "--topp",
         default=1.0,
         type=float,
-        help="The probability threshold to procedure topp sampling. ")
+        help="The probability threshold to procedure topp sampling.")
     parser.add_argument(
         "--temperature",
         default=1.0,
         type=float,
-        help="The temperature to set. ")
+        help="The temperature to set.")
     parser.add_argument(
         "--tensor_para_size",
         default=2,
@@ -65,13 +64,17 @@ def parse_args():
         "--layer_para_size",
         default=1,
         type=int,
-        help="The size for layer parallel")
+        help="The size for layer parallel.")
     parser.add_argument(
         "--layer_para_batch_size",
         default=None,
         type=int,
         help="The local batch size for pipeline parallel."
         "It is suggested to use `batch_size // layer_para_size`.")
+    parser.add_argument(
+        "--use_fp16",
+        action="store_true",
+        help="Whether to use fp16 to predict.")
     args = parser.parse_args()
     return args
 
@@ -115,3 +118,9 @@ def main(args):
             result = tokenizer.convert_ids_to_string(outputs[i].numpy().tolist(
             ))
             print("Result:", result)
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    pprint(args)
+    main(args)
