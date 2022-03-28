@@ -16,7 +16,9 @@
 import os
 import time
 import argparse
+import json
 import random
+from functools import partial
 
 import numpy as np
 
@@ -27,14 +29,8 @@ import paddle.nn as nn
 from datasets import load_dataset
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import ErnieForMultipleChoice, ErnieTokenizer
-from paddlenlp.transformers import RobertaForMultipleChoice, RobertaTokenizer
+from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
-
-MODEL_CLASSES = {
-    "ernie": (ErnieForMultipleChoice, ErnieTokenizer),
-    "roberta": (RobertaForMultipleChoice, RobertaTokenizer)
-}
 
 
 def parse_args():
@@ -45,24 +41,11 @@ def parse_args():
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
-
+        help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
         "--output_dir",
         default="best_clue_model",
@@ -128,6 +111,10 @@ def parse_args():
         help="Number of updates steps to accumualte before performing a backward/update pass."
     )
     parser.add_argument(
+        "--do_train", action='store_true', help="Whether to train.")
+    parser.add_argument(
+        "--do_predict", action='store_true', help="Whether to predict.")
+    parser.add_argument(
         "--max_seq_length",
         default=64,
         type=int,
@@ -167,14 +154,14 @@ def evaluate(model, loss_fct, metric, data_loader):
     return res
 
 
-def do_train(args):
+def run(args):
     paddle.set_device(args.device)
     set_seed(args)
 
     max_seq_length = args.max_seq_length
     max_num_choices = 10
 
-    def preprocess_function(examples):
+    def preprocess_function(examples, do_predict=False):
         SPIECE_UNDERLINE = '▁'
 
         def _is_chinese_char(cp):
@@ -253,7 +240,10 @@ def do_train(args):
         max_tokens_for_doc = max_seq_length - 3
         num_tokens = max_tokens_for_doc - 5
         num_examples = len(examples.data["candidates"])
-        result = {"input_ids": [], "token_type_ids": [], "labels": []}
+        if do_predict:
+            result = {"input_ids": [], "token_type_ids": []}
+        else:
+            result = {"input_ids": [], "token_type_ids": [], "labels": []}
         for idx in range(num_examples):
             candidate = 0
             options = examples.data['candidates'][idx]
@@ -327,126 +317,170 @@ def do_train(args):
                     # Final shape of input_ids: [batch_size, num_choices, seq_len]
                     result["input_ids"].append(new_data["input_ids"])
                     result["token_type_ids"].append(new_data["token_type_ids"])
-                    label = examples.data["answers"][idx]["candidate_id"][
-                        candidate]
-                    result["labels"].append(label)
+                    if not do_predict:
+                        label = examples.data["answers"][idx]["candidate_id"][
+                            candidate]
+                        result["labels"].append(label)
                     candidate += 1
             if (idx + 1) % 10000 == 0:
-                print(idx + 1, "samples has been processed.")
+                print(idx + 1, "samples have been processed.")
         return result
-
-    args.batch_size = int(args.batch_size / args.gradient_accumulation_steps)
 
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-
-    model = model_class.from_pretrained(
+    model = AutoModelForMultipleChoice.from_pretrained(
         args.model_name_or_path, num_choices=max_num_choices)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    train_ds = load_dataset("clue", "chid", split="train")
-    column_names = train_ds.column_names
-    train_ds = train_ds.map(preprocess_function,
+    train_ds, dev_ds, test_ds = load_dataset(
+        "clue", "chid", split=["train", "validation", "test"])
+
+    if args.do_train:
+        args.batch_size = int(args.batch_size /
+                              args.gradient_accumulation_steps)
+        column_names = train_ds.column_names
+        train_ds = train_ds.map(partial(preprocess_function),
+                                batched=True,
+                                batch_size=len(train_ds),
+                                num_proc=1,
+                                remove_columns=column_names)
+        batchify_fn = lambda samples, fn=Dict({
+            'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
+            'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
+            'labels': Stack(dtype="int64")  # label
+        }): fn(samples)
+
+        train_batch_sampler = paddle.io.DistributedBatchSampler(
+            train_ds, batch_size=args.batch_size, shuffle=True)
+        train_data_loader = paddle.io.DataLoader(
+            dataset=train_ds,
+            batch_sampler=train_batch_sampler,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            return_list=True)
+
+        dev_ds = dev_ds.map(partial(preprocess_function),
                             batched=True,
-                            batch_size=len(train_ds),
-                            num_proc=1,
-                            remove_columns=column_names)
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
-        'labels': Stack(dtype="int64")  # label
-    }): fn(samples)
+                            batch_size=len(dev_ds),
+                            remove_columns=column_names,
+                            num_proc=1)
 
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
-    train_data_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+        dev_batch_sampler = paddle.io.BatchSampler(
+            dev_ds, batch_size=args.eval_batch_size, shuffle=False)
 
-    dev_ds = load_dataset("clue", "chid", split="validation")
-    dev_ds = dev_ds.map(preprocess_function,
-                        batched=True,
-                        batch_size=len(dev_ds),
-                        remove_columns=column_names,
-                        num_proc=1)
+        dev_data_loader = paddle.io.DataLoader(
+            dataset=dev_ds,
+            batch_sampler=dev_batch_sampler,
+            collate_fn=batchify_fn,
+            return_list=True)
 
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.eval_batch_size, shuffle=False)
+        num_training_steps = int(
+            len(train_data_loader) * args.num_train_epochs /
+            args.gradient_accumulation_steps)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps, 0)
+        # Generate parameter names needed to perform weight decay.
+        # All bias and LayerNorm parameters are excluded.
+        decay_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
+        grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            apply_decay_param_fun=lambda x: x in decay_params,
+            grad_clip=grad_clip)
 
-    dev_data_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+        loss_fct = nn.CrossEntropyLoss()
+        metric = Accuracy()
 
-    num_training_steps = int(
-        len(train_data_loader) * args.num_train_epochs /
-        args.gradient_accumulation_steps)
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         0)
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
-    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=grad_clip)
+        model.train()
+        global_step = 0
+        best_acc = 0.0
+        tic_train = time.time()
+        for epoch in range(args.num_train_epochs):
+            for step, batch in enumerate(train_data_loader):
+                input_ids, segment_ids, labels = batch
+                logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+                loss = loss_fct(logits, labels)
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
+                loss.backward()
+                if (step + 1) % args.gradient_accumulation_steps == 0:
+                    global_step += 1
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.clear_grad()
+                    if global_step % args.logging_steps == 0:
+                        print(
+                            "global step %d/%d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                            % (global_step, num_training_steps, epoch, step + 1,
+                               loss,
+                               args.logging_steps / (time.time() - tic_train)))
+                        tic_train = time.time()
+            tic_eval = time.time()
+            acc = evaluate(model, loss_fct, metric, dev_data_loader)
+            print("eval acc: %.5f, eval done total : %s s" %
+                  (acc, time.time() - tic_eval))
+            if paddle.distributed.get_rank() == 0 and acc > best_acc:
+                best_acc = acc
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                if not os.path.exists(args.output_dir):
+                    os.makedirs(args.output_dir)
+                model_to_save.save_pretrained(args.output_dir)
+                tokenizer.save_pretrained(args.output_dir)
+        print("best_acc: ", best_acc)
 
-    loss_fct = nn.CrossEntropyLoss()
-    metric = Accuracy()
+    if args.do_predict:
+        column_names = test_ds.column_names
+        test_ds = test_ds.map(partial(
+            preprocess_function, do_predict=True),
+                              batched=True,
+                              batch_size=len(test_ds),
+                              remove_columns=column_names,
+                              num_proc=1)
 
-    model.train()
-    global_step = 0
-    best_acc = 0.0
-    tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        for step, batch in enumerate(train_data_loader):
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids=input_ids, token_type_ids=segment_ids)
-            loss = loss_fct(logits, labels)
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
-            loss.backward()
-            if (step + 1) % args.gradient_accumulation_steps == 0:
-                global_step += 1
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_grad()
-                if global_step % args.logging_steps == 0:
-                    print(
-                        "global step %d/%d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                        % (global_step, num_training_steps, epoch, step + 1,
-                           loss,
-                           args.logging_steps / (time.time() - tic_train)))
-                    tic_train = time.time()
-        tic_eval = time.time()
-        acc = evaluate(model, loss_fct, metric, dev_data_loader)
-        print("eval acc: %.5f, eval done total : %s s" %
-              (acc, time.time() - tic_eval))
-        if paddle.distributed.get_rank() == 0 and acc > best_acc:
-            best_acc = acc
-            model_to_save = model._layers if isinstance(
-                model, paddle.DataParallel) else model
-            if not os.path.exists(args.output_dir):
-                os.makedirs(args.output_dir)
-            model_to_save.save_pretrained(args.output_dir)
-            tokenizer.save_pretrained(args.output_dir)
-    print("best_acc: ", best_acc)
+        test_batch_sampler = paddle.io.BatchSampler(
+            test_ds, batch_size=args.eval_batch_size, shuffle=False)
+
+        batchify_fn = lambda samples, fn=Dict({
+            'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
+            'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
+        }): fn(samples)
+
+        test_data_loader = paddle.io.DataLoader(
+            dataset=test_ds,
+            batch_sampler=test_batch_sampler,
+            collate_fn=batchify_fn,
+            return_list=True)
+
+        result = {}
+        idx = 623377
+        for step, batch in enumerate(test_data_loader):
+            input_ids, segment_ids = batch
+            with paddle.no_grad():
+                logits = model(input_ids, segment_ids)
+            preds = paddle.argmax(logits, axis=1).numpy().tolist()
+            for pred in preds:
+                result["#idiom" + str(idx)] = pred
+                idx += 1
+
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir)
+        with open(
+                os.path.join(args.output_dir, 'chid11_predict.json'),
+                "w",
+                encoding='utf-8') as writer:
+            writer.write(
+                json.dumps(
+                    result, ensure_ascii=False, indent=4) + "\n")
 
 
 def print_arguments(args):
@@ -460,4 +494,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    do_train(args)
+    run(args)
