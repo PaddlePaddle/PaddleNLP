@@ -151,9 +151,10 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 def convert_example_ner(example,
                         tokenizer,
                         max_seq_length=512,
-                        pad_label_id=-100):
+                        pad_label_id=-100,
+                        is_test=False):
     """
-    Builds model inputs from a sequence. And create labels for named-
+    Builds model inputs from a sequence and creates labels for named-
     entity recognition task CMeEE.
 
     For example, a sample should be:
@@ -195,7 +196,7 @@ def convert_example_ner(example,
     encoded_inputs['position_ids'] = list(range(input_len))
     encoded_inputs['attention_mask'] = np.ones(input_len)
 
-    if example.get('labels', None):
+    if not is_test:
         labels = example['labels']
         if input_len - 2 < len(labels[0]):
             labels[0] = labels[0][:input_len - 2]
@@ -209,7 +210,47 @@ def convert_example_ner(example,
     return encoded_inputs
 
 
-def convert_example_spo(example, tokenizer, max_seq_length=512, is_test=False):
+def convert_example_spo(example,
+                        tokenizer,
+                        num_classes,
+                        max_seq_length=512,
+                        is_test=False):
+    """
+    Builds model inputs from a sequence and creates labels for SPO prediction
+    task CMeIE.
+
+    For example, a sample should be:
+    
+    - input_ids:      ``[CLS]  x1   x2 [SEP] [PAD]``
+    - token_type_ids: ``  0    0    0    0     0``
+    - position_ids:   ``  0    1    2    3     0``
+    - attention_mask: ``  1    1    1    1     0``
+    - ent_label:      ``[[0    1    0    0     0], # start ids are set as 1
+                         [0    0    1    0     0]] # end ids are set as 1
+    - spo_label: a tensor of shape [num_classes, max_batch_len, max_batch_len].
+                 Set [predicate_id, subject_start_id, object_start_id] as 1
+                 when (subject, predicate, object) exists.
+
+    Args:
+        example (obj:`dict`):
+            A dictionary of input data, containing text and label if it has.
+        tokenizer (obj:`PretrainedTokenizer`):
+            A tokenizer inherits from :class:`paddlenlp.transformers.PretrainedTokenizer`.
+            Users can refer to the superclass for more information.
+        num_classes (obj:`int`):
+            The number of predicates.
+        max_seq_length (obj:`int`):
+            The maximum total input sequence length after tokenization.
+            Sequences longer will be truncated, and the shorter will be padded.
+        is_test (obj:`bool`, default to `False`):
+            Whether the example contains label or not.
+
+    Returns:
+        encoded_output (obj: `dict[str, list|np.array]`):
+            The sample dictionary including `input_ids`, `token_type_ids`,
+            `position_ids`, `attention_mask`, `ent_label` (optional),
+            `spo_label` (optional)
+    """
     encoded_inputs = {}
     text = example['text']
     if len(text) > max_seq_length - 2:
@@ -224,52 +265,6 @@ def convert_example_spo(example, tokenizer, max_seq_length=512, is_test=False):
         encoded_inputs['ent_label'] = example['ent_label']
         encoded_inputs['spo_label'] = example['spo_label']
     return encoded_inputs
-
-
-def create_batch_label(ent_labels,
-                       spo_labels,
-                       num_classes,
-                       max_batch_len,
-                       shift=1):
-    """
-    Convert the entity labels and spo labels into one-hot representations.
-
-    Args:
-        ent_labels (list[list|tuple]):
-            The entities in the input text in the form of [start_index, end_index].
-        spo_labels (list[list|tuple]):
-            The (subject, predicate, object) in the input text in the form of
-            [(subject_start_index, subject_end_index),
-             (predicate_id),
-             (object_start_index, object_end_index)].
-        num_classes (int):
-            The number of predicates.
-        max_batch_len (int):
-            The length of the padded text in the batch.
-        shift (int):
-            When the input text starts with '[CLS]', shift label index by 1.
-    """
-    batch_size = len(ent_labels)
-    pad_ent_labels = np.zeros([batch_size, max_batch_len, 2], dtype=np.float32)
-    pad_spo_labels = np.zeros(
-        [batch_size, num_classes, max_batch_len, max_batch_len],
-        dtype=np.float32)
-    for idx, ent_idxs in enumerate(ent_labels):
-        for x, y in ent_idxs:
-            x += shift
-            y += shift
-            if x > 0 and x < max_batch_len and y < max_batch_len:
-                pad_ent_labels[idx, x, 0] = 1
-                pad_ent_labels[idx, y, 1] = 1
-    for idx, spo_idxs in enumerate(spo_labels):
-        for s, p, o in spo_idxs:
-            s_id = s[0] + shift
-            o_id = o[0] + shift
-            if s_id > 0 and s_id < max_batch_len and o_id < max_batch_len:
-                pad_spo_labels[idx, p, s_id, o_id] = 1
-    pad_ent_labels = paddle.to_tensor(pad_ent_labels)
-    pad_spo_labels = paddle.to_tensor(pad_spo_labels)
-    return pad_ent_labels, pad_spo_labels
 
 
 class NERChunkEvaluator(paddle.metric.Metric):

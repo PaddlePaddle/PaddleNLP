@@ -27,7 +27,7 @@ from paddlenlp.data import Dict, Pad, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ElectraTokenizer
 
-from utils import convert_example_spo, create_dataloader, create_batch_label, SPOChunkEvaluator, LinearDecayWithWarmup
+from utils import convert_example_spo, create_dataloader, SPOChunkEvaluator, LinearDecayWithWarmup
 from model import ElectraForSPO
 
 # yapf: disable
@@ -66,32 +66,30 @@ def evaluate(model, criterion, metric, data_loader):
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
         dataloader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
+        criterion(`paddle.nn.functional`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
     """
     model.eval()
     metric.reset()
     losses = []
     for batch in tqdm(data_loader):
-        input_ids, token_type_ids, position_ids, masks, ent_idx, spo_idx = batch
+        input_ids, token_type_ids, position_ids, masks, ent_label, spo_label = batch
         max_batch_len = input_ids.shape[-1]
         ent_mask = paddle.unsqueeze(masks, axis=2)
         spo_mask = paddle.matmul(ent_mask, ent_mask, transpose_y=True)
         spo_mask = paddle.unsqueeze(spo_mask, axis=1)
 
-        ent_label, spo_label = create_batch_label(
-            ent_idx, spo_idx, metric.num_classes, max_batch_len)
-
         logits = model(input_ids, token_type_ids, position_ids)
-        loss_logits = [F.sigmoid(x) for x in logits]
 
-        ent_loss = criterion(loss_logits[0], ent_label, weight=ent_mask)
-        spo_loss = criterion(loss_logits[1], spo_label, weight=spo_mask)
+        ent_loss = criterion(
+            logits[0], ent_label[0], weight=ent_mask, reduction='sum')
+        spo_loss = criterion(
+            logits[1], spo_label[0], weight=spo_mask, reduction='sum')
         loss = ent_loss + spo_loss
         losses.append(loss.numpy())
         lengths = paddle.sum(masks, axis=-1)
-        correct = metric.compute(lengths, logits[0], logits[1], ent_idx,
-                                 spo_idx)
+        correct = metric.compute(lengths, logits[0], logits[1], ent_label[1],
+                                 spo_label[1])
         metric.update(correct)
     results = metric.accumulate()
     print('eval loss: %.5f, entity f1: %.5f, spo f1: %.5f' %
@@ -117,18 +115,40 @@ def do_train():
     trans_func = partial(
         convert_example_spo,
         tokenizer=tokenizer,
+        num_classes=len(train_ds.label_list),
         max_seq_length=args.max_seq_length)
 
-    ignore_pad_id = -1
-
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'position_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'attention_mask': Pad(axis=0, pad_val=0, dtype='float32'),
-        'ent_label': lambda x: [x],
-        'spo_label': lambda x: [x]
-    }): fn(samples)
+    def batchify_fn(data):
+        _batchify_fn = lambda samples, fn=Dict({
+            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'position_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'attention_mask': Pad(axis=0, pad_val=0, dtype='float32'),
+        }): fn(samples)
+        ent_label = [x['ent_label'] for x in data]
+        spo_label = [x['spo_label'] for x in data]
+        data = _batchify_fn(data)
+        batch_size, batch_len = data[0].shape
+        num_classes = len(train_ds.label_list)
+        pad_ent_labels = np.zeros([batch_size, batch_len, 2], dtype=np.float32)
+        pad_spo_labels = np.zeros(
+            [batch_size, num_classes, batch_len, batch_len], dtype=np.float32)
+        for idx, ent_idxs in enumerate(ent_label):
+            for x, y in ent_idxs:
+                x = x + 1
+                y = y + 1
+                if x > 0 and x < batch_len and y < batch_len:
+                    pad_ent_labels[idx, x, 0] = 1
+                    pad_ent_labels[idx, y, 1] = 1
+        for idx, spo_idxs in enumerate(spo_label):
+            for s, p, o in spo_idxs:
+                s_id = s[0] + 1
+                o_id = o[0] + 1
+                if s_id > 0 and s_id < batch_len and o_id < batch_len:
+                    pad_spo_labels[idx, p, s_id, o_id] = 1
+        ent_label = [pad_ent_labels, ent_label]
+        spo_label = [pad_spo_labels, spo_label]
+        return (*data), ent_label, spo_label
 
     train_data_loader = create_dataloader(
         train_ds,
@@ -167,8 +187,7 @@ def do_train():
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    criterion = partial(
-        paddle.nn.functional.binary_cross_entropy, reduction='sum')
+    criterion = F.binary_cross_entropy_with_logits
 
     metric = SPOChunkEvaluator(num_classes=len(train_ds.label_list))
 
@@ -179,7 +198,7 @@ def do_train():
     total_train_time = 0
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, position_ids, masks, ent_idx, spo_idx = batch
+            input_ids, token_type_ids, position_ids, masks, ent_label, spo_label = batch
             max_batch_len = input_ids.shape[-1]
             ent_mask = paddle.unsqueeze(masks, axis=2)
             spo_mask = paddle.matmul(ent_mask, ent_mask, transpose_y=True)
@@ -189,11 +208,10 @@ def do_train():
                     args.use_amp,
                     custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
                 logits = model(input_ids, token_type_ids, position_ids)
-                ent_label, spo_label = create_batch_label(
-                    ent_idx, spo_idx, metric.num_classes, max_batch_len)
-                logits = [F.sigmoid(x) for x in logits]
-                ent_loss = criterion(logits[0], ent_label, weight=ent_mask)
-                spo_loss = criterion(logits[1], spo_label, weight=spo_mask)
+                ent_loss = criterion(
+                    logits[0], ent_label[0], weight=ent_mask, reduction='sum')
+                spo_loss = criterion(
+                    logits[1], spo_label[0], weight=spo_mask, reduction='sum')
 
                 loss = ent_loss + spo_loss
 
