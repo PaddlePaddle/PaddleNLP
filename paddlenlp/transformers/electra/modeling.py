@@ -319,7 +319,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128
         },
-        "ehealth-chinese": {
+        "ernie-health-chinese": {
             "attention_probs_dropout_prob": 0.1,
             "embedding_size": 768,
             "hidden_act": "gelu",
@@ -349,8 +349,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
-            "ehealth-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ehealth_chinese/ehealth-chinese.pdparams"
+            "ernie-health-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_health_chinese/ernie-health-chinese.pdparams"
         }
     }
 

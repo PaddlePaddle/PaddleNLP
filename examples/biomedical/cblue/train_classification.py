@@ -121,10 +121,10 @@ def do_train():
         'cblue', args.dataset, splits=['train', 'dev'])
 
     model = ElectraForSequenceClassification.from_pretrained(
-        'ehealth-chinese',
+        'ernie-health-chinese',
         num_classes=len(train_ds.label_list),
         activation='tanh')
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     trans_func = partial(
         convert_example,

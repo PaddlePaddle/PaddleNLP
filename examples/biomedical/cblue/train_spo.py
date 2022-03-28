@@ -109,8 +109,8 @@ def do_train():
     train_ds, dev_ds = load_dataset('cblue', 'CMeIE', splits=['train', 'dev'])
 
     model = ElectraForSPO.from_pretrained(
-        'ehealth-chinese', num_classes=len(train_ds.label_list))
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+        'ernie-health-chinese', num_classes=len(train_ds.label_list))
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     trans_func = partial(
         convert_example_spo,
