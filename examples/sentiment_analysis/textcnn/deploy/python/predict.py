@@ -14,12 +14,11 @@
 
 import argparse
 
+import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddle import inference
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
-
-from data import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -36,6 +35,17 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'],
     default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
+
+
+def convert_example(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
+    """convert_example"""
+    input_ids = tokenizer.encode(data)
+    seq_len = len(input_ids)
+    # Sequence length should larger or equal than the maximum ngram_filter_size in TextCNN model
+    if seq_len < max_ngram_filter_size:
+        input_ids.extend([pad_token_id] * (max_ngram_filter_size - seq_len))
+    input_ids = np.array(input_ids, dtype='int64')
+    return input_ids
 
 
 class Predictor(object):
@@ -64,15 +74,13 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-    def predict(self, data, label_map, batch_size=1, pad_token_id=0):
+    def predict(self, data, tokenizer, label_map, batch_size=1, pad_token_id=0):
         """
         Predicts the data labels.
 
         Args:
-            data (obj:`list`): The processed data whose each element 
-                is a `list` object, which contains 
-            
-                - word_ids(obj:`list[int]`): The list of word ids.
+            data (obj:`list(str)`): Data to be predicted.
+            tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
             batch_size(obj:`int`, defaults to 1): The number of batch.
             pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
@@ -80,15 +88,21 @@ class Predictor(object):
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
+        examples = []
+        for text in data:
+            input_ids = convert_example(text, tokenizer)
+            examples.append(input_ids)
 
         # Seperates data into some batches.
         batches = [
-            data[idx:idx + batch_size]
-            for idx in range(0, len(data), batch_size)
+            examples[idx:idx + batch_size]
+            for idx in range(0, len(examples), batch_size)
         ]
+
         batchify_fn = lambda samples, fn=Pad(
-            axis=0, pad_val=pad_token_id
-        ): [data for data in fn(samples)]
+            axis=0,
+            pad_val=pad_token_id  # input
+        ): fn(samples)
 
         results = []
         for batch in batches:
@@ -117,10 +131,10 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data and then do predict.
     data = ['你再骂我我真的不跟你聊了', '你看看我附近有什么好吃的', '我喜欢画画也喜欢唱歌']
-    examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
 
     results = predictor.predict(
-        examples,
+        data,
+        tokenizer,
         label_map,
         batch_size=args.batch_size,
         pad_token_id=pad_token_id)
