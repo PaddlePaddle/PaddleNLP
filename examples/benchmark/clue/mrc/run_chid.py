@@ -309,12 +309,10 @@ def run(args):
                     # example is [num_choices, seq_len]
                     for i, elem in enumerate(options):
                         option = tokenizer.tokenize(elem)
-                        tokens = ['[CLS]'] + option + ['[SEP]'] + tokens_l + [
-                            '[unused1]'
-                        ] + tokens_r + ['[SEP]']
+                        tokens = option + ['[SEP]'] + tokens_l + ['[unused1]'
+                                                                  ] + tokens_r
                         tokens_list.append(tokens)
                     new_data = tokenizer(tokens_list, is_split_into_words=True)
-
                     # Final shape of input_ids: [batch_size, num_choices, seq_len]
                     result["input_ids"].append(new_data["input_ids"])
                     result["token_type_ids"].append(new_data["token_type_ids"])
