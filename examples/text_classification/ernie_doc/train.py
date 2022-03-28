@@ -31,6 +31,7 @@ from paddlenlp.ops.optimizer import AdamWDL
 from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
 from metrics import F1
 
+# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh",
@@ -58,6 +59,7 @@ parser.add_argument("--test_results_file", default="./test_restuls.json", type=s
                     help="The file path you would like to save the model ouputs on test dataset.")
 
 args = parser.parse_args()
+# yapf: enable
 
 DATASET_INFO = {
     "imdb":

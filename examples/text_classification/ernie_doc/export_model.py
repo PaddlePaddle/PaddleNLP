@@ -18,6 +18,7 @@ import paddle
 from paddlenlp.utils.log import logger
 from predict import LongDocClassifier
 
+# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int,
                     help="Batch size per GPU/CPU for predicting (In static mode, it should be the same as in model training process.)")
@@ -34,6 +35,7 @@ parser.add_argument("--static_path", default=None, type=str,
                     help="The path which your static model is at or where you want to save after converting.")
 
 args = parser.parse_args()
+# yapf: enable
 
 paddle.set_device(args.device)
 trainer_num = paddle.distributed.get_world_size()
