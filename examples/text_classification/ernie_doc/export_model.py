@@ -1,9 +1,7 @@
 import argparse
 import os
-
 import paddle
 from paddlenlp.utils.log import logger
-
 from predict import LongDocClassifier
 
 parser = argparse.ArgumentParser()

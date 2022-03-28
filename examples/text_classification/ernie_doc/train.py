@@ -1,6 +1,3 @@
-import sys
-
-sys.path.append('/home/aistudio/external-libraries')
 import argparse
 from collections import defaultdict
 import os

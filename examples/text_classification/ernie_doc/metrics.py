@@ -17,12 +17,8 @@ import collections
 import sys
 import paddle
 from paddle.utils import try_import
-from paddle.metric import Metric
 from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_best_indexes
-
-
 # Metric for ERNIE-DOCs
-
 
 class F1(object):
     def __init__(self, positive_label=1):

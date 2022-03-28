@@ -14,17 +14,10 @@
 import itertools
 import json
 from collections import namedtuple
-
 import numpy as np
 from paddle.utils import try_import
 from paddlenlp.transformers import tokenize_chinese_chars
 from paddlenlp.utils.log import logger
-
-__all__ = [
-    'ClassifierIterator', 'MRCIterator', 'MCQIterator', 'ImdbTextPreProcessor',
-    'HYPTextPreProcessor'
-]
-
 
 def get_related_pos(insts, seq_len, memory_len=128):
     """generate relative postion ids"""
