@@ -41,12 +41,7 @@ cblue/
 
 我们按照任务类别划分，同时提供了8个任务的样例代码。可以运行下边的命令，在训练集上进行训练，并在开发集上进行验证。
 
-```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
-```
-
-### 训练参数设置（Training setup）及结果
+**训练参数设置（Training setup）及结果**
 
 | Task      | epochs | batch_size | learning_rate | max_seq_length | results |
 | --------- | :----: | :--------: | :-----------: | :------------: | :-----: |
@@ -56,7 +51,15 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --dataset CHIP-C
 | KUAKE-QQR |   16   |     32     |      6e-5     |       64       | 0.82364 |
 | KUAKE-QTR |   12   |     32     |      6e-5     |       64       | 0.69653 |
 | KUAKE-QIC |    4   |     32     |      6e-5     |      128       | 0.81176 |
+| CMeEE     |    2   |     32     |      6e-5     |      128       | 0.66167 |
+| CMeIE     |  100   |     12     |      6e-5     |      300       | 0.61385 |
 
+#### 医疗文本分类任务
+
+```shell
+$ unset CUDA_VISIBLE_DEVICES
+$ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
+```
 
 可支持配置的参数：
 
@@ -76,6 +79,20 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --dataset CHIP-C
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `use_amp`: 是否使用混合精度训练，默认为False。
 * `use_ema`: 是否使用Exponential Moving Average预测，默认为False。
+
+#### 医疗命名实体识别任务
+
+```shell
+$ export CUDA_VISIBLE_DEVICES=0
+$ python train_ner.py --batch_size 32 --max_seq_length 128 --learning_rate 6e-5 --epochs 12
+```
+
+#### 医疗关系抽取任务
+
+```shell
+$ export CUDA_VISIBLE_DEVICES=0
+$ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 --epochs 100
+```
 
 ### 依赖安装
 
