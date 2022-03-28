@@ -127,27 +127,54 @@ def do_train():
         }): fn(samples)
         ent_label = [x['ent_label'] for x in data]
         spo_label = [x['spo_label'] for x in data]
+        # data = input_ids, token_type_ids, position_ids, attention_mask
         data = _batchify_fn(data)
         batch_size, batch_len = data[0].shape
         num_classes = len(train_ds.label_list)
-        pad_ent_labels = np.zeros([batch_size, batch_len, 2], dtype=np.float32)
-        pad_spo_labels = np.zeros(
+        # Create one-hot labels.
+        #
+        # For example,
+        # - text:
+        #   [CLS], 局, 部, 皮, 肤, 感, 染, 引, 起, 的, 皮, 疹, 等, [SEP]
+        #
+        # - ent_label (obj: `list`):
+        #   [(0, 5), (9, 10)] # ['局部皮肤感染', '皮疹']
+        #
+        # - one_hot_ent_label: # shape (sequence_length, 2)
+        #   [[ 0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0], # start index
+        #    [ 0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  1,  0,  0]] # end index
+        #
+        # - spo_label (obj: `list`):
+        #   [(0, 23, 9)] # [('局部皮肤感染', '相关（导致）', '皮疹')], where entities
+        #                  are encoded by their start indexes.
+        #
+        # - one_hot_spo_label: # shape (num_predicate, sequence_length, sequence_length)
+        #   [...,
+        #    [..., [0, ..., 1, ..., 0], ...], # for predicate '相关（导致）'
+        #    ...]                             # the value at [23, 0, 9] is set as 1
+        #
+        one_hot_ent_label = np.zeros(
+            [batch_size, batch_len, 2], dtype=np.float32)
+        one_hot_spo_label = np.zeros(
             [batch_size, num_classes, batch_len, batch_len], dtype=np.float32)
         for idx, ent_idxs in enumerate(ent_label):
+            # Shift index by 1 because input_ids start with [CLS] here.
             for x, y in ent_idxs:
                 x = x + 1
                 y = y + 1
                 if x > 0 and x < batch_len and y < batch_len:
-                    pad_ent_labels[idx, x, 0] = 1
-                    pad_ent_labels[idx, y, 1] = 1
+                    on_hot_ent_labels[idx, x, 0] = 1
+                    one_hot_ent_labels[idx, y, 1] = 1
         for idx, spo_idxs in enumerate(spo_label):
             for s, p, o in spo_idxs:
                 s_id = s[0] + 1
                 o_id = o[0] + 1
                 if s_id > 0 and s_id < batch_len and o_id < batch_len:
-                    pad_spo_labels[idx, p, s_id, o_id] = 1
-        ent_label = [pad_ent_labels, ent_label]
-        spo_label = [pad_spo_labels, spo_label]
+                    one_hot_spo_labels[idx, p, s_id, o_id] = 1
+        # one_hot_xxx_label are used for loss computation.
+        # xxx_label are used for metric computation.
+        ent_label = [one_hot_ent_labels, ent_label]
+        spo_label = [one_hot_spo_labels, spo_label]
         return (*data), ent_label, spo_label
 
     train_data_loader = create_dataloader(
