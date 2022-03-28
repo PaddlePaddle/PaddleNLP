@@ -19,31 +19,33 @@ msgstr ""
 
 #: ../../data.md:1
 msgid "PaddleNLP Data API"
-msgstr ""
+msgstr "PaddleNLP Data API"
 
 #: ../../data.md:3
 msgid "该模块提供了在NLP任务中构建有效的数据处理Pipeline的常用API。"
-msgstr ""
+msgstr "This model provides the API that are commonly used in NLP tasks for building effective data processing Pipeline."
 
 #: ../../data.md:5
 msgid "APIl列表"
-msgstr ""
+msgstr "API List"
 
 #: ../../data.md:46
 msgid "API使用方法"
-msgstr ""
+msgstr "API Instruction"
 
 #: ../../data.md:48
 msgid "以上API都是用来辅助构建DataLoader，DataLoader比较重要的三个初始化参数是dataset、batch_sampler和collate_fn。"
 msgstr ""
+"The API above are all used in assist building DataLoder"
+"DataLoders has three important initialisation parameters, which are dataset, batch_sampler, and collate_fn."
 
 #: ../../data.md:50
 msgid "paddlenlp.data.Vocab和paddlenlp.data.JiebaTokenizer用在构建dataset时处理文本token到ID的映射。"
-msgstr ""
+msgstr "paddlenlp.data.Vocab and paddlenlp.data.JiebaTokenizer are used in mapping of text token to ID when building datasets."
 
 #: ../../data.md:52
 msgid "paddlenlp.data.SamplerHelper用于构建可迭代的batch_sampler。"
-msgstr ""
+msgstr "paddlenlp.data.SamplerHelper is used for building an iterable batch_sampler"
 
 #: ../../data.md:54
 msgid ""
@@ -53,73 +55,84 @@ msgstr ""
 
 #: ../../data.md:56
 msgid "数据预处理"
-msgstr ""
+msgstr "Data Pre-Processing"
 
 #: ../../data.md:58
 msgid "paddlenlp.data.Vocab"
-msgstr ""
+msgstr "paddlenlp.data.Vocab"
 
 #: ../../data.md:60
 msgid "paddlenlp.data.Vocab词表类，集合了一系列文本token与ids之间映射的一系列方法，支持从文件、字典、json等一系方式构建词表。"
 msgstr ""
+"paddlenlp.data.Vocab contains a collection on methods for mapping between a series of text tokens and ids. "
+"It supports building vocabulary from files, dictionaries, json, etc."
 
 #: ../../data.md:78
 msgid "paddlenlp.data.JiebaTokenizer"
-msgstr ""
+msgstr "paddlenlp.data.JiebaTokenizer"
 
 #: ../../data.md:80
 msgid "paddlenlp.data.JiebaTokenizer初始化需传入paddlenlp.data.Vocab类，包含cut分词方法和将句子明文转换为ids的encode方法。"
 msgstr ""
+"paddlenlp.data.JiebaTokenizer initialisation need to get paddlenlp.data.Vocab class past in. "
+"It includes the cut word segmentation method, and the encode method of converting sentence plaintext to ids. "
 
 #: ../../data.md:97
 msgid "构建Sampler"
-msgstr ""
+msgstr "Build Sampler"
 
 #: ../../data.md:99
 msgid "paddlenlp.data.SamplerHelper"
-msgstr ""
+msgstr "paddlenlp.data.SamplerHelper"
 
 #: ../../data.md:101
 msgid "paddlenlp.data.SamplerHelper的作用是构建用于DataLoader的可迭代采样器，它包含shuffle、sort、batch、shard等一系列方法，方便用户灵活使用。"
 msgstr ""
+"paddlenlp.data.SamplerHelper is for building the iterable sampler for DataLoder. "
+"It contains the methods like shuffle、sort、batch、shar, etc. It's easy for the users to use them accordingly. "
 
 #: ../../data.md:139
 msgid "构建collate_fn"
-msgstr ""
+msgstr "Build collate_fn"
 
 #: ../../data.md:141
 msgid "paddlenlp.data.Stack"
-msgstr ""
+msgstr "paddlenlp.data.Stack"
 
 #: ../../data.md:143
 msgid "paddlenlp.data.Stack用来组建batch，其输入必须具有相同的shape，输出便是这些输入的堆叠组成的batch数据。"
 msgstr ""
+"paddlenlp.data.Stack is for building batch. All the inputs must be with the same shape,"
+"the output is the batch data, which consist of the stacked inputs.  "
 
 #: ../../data.md:158
 msgid "paddlenlp.data.Pad"
-msgstr ""
+msgstr "paddlenlp.data.Pad"
 
 #: ../../data.md:160
 msgid "paddlenlp.data.Pad用来组建batch，它的输入长度不同，它首先会将输入数据全部padding到最大长度，然后再堆叠组成batch数据输出。"
 msgstr ""
+"paddlenlp.data.Pad is for building batch, the inputs have different length. "
+"It will be padding all the input data to the biggest length"
+"After that, it will stack the inputs to be the batch data output. "
 
 #: ../../data.md:175
 msgid "paddlenlp.data.Tuple"
-msgstr ""
+msgstr "paddlenlp.data.Tuple"
 
 #: ../../data.md:177
 msgid "paddlenlp.data.Tuple会将多个组batch的函数包装在一起，组成tuple。"
-msgstr ""
+msgstr "paddlenlp.data.Tuple will wrap multiple batch functions together to form a tuple"
 
 #: ../../data.md:197
 msgid "paddlenlp.data.Dict"
-msgstr ""
+msgstr "paddlenlp.data.Dict"
 
 #: ../../data.md:199
 msgid "paddlenlp.data.Dict会将多个组batch的函数包装在一起，组成dict。"
-msgstr ""
+msgstr "paddlenlp.data.Dict will wrap multiple batch functions together to form a dict."
 
 #: ../../data.md:219
 msgid "综合示例"
-msgstr ""
+msgstr "Comprehensive Example"
 

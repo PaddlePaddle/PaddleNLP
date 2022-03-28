@@ -19,33 +19,37 @@ msgstr ""
 
 #: ../../data_prepare/dataset_self_defined.rst:3
 msgid "如何自定义数据集"
-msgstr ""
+msgstr "How to self define datasets"
 
 #: ../../data_prepare/dataset_self_defined.rst:5
 msgid ""
 "通过使用PaddleNLP提供的 :func:`load_dataset` ， :class:`MapDataset` 和 "
 ":class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。"
-msgstr ""
+msgstr "Anyone can easily self define their own datasets by using `load_dataset`, `MapDataset`,and `IterDataset` from PaddleNLP. "
 
 #: ../../data_prepare/dataset_self_defined.rst:8
 msgid "从本地文件创建数据集"
-msgstr ""
+msgstr "Create dataset from local file."
 
 #: ../../data_prepare/dataset_self_defined.rst:10
 msgid ""
 "从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` "
 "中创建数据集。"
-msgstr ""
+msgstr "When creating dataset from local file, we recommend to give the fetching function accoding to local dataset form, then pass it into `load_dataset` function."
 
 #: ../../data_prepare/dataset_self_defined.rst:12
 msgid "以 :obj:`waybill_ie` 快递单信息抽取任务中的数据为例："
-msgstr ""
+msgstr "Let's take the data in `waybill ie` express courier order information extraction task as an example:"
 
 #: ../../data_prepare/dataset_self_defined.rst:32
 msgid ""
 "我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 "
 ":class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的监测数据流向。"
 msgstr ""
+"We recommend to write the data fetching coading in the form of generator. "
+"It will let us build the dataset of `MapDataset` and `IterDataset` better."
+"At the same time, we also recommend to write the single data in the form of dictionary."
+"This makes it easier to monitor the data flow. "
 
 #: ../../data_prepare/dataset_self_defined.rst:34
 msgid ""
@@ -119,5 +123,5 @@ msgstr ""
 
 #: ../../data_prepare/dataset_self_defined.rst:116
 msgid "例如HuggingFace Dataset："
-msgstr ""
+msgstr "For example, HuggingFace Dataset："
 

@@ -43,7 +43,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.from_dict
 #: paddlenlp.data.vocab.Vocab.load_vocabulary
 msgid "参数"
-msgstr ""
+msgstr "parameter"
 
 #: of paddlenlp.data.vocab.Vocab:8
 msgid "Max size of vocab, not including special tokens. Default: None."
@@ -104,7 +104,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
 #: paddlenlp.data.vocab.Vocab.to_tokens
 msgid "返回"
-msgstr ""
+msgstr "return"
 
 #: of paddlenlp.data.vocab.Vocab.to_tokens:5
 msgid "obtained token(s)."
@@ -116,7 +116,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
 #: paddlenlp.data.vocab.Vocab.to_tokens
 msgid "返回类型"
-msgstr ""
+msgstr "return type"
 
 #: of paddlenlp.data.vocab.Vocab.to_indices:1
 msgid ""

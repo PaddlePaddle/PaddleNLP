@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/lexical_analysis.rst:3
 msgid "词法分析"
-msgstr ""
+msgstr "Lexical Ana;ysis"
 

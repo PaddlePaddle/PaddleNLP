@@ -49,7 +49,7 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shard
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 msgid "参数"
-msgstr ""
+msgstr "parameter"
 
 #: of paddlenlp.data.sampler.SamplerHelper:12
 msgid "Input dataset for SamplerHelper."
@@ -76,7 +76,7 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 #: paddlenlp.data.sampler.SamplerHelper.sort
 msgid "返回"
-msgstr ""
+msgstr "return"
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply:5
 msgid "A new transformed object."
@@ -84,7 +84,7 @@ msgstr ""
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply
 msgid "返回类型"
-msgstr ""
+msgstr "return type"
 
 #: of paddlenlp.data.sampler.SamplerHelper.shuffle:1
 msgid ""

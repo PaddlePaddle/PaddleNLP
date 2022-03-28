@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/machine_translation.rst:3
 msgid "机器翻译"
-msgstr ""
+msgstr "Machine Translation"
 

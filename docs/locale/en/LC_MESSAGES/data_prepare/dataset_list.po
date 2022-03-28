@@ -19,15 +19,15 @@ msgstr ""
 
 #: ../../data_prepare/dataset_list.rst:2
 msgid "数据集列表"
-msgstr ""
+msgstr "PaddleNLP Datasets API"
 
 #: ../../data_prepare/dataset_list.rst:4
 msgid "PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要添加splits信息："
-msgstr ""
+msgstr "PaddleNLP provides a fast read API for the following datasets. Please add splits information accordingly when you use it."
 
 #: ../../data_prepare/dataset_list.rst:7
 msgid "阅读理解"
-msgstr ""
+msgstr "Reading Comprehension"
 
 #: ../../data_prepare/dataset_list.rst:10
 #: ../../data_prepare/dataset_list.rst:27
@@ -36,7 +36,7 @@ msgstr ""
 #: ../../data_prepare/dataset_list.rst:78
 #: ../../data_prepare/dataset_list.rst:89
 msgid "数据集名称"
-msgstr ""
+msgstr "Dataset Name"
 
 #: ../../data_prepare/dataset_list.rst:10
 #: ../../data_prepare/dataset_list.rst:27
@@ -45,7 +45,7 @@ msgstr ""
 #: ../../data_prepare/dataset_list.rst:78
 #: ../../data_prepare/dataset_list.rst:89
 msgid "简介"
-msgstr ""
+msgstr "Introduction"
 
 #: ../../data_prepare/dataset_list.rst:10
 #: ../../data_prepare/dataset_list.rst:27
@@ -54,327 +54,341 @@ msgstr ""
 #: ../../data_prepare/dataset_list.rst:78
 #: ../../data_prepare/dataset_list.rst:89
 msgid "调用方法"
-msgstr ""
+msgstr "Call method"
 
 #: ../../data_prepare/dataset_list.rst:12
 msgid "`SQuAD <https://rajpurkar.github.io/SQuAD-explorer/>`__"
-msgstr ""
+msgstr "`SQuAD <https://rajpurkar.github.io/SQuAD-explorer/>`__"
 
 #: ../../data_prepare/dataset_list.rst:12
 msgid "斯坦福问答数据集，包括SQuAD1.1和SQuAD2.0"
-msgstr ""
+msgstr "Stanford Question Answering Dataset (SQuAD), including SQuAD1.1 and SQuAD2.0 "
 
 #: ../../data_prepare/dataset_list.rst:12
 msgid "``paddlenlp.datasets.load_dataset('squad')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('squad')``"
 
 #: ../../data_prepare/dataset_list.rst:14
 msgid ""
 "`DuReader-yesno "
 "<https://aistudio.baidu.com/aistudio/competition/detail/49>`__"
 msgstr ""
+"`DuReader-yesno "
+"<https://aistudio.baidu.com/aistudio/competition/detail/49>`__"
 
 #: ../../data_prepare/dataset_list.rst:14
 msgid "千言数据集：阅读理解，判断答案极性"
-msgstr ""
+msgstr "Million-text dateset: reading comprehension, answer judgement"
 
 #: ../../data_prepare/dataset_list.rst:14
 msgid "``paddlenlp.datasets.load_dataset('dureader_yesno')``"
-msgstr ""
+msgstr "`paddlenlp.datasets.load_dataset('dureader_yesno')``"
 
 #: ../../data_prepare/dataset_list.rst:16
 msgid ""
 "`DuReader-robust "
 "<https://aistudio.baidu.com/aistudio/competition/detail/49>`__"
 msgstr ""
+"`DuReader-robust "
+"<https://aistudio.baidu.com/aistudio/competition/detail/49>`__"
 
 #: ../../data_prepare/dataset_list.rst:16
 msgid "千言数据集：阅读理解，答案原文抽取"
-msgstr ""
+msgstr "Million-text dateset: reading comprehension, finding answers in the original text."
 
 #: ../../data_prepare/dataset_list.rst:16
 msgid "``paddlenlp.datasets.load_dataset('dureader_robust')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('dureader_robust')``"
 
 #: ../../data_prepare/dataset_list.rst:18
 msgid "`CMRC2018 <http://hfl-rc.com/cmrc2018/>`__"
-msgstr ""
+msgstr "`CMRC2018 <http://hfl-rc.com/cmrc2018/>`__"
 
 #: ../../data_prepare/dataset_list.rst:18
 msgid "第二届“讯飞杯”中文机器阅读理解评测数据集"
-msgstr ""
+msgstr "The 2nd Evaluation Workshop on Chinese Machine Reading Comprehension Dataset"
 
 #: ../../data_prepare/dataset_list.rst:18
 msgid "``paddlenlp.datasets.load_dataset('cmrc2018')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('cmrc2018')``"
 
 #: ../../data_prepare/dataset_list.rst:20
 msgid "`DRCD <https://github.com/DRCKnowledgeTeam/DRCD>`__"
-msgstr ""
+msgstr "`DRCD <https://github.com/DRCKnowledgeTeam/DRCD>`__"
 
 #: ../../data_prepare/dataset_list.rst:20
 msgid "台達閱讀理解資料集"
-msgstr ""
+msgstr "Delta Reading Comprehension Dataset (DRCD)"
 
 #: ../../data_prepare/dataset_list.rst:20
 msgid "``paddlenlp.datasets.load_dataset('drcd')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('drcd')``"
 
 #: ../../data_prepare/dataset_list.rst:24
 msgid "文本分类"
-msgstr ""
+msgstr "File classification"
 
 #: ../../data_prepare/dataset_list.rst:29
 msgid "`CoLA <https://nyu-mll.github.io/CoLA/>`__"
-msgstr ""
+msgstr "`CoLA <https://nyu-mll.github.io/CoLA/>`__"
 
 #: ../../data_prepare/dataset_list.rst:29
 msgid "单句分类任务，二分类，判断句子是否合法"
-msgstr ""
+msgstr "single sentence classification task, binary judgement, sentence legal judegment"
 
 #: ../../data_prepare/dataset_list.rst:29
 msgid "``paddlenlp.datasets.load_dataset('glue','cola')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','cola')``"
 
 #: ../../data_prepare/dataset_list.rst:31
 msgid "`SST-2 <https://nlp.stanford.edu/sentiment/index.html>`__"
-msgstr ""
+msgstr "`SST-2 <https://nlp.stanford.edu/sentiment/index.html>`__"
 
 #: ../../data_prepare/dataset_list.rst:31
 msgid "单句分类任务，二分类，判断句子情感极性"
-msgstr ""
+msgstr "single sentence classification task, binary judgement, sentence sentiment analysis "
 
 #: ../../data_prepare/dataset_list.rst:31
 msgid "``paddlenlp.datasets.load_dataset('glue','sst-2')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','sst-2')``"
 
 #: ../../data_prepare/dataset_list.rst:33
 msgid "`MRPC <https://microsoft.com/en-us/download/details.aspx?id=52398>`__"
-msgstr ""
+msgstr "`MRPC <https://microsoft.com/en-us/download/details.aspx?id=52398>`__"
 
 #: ../../data_prepare/dataset_list.rst:33
 msgid "句对匹配任务，二分类，判断句子对是否是相同意思"
-msgstr ""
+msgstr "sentence pairing task, binary judgement, sentence pair meaning consistency evaluation"
 
 #: ../../data_prepare/dataset_list.rst:33
 msgid "``paddlenlp.datasets.load_dataset('glue','mrpc')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','mrpc')``"
 
 #: ../../data_prepare/dataset_list.rst:35
 msgid "`STSB <http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark>`__"
-msgstr ""
+msgstr "`STSB <http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark>`__"
 
 #: ../../data_prepare/dataset_list.rst:35
 msgid "计算句子对相似性，分数为1~5"
-msgstr ""
+msgstr "semantic textual similarity, score from 1 to 5 "
 
 #: ../../data_prepare/dataset_list.rst:35
 msgid "``paddlenlp.datasets.load_dataset('glue','sts-b')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','sts-b')``"
 
 #: ../../data_prepare/dataset_list.rst:37
 msgid ""
 "`QQP <https://data.quora.com/First-Quora-Dataset-Release-Question-"
 "Pairs>`__"
 msgstr ""
+"`QQP <https://data.quora.com/First-Quora-Dataset-Release-Question-"
+"Pairs>`__"
 
 #: ../../data_prepare/dataset_list.rst:37
 msgid "判定句子对是否等效，等效、不等效两种情况，二分类任务"
-msgstr ""
+msgstr " A semantic equivalence assessment, equivlent or not equivlent, binary judgment task"
 
 #: ../../data_prepare/dataset_list.rst:37
 msgid "``paddlenlp.datasets.load_dataset('glue','qqp')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','qqp')``"
 
 #: ../../data_prepare/dataset_list.rst:39
 msgid "`MNLI <http://www.nyu.edu/projects/bowman/multinli/>`__"
-msgstr ""
+msgstr "`MNLI <http://www.nyu.edu/projects/bowman/multinli/>`__"
 
 #: ../../data_prepare/dataset_list.rst:39
 msgid "句子对，一个前提，一个是假设。前提和假设的关系有三种情况：蕴含（entailment），矛盾（contradiction），中立（neutral）。句子对三分类问题"
-msgstr ""
+msgstr "sentence pair premise and the hypothesis relationship: entailment, contradiction, or neutral. Multi-Genre Natural Language Inference Dataset (MultiNLI)"
 
 #: ../../data_prepare/dataset_list.rst:39
 msgid "``paddlenlp.datasets.load_dataset('glue','mnli')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','mnli')``"
 
 #: ../../data_prepare/dataset_list.rst:41
 msgid "`QNLI <https://rajpurkar.github.io/SQuAD-explorer/>`__"
-msgstr ""
+msgstr "`QNLI <https://rajpurkar.github.io/SQuAD-explorer/>`__"
 
 #: ../../data_prepare/dataset_list.rst:41
 msgid "判断问题（question）和句子（sentence）是否蕴含，蕴含和不蕴含，二分类"
-msgstr ""
+msgstr "question and sentence entailment judgement, ential or not entail, binary judgement"
 
 #: ../../data_prepare/dataset_list.rst:41
 msgid "``paddlenlp.datasets.load_dataset('glue','qnli')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','qnli')``"
 
 #: ../../data_prepare/dataset_list.rst:43
 msgid "`RTE <https://aclweb.org/aclwiki/Recognizing_Textual_Entailment>`__"
-msgstr ""
+msgstr "`RTE <https://aclweb.org/aclwiki/Recognizing_Textual_Entailment>`__"
 
 #: ../../data_prepare/dataset_list.rst:43
 msgid "判断句对是否蕴含，句子1和句子2是否互为蕴含，二分类任务"
-msgstr ""
+msgstr "sentence pair entailment judgement, binary judgement"
 
 #: ../../data_prepare/dataset_list.rst:43
 msgid "``paddlenlp.datasets.load_dataset('glue','rte')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','rte')``"
 
 #: ../../data_prepare/dataset_list.rst:45
 msgid ""
 "`WNLI "
 "<https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html>`__"
 msgstr ""
+"`WNLI "
+"<https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html>`__"
 
 #: ../../data_prepare/dataset_list.rst:45
 msgid "判断句子对是否相关，相关或不相关，二分类任务"
-msgstr ""
+msgstr "sentence pair correlation judgement, correlate or not correlate, binary judgement"
 
 #: ../../data_prepare/dataset_list.rst:45
 msgid "``paddlenlp.datasets.load_dataset('glue','wnli')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('glue','wnli')``""
 
 #: ../../data_prepare/dataset_list.rst:47
 msgid "`LCQMC <http://icrc.hitsz.edu.cn/Article/show/171.html>`__"
-msgstr ""
+msgstr "`LCQMC <http://icrc.hitsz.edu.cn/Article/show/171.html>`__"
 
 #: ../../data_prepare/dataset_list.rst:47
 msgid "A Large-scale Chinese Question Matching Corpus 语义匹配数据集"
-msgstr ""
+msgstr "A Large-scale Chinese Question Matching Corpus"
 
 #: ../../data_prepare/dataset_list.rst:47
 msgid "``paddlenlp.datasets.load_dataset('lcqmc')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('lcqmc')``"
 
 #: ../../data_prepare/dataset_list.rst:49
 msgid ""
 "`ChnSentiCorp "
 "<https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/ChnSentiCorp_htl_all/intro.ipynb>`__"
 msgstr ""
+"`ChnSentiCorp "
+"<https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/ChnSentiCorp_htl_all/intro.ipynb>`__"
 
 #: ../../data_prepare/dataset_list.rst:49
 msgid "中文评论情感分析语料"
-msgstr ""
+msgstr "Chinese comments sentiment analysis corpus"
 
 #: ../../data_prepare/dataset_list.rst:49
 msgid "``paddlenlp.datasets.load_dataset('chnsenticorp')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('chnsenticorp')``"
 
 #: ../../data_prepare/dataset_list.rst:53
 msgid "序列标注"
-msgstr ""
+msgstr "sequence annotation"
 
 #: ../../data_prepare/dataset_list.rst:58
 msgid ""
 "`MSRA\\_NER <https://github.com/lemonhu/NER-BERT-"
 "pytorch/tree/master/data/msra>`__"
 msgstr ""
+"`MSRA\\_NER <https://github.com/lemonhu/NER-BERT-"
+"pytorch/tree/master/data/msra>`__"
 
 #: ../../data_prepare/dataset_list.rst:58
 msgid "MSRA 命名实体识别数据集"
-msgstr ""
+msgstr "MSRA named entity recognition dataset"
 
 #: ../../data_prepare/dataset_list.rst:58
 msgid "``paddlenlp.datasets.load_dataset('msra_ner')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('msra_ner')``"
 
 #: ../../data_prepare/dataset_list.rst:60
 msgid ""
 "`People's Daily <https://github.com/OYE93/Chinese-NLP-"
 "Corpus/tree/master/NER/People's%20Daily>`__"
 msgstr ""
+"`People's Daily <https://github.com/OYE93/Chinese-NLP-"
+"Corpus/tree/master/NER/People's%20Daily>`__"
 
 #: ../../data_prepare/dataset_list.rst:60
 msgid "人民日报命名实体识别数据集"
-msgstr ""
+msgstr "People's Daily named entity recognition dataset"
 
 #: ../../data_prepare/dataset_list.rst:60
 msgid "``paddlenlp.datasets.load_dataset('peoples_daily_ner')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('peoples_daily_ner')``"
 
 #: ../../data_prepare/dataset_list.rst:64
 msgid "机器翻译"
-msgstr ""
+msgstr "Machine translation"
 
 #: ../../data_prepare/dataset_list.rst:69
 msgid "`IWSLT15 <https://workshop2015.iwslt.org/>`__"
-msgstr ""
+msgstr "`IWSLT15 <https://workshop2015.iwslt.org/>`__"
 
 #: ../../data_prepare/dataset_list.rst:69
 msgid "IWSLT'15 English-Vietnamese data 英语-越南语翻译数据集"
-msgstr ""
+msgstr "IWSLT'15 English-Vietnamese translation dataset"
 
 #: ../../data_prepare/dataset_list.rst:69
 msgid "``paddlenlp.datasets.load_dataset('iwslt15')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('iwslt15')``"
 
 #: ../../data_prepare/dataset_list.rst:71
 msgid "`WMT14ENDE <http://www.statmt.org/wmt14/translation-task.html>`__"
-msgstr ""
+msgstr "`WMT14ENDE <http://www.statmt.org/wmt14/translation-task.html>`__"
 
 #: ../../data_prepare/dataset_list.rst:71
 msgid "WMT14 EN-DE 经过BPE分词的英语-德语翻译数据集"
-msgstr ""
+msgstr "WMT14 EN-DE BPE tokenised English-German translation dataset"
 
 #: ../../data_prepare/dataset_list.rst:71
 msgid "``paddlenlp.datasets.load_dataset('wmt14ende')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('wmt14ende')``"
 
 #: ../../data_prepare/dataset_list.rst:75
 msgid "文本生成"
-msgstr ""
+msgstr "File generation"
 
 #: ../../data_prepare/dataset_list.rst:80
 msgid "`Poetry <https://github.com/chinese-poetry/chinese-poetry>`__"
-msgstr ""
+msgstr "`Poetry <https://github.com/chinese-poetry/chinese-poetry>`__"
 
 #: ../../data_prepare/dataset_list.rst:80
 msgid "中文诗歌古典文集数据"
-msgstr ""
+msgstr "Chinese poetry and classic anthology dataset"
 
 #: ../../data_prepare/dataset_list.rst:80
 msgid "``paddlenlp.datasets.load_dataset('poetry')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('poetry')``"
 
 #: ../../data_prepare/dataset_list.rst:82
 msgid "`Couplet <https://github.com/v-zich/couplet-clean-dataset>`__"
-msgstr ""
+msgstr "`Couplet <https://github.com/v-zich/couplet-clean-dataset>`__"
 
 #: ../../data_prepare/dataset_list.rst:82
 msgid "中文对联数据集"
-msgstr ""
+msgstr "Chinese couplets dataset"
 
 #: ../../data_prepare/dataset_list.rst:82
 msgid "``paddlenlp.datasets.load_dataset('couplet')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('couplet')``"
 
 #: ../../data_prepare/dataset_list.rst:86
 msgid "语料库"
-msgstr ""
+msgstr "Corpus"
 
 #: ../../data_prepare/dataset_list.rst:91
 msgid "`PTB <http://www.fit.vutbr.cz/~imikolov/rnnlm/>`__"
-msgstr ""
+msgstr "`PTB <http://www.fit.vutbr.cz/~imikolov/rnnlm/>`__"
 
 #: ../../data_prepare/dataset_list.rst:91
 msgid "Penn Treebank Dataset"
-msgstr ""
+msgstr "Penn Treebank Dataset"
 
 #: ../../data_prepare/dataset_list.rst:91
 msgid "``paddlenlp.datasets.load_dataset('ptb')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('ptb')``"
 
 #: ../../data_prepare/dataset_list.rst:93
 msgid "`Yahoo Answer 100k <https://arxiv.org/pdf/1702.08139.pdf>`__"
-msgstr ""
+msgstr "`Yahoo Answer 100k <https://arxiv.org/pdf/1702.08139.pdf>`__"
 
 #: ../../data_prepare/dataset_list.rst:93
 msgid "从Yahoo Answer采样100K"
-msgstr ""
+msgstr "Sampling 100K from Yahoo Answer"
 
 #: ../../data_prepare/dataset_list.rst:93
 msgid "``paddlenlp.datasets.load_dataset('yahoo_answer_100k')``"
-msgstr ""
+msgstr "``paddlenlp.datasets.load_dataset('yahoo_answer_100k')``"
 

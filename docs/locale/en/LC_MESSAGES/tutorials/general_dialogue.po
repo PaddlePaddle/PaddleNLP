@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/general_dialogue.rst:3
 msgid "通用对话"
-msgstr ""
+msgstr "General Diaglogue"
 

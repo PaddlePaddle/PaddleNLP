@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../community/join_in_PaddleNLP-SIG.rst:3
 msgid "如何加入PaddleNLP-SIG"
-msgstr ""
+msgstr "How to join PaddleNLP-SIG"
 

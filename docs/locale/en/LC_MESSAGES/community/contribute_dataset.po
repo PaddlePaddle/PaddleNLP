@@ -19,33 +19,39 @@ msgstr ""
 
 #: ../../community/contribute_dataset.rst:3
 msgid "如何贡献数据集"
-msgstr ""
+msgstr "How to contribute to the datasets"
 
 #: ../../community/contribute_dataset.rst:5
 msgid "除了使用PaddleNLP内置的数据集以外，我们也鼓励用户向PaddleNLP贡献自己的数据集。"
-msgstr ""
+msgstr "You can use the datasets within PaddleNLP, in addition, we also encourge users to contribute with their datasets."
 
 #: ../../community/contribute_dataset.rst:7
 msgid ""
 "数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。下面我们以 :obj:`LCQMC` "
 "为例了解一下贡献一个合格的 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。"
 msgstr ""
+"The way how a user can contribute is to through an implementation of a sub-class of :class:`DatasetBuilder`. In the following section, we will show what methods and parameters"
+"an qualified PR contribution will look like through an example of :obj:`LCQMC`."
 
 #: ../../community/contribute_dataset.rst:10
 msgid "成员变量"
 msgstr ""
+"Member Variables"
 
 #: ../../community/contribute_dataset.rst:40
 msgid ""
 "首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` "
 "类，之后最好添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量："
 msgstr ""
+"First of all, the new dataset class needs to inherit from :class:`paddlenlp.datasets.DatasetBuilder`; then make sure your code is well documented by including the source of your dataset."
+"After that, the following member variables need to be defined:"
 
 #: ../../community/contribute_dataset.rst:42
 msgid ""
 ":attr:`lazy` ：数据集的默认类型。:obj:`False` 对应 :class:`MapDataset` ，:obj:`True` "
 "对应 :class:`IterDataset` 。"
 msgstr ""
+":attr:`lazy` : the default type of dataset. :obj:`False` maps to :class:`MapDataset` ，:obj:`True` "
 
 #: ../../community/contribute_dataset.rst:43
 msgid ":attr:`URL` ：数据集压缩包下载地址，需提供有效并稳定的下载链接。如果数据集不是压缩包，可以不再这里提供。"

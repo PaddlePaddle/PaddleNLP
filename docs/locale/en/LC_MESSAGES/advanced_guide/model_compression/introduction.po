@@ -20,31 +20,40 @@ msgstr ""
 #: ../../advanced_guide/model_compression/introduction.rst:3
 #: ../../advanced_guide/model_compression/introduction.rst:11
 msgid "模型压缩简介"
-msgstr ""
+msgstr "Overview of Model Compressing"
 
 #: ../../advanced_guide/model_compression/introduction.rst:6
 msgid ""
 "近些年，基于Transformer的语言模型在机器翻译、阅读理解、文本匹配、自然语言推理等自然语言处理任务上取得了实质\\ "
 "进展。然而，海量的参数和计算资源的大量耗费，使BERT及其变体在部署中困难重重。模型压缩的发展，使得这些问题得到\\ 了缓解。"
 msgstr ""
+"In the recent years, the language models based on Transformer have progressed significantly in machine translation, reading comprehension, "
+"text matching, natural language inference etc. However, the need of vast amount of data and computing resources make BERT and its variants hard to deploy."
+"Meanwhile, the development of model compression has alleviated for the aforementioned issues."
+
 
 #: ../../advanced_guide/model_compression/introduction.rst:13
 msgid ""
 "模型压缩在保证一定精度的情况下，能够降低模型的存储，加速模型的推理时间。常见的模型压缩方法主要包括模型裁剪、量化和蒸馏。\\ "
 "下面分别对这几种方法进行简要的介绍。"
 msgstr ""
+"Model compression can reduce the size of models, speed up the inference under the condition of ensuring a certain accuracy."
+"The most common approaches for model compression mainly include model pruning, quantization and distillation."
+"We will briefly introduce these methods in the following sections."
 
 #: ../../advanced_guide/model_compression/introduction.rst:17
 msgid "模型裁剪"
-msgstr ""
+msgstr "Model Pruning"
 
 #: ../../advanced_guide/model_compression/introduction.rst:18
 msgid "模型裁剪是通过对已经训练好的模型中不重要的网络连接进行裁剪，减少模型的冗余和计算量，从而减少网络存储、大幅度进行加速的模型压缩方法。"
 msgstr ""
+"Model pruning is a model compression method that reduces the redundancy and comptational complexity of the model by pruning the unimportant network connections in a trained model,"
+"thereby reducing the size of overall AI model and greatly accelerating the speed of inference."
 
 #: ../../advanced_guide/model_compression/introduction.rst:21
 msgid "量化"
-msgstr ""
+msgstr "Quantization"
 
 #: ../../advanced_guide/model_compression/introduction.rst:22
 msgid ""
@@ -54,10 +63,14 @@ msgid ""
 "因此合理的量化网络也可保证精度的情况下减小模型的存储体积，并且能够大幅度加速，使得神经网络在CPU上的运行成为可能。\\ "
 "通常，量化包含多种方法，例如：二值神经网络、三元权重网络以及XNOR网络。"
 msgstr ""
+"Normally, the type of parameters in an neural network is float32. In fact, it is unnecessary to keep such accuracy sometimes. The size of model can be reduced by "
+"quatization, in this way we can use INT8 in stead of float32 in model. For example, the accuracy required by SGD(Stochastic Gradient Descent) only needs to be 6 to 8 bits, "
+"Therefore, reasonable quatization can retain acceptable accuracy while reduce the size of models and improve the speed of inference largely, this has also made running an neural netowrk on CPU possible."
+"Generally, quatization involves various methods, e.g. Binary Neural Networks, Ternary Weight Networks and XNOR networks."
 
 #: ../../advanced_guide/model_compression/introduction.rst:29
 msgid "蒸馏"
-msgstr ""
+msgstr "Distillation"
 
 #: ../../advanced_guide/model_compression/introduction.rst:30
 msgid ""
@@ -65,10 +78,13 @@ msgid ""
 " base蒸馏到\\ Bi-LSTM或者是Transformer层数更少的BERT小模型。例如DistilBERT，它保留了BERT-base "
 "97%的精度，\\ 减少了40%的参数，推理速度快了60%。"
 msgstr ""
+"The essence of distillation is to fit of the student model(model with fewer parameters) to the teacher model(model with more parameters). The student model learns knowledge from the teacher, "
+"which is better than learning by itself. A quite common approach is to distill from a Bert based model to Bi-LSTM or a smaller BERT model with fewer transformer layers. "
+"For instance, DistilBERT, it retains the accuracy of BERT-base to 97%, meanwhile, 40% parameters is reduced and the inference time speeds up 60%."
 
 #: ../../advanced_guide/model_compression/introduction.rst:36
 msgid "模型压缩示例"
-msgstr ""
+msgstr "Demo of Model Compression"
 
 #: ../../advanced_guide/model_compression/introduction.rst:38
 msgid ""
@@ -76,4 +92,7 @@ msgid ""
 "World\"示例。\\ "
 "而《使用DynaBERT中的策略对BERT进行压缩》中使用的DynaBERT则是同时对不同尺寸的子网络进行训练，通过该方法训练后可以在推理阶段直接对模型裁剪。"
 msgstr ""
-
+"We will introduce some techniques of common model compressions. The <<The Knowledge Distillation From BERT To Bi-LSTM>> can be "
+"used as a \"Hello World\" example."
+"Moreover, <<Apply the strategy of DynaBERT to BERT Compression>> shows a way that how you can train a various of sizes of sub-networks from DynaBERT at the same time."
+"After training with this method, the model can be directly pruned during inference stage."

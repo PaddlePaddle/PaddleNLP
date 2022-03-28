@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../paddlenlp.rst:3
 msgid "PaddleNLP是什么"
-msgstr ""
+msgstr "What is PaddleNLP"
 
 #: ../../paddlenlp.rst:5
 msgid "PaddleNLP:"
-msgstr ""
+msgstr "PaddleNLP:"
 

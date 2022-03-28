@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../installation.md:1
 msgid "PaddleNLP 安装说明"
-msgstr ""
+msgstr "PaddleNLP Installation"
 

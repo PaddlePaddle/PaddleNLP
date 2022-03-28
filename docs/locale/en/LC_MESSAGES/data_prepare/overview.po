@@ -19,27 +19,34 @@ msgstr ""
 
 #: ../../data_prepare/overview.rst:3
 msgid "整体介绍"
-msgstr ""
+msgstr "Introduction"
 
 #: ../../data_prepare/overview.rst:5
 msgid "数据集和数据处理部分一直是NLP任务中最重要的环节之一。为了方便用户以更低的学习成本完成这一环节，PaddleNLP提供了以下特性："
 msgstr ""
+"Dataset and data processing is one of the most important steps in NLP tasks"
+"Below is the feature list of PaddleNLP. These features allow the users to complete this setp more efficiently. "
 
 #: ../../data_prepare/overview.rst:7
 msgid "功能强大的API。可以帮助用户完成大部分常见NLP任务的数据处理流程。"
-msgstr ""
+msgstr "Powerful API.This completes the majority of common NLP data processing tasks for the users."
 
 #: ../../data_prepare/overview.rst:8
 msgid "更灵活的封装。各个模块保持低耦合，高内聚，保证用户可以通过继承和改写满足特定的数据处理需求。"
 msgstr ""
+"More flexible encapsulation. Each module maintains low coupling and high cohesion,"
+"users can inherit or rewrite it according to the specific data processing requierment."
 
 #: ../../data_prepare/overview.rst:9
 msgid "内置数据集涵盖大部分NLP任务，搭配简洁易用的数据集加载协议和贡献协议。对新手和社区贡献者更加友好。"
 msgstr ""
+"The built in data set contains the most of NLP tasks. "
+"Come with a simple data set loading agreement and contribution agreement. "
+"More friendly to new users and contributors."
 
 #: ../../data_prepare/overview.rst:12
 msgid "核心API"
-msgstr ""
+msgstr "Core API"
 
 #: ../../data_prepare/overview.rst:14
 msgid ""
@@ -47,6 +54,8 @@ msgid ""
 ":class:`DatasetBuilder` 子类的相关方法生成数据集。关于加载数据集的详细方法，请移步 :doc:`加载数据集 "
 "<./dataset_load>` 。"
 msgstr ""
+"load_dataset() ：dataset fast loading interface, it read script names and other parameter calls from the input data. "
+":class:`DatasetBuilder`: the subclass of relevant methond generated dataset. Please refer to doc:`Dataset Loading` for the details of how to load dataset. "
 
 #: ../../data_prepare/overview.rst:15
 msgid ""
@@ -55,6 +64,10 @@ msgid ""
 " :func:`_get_data` 和 :func:`_read` 等方法像社区贡献数据集。详细信息请移步 :doc:`如何贡献数据集 "
 "</community/contribute_dataset>` 。"
 msgstr ""
+"class:`DatasetBuilder` ：DatasetBuilder is a base class. All of the built in datasets are inherited from it. "
+"It downloads and reads dataset fiels, then generate the Dataset. "
+"This class is well encapsulated. Distributors can distribue datasets by overwriting functions like _get_data() and  _read."
+"Please refer to the document of 'How To Contribute Dataset' for more information."
 
 #: ../../data_prepare/overview.rst:16
 msgid ""
@@ -64,38 +77,43 @@ msgid ""
 "等适用于NLP任务的数据处理功能。同时还能帮助用户简单创建自定义数据集。详细信息请移步***和 :doc:`如何自定义数据集 "
 "<./dataset_self_defined>` 。"
 msgstr ""
+"`MapDataset/IterDataset` is a built in dataset class of PaddleNLP. It is an extension of class:`paddle.io.Dataset` and class:`paddle.io.IterableDataset`"
+"For example, func:`map` or func:`filter` are for data processing. At the same time, it can customise dataset for users.  "
+"Please refert to 'How To Customise Dataset' for more informaton."" 
 
 #: ../../data_prepare/overview.rst:19
 msgid "数据处理流程设计"
-msgstr ""
+msgstr "Data Processing Flow Draft"
 
 #: ../../data_prepare/overview.rst:21
 msgid "目前PaddleNLP的通用数据处理流程如下："
-msgstr ""
+msgstr "Below is the standand data processing procedure of PaddleNLP:"
 
 #: ../../data_prepare/overview.rst:23
 msgid "加载数据集（内置数据集或者自定义数据集，数据集返回 **原始数据**）。"
-msgstr ""
+msgstr "Load dataser (the built in dataset or customized dataset, return **the raw data**). "
 
 #: ../../data_prepare/overview.rst:24
 msgid ""
 "定义 :func:`trans_func` ，包括tokenize，token to id等操作，并传入数据集的 :func:`map` "
 "方法，将原始数据转为 *feature* 。"
 msgstr ""
+"assign: func:`trans_func`, including tokenize，token to id, etc."
+"Use the map() method to convert the raw data into *feature*. "
 
 #: ../../data_prepare/overview.rst:25
 msgid "根据上一步数据处理的结果定义 **batchify** 方法和 :class:`BatchSampler` 。"
-msgstr ""
+msgstr "Assign **batchify** and 'BatchSample' class according to the result of the previpis step"
 
 #: ../../data_prepare/overview.rst:26
 msgid "定义 :class:`DataLoader` ， 传入 :class:`BatchSampler` 和 :func:`batchify_fn` 。"
-msgstr ""
+msgstr "assign class:`DataLoader`, input class:`BatchSampler` and func:`batchify_fn` "
 
 #: ../../data_prepare/overview.rst:28
 msgid "下面是基于Bert的文本分类任务的数据处理流程图："
-msgstr ""
+msgstr "Below is data processing procedure draft of Ber based file classification tasks:"
 
 #: ../../data_prepare/overview.rst:32
 msgid "关于数据处理的详细信息，请移步 :doc:`./data_preprocess` 。"
-msgstr ""
+msgstr "Please refer to doc:`./data_preprocess` for more data processing information."
 

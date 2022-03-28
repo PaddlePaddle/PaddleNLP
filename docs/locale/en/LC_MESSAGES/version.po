@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../version.rst:3
 msgid "版本更新"
-msgstr ""
+msgstr "New Version Update"
 

@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../metrics.md:1
 msgid "PaddleNLP Metrics API"
-msgstr ""
+msgstr "PaddleNLP Metrics API"
 
 #: ../../metrics.md:3
 msgid "目前PaddleNLP提供以下模型评价指标："
-msgstr ""
+msgstr "Currently PaddleNLP provides the following model evaluation metrics:"
 

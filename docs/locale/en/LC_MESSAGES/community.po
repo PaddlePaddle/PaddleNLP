@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../community.rst:3
 msgid "社区贡献"
-msgstr ""
+msgstr "Community Distribution"
 

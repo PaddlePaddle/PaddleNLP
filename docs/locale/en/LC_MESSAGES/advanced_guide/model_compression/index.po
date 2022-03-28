@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../advanced_guide/model_compression/index.rst:3
 msgid "模型压缩"
-msgstr ""
+msgstr "Model Compression"
 
