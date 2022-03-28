@@ -429,7 +429,7 @@ class WordTagTask(Task):
         Construct the inference model for the predictor.
         """
         model_instance = ErnieCtmWordtagModel.from_pretrained(
-            model, num_tag=len(self._tags_to_index))
+            self._task_path, num_tag=len(self._tags_to_index))
         if self._params_path is not None:
             state_dict = paddle.load(self._params_path)
             model_instance.set_dict(state_dict)
