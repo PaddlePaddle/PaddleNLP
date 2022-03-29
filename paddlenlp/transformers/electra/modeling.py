@@ -350,7 +350,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "chinese-electra-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
             "ernie-health-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_health_chinese/ernie-health-chinese.pdparams"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/ernie-health-chinese.pdparams"
         }
     }
 
