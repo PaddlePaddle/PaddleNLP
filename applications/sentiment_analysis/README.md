@@ -166,10 +166,9 @@ sh run_predict.sh
     <p>图2 数据标注样例图<p/>
 </div>
 
-
-- 在doccano平台上，定义标签 Pos-Aspect、 Neg-Aspect 和 Opinion，其中Pos-Aspect表示Aspect的情感极性为正向；Neg-Aspect表示Aspect的情感极性为负向；Opinion表示相应的观点词。
+- 在doccano平台上，定义标签 Pos-Aspect、 Neg-Aspect 和 Opinion，其中 Pos-Aspect 表示 Aspect 的情感极性为正向；Neg-Aspect 表示 Aspect 的情感极性为负向；Opinion 表示相应的观点词。
 - 使用以上定义的标签开始标注数据，图2展示了一个标注样例。
-- 当标注完成后，在doccano平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano.json` 后，放入 `./data` 目录下。
+- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano.json` 后，放入 `./data` 目录下。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
 
 ```shell
@@ -180,8 +179,8 @@ python doccano.py \
 ```
 
 **备注：** 
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为train/dev/test数据集
-- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 
 ## 5. 小模型优化策略
 以上实验中，无论是评论观点抽取模型，还是属性级情感分类模型，使用的均是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，本项目提供了一套基于 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 中文特色小模型的解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
