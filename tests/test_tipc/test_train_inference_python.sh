@@ -313,7 +313,11 @@ else
                 set_epoch=$(func_set_params "${epoch_key}" "${epoch_num}")
                 set_pretrain=$(func_set_params "${pretrain_model_key}" "${pretrain_model_value}")
                 set_batchsize=$(func_set_params "${train_batch_key}" "${train_batch_value}")
+                echo ${train_param_key1}
+                echo ${train_param_value1}
+
                 set_train_params1=$(func_set_params "${train_param_key1}" "${train_param_value1}")
+                echo ${set_train_params1}
                 set_use_gpu=$(func_set_params "${train_use_gpu_key}" "${train_use_gpu}")
                 if [ ${#ips} -le 26 ];then
                     save_log="${LOG_PATH}/${trainer}_gpus_${gpu}_autocast_${autocast}"

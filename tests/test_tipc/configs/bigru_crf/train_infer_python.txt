@@ -10,7 +10,7 @@ Global.auto_cast:null
 Global.pretrained_model:null
 train_model_name:model.pdparams
 train_infer_img_dir:./data/lexical_analysis_dataset_tiny
---data_dir:./data/lexical_analysis_dataset_tiny/
+null:null
 ##
 trainer:norm_train
 norm_train:test_tipc/train.py --model lac --optimizer adam --max_seq_len 64 --data_dir ./data/lexical_analysis_dataset_tiny/

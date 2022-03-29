@@ -1,12 +1,6 @@
 #!/bin/bash
 source test_tipc/common_func.sh
 
-# set env
-python=python
-export str_tmp=$(echo `pip list|grep paddlepaddle-gpu|awk -F ' ' '{print $2}'`)
-export frame_version=${str_tmp%%.post*}
-export frame_commit=$(echo `${python} -c "import paddle;print(paddle.version.commit)"`)
-
 # run benchmark sh 
 # Usage:
 # bash run_benchmark_train.sh config.txt params
@@ -98,6 +92,17 @@ IFS=$'\n'
 lines=(${dataline})
 model_name=$(func_parser_value "${lines[1]}")
 
+if [[ ${model_name} =~ gpt* ]]; then
+    export BENCHMARK_ROOT=/workspace
+    run_env=$BENCHMARK_ROOT/run_env
+    export PATH=$run_env:${PATH}
+fi
+# set env
+python=python
+export str_tmp=$(echo `pip list|grep paddlepaddle-gpu|awk -F ' ' '{print $2}'`)
+export frame_version=${str_tmp%%.post*}
+export frame_commit=$(echo `${python} -c "import paddle;print(paddle.version.commit)"`)
+
 # 获取benchmark_params所在的行数
 line_num=`grep -n "train_benchmark_params" $FILENAME  | cut -d ":" -f 1`
 # for train log parser
@@ -135,12 +140,15 @@ line_precision=6
 line_epoch=7
 line_batchsize=9
 line_profile=13
+line_norm_train=16
 line_eval_py=24
 line_export_py=30
 
 func_sed_params "$FILENAME" "${line_eval_py}" "null"
 func_sed_params "$FILENAME" "${line_export_py}" "null"
 func_sed_params "$FILENAME" "${line_python}"  "$python"
+
+norm_train=`sed -n ${line_norm_train}p $FILENAME`
 
 # if params
 if  [ ! -n "$PARAMS" ] ;then
@@ -176,10 +184,29 @@ for batch_size in ${batch_size_list[*]}; do
     for precision in ${fp_items_list[*]}; do
         for device_num in ${device_num_list[*]}; do
             # sed batchsize and precision
+            # NOTE: Only For NLP. 
             func_parse_amp "$FILENAME" "${line_precision}" "$precision"
+            #
             func_sed_params "$FILENAME" "${line_batchsize}" "$MODE=$batch_size"
             func_sed_params "$FILENAME" "${line_epoch}" "$MODE=$epoch"
             gpu_id=$(set_gpu_id $device_num)
+
+            # NOTE: Only for GPT for now.
+            if [[ ${model_name} =~ gpt* ]]; then
+                num_gpu_devices=$[(${#gpu_id}+1)/2]
+                sed_norm_train=$norm_train
+
+                global_batch_size=$[$batch_size*$num_gpu_devices]
+                extra_params="--global_batch_size=$global_batch_size --dp_degree=$num_gpu_devices"
+                sed_norm_train="$sed_norm_train $extra_params"
+
+                file_1=`head -n $[${line_norm_train}-1] $FILENAME`
+                file_2=`tail -n +$[${line_norm_train}+1] $FILENAME`
+                
+                echo ${file_1} > $FILENAME
+                echo ${sed_norm_train} >> $FILENAME
+                echo ${file_2} >> $FILENAME
+            fi
 
             if [ ${#gpu_id} -le 1 ];then
                 log_path="$SAVE_LOG/profiling_log"
