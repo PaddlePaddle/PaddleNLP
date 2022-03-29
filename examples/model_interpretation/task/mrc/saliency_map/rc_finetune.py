@@ -298,9 +298,10 @@ if __name__ == "__main__":
                     if step % 1000 == 0:
                         if args.save_dir is not None:
                             paddle.save(model.state_dict(),
-                                        args.save_dir / 'ckpt.bin')
+                                        os.path.join(args.save_dir, 'ckpt.bin'))
                             log.debug('save model!')
 
                 if args.save_dir is not None:
-                    paddle.save(model.state_dict(), args.save_dir / 'ckpt.bin')
+                    paddle.save(model.state_dict(),
+                                os.path.join(args.save_dir, 'ckpt.bin'))
                     log.debug('save model!')

@@ -30,7 +30,7 @@ do
                     #CKPT=pretrained_models/saved_model_en/roberta_large_20211207_174631/model_4000/model_state.pdparams
                 elif [[ $BASE_MODEL == "lstm" ]]; then
                     VOCAB_PATH='rnn/vocab.sst2_train'
-                    CKPT=rnn/checkpoints_en_ori/final.pdparams
+                    CKPT=rnn/checkpoints_en/final.pdparams
                     #CKPT=rnn/checkpoints_en/final.pdparams
                 fi
 
@@ -46,7 +46,7 @@ do
                     #CKPT=pretrained_models/saved_model_ch/roberta_large_20211229_105019/model_900/model_state.pdparams
                 elif [[ $BASE_MODEL == "lstm" ]]; then
                     VOCAB_PATH='rnn'
-                    CKPT=rnn/checkpoints_ch_ori/final.pdparams
+                    CKPT=rnn/checkpoints_ch/final.pdparams
                     #CKPT=rnn/checkpoints_ch/final.pdparams
                 fi
             fi
