@@ -27,7 +27,7 @@ from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import default_data_collator, DataCollatorWithPadding
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
@@ -196,10 +196,9 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
     for batch in data_loader:
-        input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids)
-        loss = loss_fct(logits, labels)
-        correct = metric.compute(logits, labels)
+        logits = model(batch['input_ids'], batch['token_type_ids'])
+        loss = loss_fct(logits, batch['labels'])
+        correct = metric.compute(logits, batch['labels'])
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
@@ -266,11 +265,7 @@ def do_train(args):
                             remove_columns=columns)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        'labels': Stack(dtype="int64" if label_list else "float32")  # label
-    }): fn(samples)
+    batchify_fn = DataCollatorWithPadding(tokenizer)
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
@@ -358,13 +353,11 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-
-            input_ids, segment_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits = model(input_ids, segment_ids)
-                loss = loss_fct(logits, labels)
+                logits = model(batch['input_ids'], batch['token_type_ids'])
+                loss = loss_fct(logits, batch['labels'])
             if args.use_amp:
                 scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)

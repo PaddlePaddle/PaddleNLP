@@ -30,7 +30,7 @@ from datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -68,13 +68,12 @@ def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, token_type_ids, length, labels = batch
-        logits = model(input_ids, token_type_ids)
-        loss = loss_fct(logits, labels)
+        logits = model(batch['input_ids'], batch['token_type_ids'])
+        loss = loss_fct(logits, batch['labels'])
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            length, preds, labels)
+            batch['seq_len'], preds, batch['labels'])
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
@@ -125,16 +124,14 @@ def do_train(args):
         return tokenized_inputs
 
     train_ds = train_ds.select(range(len(train_ds) - 1))
-    train_ds = train_ds.map(tokenize_and_align_labels, batched=True)
+    column_names = train_ds.column_names
+    train_ds = train_ds.map(tokenize_and_align_labels,
+                            batched=True,
+                            remove_columns=column_names)
 
     ignore_label = -100
 
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'seq_len': Stack(dtype='int64'),  # seq_len
-        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
-    }): fn(samples)
+    batchify_fn = DataCollatorForTokenClassification(tokenizer, ignore_label)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -148,7 +145,9 @@ def do_train(args):
 
     test_ds = raw_datasets['test']
     test_ds = test_ds.select(range(len(test_ds) - 1))
-    test_ds = test_ds.map(tokenize_and_align_labels, batched=True)
+    test_ds = test_ds.map(tokenize_and_align_labels,
+                          batched=True,
+                          remove_columns=column_names)
 
     test_data_loader = DataLoader(
         dataset=test_ds,
@@ -160,7 +159,9 @@ def do_train(args):
     if args.dataset == "peoples_daily_ner":
         dev_ds = raw_datasets['validation']
         dev_ds = dev_ds.select(range(len(dev_ds) - 1))
-        dev_ds = dev_ds.map(tokenize_and_align_labels, batched=True)
+        dev_ds = dev_ds.map(tokenize_and_align_labels,
+                            batched=True,
+                            remove_columns=column_names)
 
         dev_data_loader = DataLoader(
             dataset=dev_ds,
@@ -205,9 +206,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, token_type_ids, _, labels = batch
-            logits = model(input_ids, token_type_ids)
-            loss = loss_fct(logits, labels)
+            logits = model(batch['input_ids'], batch['token_type_ids'])
+            loss = loss_fct(logits, batch['labels'])
             avg_loss = paddle.mean(loss)
             if global_step % args.logging_steps == 0:
                 print(
