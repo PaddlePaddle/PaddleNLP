@@ -273,6 +273,10 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-health-chinese``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese medical corpus.      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``junnyu/hfl-chinese-electra-180g-base-discriminator``                            | Chinese      | Discriminator, 12-layer, 768-hidden,    |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on 180g Chinese text.           |
