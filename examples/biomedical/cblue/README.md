@@ -44,6 +44,12 @@ cblue/
 └── export_model.py #动态图参数导出静态图参数脚本
 ```
 
+### 依赖安装
+
+```shell
+pip install xlrd==1.2.0
+```
+
 ### 模型训练
 
 我们按照任务类别划分，同时提供了8个任务的样例代码。可以运行下边的命令，在训练集上进行训练，并在开发集上进行验证。
@@ -98,24 +104,19 @@ $ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py -
 
 * `dataset`：可选，CHIP-CDN-2C CHIP-CTC CHIP-STS KUAKE-QIC KUAKE-QTR KUAKE-QQR，默认为KUAKE-QIC数据集。
 
-#### 医疗命名实体识别任务
+#### 医疗命名实体识别任务（CMeEE）
 
 ```shell
 $ export CUDA_VISIBLE_DEVICES=0
 $ python train_ner.py --batch_size 32 --max_seq_length 128 --learning_rate 6e-5 --epochs 12
 ```
 
-#### 医疗关系抽取任务
+#### 医疗关系抽取任务（CMeIE）
 
 ```shell
 $ export CUDA_VISIBLE_DEVICES=0
 $ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 --epochs 100
 ```
 
-### 依赖安装
-
-```shell
-pip install xlrd==1.2.0
-```
-
 [1] CBLUE: A Chinese Biomedical Language Understanding Evaluation Benchmark [pdf](https://arxiv.org/abs/2106.08087) [git](https://github.com/CBLUEbenchmark/CBLUE) [web](https://tianchi.aliyun.com/specials/promotion/2021chinesemedicalnlpleaderboardchallenge)
+[2] Wang, Quan, et al. “Building Chinese Biomedical Language Models via Multi-Level Text Discrimination.” arXiv preprint arXiv:2110.07244 (2021). [pdf](https://arxiv.org/abs/2110.07244)
