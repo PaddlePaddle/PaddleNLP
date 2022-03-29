@@ -726,7 +726,7 @@ ner = Taskflow("ner", home_path="/workspace")
 
 <details><summary><b>Q：</b>Taskflow如何提升预测速度？</summary><div>
 
-**A:** 可以结合设备情况适当调整batch_size，采用批量样本输入的方式来提升平均速率。示例：
+**A:** 可以结合设备情况适当调整batch_size，采用批量输入的方式来提升平均速率。示例：
 ```python
 from paddlenlp import Taskflow
 
