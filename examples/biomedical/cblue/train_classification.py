@@ -191,7 +191,9 @@ def do_train():
             input_ids, token_type_ids, position_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                    custom_white_list=[
+                        'layer_norm', 'softmax', 'gelu', 'tanh'
+                    ], ):
                 logits = model(input_ids, token_type_ids, position_ids)
                 loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)

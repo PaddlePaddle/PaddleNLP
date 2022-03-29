@@ -50,16 +50,16 @@ cblue/
 
 **训练参数设置（Training setup）及结果**
 
-| Task      | epochs | batch_size | learning_rate | max_seq_length |  metrics  |
-| --------- | :----: | :--------: | :-----------: | :------------: | :-------: |
-| CHIP-STS  |    4   |     32     |      1e-4     |       96       |  0.88550  |
-| CHIP-CTC  |    4   |     32     |      6e-5     |      160       |  0.84136  |
-| CHIP-CDN  |   16   |    256     |      3e-5     |       32       |  0.76979  |
-| KUAKE-QQR |    2   |     32     |      6e-5     |       64       |  0.83865  |
-| KUAKE-QTR |    4   |     32     |      6e-5     |       64       |  0.69722  |
-| KUAKE-QIC |    4   |     32     |      6e-5     |      128       |  0.81483  |
-| CMeEE     |    2   |     32     |      6e-5     |      128       |  0.66120  |
-| CMeIE     |  100   |     12     |      6e-5     |      300       |  0.61385  |
+| Task      | epochs | batch_size | learning_rate | max_seq_length |  metric  | results | results (fp16) |
+| --------- | :----: | :--------: | :-----------: | :------------: | :------: | :-----: | :------------: |
+| CHIP-STS  |    4   |     16     |      1e-4     |       96       | Macro-F1 | 0.88550 |    0.85649     |
+| CHIP-CTC  |    4   |     32     |      6e-5     |      160       | Macro-F1 | 0.84136 |    0.83514     |
+| CHIP-CDN  |   16   |    256     |      3e-5     |       32       |    F1    | 0.76979 |    0.76489     |
+| KUAKE-QQR |    2   |     32     |      6e-5     |       64       | Accuracy | 0.83865 |    0.84053     |
+| KUAKE-QTR |    4   |     32     |      6e-5     |       64       | Accuracy | 0.69722 |    0.69722     |
+| KUAKE-QIC |    4   |     32     |      6e-5     |      128       | Accuracy | 0.81483 |    0.82046     |
+| CMeEE     |    2   |     32     |      6e-5     |      128       | Micro-F1 | 0.66120 |    0.66026     |
+| CMeIE     |  100   |     12     |      6e-5     |      300       | Micro-F1 | 0.61385 |    0.58444     |
 
 可支持配置的参数：
 

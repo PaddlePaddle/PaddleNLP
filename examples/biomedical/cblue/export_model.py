@@ -70,7 +70,7 @@ if __name__ == "__main__":
     if args.train_dataset in ['CMeEE', 'CMeIE']:
         input_spec.append(
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"))  # masks
+                shape=[None, None], dtype="float32"))  # masks
 
     model = paddle.jit.to_static(model, input_spec=input_spec)
     # Save in static graph model.
