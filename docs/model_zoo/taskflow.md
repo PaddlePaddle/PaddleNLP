@@ -737,7 +737,7 @@ seg_accurate = Taskflow("word_segmentation", mode="accurate", batch_size=32)
 texts = ["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"]
 seg_accurate(texts)
 ```
-通过上述方式来调用可以大大提升精确模式分词的预测速度。
+通过上述方式进行分词可以大幅提升预测速度。
 
 </div></details>
 
