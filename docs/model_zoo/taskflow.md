@@ -1,9 +1,7 @@
-<div align="center">  
-  <h1> PaddleNLP 一键预测功能 </h1>
-</div>
+# PaddleNLP一键预测功能：Taskflow API
 
 
-<p align="center">
+<p align="left">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/pyversions/paddlenlp"></a>
@@ -12,7 +10,7 @@
 </p>
 
 
-<h4 align="center">
+<h4 align="left">
   <a href=#QuickStart> QuickStart </a> |
   <a href=#社区交流> 社区交流 </a> |
   <a href=#详细使用> 一键预测&定制训练 </a> |
