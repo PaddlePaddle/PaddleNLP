@@ -733,7 +733,7 @@ from paddlenlp import Taskflow
 # 精确模式模型体积较大，可结合机器情况适当调整batch_size，采用批量样本输入的方式。
 seg_accurate = Taskflow("word_segmentation", mode="accurate", batch_size=32)
 
-# 批量样本输入，输入为多个句子组成的list，平均速率更快
+# 批量样本输入，输入为多个句子组成的list，预测速度更快
 texts = ["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"]
 seg_accurate(texts)
 ```
