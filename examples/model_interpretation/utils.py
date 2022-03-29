@@ -13,6 +13,8 @@
 # limitations under the License.
 """This file contains some public functions
 """
+
+
 def convert_tokenizer_res_to_old_version(tokenized_res):
     if isinstance(tokenized_res, list):
         return tokenized_res
