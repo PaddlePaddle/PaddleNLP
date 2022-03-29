@@ -678,6 +678,31 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
 ```
 </div></details>
 
+## 模型算法
+
+<details><summary>模型算法说明</summary><div>
+
+<table>
+  <tr><td>任务名称<td>模型<td>模型详情<td>训练集
+  <tr><td rowspan="3">中文分词<td>默认模式: BiGRU+CRF<td>  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含近2200万句子，覆盖多种场景
+  <tr><td>快速模式：Jieba<td> - <td> -
+  <tr><td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>词性标注<td>BiGRU+CRF<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
+  <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
+  <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
+  <tr><td>文本相似度<td>SimBERT<td> - <td> 收集百度知道2200万对相似句组
+  <tr><td rowspan="2">情感倾向分析<td> BiLSTM <td> - <td> 百度自建数据集
+  <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
+  <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
+  <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
+</table>
+
+</div></details>
 
 ## FAQ
 
@@ -699,6 +724,22 @@ ner = Taskflow("ner", home_path="/workspace")
 
 </div></details>
 
+<details><summary><b>Q：</b>Taskflow如何提升预测速度？</summary><div>
+
+**A:** 可以结合设备情况适当调整batch_size，采用批量输入的方式来提升平均速率。示例：
+```python
+from paddlenlp import Taskflow
+
+# 精确模式模型体积较大，可结合机器情况适当调整batch_size，采用批量样本输入的方式。
+seg_accurate = Taskflow("word_segmentation", mode="accurate", batch_size=32)
+
+# 批量样本输入，输入为多个句子组成的list，预测速度更快
+texts = ["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"]
+seg_accurate(texts)
+```
+通过上述方式进行分词可以大幅提升预测速度。
+
+</div></details>
 
 <details><summary><b>Q：</b>后续会增加更多任务支持吗？</summary><div>
 
