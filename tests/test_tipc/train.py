@@ -6,8 +6,7 @@ import inspect
 import numpy as np
 from pprint import pprint
 
-# For benchmark only. 
-from benchmark import profiler
+from paddlenlp.utils import profiler
 
 import paddle
 import paddle.distributed as dist

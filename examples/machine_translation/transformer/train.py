@@ -14,6 +14,7 @@ import paddle.distributed as dist
 import reader
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 
 from util.record import AverageStatistical
 from util.to_static import apply_to_static
@@ -89,6 +90,7 @@ def parse_args():
         type=str,
         choices=['O1', 'O2'],
         help="The amp level if --use_amp is on. Can be one of [O1, O2]. ")
+
     # For benchmark.
     parser.add_argument(
         '--profiler_options',
@@ -245,6 +247,9 @@ def do_train(args):
             reader_cost_avg.record(train_reader_cost)
             batch_cost_avg.record(train_batch_cost)
             batch_ips_avg.record(train_batch_cost, tokens_per_cards)
+
+            # Profile for model benchmark
+            profiler.add_profiler_step(args.profiler_options)
 
             # NOTE: For benchmark, loss infomation on all cards will be printed.
             if step_idx % args.print_step == 0 and (args.benchmark or
