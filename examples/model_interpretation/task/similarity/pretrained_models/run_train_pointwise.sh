@@ -16,6 +16,9 @@ elif [[ $LANGUAGE == "en" ]]; then
     MAX_SEQ_LENGTH=128
 fi
 
+[ -d "logs" ] || mkdir -p "logs"
+set -x
+
 python3 ./train_pointwise.py  \
     --learning_rate $LEARNING_RATE \
     --max_seq_length $MAX_SEQ_LENGTH \
