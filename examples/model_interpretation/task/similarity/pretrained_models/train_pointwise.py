@@ -33,7 +33,10 @@ from data import create_dataloader
 from data import convert_pointwise_example as convert_example
 import sys
 sys.path.append('..')
+sys.path.append('../../..')
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.remove('../../..')
+sys.path.remove('..')
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
