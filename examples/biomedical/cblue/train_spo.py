@@ -163,18 +163,18 @@ def do_train():
                 x = x + 1
                 y = y + 1
                 if x > 0 and x < batch_len and y < batch_len:
-                    on_hot_ent_labels[idx, x, 0] = 1
-                    one_hot_ent_labels[idx, y, 1] = 1
+                    one_hot_ent_label[idx, x, 0] = 1
+                    one_hot_ent_label[idx, y, 1] = 1
         for idx, spo_idxs in enumerate(spo_label):
             for s, p, o in spo_idxs:
                 s_id = s[0] + 1
                 o_id = o[0] + 1
                 if s_id > 0 and s_id < batch_len and o_id < batch_len:
-                    one_hot_spo_labels[idx, p, s_id, o_id] = 1
+                    one_hot_spo_label[idx, p, s_id, o_id] = 1
         # one_hot_xxx_label are used for loss computation.
         # xxx_label are used for metric computation.
-        ent_label = [one_hot_ent_labels, ent_label]
-        spo_label = [one_hot_spo_labels, spo_label]
+        ent_label = [one_hot_ent_label, ent_label]
+        spo_label = [one_hot_spo_label, spo_label]
         return (*data), ent_label, spo_label
 
     train_data_loader = create_dataloader(

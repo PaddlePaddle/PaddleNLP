@@ -23,7 +23,7 @@ parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning 
 parser.add_argument('--max_seq_length', default=128, type=int, help='The maximum total input sequence length after tokenization.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
 parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
-parser.add_argument('--save_steps', default=10000, type=int, help='The interval steps to save checkpoints.')
+parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay if we apply some.')
 parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion over the training process.')
 parser.add_argument('--use_amp', default=False, type=bool, help='Enable mixed precision training.')
