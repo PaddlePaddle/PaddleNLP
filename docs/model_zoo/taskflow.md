@@ -52,6 +52,9 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
+可进入 Jupyter Notebook 环境，在线体验 👉🏻  [进入在线运行环境](https://aistudio.baidu.com/aistudio/projectdetail/3696243)
+
+PaddleNLP Taskflow API 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
 ## 社区交流
 
@@ -62,10 +65,6 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 </div>
 
 ## 详细使用
-
-可进入 Jupyter Notebook 环境，在线体验 👉🏻  [进入在线运行环境](https://aistudio.baidu.com/aistudio/projectdetail/3494205)
-
-Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
 ## PART Ⅰ &emsp; 一键预测
 
