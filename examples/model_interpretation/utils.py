@@ -26,10 +26,10 @@ def convert_tokenizer_res_to_old_version(tokenized_res):
             res = []
             for idx in range(len(tokenized_res['input_ids'])):
                 temp_dict = {}
-                temp_dict['input_ids'] = tokenized_res['input_ids'][idx]
-                temp_dict['token_type_ids'] = tokenized_res['token_type_ids'][
-                    idx]
-                res.apend(temp_dict)
+                key_list = list(tokenized_res.keys())
+                for key in key_list:
+                    temp_dict[key] = tokenized_res[key][idx]
+                res.append(temp_dict)
             return res
     else:
         raise ValueError('unsupported result type')
