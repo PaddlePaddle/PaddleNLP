@@ -1,0 +1,512 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.unimo.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:1
+msgid ""
+"Constructs an UNIMO tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:5
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:9
+msgid ""
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:12
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:15
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:19
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:22
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:25
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:28
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:34
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string:12
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size:1
+msgid "Return the size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:1
+msgid ""
+"Instantiate an instance of `Vocab` from a file reserving all tokens by "
+"using `Vocab.from_dict`. The file contains a token per line, and the line"
+" number would be the index of corresponding token."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:5
+msgid "path of file to construct vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:7
+msgid ""
+"special token for unknown token. If no need, it also could be `None`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:10
+msgid ""
+"special token for padding token. If no need, it also could be `None`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:13
+msgid ""
+"special token for bos token. If no need, it also could be `None`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:16
+msgid ""
+"special token for eos token. If no need, it also could be `None`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:19
+msgid "keyword arguments for `Vocab.from_dict`."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:22
+msgid "An instance of `Vocab`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string:5
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword:4
+msgid "A list of string representing tokens to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string:8
+msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add:3
+msgid ""
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add:7
+msgid "Number of tokens added to sequences."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:4
+msgid "A UNIMO sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      ``[CLS] X [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:9
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:11
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:15
+msgid "Optional second list of IDs for sequence pairs. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_inputs_with_special_tokens:15
+msgid "List of input_id with the appropriate special tokens."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword:1
+msgid ""
+"Converts the subwords in a sequence of tokens (list of string) to whole "
+"words, also remove `##` when converting."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword:7
+msgid "Converted sequence of whole words."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:1
+msgid ""
+"Build offset map from a pair of offset map by concatenating and adding "
+"offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:4
+msgid "A UNIMO offset_mapping has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:9
+msgid "List of char offsets to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:11
+msgid ""
+"Optional second list of char offsets for offset mapping pairs. Defaults "
+"to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:15
+msgid "List of char offsets with the appropriate offsets     of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:17
+msgid "List of char offsets with the appropriate offsets"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.build_offset_mapping_with_special_tokens:18
+msgid "of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Create a mask from the two sequences passed to be used in a sequence-pair"
+" classification task."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:4
+msgid "A UNIMO sequence pair mask has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:10
+msgid ""
+"If `token_ids_1` is `None`, this method only returns the first portion of"
+" the mask (0s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:13
+msgid "List of IDs."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.create_token_type_ids_from_sequences:19
+msgid "List of token_type_id according to the given sequence(s)."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:1
+msgid ""
+"Main method for encoding the source for generation. It will return a "
+"dictionary containing the encoded sequence and other relative "
+"informations which meets the input format requirements of the UNIMO-text "
+"model."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:5
+msgid "The source text of generation. It should be a string."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:7
+msgid ""
+"The target text of generation. It should be set when training the model "
+"and should be None when running inference. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:11
+msgid ""
+"The additional information of some of the generation tasks such as "
+"summary. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:14
+msgid "The maximum encoded sequence length. Defaults to 512."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:17
+msgid ""
+"The maximum encoded sequence length of the input `target`. Defaults to "
+"128."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:20
+msgid "The maximum encoded sequence length of the input `title`. Defaults to 128."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:23
+msgid "Whether to return the position_ids. Defaults to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:26
+msgid "Whether to return the token_type_ids. Defaults to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:29
+msgid "Whether to return the attention_mask. Defaults to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:32
+msgid "Whether to return the length of the encoded sequence. Defaults to False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:35
+msgid ""
+"Whether to add the special token \"[CLS]\" at the end of sequence as the "
+"begining of the target when running inference to force the model to start"
+" generating target sequence. Defaults to False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:40
+msgid ""
+"Whether to pad the returned sequences to the `max_seq_len`. Note that, in"
+" this method, returned sequences will be padded on the left. Defaults to "
+"False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:44
+msgid "Whether to convert the returned sequences to Tensor. Defaults to False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:47
+msgid ""
+"Whether or not the input text (`source`, `target` and `title`) has been "
+"pretokenized. Defaults to False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:51
+msgid ""
+"Whether the position ids is continuous between source ids and target ids."
+" Defaults to False."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:55
+msgid ""
+"A dictionary containing the encoded sequence and other relative "
+"informations.  With the corresponding fields:  - input_ids "
+"(list[int]|Tensor):     A list of indices of input tokens to be feed to "
+"UNIMO-text     model. If `return_tensors` is True, it is a Tensor with "
+"shape     [1, sequence_length] and data type 'int64'. - token_type_ids "
+"(list[int]|Tensor, optional):     A list of segment token indices to "
+"indicate whether the token     belongs to the dialogue target. If "
+"`return_tensors` is True,     it is a Tensor with shape [1, "
+"sequence_length] and data type     'int64'.     Being returned when "
+"`return_token_type_ids` is set to True. - position_ids (list[int]|Tensor,"
+" optional):     A list of The position indices. If `return_tensors` is "
+"True,     it is a Tensor with shape [1, sequence_length] and data type"
+"     'int64'.     Being returned when `return_position_ids` is set to "
+"True. - attention_mask (numpy.ndarray|Tensor, optional):     A "
+"numpy.ndarray to prevents attention to some unwanted positions,     with "
+"shape [sequence_length, sequence_length] and data type     'float32'. If "
+"`return_tensors` is True, it is a Tensor with shape     [1, 1, "
+"sequence_length, sequence_length] and data type 'float32'.     Being "
+"returned when `return_attention_mask` is set to True. - seq_len (int, "
+"optional):     The actual length of the `input_ids`, excluding the pad "
+"token.     Being returned when `return_length` is set to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:55
+msgid ""
+"A dictionary containing the encoded sequence and other relative "
+"informations."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:58
+msgid "With the corresponding fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:62
+msgid "input_ids (list[int]|Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:61
+msgid ""
+"A list of indices of input tokens to be feed to UNIMO-text model. If "
+"`return_tensors` is True, it is a Tensor with shape [1, sequence_length] "
+"and data type 'int64'."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:68
+msgid "token_type_ids (list[int]|Tensor, optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:65
+msgid ""
+"A list of segment token indices to indicate whether the token belongs to "
+"the dialogue target. If `return_tensors` is True, it is a Tensor with "
+"shape [1, sequence_length] and data type 'int64'. Being returned when "
+"`return_token_type_ids` is set to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:73
+msgid "position_ids (list[int]|Tensor, optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:71
+msgid ""
+"A list of The position indices. If `return_tensors` is True, it is a "
+"Tensor with shape [1, sequence_length] and data type 'int64'. Being "
+"returned when `return_position_ids` is set to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:79
+msgid "attention_mask (numpy.ndarray|Tensor, optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:76
+msgid ""
+"A numpy.ndarray to prevents attention to some unwanted positions, with "
+"shape [sequence_length, sequence_length] and data type 'float32'. If "
+"`return_tensors` is True, it is a Tensor with shape [1, 1, "
+"sequence_length, sequence_length] and data type 'float32'. Being returned"
+" when `return_attention_mask` is set to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:82
+msgid "seq_len (int, optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:82
+msgid ""
+"The actual length of the `input_ids`, excluding the pad token. Being "
+"returned when `return_length` is set to True."
+msgstr ""
+
+#: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:87
+msgid "示例"
+msgstr ""
+

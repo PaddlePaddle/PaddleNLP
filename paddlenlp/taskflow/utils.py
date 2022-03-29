@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import re
 import csv
 import json
 import warnings
@@ -98,6 +99,18 @@ def static_mode_guard():
 def dygraph_mode_guard():
     paddle.disable_static()
     yield
+
+
+def cut_chinese_sent(para):
+    """
+    Cut the Chinese sentences more precisely, reference to "https://blog.csdn.net/blmoistawinde/article/details/82379256".
+    """
+    para = re.sub(r'([。！？\?])([^”’])', r'\1\n\2', para)
+    para = re.sub(r'(\.{6})([^”’])', r'\1\n\2', para)
+    para = re.sub(r'(\…{2})([^”’])', r'\1\n\2', para)
+    para = re.sub(r'([。！？\?][”’])([^，。！？\?])', r'\1\n\2', para)
+    para = para.rstrip()
+    return para.split("\n")
 
 
 class TermTreeNode(object):
@@ -516,7 +529,7 @@ def levenstein_distance(s1: str, s2: str) -> int:
         int: the minimal distance.
     """
     m, n = len(s1) + 1, len(s2) + 1
-    
+
     # Initialize
     dp = [[0] * n for i in range(m)]
     dp[0][0] = 0
@@ -579,7 +592,10 @@ class BurkhardKellerTree(object):
         """
         return self.__add(self.root, word)
 
-    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
+    def __search_similar_word(self,
+                              cur_node: BurkhardKellerNode,
+                              s: str,
+                              threshold: int=2) -> List[str]:
         res = []
         if cur_node is None:
             return res
@@ -588,7 +604,8 @@ class BurkhardKellerTree(object):
             res.append((cur_node.word, dist))
         start = max(dist - threshold, 1)
         while start < dist + threshold:
-            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
+            tmp_res = self.__search_similar_word(
+                cur_node.next.get(start, None), s)[:]
             res.extend(tmp_res)
             start += 1
         return res
@@ -624,11 +641,11 @@ class TriedTree(object):
 
     def __init__(self):
         self.tree = {}
-        
+
     def add_word(self, word):
         """add single word into TriedTree"""
         self.tree[word] = len(word)
-        for i in range(1,len(word)):
+        for i in range(1, len(word)):
             wfrag = word[:i]
             self.tree[wfrag] = self.tree.get(wfrag, None)
 
@@ -644,11 +661,11 @@ class TriedTree(object):
         result = []
         length = len(content)
         for start in range(length):
-            for end in range(start+1, length+1):
+            for end in range(start + 1, length + 1):
                 pos = self.tree.get(content[start:end], -1)
                 if pos == -1:
                     break
-                if pos and (len(result)==0 or end > result[-1][1]):
+                if pos and (len(result) == 0 or end > result[-1][1]):
                     result.append((start, end))
         return result
 
@@ -706,7 +723,7 @@ class Customization(object):
             index = begin
 
             tags, offsets = self.dictitem[phrase]
-            
+
             if prefix:
                 for tag, offset in zip(tags, offsets):
                     while index < begin + offset:

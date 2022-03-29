@@ -57,7 +57,7 @@ def pad_sequence_paddle(inputs, lens, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(inputs[idx:idx+l])
+        sequences.append(inputs[idx:idx + l])
         idx += l
     outputs = Pad(pad_val=pad_index)(sequences)
     output_tensor = paddle.to_tensor(outputs)
@@ -77,13 +77,15 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     dim_sum = dim1 + dim2
     dim3 = 3 - dim_sum
     if offset >= 0:
-        diagonal = np.lib.stride_tricks.as_strided(x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
-                                                   shape=(shape[dim3], shape[dim1] - offset),
-                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(
+            x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
+            shape=(shape[dim3], shape[dim1] - offset),
+            strides=(strides[dim3], strides[dim1] + strides[dim2]))
     else:
-        diagonal = np.lib.stride_tricks.as_strided(x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
-                                                   shape=(shape[dim3], shape[dim1] + offset),
-                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(
+            x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
+            shape=(shape[dim3], shape[dim1] + offset),
+            strides=(strides[dim3], strides[dim1] + strides[dim2]))
 
     diagonal[...] = value
     return x
@@ -135,15 +137,17 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=[n, w] + list(x.shape[2:]),
-                                           strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(
+        x[offset[0]:, offset[1]:],
+        shape=[n, w] + list(x.shape[2:]),
+        strides=[m, k] + list(strides[2:]))
 
 
 def flat_words(words, pad_index=0):
     mask = words != pad_index
     lens = paddle.sum(paddle.cast(mask, "int64"), axis=-1)
-    position = paddle.cumsum(lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
+    position = paddle.cumsum(
+        lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
     select = paddle.nonzero(mask)
     words = paddle.gather_nd(words, select)
     lens = paddle.sum(lens, axis=-1)
@@ -179,7 +183,7 @@ def index_sample(x, index):
     ]
     """
     x_s = x.shape
-    dim = len(index.shape) - 1 
+    dim = len(index.shape) - 1
     assert x_s[:dim] == index.shape[:dim]
 
     if len(x_s) == 3 and dim == 1:
@@ -232,7 +236,8 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * paddle.logical_not(mask) + paddle.cast(mask, input.dtype) * value
+    return input * paddle.logical_not(mask) + paddle.cast(mask,
+                                                          input.dtype) * value
 
 
 def kmeans(x, k):
@@ -363,6 +368,7 @@ def eisner(scores, mask):
 
 class Node:
     """Node class"""
+
     def __init__(self, id=None, parent=None):
         self.lefts = []
         self.rights = []
@@ -375,6 +381,7 @@ class DepTree:
     DepTree class, used to check whether the prediction result is a project Tree.
     A projective tree means that you can project the tree without crossing arcs.
     """
+
     def __init__(self, sentence):
         # set root head to -1
         sentence = copy.deepcopy(sentence)
@@ -385,7 +392,9 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
+        self.nodes = [
+            Node(index, p_index) for index, p_index in enumerate(self.sentence)
+        ]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:

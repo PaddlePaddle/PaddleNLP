@@ -98,12 +98,27 @@ class ErnieGramPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18018
         },
+        "ernie-gram-zh-finetuned-dureader-robust": {
+            "attention_probs_dropout_prob": 0.1,
+            "emb_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18018
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-gram-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/ernie_gram_zh.pdparams",
+            "ernie-gram-zh-finetuned-dureader-robust":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gram-zh-finetuned-dureader-robust/model_state.pdparams",
         },
     }
     base_model_prefix = "ernie_gram"
@@ -286,8 +301,16 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask,
+                axis=[1, 2]).astype(self.pooler.dense.weight.dtype)
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,

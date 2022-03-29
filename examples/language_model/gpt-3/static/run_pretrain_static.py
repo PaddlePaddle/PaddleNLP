@@ -87,11 +87,15 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
+            "custom_white_list": [
+                'softmax', 'layer_norm', 'gelu',
+                "fused_softmax_mask_upper_triangle", "elementwise_add"
+            ],
+            "custom_black_list":
+            ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
-            "use_pure_fp16": args.amp_level=="O2",
+            "use_pure_fp16": args.amp_level == "O2",
             "use_fp16_guard": False
         }
     if args.use_sharding:
@@ -193,10 +197,12 @@ def do_train(args):
     get_rng_state_tracker().add('global_seed', args.seed)
     get_rng_state_tracker().add('local_seed',
                                 args.seed + fleet.worker_index() + 2021)
-    
-    if args.use_amp and args.amp_level=="O2":
-        assert (args.mp_degree == 1 and args.pp_degree == 1), "When amp level is O2, mp_degree and pp_degree should be 1."
-        assert (args.use_sharding == False), "When amp level is O2, use_sharding should be False."
+
+    if args.use_amp and args.amp_level == "O2":
+        assert (args.mp_degree == 1 and args.pp_degree == 1
+                ), "When amp level is O2, mp_degree and pp_degree should be 1."
+        assert (args.use_sharding == False
+                ), "When amp level is O2, use_sharding should be False."
 
     assert args.device in [
         "cpu", "gpu", "xpu"
@@ -244,8 +250,7 @@ def do_train(args):
         with paddle.utils.unique_name.guard():
             with paddle.static.device_guard('gpu:0'):
                 data_holders = create_data_holder(args)
-                [tokens, loss_mask, position_ids,
-                 labels] = data_holders
+                [tokens, loss_mask, position_ids, labels] = data_holders
 
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
@@ -306,7 +311,6 @@ def do_train(args):
             if args.grad_clip > 0:
                 clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
-                
 
             decay_param = [
                 p.name for n, p in model.named_parameters()
@@ -354,11 +358,9 @@ def do_train(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
-    
-    
-    if args.use_amp and args.amp_level=="O2":
+
+    if args.use_amp and args.amp_level == "O2":
         optimizer.amp_init(place)
-    
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -433,11 +435,12 @@ def do_train(args):
                         train_reader_cost + train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips: %.0f tokens/s, ips_per_card: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, loss_return[0],
                            avg_reader_cost, 1. / speed, speed,
                            speed * args.global_batch_size * args.max_seq_len,
-                           lr_return[0]))
+                           speed * args.global_batch_size * args.max_seq_len /
+                           worker_num, lr_return[0]))
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)

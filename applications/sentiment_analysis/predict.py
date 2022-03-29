@@ -45,7 +45,8 @@ def predict_ext(args):
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
+    ori_test_ds = load_dataset(
+        read_test_file, data_path=args.test_path, lazy=False)
     trans_func = partial(
         convert_example_to_feature_ext,
         tokenizer=tokenizer,
@@ -83,7 +84,7 @@ def predict_ext(args):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text[:args.ext_max_seq_len-2], tag_seq)
+            aps = decoding(text[:args.ext_max_seq_len - 2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)

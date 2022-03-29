@@ -40,6 +40,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the training logs and checkpoints will be written.")
     parser.add_argument("--split", type=str, default='949,50,1', help="Train/valid/test data split.")
 
+    parser.add_argument("--binary_head", type=str2bool, default=True, help="True for NSP task.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--micro_batch_size", default=8, type=int, help="Batch size per device for one step training.", )
     parser.add_argument("--global_batch_size", default=None, type=int, help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size.")
@@ -77,7 +78,7 @@ def parse_args(MODEL_CLASSES):
     # AMP config
     parser.add_argument("--use_amp", type=str2bool, nargs='?', const=False, help="Enable mixed precision training.")
     parser.add_argument("--enable_addto", type=str2bool, nargs='?', const=True, default=True, help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.")
-    parser.add_argument("--scale_loss", type=float, default=128, help="The value of scale_loss for fp16. This is only used for AMP training.")
+    parser.add_argument("--scale_loss", type=float, default=32768, help="The value of scale_loss for fp16. This is only used for AMP training.")
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
     parser.add_argument("--attention_probs_dropout_prob", type=float, default=0.1, help="The attention probs dropout prob.")
 
@@ -107,9 +108,5 @@ def parse_args(MODEL_CLASSES):
             logger.warning(
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
-
-    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
-    for arg in vars(args):
-        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
     return args

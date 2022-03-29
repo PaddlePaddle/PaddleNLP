@@ -285,8 +285,13 @@ class MBartEncoder(MBartPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-            attention_mask.stop_gradient = True
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
@@ -586,12 +591,12 @@ class MBartModel(MBartPretrainedModel):
                                           "specified when generating attention_mask"
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-            attention_mask = (1.0 - attention_mask) * -1e9
+            attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
@@ -851,6 +856,10 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             raise AttributeError(
                 "'repetition_penalty != 1' is not supported yet in the faster version"
             )
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         self._faster_entry = FasterMBART(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry

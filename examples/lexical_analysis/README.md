@@ -151,6 +151,31 @@ lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
 '''
 ```
 
+任务的默认路径为`$HOME/.paddlenlp/taskflow/lexical_analysis/lac/`，默认路径下包含了执行该任务需要的所有文件。
+
+如果希望得到定制化的分词及标注结果，用户也可以通过Taskflow来加载自定义的词法分析模型并进行预测。
+
+通过`task_path`指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致。
+
+自定义路径包含如下文件（用户自己的模型权重、标签字典）：
+```text
+custom_task_path/
+├── model.pdparams
+├── word.dic
+├── tag.dic
+└── q2b.dic
+```
+
+使用Taskflow加载自定义模型进行一键预测：
+
+```python
+from paddlenlp import Taskflow
+
+my_lac = Taskflow("lexical_analysis", model_path="./custom_task_path/")
+```
+
+更多使用方法请参考[Taskflow文档](../../docs/model_zoo/taskflow.md)。
+
 ## 预训练模型
 
 如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：

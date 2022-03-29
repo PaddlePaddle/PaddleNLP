@@ -78,7 +78,8 @@ def evaluate(model, criterion, metric, data_loader):
         losses.append(loss.numpy())
         metric.update(probs, labels)
     auc, f1_score = metric.accumulate()
-    print("eval loss: %.5f, auc: %.5f, f1 score: %.5f" % (np.mean(losses), auc, f1_score))
+    print("eval loss: %.5f, auc: %.5f, f1 score: %.5f" %
+          (np.mean(losses), auc, f1_score))
     model.train()
     metric.reset()
 
@@ -93,11 +94,16 @@ def do_train():
 
     # Load train dataset.
     file_name = 'train.csv'
-    train_ds = load_dataset(read_custom_data, filename=os.path.join(
-        args.data_path, file_name), is_test=False, lazy=False)
+    train_ds = load_dataset(
+        read_custom_data,
+        filename=os.path.join(args.data_path, file_name),
+        is_test=False,
+        lazy=False)
 
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
+        "bert-base-uncased")
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
+        'bert-base-uncased')
 
     trans_func = partial(
         convert_example,
@@ -115,7 +121,8 @@ def do_train():
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    model = MultiLabelClassifier(pretrained_model, num_labels=len(train_ds.data[0]["label"]))
+    model = MultiLabelClassifier(
+        pretrained_model, num_labels=len(train_ds.data[0]["label"]))
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -123,8 +130,8 @@ def do_train():
     model = paddle.DataParallel(model)
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, 
-        num_training_steps, args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
