@@ -48,9 +48,9 @@ METRIC_CLASSES = {
     "rte": Accuracy,
 }
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-
     # Required parameters
     parser.add_argument(
         "--task_name",
@@ -230,9 +230,9 @@ def do_train(args):
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
     if args.tokenizer_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path) 
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path)
     else:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path) 
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,

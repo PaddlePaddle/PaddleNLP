@@ -82,13 +82,12 @@ def set_seed(seed):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(seed)
 
-
 def do_train(args):
     paddle.set_device(args.device)
     set_seed(args.seed)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-    
+
     # Load model and train from scratch
     # model = RobertaForMaskedLM(
     #     RobertaModel(**RobertaForMaskedLM.pretrained_init_configuration[
@@ -106,7 +105,7 @@ def do_train(args):
     train_ds = tokenized_datasets["train"]
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained('roberta-base')
-    
+
     # Prepare data for training
     collator_func = DataCollatorMLM(tokenizer=tokenizer) # data collator
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -117,7 +116,7 @@ def do_train(args):
         num_workers=0,
         batch_sampler=train_batch_sampler,
         return_list=True)
-    
+
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
@@ -158,7 +157,7 @@ def do_train(args):
 
             lr_scheduler.step()
             optimizer.clear_grad()
-            
+
             global_step += 1
             if global_step % args.logging_steps == 0:
 
