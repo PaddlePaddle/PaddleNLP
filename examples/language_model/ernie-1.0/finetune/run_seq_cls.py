@@ -35,11 +35,12 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
-from sequence_classification import seq_trans_fn, defaut_batchify_fn
+from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import (
     ALL_DATASETS,
     DataTrainingArguments,
-    ModelArguments, )
+    ModelArguments,
+    defaut_collator, )
 
 
 def do_train():
@@ -77,7 +78,6 @@ def do_train():
 
     # set_seed(args)
     data_args.dataset = data_args.dataset.strip()
-
     if data_args.dataset not in ALL_DATASETS:
         raise ValueError("Not found dataset {}".format(data_args.dataset))
 
@@ -96,26 +96,32 @@ def do_train():
         dataset_config[0],
         None if len(dataset_config) <= 1 else dataset_config[1], )
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-
     data_args.label_list = getattr(all_ds['train'], "label_list", None)
-
     num_classes = 1 if all_ds["train"].label_list == None else len(all_ds[
         'train'].label_list)
 
+    # Define tokenizer, model, loss function. 
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
+    loss_fct = nn.loss.CrossEntropyLoss(
+    ) if data_args.label_list else nn.loss.MSELoss()
 
-    trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
-    batchify_fn = defaut_batchify_fn(tokenizer, data_args)
+    # Define dataset pre-process function
+    if "clue" in data_args.dataset:
+        trans_fn = partial(clue_trans_fn, tokenizer=tokenizer, args=data_args)
+    else:
+        trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
 
+    # Define data collector
+    batchify_fn = defaut_collator(tokenizer, data_args)
+
+    # Dataset pre-process
     train_ds = all_ds["train"].map(trans_fn)
     dev_ds = all_ds["dev"].map(trans_fn)
     test_ds = all_ds["test"].map(trans_fn)
 
-    loss_fct = nn.loss.CrossEntropyLoss(
-    ) if train_ds.label_list else nn.loss.MSELoss()
-
+    # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions,
                                                tuple) else p.predictions
@@ -142,12 +148,17 @@ def do_train():
         tokenizer,
         compute_metrics=compute_metrics, )
 
+    # Log model and data config
+    trainer.print_config(model_args, "Model")
+    trainer.print_config(data_args, "Data")
+
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
 
+    # Training
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
     metrics = train_result.metrics
     trainer.save_model()  # Saves the tokenizer too for easy upload
@@ -155,11 +166,18 @@ def do_train():
     trainer.save_metrics("train", metrics)
     trainer.save_state()
 
+    # Evaluate and tests model
     eval_metrics = trainer.evaluate()
     trainer.log_metrics("eval", eval_metrics)
+
     test_ret = trainer.predict(test_ds)
     trainer.log_metrics("test", test_ret.metrics)
+    if test_ret.label_ids is None:
+        paddle.save(
+            test_ret.predictions,
+            os.path.join(training_args.output_dir, "test_results.pdtensor"), )
 
+    # export inference model
     input_spec = [
         paddle.static.InputSpec(
             shape=[None, None], dtype="int64"),  # input_ids
@@ -169,16 +187,5 @@ def do_train():
     trainer.export_model(input_spec=input_spec, load_best_model=True)
 
 
-def print_arguments(args):
-    """print arguments"""
-    logger.info('{:^40}'.format("Configuration Arguments"))
-    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
-    for arg in vars(args):
-        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
-
-
 if __name__ == "__main__":
-    # args = parse_args()
-
-    # print_arguments(args)
     do_train()

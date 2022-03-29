@@ -15,9 +15,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 import copy
-
 import yaml
 import os.path as osp
+
+from paddlenlp.data import Stack, Tuple, Pad
 
 TASKS = [
     "SequenceClassification",
@@ -41,6 +42,54 @@ for task_type in TASKS:
         final_args.update(new_args)
         final_args["model"] = "AutoModelFor{}".format(task_type)
         ALL_DATASETS[data_name] = final_args
+
+
+class Dict(object):
+    def __init__(self, fn):
+        assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
+                                   'Received fn=%s' % (str(fn))
+
+        self._fn = fn
+
+        for col_name, ele_fn in self._fn.items():
+            assert callable(
+                ele_fn
+            ), 'Batchify functions must be callable! type(fn[%d]) = %s' % (
+                col_name, str(type(ele_fn)))
+
+    def __call__(self, data):
+
+        ret = {}
+        if len(data) <= 0:
+            return ret
+
+        for col_name, ele_fn in self._fn.items():
+            # skip unused col_name, such as labels in test mode.
+            if col_name not in data[0].keys():
+                continue
+            result = ele_fn([ele[col_name] for ele in data])
+            ret[col_name] = result
+
+        return ret
+
+
+def defaut_collator(tokenizer, args):
+    """ Defaut collator for sequences classification
+
+    Args:
+        tokenizer (PretrainedTokenizer): tokenizer of PretrainedModel
+        args : data argument, need label list.
+
+    Returns:
+        batchify_fn (function): collator
+    """
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        "labels": Stack(dtype="int64" if args.label_list else "float32")  # labels
+    }): fn(samples)
+
+    return batchify_fn
 
 
 @dataclass

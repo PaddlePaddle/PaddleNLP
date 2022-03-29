@@ -89,7 +89,8 @@ class DataCollatorWithPadding:
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
-OPTIMIZER_NAME = "optimizer.pdparams"
+
+OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 
@@ -1518,110 +1519,22 @@ class Trainer:
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
 
-    def print_config(self):
+    def print_config(self, args=None, key=""):
         """
         """
         logger.info("=" * 60)
-        logger.info('{:^40}'.format("Configuration Arguments"))
+        if args is None:
+            args = self.args
+            key = "Training"
+
+        logger.info('{:^40}'.format("{} Configuration Arguments".format(key)))
         logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
 
-        for a in dir(self.args):
+        for a in dir(args):
             if (a[:2] != "__"):  #don't print double underscore methods
-                v = getattr(self.args, a)
+                v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(a, v))
 
-        logger.info("=" * 60)
-
-
-class TrainerBase(object):
-    """
-    """
-
-    def create_dataloader(self,
-                          dataset,
-                          mode='train',
-                          batch_size=16,
-                          batchify_fn=None,
-                          trans_fn=None,
-                          batched=False):
-        """
-        """
-        if trans_fn:
-            dataset = dataset.map(trans_fn, batched=batched)
-
-        shuffle = True if mode == 'train' else False
-        if mode == 'train':
-            batch_sampler = paddle.io.DistributedBatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-        else:
-            batch_sampler = paddle.io.BatchSampler(
-                dataset, batch_size=batch_size, shuffle=shuffle)
-
-        return paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
-
-    def train(self, *args, **kwargs):
-        """
-        """
-        pass
-
-    def eval(self, *args, **kwargs):
-        """
-        """
-        pass
-
-    def prepare_train_config(self):
-        """
-        """
-        if self.args.max_steps > 0:
-            self.args.num_training_steps = self.args.max_steps
-            self.args.num_train_epochs = math.ceil(
-                self.args.num_training_steps / len(self.train_dl))
-
-        else:
-            self.args.num_training_steps = len(
-                self.train_dl) * self.args.num_train_epochs
-            self.args.num_train_epochs = self.args.num_train_epochs
-
-        if self.args.num_training_steps // self.args.eval_steps < self.args.minimum_eval_times:
-            exp_step = self.args.num_training_steps / self.args.minimum_eval_times
-            exp_step = max(int(exp_step - exp_step % 10), 10)
-            logger.info("Set eval step to %d" % exp_step)
-            self.args.eval_steps = exp_step
-
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
-
-        self.lr_scheduler = LinearDecayWithWarmup(
-            self.args.learning_rate, self.args.num_training_steps, warmup)
-
-        # Generate parameter names needed to perform weight decay.
-        # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in self.model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
-
-        self.optimizer = paddle.optimizer.AdamW(
-            learning_rate=self.lr_scheduler,
-            beta1=0.9,
-            beta2=0.999,
-            epsilon=self.args.adam_epsilon,
-            parameters=self.model.parameters(),
-            weight_decay=self.args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm))
-
-    def print_config(self):
-        """
-        """
-        logger.info('{:^40}'.format("Configuration Arguments"))
-        logger.info('{:20}:{}'.format("paddle commit id",
-                                      paddle.version.commit))
-        for arg in vars(self.args):
-            logger.info('{:20}:{}'.format(arg, getattr(self.args, arg)))
+        logger.info("")

@@ -518,11 +518,11 @@ class DefaultFlowCallback(TrainerCallback):
         if state.global_step >= state.max_steps:
             control.should_training_stop = True
             # Log and save on end
-            if args.logging_strategy == IntervalStrategy.STEPS:
+            if args.logging_strategy == IntervalStrategy.STEPS and state.global_step >= args.logging_steps:
                 control.should_log = True
-            if args.evaluation_strategy == IntervalStrategy.STEPS:
+            if args.evaluation_strategy == IntervalStrategy.STEPS and state.global_step >= args.eval_steps:
                 control.should_evaluate = True
-            if args.save_strategy == IntervalStrategy.STEPS:
+            if args.save_strategy == IntervalStrategy.STEPS and args.save_steps > 0 and state.global_step >= args.save_steps:
                 control.should_save = True
 
         return control
