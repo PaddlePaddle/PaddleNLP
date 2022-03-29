@@ -16,7 +16,7 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import ErnieForSequenceClassification
+from paddlenlp.transformers import ElectraForSequenceClassification
 from model import ElectraForBinaryTokenClassification, ElectraForSPO
 
 # yapf: disable
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         model = ElectraForSPO.from_pretrained(
             'ernie-health-chinese', num_classes=NUM_CLASSES[args.train_dataset])
     else:
-        model = ErnieForSequenceClassification.from_pretrained(
+        model = ElectraForSequenceClassification.from_pretrained(
             'ernie-health-chinese',
             num_classes=NUM_CLASSES[args.train_dataset],
             activation='tanh')
