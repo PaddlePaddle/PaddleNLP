@@ -81,7 +81,7 @@ class ElectraTokenizer(PretrainedTokenizer):
             "chinese-electra-small":
             "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/vocab.txt",
             "ernie-health-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_health_chinese/vocab.txt"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/vocab.txt"
         }
     }
     pretrained_init_configuration = {
