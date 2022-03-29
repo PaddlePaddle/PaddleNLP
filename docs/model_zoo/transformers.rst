@@ -333,6 +333,11 @@ Transformer预训练模型汇总
 |ERNIE-GRAM_         |``ernie-gram-zh``                                                                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 108M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
++                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-gram-zh-finetuned-dureader-robust``                                       | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    |                                                                                  |              | Then finetuned on dreader-robust        |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |GPT_                |``gpt-cpm-large-cn``                                                              | Chinese      | 32-layer, 2560-hidden,                  |
 |                    |                                                                                  |              | 32-heads, 2.6B parameters.              |
