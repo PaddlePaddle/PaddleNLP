@@ -665,6 +665,11 @@ class PretrainedTokenizer(object):
                          {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
 
                 Defaults to `True`.
+            return_offsets_mapping (bool, optional):
+                Whether to include the list of pair preserving the index of start 
+                and end char in original input for each token in the returned
+                dictionary. Would be automatically set to `True` when `stride` > 0. 
+                Defaults to `False`.
                  
         Returns:
             dict or list[dict] (for batch input):
@@ -689,10 +694,10 @@ class PretrainedTokenizer(object):
                 - **special_tokens_mask** (list[int] or list[list[int]], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - **offset_mapping** (list[int] or list[list[int]], optional): list of pair preserving the
+                - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
-                  For a special token, the index pair is `(0, 0)`. Included when
-                  `stride` works.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when 
+                  `return_overflowing_tokens` is True or `stride` > 0.
                 - **overflow_to_sample** (int or list[int], optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
@@ -1658,10 +1663,24 @@ class PretrainedTokenizer(object):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
+            return_dict (bool, optional):
+                Decide the format for returned encoded batch inputs. Only works when
+                input is a batch of data.
+                ::
+                    - If True, encoded inputs would be a dictionary like: 
+                        {'input_ids': [[1, 4444, 4385, 1545, 6712],[1, 4444, 4385]],
+                        'token_type_ids': [[0, 0, 0, 0, 0], [0, 0, 0]]}
+                    - If False, encoded inputs would be a list like:
+                        [{'input_ids': [1, 4444, 4385, 1545, 6712],
+                          'token_type_ids': [0, 0, 0, 0, 0]},
+                         {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
+
+                Defaults to `True`.
             return_offsets_mapping (bool, optional):
                 Whether to include the list of pair preserving the index of start 
                 and end char in original input for each token in the returned
-                dictionary. Would always be returned when 'stride' > 0. Defaults to `False`.
+                dictionary. Would be automatically set to `True` when `stride` > 0. 
+                Defaults to `False`.
 
         Returns:
             list[dict]:
