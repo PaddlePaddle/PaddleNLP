@@ -151,7 +151,7 @@ def do_train():
         # - one_hot_spo_label: # shape (num_predicate, sequence_length, sequence_length)
         #   [...,
         #    [..., [0, ..., 1, ..., 0], ...], # for predicate '相关（导致）'
-        #    ...]                             # the value at [23, 0, 9] is set as 1
+        #    ...]                             # the value at [23, 1, 10] is set as 1
         #
         one_hot_ent_label = np.zeros(
             [batch_size, batch_len, 2], dtype=np.float32)
