@@ -80,8 +80,8 @@ class ElectraTokenizer(PretrainedTokenizer):
             "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/vocab.txt",
             "chinese-electra-small":
             "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/vocab.txt",
-            "ehealth-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ehealth_chinese/vocab.txt"
+            "ernie-health-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/vocab.txt"
         }
     }
     pretrained_init_configuration = {
@@ -100,7 +100,7 @@ class ElectraTokenizer(PretrainedTokenizer):
         "chinese-electra-small": {
             "do_lower_case": True
         },
-        "ehealth-chinese": {
+        "ernie-health-chinese": {
             "do_lower_case": True
         }
     }
