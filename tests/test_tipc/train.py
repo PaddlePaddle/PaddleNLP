@@ -89,8 +89,6 @@ def do_train(args):
         for input_data in train_loader:
             train_reader_cost = time.time() - batch_start
 
-            # profiler.add_profiler_step(args.profiler_options)
-
             if args.use_amp:
                 with paddle.amp.auto_cast(
                         custom_black_list=args.custom_black_list
@@ -122,6 +120,7 @@ def do_train(args):
             batch_cost_avg.record(train_batch_cost)
             batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
+            profiler.add_profiler_step(args.profiler_options)
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
 

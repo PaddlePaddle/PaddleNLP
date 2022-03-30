@@ -100,6 +100,7 @@ if [[ ${model_name} =~ transformer* ]]; then
 fi
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+python3.7 -m pip install --upgrade pip
 python3.7 -m pip install -r ../requirements.txt -i https://mirror.baidu.com/pypi/simple
 python3.7 -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
 python3.7 -m pip install -e ..
