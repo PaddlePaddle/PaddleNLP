@@ -1402,23 +1402,26 @@ def enable_ft_para(tensor_para_size=1,
         @functools.wraps(func)
         def _impl(self, *args, **kwargs):
             state_dict = func(self, *args, **kwargs)
+            arg_dict = fn_args_to_dict(func, *((self, ) + args), **kwargs)
+            structured_name_prefix = arg_dict["structured_name_prefix"]
 
             def reidx_state_layer(state_dict):
-                prfix_len = len("decoder.layers.")
+                prefix = structured_name_prefix + "decoder.layers."
+                prefix_len = len(prefix)
                 for name, param in list(state_dict.items()):
-                    if name.startswith("decoder.layers."):
+                    if name.startswith(prefix):
                         layer_idx_len = 0
-                        for i in name[prfix_len:]:
+                        for i in name[prefix_len:]:
                             if i == ".":
                                 break
                             else:
                                 layer_idx_len += 1
-                        layer_idx = int(name[prfix_len:prfix_len +
+                        layer_idx = int(name[prefix_len:prefix_len +
                                              layer_idx_len])
-                        new_name = name[:prfix_len] + str(
+                        new_name = name[:prefix_len] + str(
                             _ft_para_conf.layer_para_rank * len(
                                 self.decoder.layers) + layer_idx) + name[
-                                    prfix_len + layer_idx_len:]
+                                    prefix_len + layer_idx_len:]
                         state_dict[new_name] = state_dict.pop(name)
 
             reidx_state_layer(state_dict)
