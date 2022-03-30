@@ -73,9 +73,6 @@ class RNNLMBenchmark(BenchmarkBase):
         ppl_metric = Perplexity()
         callback = UpdateModel()
 
-        profiler_callback = AddProfiler()
-        profiler_callback.profiler_options = args.profiler_options
-
         scheduler = paddle.callbacks.LRScheduler(by_step=False, by_epoch=True)
 
         model.prepare(
@@ -85,13 +82,20 @@ class RNNLMBenchmark(BenchmarkBase):
 
         benchmark_logger = self.logger(args)
 
+        if args.profiler_options is not None:
+            profiler_callback = AddProfiler()
+            profiler_callback.profiler_options = args.profiler_options
+            callbacks_lists = [
+                callback, scheduler, benchmark_logger, profiler_callback
+            ]
+        else:
+            callbacks_lists = [callback, scheduler, benchmark_logger]
+
         model.fit(train_data=kwargs.get("train_loader"),
                   eval_data=kwargs.get("eval_loader"),
                   epochs=args.epoch,
                   shuffle=False,
-                  callbacks=[
-                      callback, scheduler, benchmark_logger, profiler_callback
-                  ])
+                  callbacks=callbacks_lists)
 
     def logger(self,
                args,
