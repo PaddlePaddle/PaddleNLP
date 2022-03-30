@@ -60,6 +60,12 @@ def parse_args():
         help="The name of the task to train selected in the list: " +
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
+        "--model_type",
+        default=None,
+        type=str,
+        required=False,
+        help="should be remove later")
+    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
