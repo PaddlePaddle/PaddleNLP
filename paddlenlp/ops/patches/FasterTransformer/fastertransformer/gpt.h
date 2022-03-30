@@ -115,7 +115,7 @@ public:
         args_.probability_threshold_ = probability_threshold;
         args_.temperature_ = temperature;
         args_.repetition_penalty_ = repetition_penalty;
-        /***** newly added *****/
+        /***** newly added by PaddleNLP *****/
         args_.seed_ = seed;
         
         K_cache_ = new DataType_ *[1];
@@ -526,6 +526,7 @@ public:
                 if(l_parallel_param_.rank == 0)
                 {
                     PUSH_RANGE("Before Transformer/Embedding")
+                    /***** newly fixed by PaddleNLP *****/
                     embedding_position_lookups_kernel_launcher(from_tensor_[0],
                                                             decoding_params.embedding_table,
                                                             decoding_params.position_encoding_table,

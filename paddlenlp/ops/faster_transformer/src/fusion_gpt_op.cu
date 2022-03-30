@@ -284,7 +284,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
                                                 word_emb.data<data_t_>());
   auto& tensor_parallel_param = model_para_desc->tensor_parallel_param;
   auto& layer_parallel_param = model_para_desc->layer_parallel_param;
-  auto seed = model_para_desc->dist(gen);
+  auto seed = model_para_desc->dist(model_para_desc->gen);
 #else
   TensorParallelParam tensor_parallel_param;
   LayerParallelParam layer_parallel_param;
