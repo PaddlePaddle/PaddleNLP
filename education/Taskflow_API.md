@@ -1,12 +1,12 @@
 # ⭐️⭐️NLP十一大任务一键预测⭐️⭐️ 打卡活动
 
-[step1: 启动环境](#step1启动环境) 
+[step1: 启动环境](#step1启动环境)
 
-[step2: 运行项目](#step2运行项目) 
+[step2: 运行项目](#step2运行项目)
 
-[step3: 完成作业](#step3完成作业) 
+[step3: 完成作业](#step3完成作业)
 
-[step4: 完成打卡](#step4完成打卡) 
+[step4: 完成打卡](#step4完成打卡)
 
 
 ## step1启动环境
@@ -20,7 +20,7 @@
 2、启动环境（AI Studio Jupyter Notebook环境，预装了PaddlePaddle）
 
 温馨提示：如果未登录AI Studio，需要先登录一下哦
- 
+
  ![image](https://user-images.githubusercontent.com/11793384/160789931-ac69e562-d9fb-43e5-8307-e17980cc1c7d.png)
 
 
@@ -28,12 +28,12 @@
 
 ![image](https://user-images.githubusercontent.com/11793384/160789736-d7bfbc2a-c165-494c-9b87-acde7f99a4b3.png)
 
- 
+
 ## step2运行项目
 环境启动成功后，将会看到PaddleNLP一键预测功能 Taskflow API 的使用教程。点击“运行全部”按钮，将自动逐行运行教程中所有代码。
 
 ![image](https://user-images.githubusercontent.com/11793384/160790696-db55bb7f-d4bd-4065-b478-777d83a41110.png)
- 
+
 也可以指定运行某段代码：
 
 ![image](https://user-images.githubusercontent.com/11793384/160790840-02d7c235-0f2c-4dfd-9d7e-57c2ab183405.png)
@@ -67,17 +67,17 @@
 ![image](https://user-images.githubusercontent.com/11793384/160793744-07e9f3e1-3942-4899-9629-2b8e822e1ecf.png)
 
 ![image](https://user-images.githubusercontent.com/11793384/160793762-febe0b8f-9d69-44a1-a749-e95d5ad4cf11.png)
- 
+
 成功看到代码运行结果后，**需要公开下项目，才能被看到哦。**
 
 **公开项目第一步：生成版本**
-  
+
 ![image](https://user-images.githubusercontent.com/11793384/160794002-e8bdbce3-6dc8-4fd5-a4b3-41f6656166e3.png)
 
 ![image](https://user-images.githubusercontent.com/11793384/160794021-62d66a0f-be42-49e0-a2f5-ce1562bfba53.png)
 
 **公开项目第二步：生成版本后公开**
- 
+
  ![image](https://user-images.githubusercontent.com/11793384/160794471-707b6f39-2474-4c5d-822d-30b605f06639.png)
 
 
@@ -86,10 +86,10 @@
 **恭喜你开启了愉快的NLP之旅！**
 
 **加入打卡活动群**（二维码7天有效，如无法进群，可前往PaddleNLP GitHub[主页](https://github.com/PaddlePaddle/PaddleNLP)获取最新二维码 ）：
- 
+
  ![image](https://user-images.githubusercontent.com/11793384/160795335-9b72416a-467b-4df1-ae03-a1cfc45ebffc.png)
 
- 
+
 完成作业后，在群内发消息，按如下格式完成打卡：
 
 **【打卡】题目xxx：自己的AI Studio项目链接 或者 运行结果截图**
