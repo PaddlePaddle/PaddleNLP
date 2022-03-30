@@ -1486,8 +1486,6 @@ class PretrainedTokenizer(object):
         len_pair_ids = len(pair_ids) if pair else 0
 
         encoded_inputs = {}
-        token_offset_mapping = self.get_offset_mapping(text)
-        token_pair_offset_mapping = self.get_offset_mapping(text_pair)
         # Truncation: Handle max sequence length
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(
             pair=pair))
