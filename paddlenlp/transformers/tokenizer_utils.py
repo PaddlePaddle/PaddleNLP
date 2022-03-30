@@ -1896,6 +1896,8 @@ class PretrainedTokenizer(object):
             list: The offset map of input text.
             
         """
+        if text is None:
+            return None
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
