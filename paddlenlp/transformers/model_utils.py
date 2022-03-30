@@ -37,6 +37,12 @@ __all__ = [
 ]
 
 
+def unwrap_model(model, *args, **kwargs):
+    raw_model = model._layers if isinstance(model,
+                                            paddle.DataParallel) else model
+    return raw_model
+
+
 def register_base_model(cls):
     """
     A decorator for `PretrainedModel` class. It first retrieves the parent class
