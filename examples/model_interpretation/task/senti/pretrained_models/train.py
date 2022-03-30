@@ -31,7 +31,9 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 sys.path.append('..')
+sys.path.append('../../..')
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.remove('../../..')
 sys.path.remove('..')
 from utils import convert_example
 
