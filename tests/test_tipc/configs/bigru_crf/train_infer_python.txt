@@ -3,11 +3,11 @@ model_name:bigru_crf
 python:python3.7
 gpu_list:0|0,1
 --device:gpu
-Global.auto_cast:null
+null:null
 --epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=100
 --save_model:./test_tipc/output/
 --batch_size:lite_train_lite_infer=16|lite_train_whole_infer=16|whole_train_whole_infer=32
-Global.pretrained_model:null
+null:null
 train_model_name:model.pdparams
 train_infer_img_dir:./data/lexical_analysis_dataset_tiny
 null:null

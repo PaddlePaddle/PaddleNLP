@@ -24,8 +24,8 @@ if [[ ${model_name} =~ bert* ]]; then
     wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/benchmark_hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5.tar --no-check-certificate
 
     cd ./data/
-    tar -xf wikicorpus_en_seqlen128.tar
-    tar -xf hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5.tar
+    tar -xf benchmark_wikicorpus_en_seqlen128.tar
+    tar -xf benchmark_hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5.tar
 
     ln -s hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5/wikicorpus_en_seqlen512/ wikicorpus_en_seqlen512
 
