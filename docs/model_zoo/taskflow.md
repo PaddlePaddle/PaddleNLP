@@ -38,7 +38,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")` | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
-| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            | ✅          | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
+| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 
 
 ## QuickStart
