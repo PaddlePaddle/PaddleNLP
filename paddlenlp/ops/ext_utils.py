@@ -16,6 +16,7 @@ import os
 import sys
 import subprocess
 import textwrap
+import hashlib
 import inspect
 from pathlib import Path
 from setuptools import setup, Extension
@@ -160,7 +161,8 @@ class FasterTransformerExtension(CMakeExtension):
             ext_builder.copy_tree(
                 os.path.join(ext_builder.build_temp, "lib"),
                 ext_builder.build_lib)
-            # NOTE: 
+            # TODO(guosheng): Maybe we should delete the build dir especially
+            # when it is in the dir of paddlenlp package.
             # os.remove(ext_builder.build_temp)
         except Exception as e:
             logger.warning(
@@ -258,11 +260,18 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # extension object is created using them.
         return LOADED_EXT[name]
     if build_dir is None:
-        # Maybe under package dir is better to avoid cmake source path conflict
-        # with different source path.
         # build_dir = os.path.join(PPNLP_HOME, 'extenstions')
+        # Maybe under package dir is better to avoid cmake source path conflict
+        # with different source path, like this:
+        # build_dir = os.path.join(
+        #     str(Path(__file__).parent.resolve()), 'extenstions')
+        # However if it is under the package dir, it might make the package hard
+        # to uninstall. Thus we put it in PPNLP_HOME with digest of current path,
+        # like this:
         build_dir = os.path.join(
-            str(Path(__file__).parent.resolve()), 'extenstions')
+            PPNLP_HOME, 'extensions',
+            hashlib.md5(str(Path(__file__).parent.resolve()).encode(
+                'utf-8')).hexdigest())
     build_base_dir = os.path.abspath(
         os.path.expanduser(os.path.join(build_dir, name)))
     if not os.path.exists(build_base_dir):
