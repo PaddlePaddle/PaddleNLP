@@ -144,6 +144,22 @@ class DataTrainingArguments:
             "help":
             "Whether to lower case the input text. Should be True for uncased models and False for cased models."
         }, )
+    overwrite_cache: bool = field(
+        default=False,
+        metadata={"help": "Overwrite the cached training and evaluation sets"})
+    preprocessing_num_workers: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "The number of processes to use for the preprocessing."
+        }, )
+    null_score_diff_threshold: float = field(
+        default=0.0,
+        metadata={
+            "help":
+            "The threshold used to select the null answer: if the best answer has a score that is less than "
+            "the score of the null answer minus this threshold, the null answer is selected for this example. "
+            "Only useful when `version_2_with_negative=True`."
+        }, )
 
 
 @dataclass
@@ -168,3 +184,9 @@ class ModelArguments:
             "help":
             "Pretrained tokenizer name or path if not the same as model_name"
         })
+    cache_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help":
+            "Path to directory to store the pretrained models downloaded from huggingface.co"
+        }, )

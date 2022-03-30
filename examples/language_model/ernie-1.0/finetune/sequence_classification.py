@@ -124,9 +124,9 @@ def seq_trans_fn(example, tokenizer, args):
         max_seq_length=args.max_seq_length, )
 
 
-def clue_trans_fn(examples, tokenizer, args):
+def clue_trans_fn(example, tokenizer, args):
     return convert_clue(
-        examples,
+        example,
         tokenizer=tokenizer,
         label_list=args.label_list,
         max_seq_length=args.max_seq_length)

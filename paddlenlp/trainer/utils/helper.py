@@ -29,10 +29,10 @@ def paddle_pad_and_concatenate(tensor1, tensor2, padding_index=-100):
     if len(tensor1.shape) == 1 or tensor1.shape[1] == tensor2.shape[1]:
         return paddle.concat((tensor1, tensor2), axis=0)
 
-    raise ValueError("Error")
+    # raise ValueError("Error")
     # Let's figure out the new shape
     new_shape = (tensor1.shape[0] + tensor2.shape[0], max(
-        tensor1.shape[1], tensor2.shape[1])) + tensor1.shape[2:]
+        tensor1.shape[1], tensor2.shape[1])) + tuple(tensor1.shape[2:])
 
     # Now let's fill the result tensor
     # result = tensor1.new_full(new_shape, padding_index)
