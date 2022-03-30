@@ -4,6 +4,7 @@ import sys
 import paddle
 import paddle.nn as nn
 
+from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics import Perplexity
 
@@ -16,6 +17,12 @@ sys.path.append(
             os.pardir, "examples", "language_model")))
 from rnnlm.reader import create_data_loader
 from rnnlm.model import RnnLm, CrossEntropyLossForLm, UpdateModel
+
+
+class AddProfiler(paddle.callbacks.Callback):
+    def on_batch_end(self, mode, step=None, logs=None):
+        if mode == 'train':
+            profiler.add_profiler_step(self.profiler_options)
 
 
 class RNNLMBenchmark(BenchmarkBase):
@@ -65,6 +72,10 @@ class RNNLMBenchmark(BenchmarkBase):
     def forward(self, model, args, input_data=None, **kwargs):
         ppl_metric = Perplexity()
         callback = UpdateModel()
+
+        profiler_callback = AddProfiler()
+        profiler_callback.profiler_options = args.profiler_options
+
         scheduler = paddle.callbacks.LRScheduler(by_step=False, by_epoch=True)
 
         model.prepare(
@@ -78,7 +89,9 @@ class RNNLMBenchmark(BenchmarkBase):
                   eval_data=kwargs.get("eval_loader"),
                   epochs=args.epoch,
                   shuffle=False,
-                  callbacks=[callback, scheduler, benchmark_logger])
+                  callbacks=[
+                      callback, scheduler, benchmark_logger, profiler_callback
+                  ])
 
     def logger(self,
                args,
