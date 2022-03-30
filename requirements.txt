@@ -5,3 +5,4 @@ colorama
 seqeval
 multiprocess
 datasets
+tqdm
