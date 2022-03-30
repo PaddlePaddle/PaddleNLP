@@ -379,4 +379,6 @@ if __name__ == "__main__":
     args.eos_token = ARGS.eos_token
     pprint(args)
 
+    args.profiler_options = ARGS.profiler_options
+
     do_train(args)
