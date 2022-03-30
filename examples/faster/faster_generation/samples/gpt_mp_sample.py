@@ -112,8 +112,8 @@ def main(args):
         temperature=args.temperature,
         use_faster=True)
 
-    # Only use the process corresponding to the last layer group to output.
-    if get_ft_para_conf().is_last_group():
+    # Only make the first process to output.
+    if get_ft_para_conf().rank == 0:
         for i in range(len(outputs)):
             result = tokenizer.convert_ids_to_string(outputs[i].numpy().tolist(
             ))

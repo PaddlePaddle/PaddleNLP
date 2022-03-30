@@ -126,6 +126,9 @@ struct ModelParaDesc {
   TensorParallelParam tensor_parallel_param;
   LayerParallelParam layer_parallel_param;
   ncclComm_t tensor_para_nccl_comm, layer_para_nccl_comm;
+  std::mt19937_64 gen;
+  std::uniform_int_distribution<> dist{0, std::numeric_limits<int>::max()};
+
 
   ModelParaDesc(int head_num,
                 int size_per_head,
@@ -161,6 +164,11 @@ struct ModelParaDesc {
     layer_parallel_param.layers_per_group = layers_per_group;
     layer_parallel_param.local_batch_size = layer_para_batch_size;
     layer_parallel_param.nccl_comm = layer_para_nccl_comm;
+    // fix the seed to prevent the seed of different gpu are differnet in Tensor
+    // Parallel
+    size_t meta_seed =
+        *(reinterpret_cast<size_t*>(tensor_para_nccl_uid.internal));
+    gen = std::mt19937_64(meta_seed);
   }
 
   ~ModelParaDesc() {
@@ -276,6 +284,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
                                                 word_emb.data<data_t_>());
   auto& tensor_parallel_param = model_para_desc->tensor_parallel_param;
   auto& layer_parallel_param = model_para_desc->layer_parallel_param;
+  auto seed = model_para_desc->dist(gen);
 #else
   TensorParallelParam tensor_parallel_param;
   LayerParallelParam layer_parallel_param;
@@ -288,6 +297,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
   layer_parallel_param.world_size = 1;
   layer_parallel_param.layers_per_group = num_layer;
   layer_parallel_param.local_batch_size = batch_size_;
+  int seed = -1;
 #endif
 
   DecodingGpt<DecodingTraits_::OpType>* gpt_decoding;
@@ -302,21 +312,24 @@ std::vector<paddle::Tensor> gpt2_kernel(
       reinterpret_cast<DataType_*>(const_cast<data_t_ *>(attn_mask.data<data_t_>()));
   decoding_params.d_start_lengths = start_length.data<int>();
 
-  gpt_decoding = new DecodingGpt<DecodingTraits_::OpType>(allocator_,
-                                                          batch_size_,
-                                                          max_len,
-                                                          n_head,
-                                                          size_per_head,
-                                                          vocab_size,
-                                                          num_layer,
-                                                          bos_id,
-                                                          eos_id,
-                                                          topk,
-                                                          topp,
-                                                          temperature,
-                                                          tensor_para_size,
-                                                          layer_para_size,
-                                                          true /*is_fuse_QKV*/);
+  gpt_decoding =
+      new DecodingGpt<DecodingTraits_::OpType>(allocator_,
+                                               batch_size_,
+                                               max_len,
+                                               n_head,
+                                               size_per_head,
+                                               vocab_size,
+                                               num_layer,
+                                               bos_id,
+                                               eos_id,
+                                               topk,
+                                               topp,
+                                               temperature,
+                                               tensor_para_size,
+                                               layer_para_size,
+                                               true, /*is_fuse_QKV*/
+                                               1.0,  /*repetition_penalty*/
+                                               seed);
 
   gpt_decoding->set_tensor_parallel_param(tensor_parallel_param);
   gpt_decoding->set_layer_parallel_param(layer_parallel_param);
