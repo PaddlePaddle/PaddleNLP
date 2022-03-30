@@ -70,8 +70,6 @@ from .utils.helper import (
     nested_detach,
     nested_numpify,
     nested_truncate, )
-# from .utils import logging
-# logger = logging.get_logger(__name__)
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 

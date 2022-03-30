@@ -23,17 +23,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .utils import logging
+# from .utils import logging
 from .trainer_utils import (
     SchedulerType,
     IntervalStrategy,
     EvaluationStrategy,
     OptimizerNames, )
 
-logger = logging.get_logger(__name__)
-log_levels = logging.get_log_levels_dict().copy()
-trainer_log_levels = dict(**log_levels, passive=-1)
-
+# logger = logging.get_logger(__name__)
+# log_levels = logging.get_log_levels_dict().copy()
+# trainer_log_levels = dict(**log_levels, passive=-1)
+from paddlenlp.utils.log import logger
 import paddle
 
 
@@ -376,20 +376,6 @@ class TrainingArguments:
     warmup_steps: int = field(
         default=0, metadata={"help": "Linear warmup over warmup_steps."})
 
-    log_level: Optional[str] = field(
-        default="passive",
-        metadata={
-            "help":
-            "Logger log level to use on the main node. Possible choices are the log levels as strings: 'debug', 'info', 'warning', 'error' and 'critical', plus a 'passive' level which doesn't set anything and lets the application set the level. Defaults to 'passive'.",
-            "choices": trainer_log_levels.keys(),
-        }, )
-    log_level_replica: Optional[str] = field(
-        default="passive",
-        metadata={
-            "help":
-            "Logger log level to use on replica nodes. Same choices and defaults as ``log_level``",
-            "choices": trainer_log_levels.keys(),
-        }, )
     log_on_each_node: bool = field(
         default=True,
         metadata={
@@ -571,8 +557,8 @@ class TrainingArguments:
             self.local_rank = env_local_rank
 
         # convert to int
-        self.log_level = trainer_log_levels[self.log_level]
-        self.log_level_replica = trainer_log_levels[self.log_level_replica]
+        self.log_level = -1
+        self.log_level_replica = -1
 
         # expand paths, if not os.makedirs("~/bar") will make directory
         # in the current directory instead of the actual home
@@ -585,7 +571,7 @@ class TrainingArguments:
             self.logging_dir = os.path.expanduser(self.logging_dir)
 
         if self.disable_tqdm is None:
-            self.disable_tqdm = logger.getEffectiveLevel() > logging.WARN
+            self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
 
         if isinstance(self.evaluation_strategy, EvaluationStrategy):
             warnings.warn(

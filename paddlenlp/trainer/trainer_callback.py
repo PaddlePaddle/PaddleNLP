@@ -25,9 +25,9 @@ from tqdm.auto import tqdm
 
 from .trainer_utils import IntervalStrategy, has_length
 from .trainer_args import TrainingArguments
-from .utils import logging
+from paddlenlp.utils.log import logger
 
-logger = logging.get_logger(__name__)
+# logger = logging.get_logger(__name__)
 
 
 @dataclass

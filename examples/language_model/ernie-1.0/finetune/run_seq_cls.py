@@ -92,13 +92,13 @@ def do_train():
     training_args.per_device_eval_batch_size = config["batch_size"]
 
     dataset_config = data_args.dataset.split(" ")
-    all_ds = load_dataset(
+    raw_datasets = load_dataset(
         dataset_config[0],
         None if len(dataset_config) <= 1 else dataset_config[1], )
 
-    data_args.label_list = getattr(all_ds['train'], "label_list", None)
-    num_classes = 1 if all_ds["train"].label_list == None else len(all_ds[
-        'train'].label_list)
+    data_args.label_list = getattr(raw_datasets['train'], "label_list", None)
+    num_classes = 1 if raw_datasets["train"].label_list == None else len(
+        raw_datasets['train'].label_list)
 
     # Define tokenizer, model, loss function. 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -117,9 +117,9 @@ def do_train():
     batchify_fn = defaut_collator(tokenizer, data_args)
 
     # Dataset pre-process
-    train_ds = all_ds["train"].map(trans_fn)
-    dev_ds = all_ds["dev"].map(trans_fn)
-    test_ds = all_ds["test"].map(trans_fn)
+    train_dataset = raw_datasets["train"].map(trans_fn)
+    eval_dataset = raw_datasets["dev"].map(trans_fn)
+    test_dataset = raw_datasets["test"].map(trans_fn)
 
     # Define the metrics of tasks.
     def compute_metrics(p):
@@ -139,13 +139,13 @@ def do_train():
         return {"accuracy": accu}
 
     trainer = Trainer(
-        model,
-        loss_fct,
-        training_args,
-        batchify_fn,
-        train_ds,
-        dev_ds,
-        tokenizer,
+        model=model,
+        criterion=loss_fct,
+        args=training_args,
+        data_collator=batchify_fn,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer,
         compute_metrics=compute_metrics, )
 
     # Log model and data config
@@ -170,7 +170,7 @@ def do_train():
     eval_metrics = trainer.evaluate()
     trainer.log_metrics("eval", eval_metrics)
 
-    test_ret = trainer.predict(test_ds)
+    test_ret = trainer.predict(test_dataset)
     trainer.log_metrics("test", test_ret.metrics)
     if test_ret.label_ids is None:
         paddle.save(
@@ -184,7 +184,10 @@ def do_train():
         paddle.static.InputSpec(
             shape=[None, None], dtype="int64")  # segment_ids
     ]
-    trainer.export_model(input_spec=input_spec, load_best_model=True)
+    trainer.export_model(
+        input_spec=input_spec,
+        load_best_model=True,
+        output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

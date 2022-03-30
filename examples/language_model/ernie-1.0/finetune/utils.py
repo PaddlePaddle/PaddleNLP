@@ -190,3 +190,9 @@ class ModelArguments:
             "help":
             "Path to directory to store the pretrained models downloaded from huggingface.co"
         }, )
+    export_model_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help":
+            "Path to directory to store the pretrained models downloaded from huggingface.co"
+        }, )

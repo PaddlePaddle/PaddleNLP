@@ -231,7 +231,10 @@ def do_train():
         paddle.static.InputSpec(
             shape=[None, None], dtype="int64")  # segment_ids
     ]
-    trainer.export_model(input_spec=input_spec, load_best_model=True)
+    trainer.export_model(
+        input_spec=input_spec,
+        load_best_model=True,
+        output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":
