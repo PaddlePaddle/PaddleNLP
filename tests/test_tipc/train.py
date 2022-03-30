@@ -120,7 +120,9 @@ def do_train(args):
             batch_cost_avg.record(train_batch_cost)
             batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
-            profiler.add_profiler_step(args.profiler_options)
+            if args.profiler_options is not None:
+                profiler.add_profiler_step(args.profiler_options)
+
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
 

@@ -450,7 +450,8 @@ def do_train(args):
                 train_cost_avg.record(train_run_cost)
 
                 # Profile for model benchmark
-                profiler.add_profiler_step(args.profiler_options)
+                if args.profiler_options is not None:
+                    profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
