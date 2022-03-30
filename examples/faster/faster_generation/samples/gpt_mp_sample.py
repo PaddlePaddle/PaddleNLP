@@ -98,6 +98,8 @@ def main(args):
     input_ids = [tokenizer.eos_token_id]
     # NOTE: When using prompt, open this and replace the text with what you want.
     # input = '花间一壶酒，独酌无相亲。举杯邀明月，'
+    # input = '一时黛玉进了荣府，下了车。众嬷嬷引着，便往东转弯，'
+    # input = '爱因斯坦曾经说过：'
     # input_ids = tokenizer(input)["input_ids"]
     input_ids = [input_ids] * args.batch_size
 
