@@ -115,7 +115,8 @@ public:
         args_.probability_threshold_ = probability_threshold;
         args_.temperature_ = temperature;
         args_.repetition_penalty_ = repetition_penalty;
-        args_.seed_ = seed
+        /***** newly added *****/
+        args_.seed_ = seed;
         
         K_cache_ = new DataType_ *[1];
         V_cache_ = new DataType_ *[1];
