@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.metrics.distinct.rst:2
+#: ../source/paddlenlp.metrics.distinct.rst:2
 msgid "distinct"
 msgstr ""
 
@@ -27,71 +27,85 @@ msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct:1
 msgid ""
-"Distinct is an algorithm for evaluating the textual diversity of the "
+"`Distinct` is an algorithm for evaluating the textual diversity of the "
 "generated text by calculating the number of distinct n-grams. The larger "
-"the value of n-grams, the higher the diversity of the text. See detail at"
-" https://arxiv.org/abs/1510.03055"
+"the number of distinct n-grams, the higher the diversity of the text. See"
+" details at https://arxiv.org/abs/1510.03055."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct:6
 msgid ""
-"`Distinct` could be used as `paddle.metric.Metric` class, or an ordinary "
-"class. When `Distinct` is used as `paddle.metric.Metric` class. A "
-"function is needed that transforms the network output to string list. It "
-"should be noted that the `Distinct` here is different from the `Distinct`"
-" calculated in prediction, and it is only for observation during training"
-" and evaluation."
+":class:`Distinct` could be used as a :class:`paddle.metric.Metric` class,"
+" or an ordinary class. When :class:`Distinct` is used as a "
+":class:`paddle.metric.Metric` class, a function is needed to transform "
+"the network output to a string list."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct
 #: paddlenlp.metrics.distinct.Distinct.add_inst
+#: paddlenlp.metrics.distinct.Distinct.update
 msgid "参数"
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:12
+#: of paddlenlp.metrics.distinct.Distinct:11
+msgid "Number of gram for :class:`Distinct` metric. Defaults to 2."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct:13
 msgid ""
-"`trans_func` transforms the network output to string list. Default None. "
-"When `Distinct` is used as `paddle.metric.Metric` class, `trans_func` "
-"must be provided. Please note that the input of `trans_func` is numpy "
-"array."
+"`trans_func` transforms the network output to a string list. Defaults to "
+"None.  .. note::     When :class:`Distinct` is used as a "
+":class:`paddle.metric.Metric`     class, `trans_func` must be provided. "
+"Please note that the     input of `trans_func` is numpy array."
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:17
-msgid "Number of gram for `Distinct` metric. Default: 2."
+#: of paddlenlp.metrics.distinct.Distinct:13
+msgid ""
+"`trans_func` transforms the network output to a string list. Defaults to "
+"None."
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:19
-msgid "Name of `paddle.metric.Metric` instance. Default: \"distinct\"."
+#: of paddlenlp.metrics.distinct.Distinct:16
+msgid ""
+"When :class:`Distinct` is used as a :class:`paddle.metric.Metric` class, "
+"`trans_func` must be provided. Please note that the input of `trans_func`"
+" is numpy array."
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:24
-msgid "实际案例"
+#: of paddlenlp.metrics.distinct.Distinct:20
+msgid "Name of :class:`paddle.metric.Metric` instance. Defaults to \"distinct\"."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct:25
-msgid "1. Using as a general evaluation object. .. code-block:: python"
+msgid "实际案例"
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:28
-msgid ""
-"from paddlenlp.metrics import Distinct distinct = Distinct() cand = "
-"[\"The\",\"cat\",\"The\",\"cat\",\"on\",\"the\",\"mat\"] "
-"distinct.add_inst(cand) print(distinct.score()) # 0.8333333333333334"
+#: of paddlenlp.metrics.distinct.Distinct:26
+msgid "Using as a general evaluation object."
 msgstr ""
 
-#: of paddlenlp.metrics.distinct.Distinct:34
+#: of paddlenlp.metrics.distinct.Distinct:38
 msgid "Using as an instance of `paddle.metric.Metric`."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.update:1
 msgid ""
-"Update the metrics states. This method firstly will use `trans_func` to "
-"process the `output` to get the tokenized candidate sentence list. Then "
-"call `add_inst` to process the candidate list one by one."
+"Updates the metrics states. This method firstly will use "
+":meth:`trans_func` method to process the `output` to get the tokenized "
+"candidate sentence list. Then call :meth:`add_inst` method to process the"
+" candidate list one by one."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.update:6
+msgid "The outputs of model."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.update:8
+msgid "The additional inputs."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.add_inst:1
-msgid "Update the states based on the candidate."
+msgid "Updates the states based on the candidate."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.add_inst:3
@@ -99,14 +113,39 @@ msgid "Tokenized candidate sentence generated by model."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.reset:1
-msgid "Reset states and result"
+msgid "Resets states and result."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.accumulate:1
-msgid "Calculate the final distinct metric."
+msgid "Calculates the final distinct score."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.accumulate
+#: paddlenlp.metrics.distinct.Distinct.name
+#: paddlenlp.metrics.distinct.Distinct.score
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.accumulate:3
+#: paddlenlp.metrics.distinct.Distinct.score:3
+msgid "The final distinct score."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.accumulate
+#: paddlenlp.metrics.distinct.Distinct.name
+#: paddlenlp.metrics.distinct.Distinct.score
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.score:1
+msgid "The function is the same as :meth:`accumulate` method."
 msgstr ""
 
 #: of paddlenlp.metrics.distinct.Distinct.name:1
-msgid "Returns metric name"
+msgid "Returns the metric name."
+msgstr ""
+
+#: of paddlenlp.metrics.distinct.Distinct.name:3
+msgid "The metric name."
 msgstr ""
 
