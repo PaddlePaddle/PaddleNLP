@@ -1,6 +1,7 @@
-paddlenlp
+datasets
+h5py
 multiprocess
 numpy
+paddlenlp
 scipy
 wandb
-h5py

@@ -23,9 +23,9 @@ import numpy as np
 import paddle
 import paddle.optimizer
 import paddle.static
-from paddle.io import DataLoader, BatchSampler
+from datasets import load_dataset
+from paddle.io import BatchSampler, DataLoader
 from paddlenlp.data import Dict, Stack
-from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import BertTokenizer, LinearDecayWithWarmup
 
@@ -59,61 +59,66 @@ def create_data_holder(args):
 
 
 def prepare_train_features(examples, tokenizer, args):
+    # Some of the questions have lots of whitespace on the left, which is not useful and will make the
+    # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
+    # left whitespace
+    contexts = examples['context']
+    questions = examples['question']
+
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
-    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    contexts = [examples[i]['context'] for i in range(len(examples))]
-    questions = [examples[i]['question'] for i in range(len(examples))]
-
     tokenized_examples = tokenizer(
         questions,
         contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length,
+        stride=128,
+        max_seq_len=args.seq_len,
         pad_to_max_seq_len=True,
         return_position_ids=True,
         return_token_type_ids=True,
         return_attention_mask=True,
         return_length=True)
 
+    # Since one example might give us several features if it has a long context, we need a map from a feature to
+    # its corresponding example. This key gives us just that.
+    sample_mapping = tokenized_examples.pop("overflow_to_sample")
+    # The offset mappings will give us a map from token to character position in the original context. This will
+    # help us compute the start_positions and end_positions.
+    offset_mapping = tokenized_examples.pop("offset_mapping")
+
     # Let's label those examples!
-    for i, tokenized_example in enumerate(tokenized_examples):
+    tokenized_examples["start_positions"] = []
+    tokenized_examples["end_positions"] = []
+    tokenized_examples["input_mask"] = []
+
+    for i, offsets in enumerate(offset_mapping):
         # We will label impossible answers with the index of the CLS token.
-        input_ids = tokenized_example["input_ids"]
+        input_ids = tokenized_examples["input_ids"][i]
         cls_index = input_ids.index(tokenizer.cls_token_id)
 
-        # The offset mappings will give us a map from token to character position in the original context. This will
-        # help us compute the start_positions and end_positions.
-        offsets = tokenized_example['offset_mapping']
-
-        # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_example['token_type_ids']
-
-        # One example can give several spans, this is the index of the example containing this span of text.
-        sample_index = tokenized_example['overflow_to_sample']
-        answers = examples[sample_index]['answers']
-        answer_starts = examples[sample_index]['answer_starts']
+        sequence_ids = tokenized_examples['token_type_ids'][i]
 
         # attention_mask to input_mask
         input_mask = (
-            np.asarray(tokenized_examples[i]["attention_mask"]) - 1) * 1e3
+            np.asarray(tokenized_examples["attention_mask"][i]) - 1) * 1e3
         input_mask = np.expand_dims(input_mask, axis=(0, 1))
         if args.ipu_enable_fp16:
             input_mask = input_mask.astype(np.float16)
         else:
             input_mask = input_mask.astype(np.float32)
-        tokenized_examples[i]["input_mask"] = input_mask
+        tokenized_examples["input_mask"].append(input_mask)
 
+        # One example can give several spans, this is the index of the example containing this span of text.
+        sample_index = sample_mapping[i]
+        answers = examples['answers'][sample_index]
         # If no answers are given, set the cls_index as answer.
-        if len(answer_starts) == 0:
-            tokenized_examples[i]["start_positions"] = cls_index
-            tokenized_examples[i]["end_positions"] = cls_index
+        if len(answers["answer_start"]) == 0:
+            tokenized_examples["start_positions"].append(cls_index)
+            tokenized_examples["end_positions"].append(cls_index)
         else:
             # Start/end character index of the answer in the text.
-            start_char = answer_starts[0]
-            end_char = start_char + len(answers[0])
+            start_char = answers["answer_start"][0]
+            end_char = start_char + len(answers["text"][0])
 
             # Start token index of the current span in the text.
             token_start_index = 0
@@ -124,24 +129,24 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index = len(input_ids) - 1
             while sequence_ids[token_end_index] != 1:
                 token_end_index -= 1
-            # Minus one more to reach actual text
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             if not (offsets[token_start_index][0] <= start_char and
                     offsets[token_end_index][1] >= end_char):
-                tokenized_examples[i]["start_positions"] = cls_index
-                tokenized_examples[i]["end_positions"] = cls_index
+                tokenized_examples["start_positions"].append(cls_index)
+                tokenized_examples["end_positions"].append(cls_index)
             else:
                 # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
                 # Note: we could go after the last offset if the answer is the last word (edge case).
                 while token_start_index < len(offsets) and offsets[
                         token_start_index][0] <= start_char:
                     token_start_index += 1
-                tokenized_examples[i]["start_positions"] = token_start_index - 1
+                tokenized_examples["start_positions"].append(token_start_index -
+                                                             1)
                 while offsets[token_end_index][1] >= end_char:
                     token_end_index -= 1
-                tokenized_examples[i]["end_positions"] = token_end_index + 1
+                tokenized_examples["end_positions"].append(token_end_index + 1)
 
     return tokenized_examples
 
@@ -152,74 +157,73 @@ def prepare_validation_features(examples, tokenizer, args):
     # context that overlaps a bit the context of the previous feature.
     #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    contexts = [examples[i]['context'] for i in range(len(examples))]
-    questions = [examples[i]['question'] for i in range(len(examples))]
-
+    contexts = examples['context']
+    questions = examples['question']
     tokenized_examples = tokenizer(
         questions,
         contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length,
+        stride=128,
+        max_seq_len=args.seq_len,
         pad_to_max_seq_len=True,
         return_position_ids=True,
         return_token_type_ids=True,
-        return_attention_mask=True)
+        return_attention_mask=True,
+        return_length=True)
 
-    # For validation, there is no need to compute start and end positions
-    for i, tokenized_example in enumerate(tokenized_examples):
+    # Since one example might give us several features if it has a long context, we need a map from a feature to
+    # its corresponding example. This key gives us just that.
+    sample_mapping = tokenized_examples.pop("overflow_to_sample")
+
+    # For evaluation, we will need to convert our predictions to substrings of the context, so we keep the
+    # corresponding example_id and we will store the offset mappings.
+    tokenized_examples["example_id"] = []
+    tokenized_examples["input_mask"] = []
+
+    for i in range(len(tokenized_examples["input_ids"])):
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_example['token_type_ids']
+        input_ids = tokenized_examples["input_ids"][i]
+        sequence_A_lengths = input_ids.index(tokenizer.sep_token_id) + 2
+        sequence_B_lengths = len(input_ids) - sequence_A_lengths
+        sequence_ids = [0] * sequence_A_lengths + [1] * sequence_B_lengths
+        context_index = 1
 
         # One example can give several spans, this is the index of the example containing this span of text.
-        sample_index = tokenized_example['overflow_to_sample']
-        tokenized_examples[i]["example_id"] = examples[sample_index]['id']
+        sample_index = sample_mapping[i]
+        tokenized_examples["example_id"].append(examples["id"][sample_index])
 
         # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
         # position is part of the context or not.
-        tokenized_examples[i]["offset_mapping"] = [
-            (o if sequence_ids[k] == 1 else None)
-            for k, o in enumerate(tokenized_example["offset_mapping"])
+        tokenized_examples["offset_mapping"][i] = [
+            (o if sequence_ids[k] == context_index else None)
+            for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 
         # attention_mask to input_mask
         input_mask = (
-            np.asarray(tokenized_examples[i]["attention_mask"]) - 1) * 1e3
+            np.asarray(tokenized_examples["attention_mask"][i]) - 1) * 1e3
         input_mask = np.expand_dims(input_mask, axis=(0, 1))
         if args.ipu_enable_fp16:
             input_mask = input_mask.astype(np.float16)
         else:
             input_mask = input_mask.astype(np.float32)
-        tokenized_examples[i]["input_mask"] = input_mask
+        tokenized_examples["input_mask"].append(input_mask)
 
     return tokenized_examples
 
 
 def load_squad_dataset(args):
-    args.max_seq_length = args.seq_len
-    args.doc_stride = 128
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    if args.is_training:
-        cache_file = f'squad_train_v1.{args.max_seq_length}.cache'
-    else:
-        cache_file = f'squad_dev_v1.{args.max_seq_length}.cache'
     features_fn = prepare_train_features if args.is_training else prepare_validation_features
-    if os.path.exists(cache_file):
-        logging.info(f"loading cache {cache_file}")
-        with open(cache_file, "rb") as f:
-            dataset = pickle.load(f)
+    if args.is_training:
+        raw_dataset = load_dataset('squad', split='train')
     else:
-        logging.info(f"loading squad dataset, it will take a few minutes")
-        if args.is_training:
-            dataset = load_dataset('squad', splits='train_v1')
-        else:
-            dataset = load_dataset('squad', splits='dev_v1')
-        dataset.map(partial(
-            features_fn, tokenizer=tokenizer, args=args),
-                    batched=True,
-                    num_workers=20)
-        logging.info(f"saving cache to {cache_file}")
-        with open(cache_file, "wb") as f:
-            pickle.dump(dataset, f)
+        raw_dataset = load_dataset('squad', split='validation')
+    column_names = raw_dataset.column_names
+    dataset = raw_dataset.map(partial(
+        features_fn, tokenizer=tokenizer, args=args),
+                              batched=True,
+                              remove_columns=column_names,
+                              num_proc=4)
 
     bs = args.micro_batch_size * args.grad_acc_factor * args.batches_per_step * args.num_replica
     args.batch_size = bs
@@ -251,7 +255,7 @@ def load_squad_dataset(args):
         batch_sampler=train_batch_sampler,
         collate_fn=collate_fn,
         return_list=True)
-    return data_loader
+    return raw_dataset, data_loader
 
 
 def main(args):
@@ -311,7 +315,7 @@ def main(args):
                                         end_labels)
 
     # load squad dataset
-    data_loader = load_squad_dataset(args)
+    raw_dataset, data_loader = load_squad_dataset(args)
 
     total_samples = len(data_loader.dataset)
     max_steps = total_samples // args.batch_size * args.epochs
@@ -476,17 +480,17 @@ def main(args):
 
         # evaluate results
         all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
-            data_loader.dataset.data, data_loader.dataset.new_data,
+            raw_dataset, data_loader.dataset,
             (all_start_logits, all_end_logits))
+        squad_evaluate(
+            examples=[raw_data for raw_data in raw_dataset],
+            preds=all_predictions,
+            na_probs=scores_diff_json)
         # write results to file
         with open('squad_prediction.json', "w", encoding='utf-8') as writer:
             writer.write(
                 json.dumps(
                     all_predictions, ensure_ascii=False, indent=4) + "\n")
-        squad_evaluate(
-            examples=data_loader.dataset.data,
-            preds=all_predictions,
-            na_probs=scores_diff_json)
 
 
 if __name__ == "__main__":
