@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "fastertransformer/gpt.h"
-#include "fastertransformer/open_decoder.h"
-#include "fastertransformer/utils/common.h"
+// #include "fastertransformer/gpt.h"
+// #include "fastertransformer/open_decoder.h"
+// #include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
@@ -49,4 +49,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
     const int& bos_id,
     const int& eos_id,
     const float& temperature,
-    const bool& use_fp16);
+    const bool& use_fp16,
+    const int& tensor_para_size,
+    const int& layer_para_size,
+    const int& layer_para_batch_size);

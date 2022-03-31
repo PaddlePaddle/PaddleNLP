@@ -273,6 +273,10 @@ Transformer预训练模型汇总
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
 |                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-health-chinese``                                                          | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 102M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese medical corpus.      |
+|                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |                    |``junnyu/hfl-chinese-electra-180g-base-discriminator``                            | Chinese      | Discriminator, 12-layer, 768-hidden,    |
 |                    |                                                                                  |              | 12-heads, 102M parameters.              |
 |                    |                                                                                  |              | Trained on 180g Chinese text.           |
@@ -329,6 +333,11 @@ Transformer预训练模型汇总
 |ERNIE-GRAM_         |``ernie-gram-zh``                                                                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                                                                  |              | 12-heads, 108M parameters.              |
 |                    |                                                                                  |              | Trained on Chinese text.                |
++                    +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-gram-zh-finetuned-dureader-robust``                                       | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                                                                  |              | 12-heads, 108M parameters.              |
+|                    |                                                                                  |              | Trained on Chinese text.                |
+|                    |                                                                                  |              | Then finetuned on dreader-robust        |
 +--------------------+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |GPT_                |``gpt-cpm-large-cn``                                                              | Chinese      | 32-layer, 2560-hidden,                  |
 |                    |                                                                                  |              | 32-heads, 2.6B parameters.              |
@@ -853,3 +862,4 @@ Reference
 - Bao, Siqi, et al. "Plato-2: Towards building an open-domain chatbot via curriculum learning." arXiv preprint arXiv:2006.16779 (2020).
 - Yang, Zhilin, et al. "Xlnet: Generalized autoregressive pretraining for language understanding." arXiv preprint arXiv:1906.08237 (2019).
 - Cui, Yiming, et al. "Pre-training with whole word masking for chinese bert." arXiv preprint arXiv:1906.08101 (2019).
+- Wang, Quan, et al. “Building Chinese Biomedical Language Models via Multi-Level Text Discrimination.” arXiv preprint arXiv:2110.07244 (2021).

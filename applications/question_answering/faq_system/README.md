@@ -269,6 +269,9 @@ python vector_insert.py
 
 ### Paddle Serving 部署
 
+Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，安装完依赖后就可以执行下面的步骤。
+
+
 首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
 
 ```
@@ -353,4 +356,4 @@ Search milvus time cost is 0.004535675048828125 seconds
 华新镇“亮牌分批复工”工作方案具体内容是什么？    所有店铺一律先贴“红牌”禁止经营，经相关部门审批後，再换贴“蓝牌”准许复工。 0.7162970900535583
 .....
 ```
-输出的结果包括特征提取和检索的时间，还包含检索出来的问答对，
+输出的结果包括特征提取和检索的时间，还包含检索出来的问答对。
