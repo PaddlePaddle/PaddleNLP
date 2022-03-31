@@ -18,7 +18,6 @@ import os
 import random
 import datasets
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
