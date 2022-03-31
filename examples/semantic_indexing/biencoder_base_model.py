@@ -66,7 +66,7 @@ class BiEncoderNllLoss(object):
              ctx_vectors,
              positive_idx_per_question,
              loss_scale=None):
-        scorces = paddle.matmul(q_vectors,paddle.transpose(ctx_vectors,[0,1]))#这里需要对照一下paddle和torch的算子的差异
+        scorces = paddle.matmul(q_vectors,paddle.transpose(ctx_vectors,[0,1]))
 
         if len(q_vectors.size()) > 1:
             q_num = q_vectors.size(0)
@@ -74,12 +74,12 @@ class BiEncoderNllLoss(object):
 
         softmax_scorces = F.log_softmax(scores,axis=1)
 
-        loss = F.nll_loss(softmax_scorces,paddle.to_tensor(positive_idx_per_question).todevice)#to_device这里需要修改
+        loss = F.nll_loss(softmax_scorces,paddle.to_tensor(positive_idx_per_question))
 
         max_score = paddle.max(softmax_scorces,axis=1)
-        correct_predictions_count = ()#需要修改
+        correct_predictions_count = (None)
 
         if loss_scale:
-            loss.mul_(loss_scale)#对照paddle
+            loss.mul_(loss_scale)
 
         return loss,correct_predictions_count
