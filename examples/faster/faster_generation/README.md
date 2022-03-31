@@ -146,10 +146,17 @@ outputs, _ = model.generate(
 完整的使用示例已在`gpt_mp_sample.py`中提供，按照如下方式启动即可：
 
 ```sh
-mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 2 --layer_para_size 2
+mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 4 --layer_para_size 1
 ```
 
-其中`-n 4`指明使用的进程和GPU数，`tensor_para_size`和`tensor_para_size`分别指明Tensor Parallel和Layer Parallel各自使用的GPU数。
+其中`-n 4`指明使用的进程和GPU数，`tensor_para_size`和`tensor_para_size`分别指明Tensor Parallel和Layer Parallel各自使用的GPU数，均设置为1则进行单卡预测。另外加上`--use_fp16`以使用FP16，加上`--profile`可以进行相应设置的性能测试。其他生成相关的参数设置释义如下：
+- `model_name` 指定使用的GPT模型，默认为[`gpt-cpm-larg-cn`](https://github.com/TsinghuaAI/CPM-1-Generate)。
+- `max_length` 指定生成的最大长度，默认为50。
+- `topk` 用于Top-K采样策略，采样时将只从概率最高K个token中采样，默认为1，即greedy search。
+- `topp` 用于Top-P采样策略，采样时将只从概率最高且累加概率不超过该值的token中采样，默认为1.0。
+- `temperature` 用于调整预测概率分布，默认为1.0，即保持模型原有的预测概率。
+
+使用`gpt-cpm-larg-cn`和默认设置，在V100上4卡Tensor Parallel较单卡高性能预测速度提升约40%。
 
 ## Generate Examples
 
