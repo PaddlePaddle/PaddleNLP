@@ -16,13 +16,15 @@ cd PaddleNLP/tests/
 
 # 准备数据
 
+无需额外准备数据，`${shell_name}.sh` 脚本里面已经加上了 prepare.sh 的调用。
+
 ```shell
 bash test_tipc/static/${model_item}/benchmark_common/prepare.sh
 ```
 
 # 运行模型
 
-## 单卡（自动运行打开Profiling）
+## 单卡
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
