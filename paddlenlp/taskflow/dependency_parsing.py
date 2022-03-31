@@ -192,6 +192,8 @@ class DDParserTask(Task):
         return inputs
 
     def from_segments(self, segmented_words):
+        # pos tag is not available for segmented inputs
+        self.use_pos = False
         segmented_words = self._check_segmented_words(segmented_words)
         inputs = {}
         inputs['words'] = segmented_words

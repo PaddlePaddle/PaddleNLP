@@ -1,0 +1,109 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.funnel.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.funnel.modeling.FunnelForQuestionAnswering:1
+#: paddlenlp.transformers.funnel.modeling.FunnelForSequenceClassification:1
+#: paddlenlp.transformers.funnel.modeling.FunnelForTokenClassification:1
+#: paddlenlp.transformers.funnel.modeling.FunnelModel:1
+msgid "基类：:class:`paddlenlp.transformers.funnel.modeling.FunnelPreTrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForSequenceClassification.forward:3
+msgid "labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, `optional`):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForSequenceClassification.forward:2
+msgid ""
+"Labels for computing the sequence classification/regression loss. Indices"
+" should be in :obj:`[0, ..., config.num_labels - 1]`. If "
+":obj:`config.num_labels == 1` a regression loss is computed (Mean-Square "
+"loss), If :obj:`config.num_labels > 1` a classification loss is computed "
+"(Cross-Entropy)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForTokenClassification.forward:2
+msgid ""
+"labels (:obj:`paddle.Tensor` of shape :obj:`(batch_size, "
+"sequence_length)`, `optional`):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForTokenClassification.forward:2
+msgid ""
+"Labels for computing the token classification loss. Indices should be in "
+"``[0, ..., config.num_labels - 1]``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForQuestionAnswering.forward:3
+msgid ""
+"start_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, "
+"`optional`):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForQuestionAnswering.forward:2
+msgid ""
+"Labels for position (index) of the start of the labelled span for "
+"computing the token classification loss. Positions are clamped to the "
+"length of the sequence (:obj:`sequence_length`). Position outside of the "
+"sequence are not taken into account for computing the loss."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForQuestionAnswering.forward:7
+msgid ""
+"end_positions (:obj:`paddle.Tensor` of shape :obj:`(batch_size,)`, "
+"`optional`):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.funnel.modeling.FunnelForQuestionAnswering.forward:6
+msgid ""
+"Labels for position (index) of the end of the labelled span for computing"
+" the token classification loss. Positions are clamped to the length of "
+"the sequence (:obj:`sequence_length`). Position outside of the sequence "
+"are not taken into account for computing the loss."
+msgstr ""
+
