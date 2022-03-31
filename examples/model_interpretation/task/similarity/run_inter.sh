@@ -24,8 +24,7 @@ if [[ $LANGUAGE == "ch" ]]; then
         #CKPT=pretrained_models/saved_model_ch/roberta_large_20211208_131546/model_22000/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
         FROM_PRETRAIN='skep_ernie_1.0_large_ch'
-        CKPT=simnet/checkpoints_ch_ori/final.pdparams
-        #CKPT=simnet/checkpoints_ch/final.pdparams
+        CKPT=simnet/checkpoints_ch/final.pdparams
     fi
 
 elif [[ $LANGUAGE == "en" ]]; then
@@ -39,8 +38,7 @@ elif [[ $LANGUAGE == "en" ]]; then
         #CKPT=pretrained_models/saved_model_en/roberta_large_20211208_131440/model_42000/model_state.pdparams
     elif [[ $BASE_MODEL == "lstm" ]]; then
         FROM_PRETRAIN='data/skep_ernie_1.0_large_ch'
-        CKPT=simnet/checkpoints_en_ori/final.pdparams
-        #CKPT=simnet/checkpoints_en/final.pdparams
+        CKPT=simnet/checkpoints_en/final.pdparams
     fi
 fi
 

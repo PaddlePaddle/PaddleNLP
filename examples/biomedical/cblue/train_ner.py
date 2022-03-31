@@ -23,13 +23,14 @@ parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning 
 parser.add_argument('--max_seq_length', default=128, type=int, help='The maximum total input sequence length after tokenization.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
 parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
-parser.add_argument('--save_steps', default=10000, type=int, help='The interval steps to save checkpoints.')
+parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay if we apply some.')
 parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion over the training process.')
 parser.add_argument('--use_amp', default=False, type=bool, help='Enable mixed precision training.')
 parser.add_argument('--epochs', default=1, type=int, help='Total number of training epochs.')
 parser.add_argument('--seed', default=1000, type=int, help='Random seed.')
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
+parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
 args = parser.parse_args()
 # yapf: enable
@@ -79,8 +80,9 @@ def do_train():
     train_ds, dev_ds = load_dataset('cblue', 'CMeEE', splits=['train', 'dev'])
 
     model = ElectraForBinaryTokenClassification.from_pretrained(
-        'ehealth-chinese', num_classes=[len(x) for x in train_ds.label_list])
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+        'ernie-health-chinese',
+        num_classes=[len(x) for x in train_ds.label_list])
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     label_list = train_ds.label_list
     pad_label_id = [len(label_list[0]) - 1, len(label_list[1]) - 1]
