@@ -78,7 +78,7 @@ msgstr ""
 
 #: ../../data_prepare/dataset_list.rst:14
 msgid "千言数据集：阅读理解，判断答案极性"
-msgstr "Thousand-word dateset: reading comprehension, answer judgement"
+msgstr "LUGE dateset: reading comprehension, answer judgement"
 
 #: ../../data_prepare/dataset_list.rst:14
 msgid "``paddlenlp.datasets.load_dataset('dureader_yesno')``"
@@ -94,7 +94,7 @@ msgstr ""
 
 #: ../../data_prepare/dataset_list.rst:16
 msgid "千言数据集：阅读理解，答案原文抽取"
-msgstr "Thousand-word dateset: reading comprehension, finding answers in the original text."
+msgstr "LUGE dateset: reading comprehension, finding answers in the original text."
 
 #: ../../data_prepare/dataset_list.rst:16
 msgid "``paddlenlp.datasets.load_dataset('dureader_robust')``"
