@@ -21,7 +21,7 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 ## Dataset
 
-1. Pretraining dataset
+- Pretraining dataset
 
    Wikipedia dataset is used to do pretraining. Please refer to the Wikipedia dataset generator provided by [Nvidia](https://github.com/NVIDIA/DeepLearningExamples.git) to generate pretraining dataset.
 
@@ -49,83 +49,94 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
    bash data/create_datasets_from_start.sh wiki_only
    ```
 
-2. SQuAD v1.1 dataset
+- SQuAD v1.1 dataset
 
-   paddlenlp will download SQuAD v1.1 dataset automatically. You don't have to download manually.
+   SQuAD v1.1 dataset will be downloaded automatically. You don't have to download manually.
 
 
 ## Quick Start Guide
 
 ### Prepare Project Environment
 
-PaddlePaddle with IPU implementation, which is provided by Graphcore, is required by this application. User can either download the released package or build it from source.
+- Create docker image
 
-#### Install PaddlePaddle IPU Package
-
-The released PaddlePaddle IPU package can be downloaded from https://github.com/graphcore/Paddle/releases/tag/bert-base-v0.1.
-
-#### Build PaddlePaddle From Source
-
-- Create Docker container
-
-```
-git clone -b bert_base_sdk_2.3.0 https://github.com/graphcore/Paddle.git
-
+```bash
+# clone paddle repo
+git clone https://github.com/paddlepaddle/Paddle.git
 cd Paddle
 
 # build docker image
-docker build -t paddlepaddle/paddle:ipu-dev-2.3.0 -f tools/dockerfile/Dockerfile.ipu .
+docker build -t paddlepaddle/paddle:latest-dev-ipu -f tools/dockerfile/Dockerfile.ipu .
+```
 
-# create container
-# The ipuof.conf is required here.
+- Create docker container
+
+```bash
+# clone paddlenlp repo
+git clone https://github.com/paddlepaddle/paddlenlp.git
+cd paddlenlp/examples/language_model/bert/static_ipu
+
+# create docker container
+# the ipuof configuration file need to be pre-generated and mounted to docker container
+# the environment variable IPUOF_CONFIG_PATH should point to the ipuof configuration file
+# more information on ipuof configuration is available at https://docs.graphcore.ai/projects/vipu-admin/en/latest/cli_reference.html?highlight=ipuof#ipuof-configuration-file
 docker run --ulimit memlock=-1:-1 --net=host --cap-add=IPC_LOCK \
---device=/dev/infiniband/ --ipc=host --name paddle-ipu-dev \
--v ${HOST_IPUOF_PATH}:/ipuof \
--e IPUOF_CONFIG_PATH=/ipuof/ipu.conf \
--it paddlepaddle/paddle:ipu-dev-2.3.0 bash
+--device=/dev/infiniband/ --ipc=host \
+--name paddle-bert-base \
+-v ${IPUOF_CONFIG_PATH}:/ipu.conf \
+-e IPUOF_CONFIG_PATH=/ipu.conf \
+-v ${PWD}:/workdir \
+-w /home -it paddlepaddle/paddle:latest-dev-ipu bash
 ```
 
 All of later processes are required to be executed in the container.
 
 - Compile and installation
 
-```
-git clone -b bert_base_sdk_2.3.0 https://github.com/graphcore/Paddle.git
-
+```bash
+# clone paddle repo
+git clone https://github.com/paddlepaddle/Paddle.git
 cd Paddle
 
-cmake -DPYTHON_EXECUTABLE=/usr/bin/python \
--DWITH_PYTHON=ON -DWITH_IPU=ON -DPOPLAR_DIR=/opt/poplar \
--DPOPART_DIR=/opt/popart -G "Unix Makefiles" -H`pwd` -B`pwd`/build
+mkdir build && cd build
 
-cmake --build `pwd`/build --config Release --target paddle_python -j$(nproc)
+# run cmake
+cmake .. -DWITH_IPU=ON -DWITH_PYTHON=ON -DPY_VERSION=3.7 -DWITH_MKL=ON \
+         -DPOPLAR_DIR=/opt/poplar -DPOPART_DIR=/opt/popart -DCMAKE_BUILD_TYPE=Release
 
-pip3.7 install -U build/python/dist/paddlepaddle-0.0.0-cp37-cp37m-linux_x86_64.whl
+# compile
+make paddle_python -j$(nproc)
+
+# install paddle package
+pip install -U python/dist/paddlepaddle-0.0.0-cp37-cp37m-linux_x86_64.whl
+
+# go to workdir
+cd /workdir
 ```
 
 ### Execution
 
 - Run pretraining phase1 (sequence_length = 128)
 
-```
+```bash
 ./run_pretrain.sh
 ```
 
 - Run pretraining phase2 (sequence_length = 384)
 
-```
+```bash
 ./run_pretrain_phase2.sh
 ```
 
 - Run SQuAD finetune task
 
-```
+```bash
 ./run_squad.sh
 ```
 
 - Run SQuAD validation
 
-```
+```bash
 ./run_squad_infer.sh
 ```
 

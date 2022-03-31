@@ -22,6 +22,7 @@ def load_custom_ops():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     custom_dir = cur_dir + "/custom_ops"
     sources = [
+        f"{custom_dir}/custom_shape_infer.cc",
         f"{custom_dir}/custom_checkpointoutput.cc",
         f"{custom_dir}/custom_detach.cc", f"{custom_dir}/custom_identity.cc",
         f"{custom_dir}/custom_nll_loss.cc",
@@ -30,18 +31,11 @@ def load_custom_ops():
         f"{custom_dir}/workarounds/prevent_const_expr_folding_op.cc",
         f"{custom_dir}/utils.cc"
     ]
-
-    if '2.5.0' in os.environ['POPLAR_SDK_ENABLED']:
-        build_dir = cur_dir + "/custom_ops_2.5"
-    else:
-        sources.append(f"{custom_dir}/custom_shape_infer.cc")
-        build_dir = custom_dir
-
     custom_ops = load(
         name="custom_ops",
         sources=sources,
         extra_cxx_cflags=['-DONNX_NAMESPACE=onnx'],
-        build_directory=build_dir, )
+        build_directory=custom_dir, )
     return custom_ops
 
 
