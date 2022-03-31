@@ -6,7 +6,10 @@ export CUDA_VISIBLE_DEVICES=7
 export PYTHONPATH=.:$PYTHONPATH
 
 LANGUAGE=ch                    # LANGUAGE choose in [ch, en]
-BASE_MODEL=roberta_large       # chooices [roberta_base, roberta_large]
+BASE_MODEL=roberta_base       # chooices [roberta_base, roberta_large]
+
+[ -d "logs" ] || mkdir -p "logs"
+set -x
 
 if [[ $LANGUAGE == "ch" ]]; then
     if [[ $BASE_MODEL == "roberta_base" ]]; then

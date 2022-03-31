@@ -26,11 +26,10 @@ from paddle.metric import Accuracy
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer, LinearDecayWithWarmup
+from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.metrics import MultiLabelsMetric, AccuracyAndF1
-from paddlenlp.ops.optimizer import ExponentialMovingAverage
 
-from utils import convert_example, create_dataloader
+from utils import convert_example, create_dataloader, LinearDecayWithWarmup
 
 METRIC_CLASSES = {
     'KUAKE-QIC': Accuracy,
@@ -58,7 +57,6 @@ parser.add_argument('--logging_steps', default=10, type=int, help='The interval 
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
 parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--use_ema', default=False, type=bool, help='Use exponential moving average for evaluation.')
 parser.add_argument('--use_amp', default=False, type=distutils.util.strtobool, help='Enable mixed precision training.')
 parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
@@ -121,10 +119,10 @@ def do_train():
         'cblue', args.dataset, splits=['train', 'dev'])
 
     model = ElectraForSequenceClassification.from_pretrained(
-        'ehealth-chinese',
+        'ernie-health-chinese',
         num_classes=len(train_ds.label_list),
         activation='tanh')
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     trans_func = partial(
         convert_example,
@@ -185,9 +183,6 @@ def do_train():
         metric_name = 'micro f1'
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-    if args.use_ema and rank == 0:
-        ema = ExponentialMovingAverage(model)
-        ema.register()
     global_step = 0
     tic_train = time.time()
     total_train_time = 0
@@ -196,7 +191,9 @@ def do_train():
             input_ids, token_type_ids, position_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                    custom_white_list=[
+                        'layer_norm', 'softmax', 'gelu', 'tanh'
+                    ], ):
                 logits = model(input_ids, token_type_ids, position_ids)
                 loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
@@ -217,8 +214,6 @@ def do_train():
                 loss.backward()
                 optimizer.step()
             lr_scheduler.step()
-            if args.use_ema and rank == 0:
-                ema.update()
             optimizer.clear_grad()
 
             global_step += 1
@@ -232,12 +227,7 @@ def do_train():
                 tic_train = time.time()
 
             if global_step % args.valid_steps == 0 and rank == 0:
-                if args.use_ema:
-                    ema.apply_shadow()
-                    evaluate(model, criterion, metric, dev_data_loader)
-                    ema.restore()
-                else:
-                    evaluate(model, criterion, metric, dev_data_loader)
+                evaluate(model, criterion, metric, dev_data_loader)
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0 and rank == 0:
@@ -250,7 +240,7 @@ def do_train():
                     model.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
-    if rank == 0:
+    if rank == 0 and total_train_time > 0:
         print('Speed: %.2f steps/s' % (global_step / total_train_time))
 
 
