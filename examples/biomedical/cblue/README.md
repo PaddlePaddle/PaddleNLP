@@ -58,7 +58,7 @@ pip install xlrd==1.2.0
 
 | Task      | epochs | batch_size | learning_rate | max_seq_length |  metric  | results | results (fp16) |
 | --------- | :----: | :--------: | :-----------: | :------------: | :------: | :-----: | :------------: |
-| CHIP-STS  |    4   |     16     |      1e-4     |       96       | Macro-F1 | 0.88550 |    0.85649     |
+| CHIP-STS  |    4   |     16     |      3e-5     |       96       | Macro-F1 | 0.88749 |    0.88555     |
 | CHIP-CTC  |    4   |     32     |      6e-5     |      160       | Macro-F1 | 0.84136 |    0.83514     |
 | CHIP-CDN  |   16   |    256     |      3e-5     |       32       |    F1    | 0.76979 |    0.76489     |
 | KUAKE-QQR |    2   |     32     |      6e-5     |       64       | Accuracy | 0.83865 |    0.84053     |
