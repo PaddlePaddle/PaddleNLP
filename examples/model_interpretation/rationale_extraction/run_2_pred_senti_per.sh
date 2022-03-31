@@ -26,8 +26,7 @@ do
             #CKPT=../../../${TASK}/pretrained_models/saved_model_en/roberta_large_20211207_174631/model_4000/model_state.pdparams
         elif [[ $BASE_MODEL == "lstm" ]]; then
             VOCAB_PATH=../task/${TASK}/rnn/vocab.sst2_train
-            CKPT=../task/${TASK}/rnn/checkpoints_en_ori/final.pdparams
-            #CKPT=../../../${TASK}/rnn/checkpoints_en/final.pdparams
+            CKPT=../task/${TASK}/rnn/checkpoints_en/final.pdparams
         fi
 
     elif [[ $LANGUAGE == "ch" ]]; then
@@ -42,8 +41,7 @@ do
             #CKPT=../../../${TASK}/pretrained_models/saved_model_ch/roberta_large_20211207_143351/model_900/model_state.pdparams
         elif [[ $BASE_MODEL == "lstm" ]]; then
             VOCAB_PATH=../task/${TASK}/rnn
-            CKPT=../task/${TASK}/rnn/checkpoints_ch_ori/final.pdparams
-            #CKPT=../../../${TASK}/rnn/checkpoints_ch/final.pdparams
+            CKPT=../task/${TASK}/rnn/checkpoints_ch/final.pdparams
         fi
     fi
 
