@@ -276,7 +276,6 @@ def do_train():
                 tokenizer.save_pretrained(save_dir)
 
             if args.max_steps > 0 and global_step >= args.max_steps:
-                del train_data_loader
                 return
             tic_train = time.time()
 
