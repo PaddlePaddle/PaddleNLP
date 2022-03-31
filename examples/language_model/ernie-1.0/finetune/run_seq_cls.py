@@ -25,10 +25,12 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.metric import Accuracy
-
 import paddlenlp
-from paddlenlp.trainer import (PdArgumentParser, TrainingArguments, Trainer)
 from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    TrainingArguments,
+    Trainer, )
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification, )

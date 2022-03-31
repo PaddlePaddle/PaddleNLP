@@ -20,25 +20,22 @@ import distutils.util
 import os.path as osp
 from typing import Optional
 
+from datasets import load_metric, load_dataset
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from datasets import load_metric, load_dataset
-
 import paddlenlp
+from paddlenlp.metrics.squad import compute_prediction
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-
-# from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering, )
 from paddlenlp.utils.log import logger
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
 sys.path.insert(0, os.path.abspath("."))
 from question_answering import (
@@ -47,7 +44,6 @@ from question_answering import (
     prepare_train_features,
     prepare_validation_features,
     qa_collator, )
-
 from utils import (
     ALL_DATASETS,
     DataTrainingArguments,

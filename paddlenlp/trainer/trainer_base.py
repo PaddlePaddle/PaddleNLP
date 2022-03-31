@@ -829,10 +829,7 @@ class Trainer:
         """
         if self.criterion is not None and "labels" in inputs:
             labels = inputs.pop("labels")
-        else:
-            labels = None
-
-        if self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
+        elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
             labels = (inputs.pop("start_positions"),
                       inputs.pop("end_positions"))
         else:
