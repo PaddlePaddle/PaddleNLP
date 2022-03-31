@@ -19,37 +19,37 @@ msgstr ""
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.data"
-msgstr ""
+msgstr "paddlenlp.data"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.datasets"
-msgstr ""
+msgstr "paddlenlp.datasets"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.embeddings"
-msgstr ""
+msgstr "paddlenlp.embeddings"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.layers"
-msgstr ""
+msgstr "paddlenlp.layers"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.metrics"
-msgstr ""
+msgstr "paddlenlp.metrics"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.seq2vec"
-msgstr ""
+msgstr "paddlenlp.seq2vec"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.transformers"
-msgstr ""
+msgstr "paddlenlp.transformers"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp.utils"
-msgstr ""
+msgstr "paddlenlp.utils"
 
 #: ../../api_reference.rst:5
 msgid "paddlenlp"
-msgstr ""
+msgstr "paddlenlp"
 

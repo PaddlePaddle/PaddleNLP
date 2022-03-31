@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.embeddings.constant.rst:2
 msgid "constant"
-msgstr ""
+msgstr "constant"
 

@@ -19,33 +19,35 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.chnsenticorp.rst:2
 msgid "chnsenticorp"
-msgstr ""
+msgstr "chnsenticorp"
 
 #: of paddlenlp.datasets.chnsenticorp.ChnSentiCorp:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.chnsenticorp.ChnSentiCorp:1
 msgid ""
 "ChnSentiCorp (by Tan Songbo at ICT of Chinese Academy of Sciences, and "
 "for opinion mining)"
 msgstr ""
+"ChnSentiCorp (by Tan Songbo at ICT of Chinese Academy of Sciences, and "
+"for opinion mining)"
 
 #: of paddlenlp.datasets.chnsenticorp.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of
 #: paddlenlp.datasets.chnsenticorp.ChnSentiCorp.META_INFO.file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of
 #: paddlenlp.datasets.chnsenticorp.ChnSentiCorp.META_INFO.md5:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 
 #: of paddlenlp.datasets.chnsenticorp.ChnSentiCorp.get_labels:1
 msgid "Return labels of the ChnSentiCorp object."
-msgstr ""
+msgstr "Return labels of the ChnSentiCorp object."
 

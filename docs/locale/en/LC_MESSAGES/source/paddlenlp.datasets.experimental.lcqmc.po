@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.lcqmc.rst:2
 msgid "lcqmc"
-msgstr ""
+msgstr "lcqmc"
 

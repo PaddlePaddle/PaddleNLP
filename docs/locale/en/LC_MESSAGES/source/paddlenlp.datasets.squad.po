@@ -19,25 +19,25 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.squad.rst:2
 msgid "squad"
-msgstr ""
+msgstr "squad"
 
 #: of paddlenlp.datasets.squad.SQuAD:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.squad.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple"
 
 #: ../../docstring of paddlenlp.datasets.squad.SQuAD.META_INFO.URL:1
 msgid "Alias for field number 2"
-msgstr ""
+msgstr "Alias for field number 2"
 
 #: ../../docstring of paddlenlp.datasets.squad.SQuAD.META_INFO.file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of paddlenlp.datasets.squad.SQuAD.META_INFO.md5:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 

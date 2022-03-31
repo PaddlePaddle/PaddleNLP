@@ -19,7 +19,7 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.electra.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:1
 #: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:1
@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator:1
 #: paddlenlp.transformers.electra.modeling.ElectraModel:1
 msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:1
@@ -43,6 +43,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward
 #: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward
@@ -53,7 +55,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:4
@@ -65,7 +67,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward:4
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:6
@@ -77,39 +79,41 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward:6
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
 msgid ""
 "An abstract class to handle weights initialization and a simple interface"
 " for downloading and loading pretrained models."
 msgstr ""
+"An abstract class to handle weights initialization and a simple interface"
+" for downloading and loading pretrained models."
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.init_weights:1
 msgid "Initializes and tie weights if needed."
-msgstr ""
+msgstr "Initializes and tie weights if needed."
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.tie_weights:1
 msgid "Tie the weights between the input embeddings and the output embeddings."
-msgstr ""
+msgstr "Tie the weights between the input embeddings and the output embeddings."
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.get_discriminator_inputs:1
 msgid "Sample from the generator to create discriminator input."
-msgstr ""
+msgstr "Sample from the generator to create discriminator input."
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
 msgid "Head for sentence-level classification tasks."
-msgstr ""
+msgstr "Head for sentence-level classification tasks."
 

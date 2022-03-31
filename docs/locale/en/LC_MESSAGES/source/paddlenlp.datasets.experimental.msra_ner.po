@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.msra_ner.rst:2
 msgid "msra\\_ner"
-msgstr ""
+msgstr "msra\\_ner"
 

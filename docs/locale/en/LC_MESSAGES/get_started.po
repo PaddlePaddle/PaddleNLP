@@ -19,21 +19,21 @@ msgstr ""
 
 #: ../../get_started.rst:7
 msgid "安装"
-msgstr ""
+msgstr "Installation"
 
 #: ../../get_started.rst:7
 msgid "10分钟完成高精度中文情感分析"
-msgstr ""
+msgstr "Complete high-precision Chinese sentiment analysis in 10 minutes"
 
 #: ../../get_started.rst:3
 msgid "安装、快速开始"
-msgstr ""
+msgstr "Installation, Quick Start "
 
 #: ../../get_started.rst:5
 msgid "快速上手PaddleNLP:"
-msgstr ""
+msgstr "Qucikly get started with PaddleNLP:"
 
 #: ../../get_started.rst:13
 msgid "以上简单地介绍了PaddleNLP的使用流程，更多的教程分析见 :doc:`/tutorials`"
-msgstr ""
+msgstr "The above briefly introduces the use process of PaddleNLP. Please refer to :doc:`/tutorials` for more tutorials. "
 

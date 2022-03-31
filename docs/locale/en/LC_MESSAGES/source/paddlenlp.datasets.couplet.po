@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.couplet.rst:2
 msgid "couplet"
-msgstr ""
+msgstr "couplet"
 
 #: of paddlenlp.datasets.couplet.Couplet:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.couplet.Couplet:1
 msgid ""
@@ -31,28 +31,31 @@ msgid ""
 "https://github.com/v-zich/couplet-clean-dataset, which filters dirty data"
 " from the original repository https://github.com/wb14123/couplet-dataset."
 msgstr ""
+"Couplet dataset. The couplet data is from this github repository: "
+"https://github.com/v-zich/couplet-clean-dataset, which filters dirty data"
+" from the original repository https://github.com/wb14123/couplet-dataset."
 
 #: of paddlenlp.datasets.couplet.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of paddlenlp.datasets.couplet.Couplet.META_INFO.src_file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of paddlenlp.datasets.couplet.Couplet.META_INFO.src_md5:1
 msgid "Alias for field number 2"
-msgstr ""
+msgstr "Alias for field number 2"
 
 #: ../../docstring of paddlenlp.datasets.couplet.Couplet.META_INFO.tgt_file:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 
 #: ../../docstring of paddlenlp.datasets.couplet.Couplet.META_INFO.tgt_md5:1
 msgid "Alias for field number 3"
-msgstr ""
+msgstr "Alias for field number 3"
 
 #: of paddlenlp.datasets.couplet.Couplet.get_vocab:1
 msgid "Return vocab file path of the dataset if specified."
-msgstr ""
+msgstr "Return vocab file path of the dataset if specified."
 

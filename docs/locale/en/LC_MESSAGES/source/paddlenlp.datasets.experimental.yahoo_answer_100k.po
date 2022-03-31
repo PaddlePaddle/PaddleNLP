@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.yahoo_answer_100k.rst:2
 msgid "yahoo\\_answer\\_100k"
-msgstr ""
+msgstr "yahoo\\_answer\\_100k"
 

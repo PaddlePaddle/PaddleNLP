@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.embeddings.rst:2
 msgid "paddlenlp.embeddings"
-msgstr ""
+msgstr "paddlenlp.embeddings"
 

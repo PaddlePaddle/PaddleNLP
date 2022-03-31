@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.transformer.rst:2
 msgid "transformer"
-msgstr ""
+msgstr "transformer"
 

@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.unified_transformer.rst:2
 msgid "unified\\_transformer"
-msgstr ""
+msgstr "unified\\_transformer"
 

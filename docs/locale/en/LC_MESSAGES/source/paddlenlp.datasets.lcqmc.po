@@ -19,31 +19,33 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.lcqmc.rst:2
 msgid "lcqmc"
-msgstr ""
+msgstr "lcqmc"
 
 #: of paddlenlp.datasets.lcqmc.LCQMC:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.lcqmc.LCQMC:1
 msgid ""
 "LCQMC:A Large-scale Chinese Question Matching Corpus More information "
 "please refer to `https://www.aclweb.org/anthology/C18-1166/`"
 msgstr ""
+"LCQMC:A Large-scale Chinese Question Matching Corpus More information "
+"please refer to `https://www.aclweb.org/anthology/C18-1166/`"
 
 #: of paddlenlp.datasets.lcqmc.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of paddlenlp.datasets.lcqmc.LCQMC.META_INFO.file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of paddlenlp.datasets.lcqmc.LCQMC.META_INFO.md5:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 
 #: of paddlenlp.datasets.lcqmc.LCQMC.get_labels:1
 msgid "Return labels of the LCQMC object."
-msgstr ""
+msgstr "Return labels of the LCQMC object."
 

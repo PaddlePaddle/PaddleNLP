@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../model_zoo/transformer.rst:3
 msgid "Transformer预训练模型"
-msgstr ""
+msgstr "Transformer Per-Trained Model"
 
 #: ../../model_zoo/transformer.rst:5
 msgid "Transformer预训练模型："
-msgstr ""
+msgstr "Transformer Per-Trained Model:"
 

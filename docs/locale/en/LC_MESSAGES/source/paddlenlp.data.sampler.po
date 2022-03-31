@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.data.sampler.rst:2
 msgid "sampler"
-msgstr ""
+msgstr "sampler"
 
 #: of paddlenlp.data.sampler.SamplerHelper:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class: :class:`object`"
 
 #: of paddlenlp.data.sampler.SamplerHelper:1
 msgid ""
@@ -37,31 +37,42 @@ msgid ""
 "with a iterable dataset. .. note:: The :meth:`__len__` method isn't "
 "strictly required by"
 msgstr ""
+"SamplerHelper is to help construct iterable sampler used for "
+"`DataLoader`. It wraps a dataset and uses its :code:`__getitem__` Every "
+"SamplerHelper subclass has to provide an :meth:`__iter__` method, "
+"providing a way to iterate over indices of dataset elements, and a "
+":meth:`__len__` method that returns the length of the returned iterators."
+" Also can be used as batch iterator instead of indices iterator when "
+"`iterator` yield samples rather than indices by initializing `iterator` "
+"with a iterable dataset. .. note:: The :meth:`__len__` method isn't "
+"strictly required by"
 
 #: of paddlenlp.data.sampler.SamplerHelper:10
 msgid ""
 ":class:`DataLoader`, but is expected in any calculation involving the "
 "length of a :class:`DataLoader`."
 msgstr ""
+":class:`DataLoader`, but is expected in any calculation involving the "
+"length of a :class:`DataLoader`."
 
 #: of paddlenlp.data.sampler.SamplerHelper
 #: paddlenlp.data.sampler.SamplerHelper.batch
 #: paddlenlp.data.sampler.SamplerHelper.shard
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 msgid "参数"
-msgstr ""
+msgstr "parameter"
 
 #: of paddlenlp.data.sampler.SamplerHelper:12
 msgid "Input dataset for SamplerHelper."
-msgstr ""
+msgstr "Input dataset for SamplerHelper."
 
 #: of paddlenlp.data.sampler.SamplerHelper:14
 msgid "Iterator of dataset. Default: None."
-msgstr ""
+msgstr "Iterator of dataset. Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.length:1
 msgid "Returns: the length of the SamplerHelper."
-msgstr ""
+msgstr "Returns: the length of the SamplerHelper."
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply:1
 msgid ""
@@ -69,6 +80,9 @@ msgid ""
 "and `shard`. :param fn: Transformations to be performed. It returns "
 "transformed iterable (and data_source). :type fn: callable"
 msgstr ""
+"Transformations would be performed. It includes `Shuffle`, `sort`, `fit` "
+"and `shard`. :param fn: Transformations to be performed. It returns "
+"transformed iterable (and data_source). :type fn: callable"
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply
 #: paddlenlp.data.sampler.SamplerHelper.batch
@@ -76,15 +90,15 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 #: paddlenlp.data.sampler.SamplerHelper.sort
 msgid "返回"
-msgstr ""
+msgstr "return"
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply:5
 msgid "A new transformed object."
-msgstr ""
+msgstr "A new transformed object."
 
 #: of paddlenlp.data.sampler.SamplerHelper.apply
 msgid "返回类型"
-msgstr ""
+msgstr "return type"
 
 #: of paddlenlp.data.sampler.SamplerHelper.shuffle:1
 msgid ""
@@ -92,21 +106,24 @@ msgid ""
 ":param buffer_size: Buffer size for shuffle. if buffer_size < 0 or more "
 "than the length of the dataset,"
 msgstr ""
+"Shuffle the dataset according to the given buffer size and random seed. "
+":param buffer_size: Buffer size for shuffle. if buffer_size < 0 or more "
+"than the length of the dataset,"
 
 #: of paddlenlp.data.sampler.SamplerHelper.shuffle:3
 msgid "buffer_size is the length of the dataset. Default: -1."
-msgstr ""
+msgstr "buffer_size is the length of the dataset. Default: -1."
 
 #: of paddlenlp.data.sampler.SamplerHelper.shuffle:5
 msgid "Seed for the random. Default: None."
-msgstr ""
+msgstr "Seed for the random. Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:20
 #: paddlenlp.data.sampler.SamplerHelper.shard:9
 #: paddlenlp.data.sampler.SamplerHelper.shuffle:8
 #: paddlenlp.data.sampler.SamplerHelper.sort:12
 msgid "SamplerHelper"
-msgstr ""
+msgstr "SamplerHelper"
 
 #: of paddlenlp.data.sampler.SamplerHelper.sort:1
 msgid ""
@@ -118,10 +135,17 @@ msgid ""
 "Buffer size for sort. If buffer_size < 0 or buffer_size is more than the "
 "length of the data,"
 msgstr ""
+"Sort samples according to given callable cmp or key. :param cmp: The "
+"function of comparison. Default: None. :type cmp: callable :param key: "
+"Return element to be compared. Default: None. :type key: callable :param "
+"reverse: If True, it means in descending order, and False means in "
+"ascending order. Default: False. :type reverse: bool :param buffer_size: "
+"Buffer size for sort. If buffer_size < 0 or buffer_size is more than the "
+"length of the data,"
 
 #: of paddlenlp.data.sampler.SamplerHelper.sort:9
 msgid "buffer_size will be set to the length of the data. Default: -1."
-msgstr ""
+msgstr "buffer_size will be set to the length of the data. Default: -1."
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:1
 msgid ""
@@ -129,10 +153,13 @@ msgid ""
 "batch_size: int :param drop_last: Whether to drop the last mini batch. "
 "Default:"
 msgstr ""
+"To produce a BatchSampler. :param batch_size: Batch size. :type "
+"batch_size: int :param drop_last: Whether to drop the last mini batch. "
+"Default:"
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:5
 msgid "False."
-msgstr ""
+msgstr "False."
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:7
 msgid ""
@@ -142,6 +169,11 @@ msgid ""
 "would used as argument size_so_far in `key`. If None, it would return the"
 " length of mini match. Default: None."
 msgstr ""
+"It accepts four arguments: index of data source, the length of minibatch,"
+" the size of minibatch so far and data source, and it returns the size of"
+" mini batch so far. Actually, the returned value can be anything and "
+"would used as argument size_so_far in `key`. If None, it would return the"
+" length of mini match. Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:14
 msgid ""
@@ -149,22 +181,29 @@ msgid ""
 "returns what to be compared with `batch_size`. If None, only the size of "
 "mini batch so far would be compared with `batch_size`. Default: None."
 msgstr ""
+"It accepts the size of minibatch so far and the length of minibatch, and "
+"returns what to be compared with `batch_size`. If None, only the size of "
+"mini batch so far would be compared with `batch_size`. Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.shard:1
 msgid ""
 "Operates slice using multi GPU. :param num_replicas: The number of "
 "training process, and is also the number of GPU cards used in training."
 msgstr ""
+"Operates slice using multi GPU. :param num_replicas: The number of "
+"training process, and is also the number of GPU cards used in training."
 
 #: of paddlenlp.data.sampler.SamplerHelper.shard:3
 msgid "Default: None."
-msgstr ""
+msgstr "Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.shard:5
 msgid ""
 "Number of training process. Equal to the value of the environment "
 "variable PADDLE_TRAINER_ID. Default: None."
 msgstr ""
+"Number of training process. Equal to the value of the environment "
+"variable PADDLE_TRAINER_ID. Default: None."
 
 #: of paddlenlp.data.sampler.SamplerHelper.list:1
 msgid ""
@@ -172,4 +211,7 @@ msgid ""
 " would fetch all contents at time, thus it can get accurate length. "
 ":returns: SamplerHelper"
 msgstr ""
+"Produce a sampler with a `listiterator` when calling `iter`. Since `list`"
+" would fetch all contents at time, thus it can get accurate length. "
+":returns: SamplerHelper"
 

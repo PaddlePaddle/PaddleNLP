@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.ext_op.rst:2
 msgid "paddlenlp.ext\\_op"
-msgstr ""
+msgstr "paddlenlp.ext\\_op"
 

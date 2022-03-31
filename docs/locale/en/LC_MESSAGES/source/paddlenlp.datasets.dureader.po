@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.dureader.rst:2
 msgid "dureader"
-msgstr ""
+msgstr "dureader"
 

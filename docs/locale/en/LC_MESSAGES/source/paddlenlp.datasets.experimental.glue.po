@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.glue.rst:2
 msgid "glue"
-msgstr ""
+msgstr "glue"
 

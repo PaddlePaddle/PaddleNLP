@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.data.tokenizer.rst:2
 msgid "tokenizer"
-msgstr ""
+msgstr "tokenizer"
 

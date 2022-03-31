@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.dureader_robust.rst:2
 msgid "dureader\\_robust"
-msgstr ""
+msgstr "dureader\\_robust"
 

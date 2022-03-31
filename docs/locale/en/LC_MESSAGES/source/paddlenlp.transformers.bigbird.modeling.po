@@ -19,13 +19,13 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.bigbird.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdModel:1
 msgid "基类：:class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:1
@@ -36,6 +36,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward
@@ -43,7 +45,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:4
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:4
@@ -51,7 +53,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:4
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:6
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:6
@@ -59,11 +61,11 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:6
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
 msgid ""
@@ -73,14 +75,19 @@ msgid ""
 "`base_model_prefix` for downloading and loading pretrained models. See "
 "`PretrainedModel` for more details."
 msgstr ""
+"An abstract class for pretrained BigBird models. It provides BigBird "
+"related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
 
 #: of
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel.init_weights:1
 msgid "Initialization hook"
-msgstr ""
+msgstr "Initialization hook"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 

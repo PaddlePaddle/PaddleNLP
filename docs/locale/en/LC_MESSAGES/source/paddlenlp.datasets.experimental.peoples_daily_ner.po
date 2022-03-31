@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.peoples_daily_ner.rst:2
 msgid "peoples\\_daily\\_ner"
-msgstr ""
+msgstr "peoples\\_daily\\_ner"
 

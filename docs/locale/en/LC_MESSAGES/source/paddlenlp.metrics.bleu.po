@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.metrics.bleu.rst:2
 msgid "bleu"
-msgstr ""
+msgstr "bleu"
 
 #: of paddlenlp.metrics.bleu.BLEU:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class: :class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.bleu.BLEU:1
 msgid ""
@@ -32,6 +32,10 @@ msgid ""
 "language to another. This metric uses a modified form of precision to "
 "compare a candidate translation against multiple reference translations."
 msgstr ""
+"BLEU (bilingual evaluation understudy) is an algorithm for evaluating the"
+" quality of text which has been machine-translated from one natural "
+"language to another. This metric uses a modified form of precision to "
+"compare a candidate translation against multiple reference translations."
 
 #: of paddlenlp.metrics.bleu.BLEU:6
 msgid ""
@@ -45,6 +49,15 @@ msgid ""
 " the BLEU calculated in prediction, and it is only for observation during"
 " training and evaluation."
 msgstr ""
+"BLEU could be used as `paddle.metric.Metric` class, or an ordinary class."
+" When BLEU is used as `paddle.metric.Metric` class. A function is needed "
+"that transforms the network output to reference string list, and "
+"transforms the label to candidate string. By default, a default function "
+"`default_trans_func` is provided, which gets target sequence id by "
+"calculating the maximum probability of each step. In this case, user must"
+" provide `vocab`. It should be noted that the BLEU here is different from"
+" the BLEU calculated in prediction, and it is only for observation during"
+" training and evaluation."
 
 #: of paddlenlp.metrics.bleu.BLEU:16
 msgid ""
@@ -56,21 +69,30 @@ msgid ""
 "\n"
 "BLEU & = BP\\exp(\\sum_{n=1}^N w_{n} \\log{p_{n}})"
 msgstr ""
+"BP & =\n"
+"\\begin{cases}\n"
+"1,  & \\text{if }c>r \\\\\n"
+"e_{1-r/c}, & \\text{if }c\\leq r\n"
+"\\end{cases}\n"
+"\n"
+"BLEU & = BP\\exp(\\sum_{n=1}^N w_{n} \\log{p_{n}})"
 
 #: of paddlenlp.metrics.bleu.BLEU:26
 msgid ""
 "where `c` is the length of candidate sentence, and 'r' is the length of "
 "refrence sentence."
 msgstr ""
+"where `c` is the length of candidate sentence, and 'r' is the length of "
+"refrence sentence."
 
 #: of paddlenlp.metrics.bleu.BLEU paddlenlp.metrics.bleu.BLEU.add_inst
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst
 msgid "参数"
-msgstr ""
+msgstr "Parameter"
 
 #: of paddlenlp.metrics.bleu.BLEU:28
 msgid "`trans_func` transforms the network output to string to calculate."
-msgstr ""
+msgstr "`trans_func` transforms the network output to string to calculate."
 
 #: of paddlenlp.metrics.bleu.BLEU:31
 msgid ""
@@ -78,26 +100,29 @@ msgid ""
 "`paddle.metric.Metric` instance, `default_trans_func` will be performed "
 "and `vocab` must be provided."
 msgstr ""
+"Vocab for target language. If `trans_func` is None and BLEU is used as "
+"`paddle.metric.Metric` instance, `default_trans_func` will be performed "
+"and `vocab` must be provided."
 
 #: of paddlenlp.metrics.bleu.BLEU:36
 msgid "Number of gram for BLEU metric. Default: 4."
-msgstr ""
+msgstr "Number of gram for BLEU metric. Default: 4."
 
 #: of paddlenlp.metrics.bleu.BLEU:38
 msgid "The weights of precision of each gram. Default: None."
-msgstr ""
+msgstr "The weights of precision of each gram. Default: None."
 
 #: of paddlenlp.metrics.bleu.BLEU:41
 msgid "Name of `paddle.metric.Metric` instance. Default: \"bleu\"."
-msgstr ""
+msgstr "Name of `paddle.metric.Metric` instance. Default: \"bleu\"."
 
 #: of paddlenlp.metrics.bleu.BLEU:46
 msgid "实际案例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.metrics.bleu.BLEU:47
 msgid "1. Using as a general evaluation object. .. code-block:: python"
-msgstr ""
+msgstr "1. Using as a general evaluation object. .. code-block:: python"
 
 #: of paddlenlp.metrics.bleu.BLEU:50
 msgid ""
@@ -107,14 +132,19 @@ msgid ""
 "[\"There\",\"is\",\"a\",\"cat\",\"on\",\"the\",\"mat\"]] "
 "bleu.add_inst(cand, ref_list) print(bleu.score()) # 0.4671379777282001"
 msgstr ""
+"from paddlenlp.metrics import BLEU bleu = BLEU() cand = "
+"[\"The\",\"cat\",\"The\",\"cat\",\"on\",\"the\",\"mat\"] ref_list = "
+"[[\"The\",\"cat\",\"is\",\"on\",\"the\",\"mat\"], "
+"[\"There\",\"is\",\"a\",\"cat\",\"on\",\"the\",\"mat\"]] "
+"bleu.add_inst(cand, ref_list) print(bleu.score()) # 0.4671379777282001"
 
 #: of paddlenlp.metrics.bleu.BLEU:57
 msgid "Using as an instance of `paddle.metric.Metric`."
-msgstr ""
+msgstr "Using as an instance of `paddle.metric.Metric`."
 
 #: of paddlenlp.metrics.bleu.BLEU.update:1
 msgid "Update states for metric"
-msgstr ""
+msgstr "Update states for metric"
 
 #: of paddlenlp.metrics.bleu.BLEU.update:3
 msgid ""
@@ -123,45 +153,49 @@ msgid ""
 "flatten arguments of **output** of mode and **label** from data: "
 ":code:`update(output1, output2, ..., label1, label2,...)`"
 msgstr ""
+"Inputs of :code:`update` is the outputs of :code:`Metric.compute`, if "
+":code:`compute` is not defined, the inputs of :code:`update` will be "
+"flatten arguments of **output** of mode and **label** from data: "
+":code:`update(output1, output2, ..., label1, label2,...)`"
 
 #: of paddlenlp.metrics.bleu.BLEU.update:8
 msgid "see :code:`Metric.compute`"
-msgstr ""
+msgstr "see :code:`Metric.compute`"
 
 #: of paddlenlp.metrics.bleu.BLEU.add_inst:1
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst:1
 msgid "Update the states based on a pair of candidate and references."
-msgstr ""
+msgstr "Update the states based on a pair of candidate and references."
 
 #: of paddlenlp.metrics.bleu.BLEU.add_inst:3
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst:3
 msgid "Tokenized candidate sentence."
-msgstr ""
+msgstr "Tokenized candidate sentence."
 
 #: of paddlenlp.metrics.bleu.BLEU.add_inst:5
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst:5
 msgid "List of tokenized ground truth sentences."
-msgstr ""
+msgstr "List of tokenized ground truth sentences."
 
 #: of paddlenlp.metrics.bleu.BLEU.reset:1
 msgid "Reset states and result"
-msgstr ""
+msgstr "Reset states and result"
 
 #: of paddlenlp.metrics.bleu.BLEU.accumulate:1
 msgid "Calculate the final bleu metric."
-msgstr ""
+msgstr "Calculate the final bleu metric."
 
 #: of paddlenlp.metrics.bleu.BLEU.name:1
 msgid "Returns metric name"
-msgstr ""
+msgstr "Returns metric name"
 
 #: of paddlenlp.metrics.bleu.BLEUForDuReader:1
 msgid "基类：:class:`paddlenlp.metrics.bleu.BLEU`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.metrics.bleu.BLEU`"
 
 #: of paddlenlp.metrics.bleu.BLEUForDuReader:1
 msgid "BLEU metric with bonus for DuReader contest."
-msgstr ""
+msgstr "BLEU metric with bonus for DuReader contest."
 
 #: of paddlenlp.metrics.bleu.BLEUForDuReader:3
 msgid ""
@@ -169,4 +203,7 @@ msgid ""
 "Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for "
 "more details."
 msgstr ""
+"Please refer to `DuReader "
+"Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for "
+"more details."
 

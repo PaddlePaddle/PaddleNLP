@@ -19,27 +19,29 @@ msgstr ""
 
 #: ../../source/paddlenlp.models.ernie.rst:2
 msgid "ernie"
-msgstr ""
+msgstr "ernie"
 
 #: of paddlenlp.models.ernie.Ernie:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.models.ernie.Ernie.forward:1
 msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.models.ernie.Ernie.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.models.ernie.Ernie.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.models.ernie.Ernie.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 

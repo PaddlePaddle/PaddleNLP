@@ -19,9 +19,11 @@ msgstr ""
 
 #: ../../models.md:1
 msgid "PaddleNLP Models API"
-msgstr ""
+msgstr "PaddleNLP Models API"
 
 #: ../../models.md:3
 msgid "该模块提供了百度自研的模型的高阶API，如文本分类模型Senta，文本匹配模型SimNet，通用预训练模型ERNIE等。"
 msgstr ""
+"This module provides a high-level API of Baidu's self-developed models"
+"For example, text classification model Senta, text matching model SimNet, general pre-training model ERNIE, etc.  "
 

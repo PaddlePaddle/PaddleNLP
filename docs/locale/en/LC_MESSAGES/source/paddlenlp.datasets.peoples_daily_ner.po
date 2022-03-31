@@ -19,27 +19,27 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.peoples_daily_ner.rst:2
 msgid "peoples\\_daily\\_ner"
-msgstr ""
+msgstr "peoples\\_daily\\_ner"
 
 #: of paddlenlp.datasets.peoples_daily_ner.PeoplesDailyNER:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.peoples_daily_ner.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of
 #: paddlenlp.datasets.peoples_daily_ner.PeoplesDailyNER.META_INFO.file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of
 #: paddlenlp.datasets.peoples_daily_ner.PeoplesDailyNER.META_INFO.md5:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 
 #: of paddlenlp.datasets.peoples_daily_ner.PeoplesDailyNER.get_labels:1
 msgid "Return list of class labels of the dataset if specified."
-msgstr ""
+msgstr "Return list of class labels of the dataset if specified."
 

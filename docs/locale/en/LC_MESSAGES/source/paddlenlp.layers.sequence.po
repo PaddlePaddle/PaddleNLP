@@ -19,37 +19,41 @@ msgstr ""
 
 #: ../../source/paddlenlp.layers.sequence.rst:2
 msgid "sequence"
-msgstr ""
+msgstr "sequence"
 
 #: of paddlenlp.layers.sequence.sequence_mask:1
 msgid ""
 "To boost the performance, this sequence_mask is different with "
 "paddle.fluid.layers.sequence_mask"
 msgstr ""
+"To boost the performance, this sequence_mask is different with "
+"paddle.fluid.layers.sequence_mask"
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "参数"
-msgstr ""
+msgstr "parameter"
 
 #: of paddlenlp.layers.sequence.sequence_mask:3
 msgid ""
 "The whole sequence index, a tensor with shape `[batch_size, "
 "sequence_length]`."
 msgstr ""
+"The whole sequence index, a tensor with shape `[batch_size, "
+"sequence_length]`."
 
 #: of paddlenlp.layers.sequence.sequence_mask:5
 msgid "The valid length of every sequence, a tensor with shape `[batch_size]`"
-msgstr ""
+msgstr "The valid length of every sequence, a tensor with shape `[batch_size]`"
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.layers.sequence.sequence_mask:8
 msgid "The output sequence mask."
-msgstr ""
+msgstr "The output sequence mask."
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

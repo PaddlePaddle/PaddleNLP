@@ -19,13 +19,13 @@ msgstr ""
 
 #: ../../source/paddlenlp.models.simnet.rst:2
 msgid "simnet"
-msgstr ""
+msgstr "simnet"
 
 #: of paddlenlp.models.simnet.BoWModel:1 paddlenlp.models.simnet.CNNModel:1
 #: paddlenlp.models.simnet.GRUModel:1 paddlenlp.models.simnet.LSTMModel:1
 #: paddlenlp.models.simnet.SimNet:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.models.simnet.BoWModel.forward:1
 #: paddlenlp.models.simnet.CNNModel.forward:1
@@ -36,6 +36,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.models.simnet.BoWModel.forward
 #: paddlenlp.models.simnet.CNNModel.forward
@@ -43,7 +45,7 @@ msgstr ""
 #: paddlenlp.models.simnet.LSTMModel.forward
 #: paddlenlp.models.simnet.SimNet.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.models.simnet.BoWModel.forward:4
 #: paddlenlp.models.simnet.CNNModel.forward:4
@@ -51,7 +53,7 @@ msgstr ""
 #: paddlenlp.models.simnet.LSTMModel.forward:4
 #: paddlenlp.models.simnet.SimNet.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.models.simnet.BoWModel.forward:6
 #: paddlenlp.models.simnet.CNNModel.forward:6
@@ -59,7 +61,7 @@ msgstr ""
 #: paddlenlp.models.simnet.LSTMModel.forward:6
 #: paddlenlp.models.simnet.SimNet.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.models.simnet.BoWModel:1
 msgid ""
@@ -77,14 +79,27 @@ msgid ""
 " defaults to 96): The second full-connected layer hidden size. :param "
 "num_classes (obj: `int`): All the labels that the data has."
 msgstr ""
+"This class implements the Bag of Words Classification Network model to "
+"classify texts. At a high level, the model starts by embedding the tokens"
+" and running them through a word embedding. Then, we encode these "
+"epresentations with a `BoWEncoder`. Lastly, we take the output of the "
+"encoder to create a final representation, which is passed through some "
+"feed-forward layers to output a logits (`output_layer`). :param "
+"vocab_size (obj: `int`): The vocabulary size. :param emb_dim (obj: `int`,"
+" optional, defaults to 128):  The embedding dimension. :param padding_idx"
+" (obj: `int`, optinal, defaults to 0) : The pad token index. :param "
+"hidden_size (obj: `int`, optional, defaults to 128): The first full-"
+"connected layer hidden size. :param fc_hidden_size (obj: `int`, optional,"
+" defaults to 96): The second full-connected layer hidden size. :param "
+"num_classes (obj: `int`): All the labels that the data has."
 
 #: of paddlenlp.models.simnet.CNNModel:1
 msgid "This class implements the"
-msgstr ""
+msgstr "This class implements the"
 
 #: of paddlenlp.models.simnet.CNNModel:4
 msgid "Convolution Neural Network model."
-msgstr ""
+msgstr "Convolution Neural Network model."
 
 #: of paddlenlp.models.simnet.CNNModel:5
 msgid ""
@@ -103,4 +118,18 @@ msgid ""
 "pad token index. :param num_classes (obj: `int`): All the labels that the"
 " data has."
 msgstr ""
+"At a high level, the model starts by embedding the tokens and running "
+"them through a word embedding. Then, we encode these epresentations with "
+"a `CNNEncoder`. The CNN has one convolution layer for each ngram filter "
+"size. Each convolution operation gives out a vector of size num_filter. "
+"The number of times a convolution layer will be used is `num_tokens - "
+"ngram_size + 1`. The corresponding maxpooling layer aggregates all these "
+"outputs from the convolution layer and outputs the max. Lastly, we take "
+"the output of the encoder to create a final representation, which is "
+"passed through some feed-forward layers to output a logits "
+"(`output_layer`). :param vocab_size (obj: `int`): The vocabulary size. "
+":param emb_dim (obj: `int`, optional, defaults to 128):  The embedding "
+"dimension. :param padding_idx (obj: `int`, optinal, defaults to 0) : The "
+"pad token index. :param num_classes (obj: `int`): All the labels that the"
+" data has."
 

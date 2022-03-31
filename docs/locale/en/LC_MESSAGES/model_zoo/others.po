@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../model_zoo/others.rst:3
 msgid "经典模型"
-msgstr ""
+msgstr "Classic Model"
 
 #: ../../model_zoo/others.rst:5
 msgid "经典模型："
-msgstr ""
+msgstr "Classic Model"
 

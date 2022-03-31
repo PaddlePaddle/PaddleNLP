@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/ner.rst:3
 msgid "序列标注"
-msgstr ""
+msgstr "Sequence Annotation"
 

@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/text_generation.rst:3
 msgid "文本生成"
-msgstr ""
+msgstr "Text Generation"
 

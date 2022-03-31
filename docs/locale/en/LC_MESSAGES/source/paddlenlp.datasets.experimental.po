@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.rst:2
 msgid "experimental"
-msgstr ""
+msgstr "experimental"
 

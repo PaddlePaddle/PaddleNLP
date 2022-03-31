@@ -19,13 +19,13 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.glue.rst:2
 msgid "glue"
-msgstr ""
+msgstr "glue"
 
 #: of paddlenlp.datasets.glue.Glue:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.glue.Glue.get_labels:1
 msgid "Return labels of the Glue task."
-msgstr ""
+msgstr "Return labels of the Glue task."
 

@@ -19,27 +19,29 @@ msgstr ""
 
 #: ../../source/paddlenlp.ext_op.transformer.decoding.rst:2
 msgid "decoding"
-msgstr ""
+msgstr "decoding"
 
 #: of paddlenlp.ext_op.transformer.decoding.InferTransformerDecoding:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.ext_op.transformer.decoding.InferTransformerDecoding.forward:1
 msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.ext_op.transformer.decoding.InferTransformerDecoding.forward
 msgid "参数"
-msgstr ""
+msgstr "parameter"
 
 #: of paddlenlp.ext_op.transformer.decoding.InferTransformerDecoding.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.ext_op.transformer.decoding.InferTransformerDecoding.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 

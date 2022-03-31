@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../advanced_guide/distributed_training.rst:3
 msgid "大规模分布式训练"
-msgstr ""
+msgstr "Large-Scale Distributed Training"
 
 #: ../../advanced_guide/distributed_training.rst:5
 msgid "大规模分布式训练："
-msgstr ""
+msgstr "Large-Scale Distributed Training:"
 

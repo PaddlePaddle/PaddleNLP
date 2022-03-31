@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/classify.rst:3
 msgid "文本分类"
-msgstr ""
+msgstr "Text Classification"
 

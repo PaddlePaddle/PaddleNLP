@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.bigbird.tokenizer.rst:2
 msgid "tokenizer"
-msgstr ""
+msgstr "tokenizer"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
 msgid ""
@@ -33,6 +33,11 @@ msgid ""
 "path of the vocabulary :type sentencepiece_model_file: str :param "
 "do_lower_case: Whether the text strips accents and convert to"
 msgstr ""
+"Constructs a BigBird tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords. :param sentencepiece_model_file: file "
+"path of the vocabulary :type sentencepiece_model_file: str :param "
+"do_lower_case: Whether the text strips accents and convert to"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:7
 msgid ""
@@ -40,40 +45,45 @@ msgid ""
 "False when using the cased model, otherwise it is set to True. Default: "
 "True."
 msgstr ""
+"lower case. If you use the BigBird pretrained model, lower is set to "
+"False when using the cased model, otherwise it is set to True. Default: "
+"True."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:11
 msgid "The special token for unkown words. Default: \"[UNK]\"."
-msgstr ""
+msgstr "The special token for unkown words. Default: \"[UNK]\"."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:13
 msgid "The special token for separator token . Default: \"[SEP]\"."
-msgstr ""
+msgstr "The special token for separator token . Default: \"[SEP]\"."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:15
 msgid "The special token for padding. Default: \"[PAD]\"."
-msgstr ""
+msgstr "The special token for padding. Default: \"[PAD]\"."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:17
 msgid "The special token for cls. Default: \"[CLS]\"."
-msgstr ""
+msgstr "The special token for cls. Default: \"[CLS]\"."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:19
 msgid "The special token for mask. Default: \"[MASK]\"."
-msgstr ""
+msgstr "The special token for mask. Default: \"[MASK]\"."
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:22
 msgid "Examples:"
-msgstr ""
+msgstr "Examples:"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:1
 msgid ""
 "return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
 "int"
 msgstr ""
+"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
+"int"
 
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:1
@@ -83,19 +93,23 @@ msgid ""
 "`##` when converting. :param tokens: A list of string representing tokens"
 " to be converted. :type tokens: list"
 msgstr ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting. :param tokens: A list of string representing tokens"
+" to be converted. :type tokens: list"
 
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:7
 msgid "Converted string from tokens."
-msgstr ""
+msgstr "Converted string from tokens."
 
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
 msgid "返回类型"
-msgstr ""
+msgstr "Retutn Type"
 

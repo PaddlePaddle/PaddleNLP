@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.xlnet.rst:2
 msgid "xlnet"
-msgstr ""
+msgstr "xlnet"
 

@@ -19,61 +19,62 @@ msgstr ""
 
 #: ../../get_started/installation.rst:2
 msgid "安装PaddleNLP"
-msgstr ""
+msgstr "PaddleNLP Installation"
 
 #: ../../get_started/installation.rst:3
 msgid ""
 "以下安装过程默认用户已安装好paddlepaddle-"
 "gpu或paddlepaddle(版本大于或等于2.0)，paddlepaddle安装方式参照 飞桨官网_。"
-msgstr ""
+msgstr "Paddlepaddle-gpu or paddlepaddle(version 2.0 or higher) must be installed in advance, please refer to the Paddle Official Website for paddlepaddle installation."
 
 #: ../../get_started/installation.rst:8
 msgid "pip安装"
-msgstr ""
+msgstr "Pip Installation"
 
 #: ../../get_started/installation.rst:14
 msgid "Anaconda安装"
-msgstr ""
+msgstr "Anaconda Installation"
 
 #: ../../get_started/installation.rst:15
 msgid "Anaconda是一个开源的Python发行版本，其包含了conda、Python等180多个科学包及其依赖项。使用Anaconda可以通过创建多个独立的Python环境，避免用户的Python环境安装太多不同版本依赖导致冲突。"
-msgstr ""
+msgstr "Anaconda is an open-source distribution of Python. It includes over 180 packages and dependencies, like conda and Python. Anaconda allows the users to create isolated virtual environments for their Python projects. So the dependencies of every project are isolated from the system and each other."
 
 #: ../../get_started/installation.rst:18
 msgid "1、windows安装Anaconda"
-msgstr ""
+msgstr "1, Install Anaconda On Windows"
 
 #: ../../get_started/installation.rst:21 ../../get_started/installation.rst:56
 msgid "第一步 下载"
-msgstr ""
+msgstr "Step One: Download"
 
 #: ../../get_started/installation.rst:22
 msgid "在 Anaconda官网_ 选择下载Windows Python3.7 64-Bit版本。"
-msgstr ""
+msgstr "On the Anaconda Official Website, download Python3.7 64-Bit version. "
 
 #: ../../get_started/installation.rst:26
 msgid "确保已经安装Visual C++ Build Tools(可以在开始菜单中找到)，如未安装，请点击 下载安装_。"
-msgstr ""
+msgstr "Visual C++ Build Tools must be installed in advance (check the installation on Start menu). If it hasn't been installed, please click Download. 
+"
 
 #: ../../get_started/installation.rst:31 ../../get_started/installation.rst:62
 msgid "第二步 安装"
-msgstr ""
+msgstr "Step Two: Installation"
 
 #: ../../get_started/installation.rst:32
 msgid "运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。"
-msgstr ""
+msgstr "Run the downloaded package (suffix with .exe), follow the guide to complete the installation, users can choose the install location (please refer to the picture below)."
 
 #: ../../get_started/installation.rst:37 ../../get_started/installation.rst:73
 msgid "第三步 使用"
-msgstr ""
+msgstr "Step Three: Use"
 
 #: ../../get_started/installation.rst:38
 msgid "点击Windows系统左下角的Windows图标，打开：所有程序->Anaconda3/2（64-bit）->Anaconda Prompt"
-msgstr ""
+msgstr "Click the Windows icon at bottom left on the Windows system. Click: All Programmes ->Anaconda3/2（64-bit）->Anaconda Prompt"
 
 #: ../../get_started/installation.rst:39
 msgid "在命令行中执行下述命令"
-msgstr ""
+msgstr "Execute the below command on terminal."
 
 #: ../../get_started/installation.rst:50 ../../get_started/installation.rst:84
 msgid ""
@@ -81,28 +82,31 @@ msgid ""
 "paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda "
 "Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。"
 msgstr ""
+"After the configuration as shown above, PaddleNLP will be ready for use in the environment. Let’s try to import PaddleNLP, type the command “python”, then press the “Enter” key."
+"You can use the environment and PaddleNLP again by clicking “All Programmes ->Anaconda3/2（64-bit）->Anaconda Prompt”, then execute the command ”conda activate my_paddlenlp”."
+
 
 #: ../../get_started/installation.rst:53
 msgid "2、Linux/Mac安装安装Anaconda"
-msgstr ""
+msgstr "Install Anaconda On Linux/Mac"
 
 #: ../../get_started/installation.rst:57
 msgid "在 Anaconda官网_ 选择下载对应系统 Python3.7版本下载（Mac下载Command Line Installer版本即可)。"
-msgstr ""
+msgstr "Download the corresponding Python 3.7 version from the Anaconda Official Website, (download Command Line Installer version for Mac system)."
 
 #: ../../get_started/installation.rst:63
 msgid "打开终端，在终端安装Anaconda"
-msgstr ""
+msgstr "Install Anaconda from the terminal "
 
 #: ../../get_started/installation.rst:70
 msgid "安装过程中一直回车即可，如提示设置安装路径，可根据需求修改，一般默认即可。"
-msgstr ""
+msgstr "Press the “Enter” key for the installation. The installation location can be modified accordingly or kept as default. "
 
 #: ../../get_started/installation.rst:87
 msgid "代码安装"
-msgstr ""
+msgstr "Code Installation"
 
 #: ../../get_started/installation.rst:88
 msgid "github代码会跟随开发进度不断更新"
-msgstr ""
+msgstr "Github code will be continuously updated with the development progress."
 

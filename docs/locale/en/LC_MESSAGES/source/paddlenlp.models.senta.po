@@ -19,7 +19,7 @@ msgstr ""
 
 #: ../../source/paddlenlp.models.senta.rst:2
 msgid "senta"
-msgstr ""
+msgstr "senta"
 
 #: of paddlenlp.models.senta.BiLSTMAttentionModel:1
 #: paddlenlp.models.senta.BoWModel:1 paddlenlp.models.senta.CNNModel:1
@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.models.senta.SelfInteractiveAttention:1
 #: paddlenlp.models.senta.Senta:1 paddlenlp.models.senta.TextCNNModel:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.models.senta.BiLSTMAttentionModel.forward:1
 #: paddlenlp.models.senta.BoWModel.forward:1
@@ -42,6 +42,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.models.senta.BiLSTMAttentionModel.forward
 #: paddlenlp.models.senta.BoWModel.forward
@@ -54,7 +56,7 @@ msgstr ""
 #: paddlenlp.models.senta.Senta.forward
 #: paddlenlp.models.senta.TextCNNModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.models.senta.BiLSTMAttentionModel.forward:4
 #: paddlenlp.models.senta.BoWModel.forward:4
@@ -65,7 +67,7 @@ msgstr ""
 #: paddlenlp.models.senta.Senta.forward:4
 #: paddlenlp.models.senta.TextCNNModel.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.models.senta.BiLSTMAttentionModel.forward:6
 #: paddlenlp.models.senta.BoWModel.forward:6
@@ -76,7 +78,7 @@ msgstr ""
 #: paddlenlp.models.senta.Senta.forward:6
 #: paddlenlp.models.senta.TextCNNModel.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.models.senta.BoWModel:1
 msgid ""
@@ -87,6 +89,12 @@ msgid ""
 "encoder to create a final representation, which is passed through some "
 "feed-forward layers to output a logits (`output_layer`)."
 msgstr ""
+"This class implements the Bag of Words Classification Network model to "
+"classify texts. At a high level, the model starts by embedding the tokens"
+" and running them through a word embedding. Then, we encode these "
+"epresentations with a `BoWEncoder`. Lastly, we take the output of the "
+"encoder to create a final representation, which is passed through some "
+"feed-forward layers to output a logits (`output_layer`)."
 
 #: of paddlenlp.models.senta.SelfAttention:1
 msgid ""
@@ -96,17 +104,24 @@ msgid ""
 "https://www.aclweb.org/anthology/P16-2034/ :param hidden_size: The number"
 " of expected features in the input x. :type hidden_size: int"
 msgstr ""
+"A close implementation of attention network of ACL 2016 paper, Attention-"
+"Based Bidirectional Long Short-Term Memory Networks for Relation "
+"Classification (Zhou et al., 2016). ref: "
+"https://www.aclweb.org/anthology/P16-2034/ :param hidden_size: The number"
+" of expected features in the input x. :type hidden_size: int"
 
 #: of paddlenlp.models.senta.SelfAttention.forward:1
 #: paddlenlp.models.senta.SelfInteractiveAttention.forward:1
 msgid "Tensor containing the features of the input sequence."
-msgstr ""
+msgstr "Tensor containing the features of the input sequence."
 
 #: of paddlenlp.models.senta.SelfAttention.forward:3
 msgid ""
 "Tensor is a bool tensor, whose each element identifies whether the input "
 "word id is pad token or not. Defaults to `None`."
 msgstr ""
+"Tensor is a bool tensor, whose each element identifies whether the input "
+"word id is pad token or not. Defaults to `None`."
 
 #: of paddlenlp.models.senta.SelfInteractiveAttention:1
 msgid ""
@@ -116,12 +131,19 @@ msgid ""
 "attention-networks.pdf :param hidden_size: The number of expected "
 "features in the input x. :type hidden_size: int"
 msgstr ""
+"A close implementation of attention network of NAACL 2016 paper, "
+"Hierarchical Attention Networks for Document Classiﬁcation (Yang et al., "
+"2016). ref: https://www.cs.cmu.edu/~./hovy/papers/16HLT-hierarchical-"
+"attention-networks.pdf :param hidden_size: The number of expected "
+"features in the input x. :type hidden_size: int"
 
 #: of paddlenlp.models.senta.SelfInteractiveAttention.forward:3
 msgid ""
 "Tensor is a bool tensor, whose each element identifies whether the input "
 "word id is pad token or not. Defaults to `None"
 msgstr ""
+"Tensor is a bool tensor, whose each element identifies whether the input "
+"word id is pad token or not. Defaults to `None"
 
 #: of paddlenlp.models.senta.CNNModel:1
 msgid ""
@@ -137,6 +159,17 @@ msgid ""
 "passed through some feed-forward layers to output a logits "
 "(`output_layer`)."
 msgstr ""
+"This class implements the Convolution Neural Network model. At a high "
+"level, the model starts by embedding the tokens and running them through "
+"a word embedding. Then, we encode these epresentations with a "
+"`CNNEncoder`. The CNN has one convolution layer for each ngram filter "
+"size. Each convolution operation gives out a vector of size num_filter. "
+"The number of times a convolution layer will be used is `num_tokens - "
+"ngram_size + 1`. The corresponding maxpooling layer aggregates all these "
+"outputs from the convolution layer and outputs the max. Lastly, we take "
+"the output of the encoder to create a final representation, which is "
+"passed through some feed-forward layers to output a logits "
+"(`output_layer`)."
 
 #: of paddlenlp.models.senta.TextCNNModel:1
 msgid ""
@@ -152,4 +185,15 @@ msgid ""
 "passed through some feed-forward layers to output a logits "
 "(`output_layer`)."
 msgstr ""
+"This class implements the Text Convolution Neural Network model. At a "
+"high level, the model starts by embedding the tokens and running them "
+"through a word embedding. Then, we encode these epresentations with a "
+"`CNNEncoder`. The CNN has one convolution layer for each ngram filter "
+"size. Each convolution operation gives out a vector of size num_filter. "
+"The number of times a convolution layer will be used is `num_tokens - "
+"ngram_size + 1`. The corresponding maxpooling layer aggregates all these "
+"outputs from the convolution layer and outputs the max. Lastly, we take "
+"the output of the encoder to create a final representation, which is "
+"passed through some feed-forward layers to output a logits "
+"(`output_layer`)."
 

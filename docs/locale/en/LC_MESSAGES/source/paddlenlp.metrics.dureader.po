@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.metrics.dureader.rst:2
 msgid "dureader"
-msgstr ""
+msgstr "dureader"
 
 #: of paddlenlp.metrics.dureader:1
 msgid "Official evaluation script for SQuAD version 2.0."
-msgstr ""
+msgstr "Official evaluation script for SQuAD version 2.0."
 
 #: of paddlenlp.metrics.dureader:3
 msgid ""
@@ -32,24 +32,28 @@ msgid ""
 "provided. This file is expected to map question ID's to the model's "
 "predicted probability that a question is unanswerable."
 msgstr ""
+"In addition to basic functionality, we also compute additional statistics"
+" and plot precision-recall curves if an additional na_prob.json file is "
+"provided. This file is expected to map question ID's to the model's "
+"predicted probability that a question is unanswerable."
 
 #: of paddlenlp.metrics.dureader.compute_predictions:1
 msgid "Write final predictions to the json file and log-odds of null if needed."
-msgstr ""
+msgstr "Write final predictions to the json file and log-odds of null if needed."
 
 #: of paddlenlp.metrics.dureader.get_final_text:1
 msgid "Project the tokenized prediction back to the original text."
-msgstr ""
+msgstr "Project the tokenized prediction back to the original text."
 
 #: of paddlenlp.metrics.dureader.normalize:1
 msgid "Normalize strings to space joined chars. :param s: a list of strings."
-msgstr ""
+msgstr "Normalize strings to space joined chars. :param s: a list of strings."
 
 #: of paddlenlp.metrics.dureader.normalize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.dureader.normalize:4
 msgid "A list of normalized strings."
-msgstr ""
+msgstr "A list of normalized strings."
 

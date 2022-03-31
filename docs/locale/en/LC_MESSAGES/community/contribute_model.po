@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../community/contribute_model.rst:3
 msgid "如何贡献模型"
-msgstr ""
+msgstr "How to distribute model"
 

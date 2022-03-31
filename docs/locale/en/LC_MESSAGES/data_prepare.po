@@ -19,9 +19,9 @@ msgstr ""
 
 #: ../../data_prepare.rst:3
 msgid "数据准备"
-msgstr ""
+msgstr "Data Preparartion"
 
 #: ../../data_prepare.rst:5
 msgid "数据准备:"
-msgstr ""
+msgstr "Data Preparation"
 

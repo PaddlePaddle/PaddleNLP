@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.couplet.rst:2
 msgid "couplet"
-msgstr ""
+msgstr "couplet"
 

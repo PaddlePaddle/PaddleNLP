@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.layers.tcn.rst:2
 msgid "tcn"
-msgstr ""
+msgstr "tcn"
 
 #: of paddlenlp.layers.tcn.TCN:1 paddlenlp.layers.tcn.TemporalBlock:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.layers.tcn.TemporalBlock:1
 msgid ""
@@ -31,75 +31,84 @@ msgid ""
 "See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more "
 "details."
 msgstr ""
+"The TCN block, consists of dilated causal conv, relu and residual block. "
+"See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more "
+"details."
 
 #: of paddlenlp.layers.tcn.TCN.forward paddlenlp.layers.tcn.TemporalBlock
 #: paddlenlp.layers.tcn.TemporalBlock.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameter"
 
 #: of paddlenlp.layers.tcn.TemporalBlock:4
 msgid "The number of channels in the input tensor."
-msgstr ""
+msgstr "The number of channels in the input tensor."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:6
 msgid "The number of filters."
-msgstr ""
+msgstr "The number of filters."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:8
 msgid "The filter size."
-msgstr ""
+msgstr "The filter size."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:10
 msgid "The stride size."
-msgstr ""
+msgstr "The stride size."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:12
 msgid "The dilation size."
-msgstr ""
+msgstr "The dilation size."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:14
 msgid "The size of zeros to be padded."
-msgstr ""
+msgstr "The size of zeros to be padded."
 
 #: of paddlenlp.layers.tcn.TemporalBlock:16
 msgid "Probability of dropout the units. Defaults to 0.2."
-msgstr ""
+msgstr "Probability of dropout the units. Defaults to 0.2."
 
 #: of paddlenlp.layers.tcn.TemporalBlock.forward:1
 msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.layers.tcn.TemporalBlock.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.layers.tcn.TemporalBlock.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.layers.tcn.TCN.forward:1
 msgid "Apply temporal convolutional networks to the input tensor."
-msgstr ""
+msgstr "Apply temporal convolutional networks to the input tensor."
 
 #: of paddlenlp.layers.tcn.TCN.forward:3
 msgid ""
 "The input tensor with shape `[batch_size, input_channel, "
 "sequence_length]`."
 msgstr ""
+"The input tensor with shape `[batch_size, input_channel, "
+"sequence_length]`."
 
 #: of paddlenlp.layers.tcn.TCN.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.layers.tcn.TCN.forward:6
 msgid ""
 "The output tensor with shape `[batch_size, num_channels[-1], "
 "sequence_length]`."
 msgstr ""
+"The output tensor with shape `[batch_size, num_channels[-1], "
+"sequence_length]`."
 
 #: of paddlenlp.layers.tcn.TCN.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 

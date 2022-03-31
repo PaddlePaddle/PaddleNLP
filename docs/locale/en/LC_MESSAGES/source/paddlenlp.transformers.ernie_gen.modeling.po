@@ -19,51 +19,55 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.ernie_gen.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
 msgid "基类：:class:`paddlenlp.transformers.ernie_gen.modeling.ErnieModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.ernie_gen.modeling.ErnieModel`"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
 msgid "Ernie Model for sequence to sequence generation."
-msgstr ""
+msgstr "Ernie Model for sequence to sequence generation."
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:6
 msgid "Args"
-msgstr ""
+msgstr "Args"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:2
 msgid ""
 "tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, "
 "vocab_size]):"
 msgstr ""
+"tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, "
+"vocab_size]):"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:3
 msgid "ground trouth target sequence id (hard label) or distribution (soft label)"
-msgstr ""
+msgstr "ground trouth target sequence id (hard label) or distribution (soft label)"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:4
 msgid "tgt_pos(`Variable` of shape [n_targets, 2]):"
-msgstr ""
+msgstr "tgt_pos(`Variable` of shape [n_targets, 2]):"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:5
 msgid ""
 "index of tgt_labels in `src_ids`, can be obtained from "
 "`fluid.layers.where(src_ids==mask_id)`"
 msgstr ""
+"index of tgt_labels in `src_ids`, can be obtained from "
+"`fluid.layers.where(src_ids==mask_id)`"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:6
 msgid "encoder_only(Bool):"
-msgstr ""
+msgstr "encoder_only(Bool):"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:7
 msgid "if set, will not return loss, logits_2d"
-msgstr ""
+msgstr "if set, will not return loss, logits_2d"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:8
 msgid ""
@@ -72,26 +76,32 @@ msgid ""
 "logits for every targets. if `encode_only`, returns None. "
 "info(Dictionary): see `ErnieModel`"
 msgstr ""
+"cross entropy loss mean over every target label. if `encode_only`, "
+"returns None. logits(`Variable` of shape [n_targets, vocab_size]):     "
+"logits for every targets. if `encode_only`, returns None. "
+"info(Dictionary): see `ErnieModel`"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:8
 msgid ""
 "cross entropy loss mean over every target label. if `encode_only`, "
 "returns None. logits(`Variable` of shape [n_targets, vocab_size]):"
 msgstr ""
+"cross entropy loss mean over every target label. if `encode_only`, "
+"returns None. logits(`Variable` of shape [n_targets, vocab_size]):"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:10
 msgid "logits for every targets. if `encode_only`, returns None."
-msgstr ""
+msgstr "logits for every targets. if `encode_only`, returns None."
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:11
 msgid "info(Dictionary): see `ErnieModel`"
-msgstr ""
+msgstr "info(Dictionary): see `ErnieModel`"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:12
 msgid "loss(`Variable` of shape [])"
-msgstr ""
+msgstr "loss(`Variable` of shape [])"
 

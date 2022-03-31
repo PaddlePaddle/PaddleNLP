@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../advanced_guide.rst:1
 msgid "进阶指南"
-msgstr ""
+msgstr "Advanced Guide"
 

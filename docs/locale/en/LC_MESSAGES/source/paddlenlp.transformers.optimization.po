@@ -19,14 +19,14 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.optimization.rst:2
 msgid "optimization"
-msgstr ""
+msgstr "optimization"
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:1
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:1
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:1
 msgid "基类：:class:`paddle.optimizer.lr.LambdaDecay`"
-msgstr ""
+msgstr "Base class: :class:`paddle.optimizer.lr.LambdaDecay`"
 
 #: of paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
 msgid ""
@@ -34,26 +34,29 @@ msgid ""
 "from 0 to given `learning_rate`, after this warmup period learning rate "
 "would be decreased linearly from the base learning rate to 0."
 msgstr ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate`, after this warmup period learning rate "
+"would be decreased linearly from the base learning rate to 0."
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:5
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:7
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:5
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:6
 msgid "The base learning rate. It is a python float number."
-msgstr ""
+msgstr "The base learning rate. It is a python float number."
 
 #: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:10
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:8
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:9
 msgid "The number of training steps."
-msgstr ""
+msgstr "The number of training steps."
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:8
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:12
@@ -63,6 +66,8 @@ msgid ""
 "If int, it means the number of steps for warmup. If float, it means the "
 "proportion of warmup in total training steps."
 msgstr ""
+"If int, it means the number of steps for warmup. If float, it means the "
+"proportion of warmup in total training steps."
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:14
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:23
@@ -72,17 +77,19 @@ msgid ""
 "The index of last epoch. It can be set to restart training. If None, it "
 "means initial learning rate. Default: -1."
 msgstr ""
+"The index of last epoch. It can be set to restart training. If None, it "
+"means initial learning rate. Default: -1."
 
 #: of paddlenlp.transformers.optimization.LinearDecayWithWarmup:17
 msgid "If True, prints a message to stdout for each update. Default: False."
-msgstr ""
+msgstr "If True, prints a message to stdout for each update. Default: False."
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:20
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:29
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:22
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:24
 msgid "实际案例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:1
 msgid ""
@@ -90,12 +97,17 @@ msgid ""
 "from 0 to given `learning_rate` during warmup periods and keeps learning "
 "rate a constant after that."
 msgstr ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate` during warmup periods and keeps learning "
+"rate a constant after that."
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:11
 msgid ""
 "The number of training steps. If `warmup` is a float number, "
 "`total_steps` must be provided."
 msgstr ""
+"The number of training steps. If `warmup` is a float number, "
+"`total_steps` must be provided."
 
 #: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:1
 msgid ""
@@ -105,10 +117,15 @@ msgid ""
 "`with_hard_restarts` is True, the cosine function could have serveral "
 "hard restarts."
 msgstr ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate`, after this warmup period learning rate "
+"would be decreased following the values of the cosine function. If "
+"`with_hard_restarts` is True, the cosine function could have serveral "
+"hard restarts."
 
 #: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:15
 msgid "restarts. Default: False."
-msgstr ""
+msgstr "restarts. Default: False."
 
 #: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:17
 msgid ""
@@ -117,6 +134,10 @@ msgid ""
 "`with_hard_restarts` is True, it means the number of hard restarts to use"
 " and should be a float number and defaults to be 0.5. Default: None."
 msgstr ""
+"If `with_hard_restarts` is False, it means the number of waves in cosine "
+"scheduler and should be an integer number and defaults to 1. If "
+"`with_hard_restarts` is True, it means the number of hard restarts to use"
+" and should be a float number and defaults to be 0.5. Default: None."
 
 #: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:1
 msgid ""
@@ -125,12 +146,17 @@ msgid ""
 "be decreased as a polynomial decay from the base learning rate to the end"
 " learning rate `lr_end`."
 msgstr ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `lr_init`, after this warmup period learning rate would "
+"be decreased as a polynomial decay from the base learning rate to the end"
+" learning rate `lr_end`."
+
 
 #: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:14
 msgid "The end learning rate. Default: 1e-7."
-msgstr ""
+msgstr "The end learning rate. Default: 1e-7."
 
 #: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:16
 msgid "Power factor. Default: 1.0."
-msgstr ""
+msgstr "Power factor. Default: 1.0."
 

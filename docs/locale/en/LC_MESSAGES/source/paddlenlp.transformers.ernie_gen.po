@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.ernie_gen.rst:2
 msgid "ernie\\_gen"
-msgstr ""
+msgstr "ernie\\_gen"
 

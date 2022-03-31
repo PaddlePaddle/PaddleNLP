@@ -19,59 +19,69 @@ msgstr ""
 
 #: ../../data_prepare/dataset_self_defined.rst:3
 msgid "如何自定义数据集"
-msgstr ""
+msgstr "How to self define datasets"
 
 #: ../../data_prepare/dataset_self_defined.rst:5
 msgid ""
 "通过使用PaddleNLP提供的 :func:`load_dataset` ， :class:`MapDataset` 和 "
 ":class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。"
-msgstr ""
+msgstr "Anyone can easily self define their own datasets by using :func:`load_dataset`, :class:`MapDataset` ,and :class:`IterDataset` from PaddleNLP. "
 
 #: ../../data_prepare/dataset_self_defined.rst:8
 msgid "从本地文件创建数据集"
-msgstr ""
+msgstr "Create dataset from local file."
 
 #: ../../data_prepare/dataset_self_defined.rst:10
 msgid ""
 "从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` "
 "中创建数据集。"
-msgstr ""
+msgstr "When creating dataset from local file, we **recommend** to give the fetching function accoding to local dataset form, then pass it into :func:`load_dataset`."
 
 #: ../../data_prepare/dataset_self_defined.rst:12
 msgid "以 :obj:`waybill_ie` 快递单信息抽取任务中的数据为例："
-msgstr ""
+msgstr "Let's take the data in :obj:`waybill_ie` express courier order information extraction task as an example:"
 
 #: ../../data_prepare/dataset_self_defined.rst:32
 msgid ""
 "我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 "
 ":class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的监测数据流向。"
 msgstr ""
+"We recommend to write the data fetching coading in the form of generator. "
+"It will let us build the dataset of :class:`MapDataset` and :class:`IterDataset` better."
+"At the same time, we also recommend to write the single data in the form of dictionary."
+"This makes it easier to monitor the data flow. "
 
 #: ../../data_prepare/dataset_self_defined.rst:34
 msgid ""
 "事实上，:class:`MapDataset` 在绝大多数时候都可以满足要求。一般只有在数据集过于庞大无法一次性加载进内存的时候我们才考虑使用 "
 ":class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。"
 msgstr ""
+"In fact, :class:`MapDataset` is enough in most cases. We only need to use :class:`IterDataset` when the dataset is too large and unable to be loaded into memory at once. "
+"Anyone can easily define their own dataset."
 
 #: ../../data_prepare/dataset_self_defined.rst:38
 msgid ""
 "需要注意的是，只有从 :class:`DatasetBuilder` 初始化的数据集具有将数据中的label自动转为id的功能（详细条件参见 "
 ":doc:`如何贡献数据集 <../community/contribute_dataset>`）。"
 msgstr ""
+"Please be aware, only the :class:`DatasetBuilder` initialised datasets are able to convert label into id"
+"(To find out more detils, please read :doc:`How to contribute dataset <../community/contribute_dataset>`)."
 
 #: ../../data_prepare/dataset_self_defined.rst:40
 msgid "像上例中的自定义数据集需要在自定义的convert to feature方法中添加label转id的功能。"
-msgstr ""
+msgstr "A custom dataset like the above example needs to add the function of label to id in the custom convert to feature method."
 
 #: ../../data_prepare/dataset_self_defined.rst:42
 msgid ""
 "自定义数据读取function中的参数可以直接以关键字参数的的方式传入 :func:`load_dataset` "
 "中。而且对于自定义数据集，:attr:`lazy` 参数是 **必须** 传入的。"
 msgstr ""
+"The parameters in the custom data fetching function can be directly passed in :func:`load_dataset` as keyword parameters."
+"But for custom dataset, the parameter :attr:`lazy` **must** be passed in. "
 
 #: ../../data_prepare/dataset_self_defined.rst:45
 msgid "从 :class:`paddle.io.Dataset/IterableDataset` 创建数据集"
-msgstr ""
+msgstr "Create dataset from :class:`paddle.io.Dataset/IterableDataset`"
 
 #: ../../data_prepare/dataset_self_defined.rst:47
 msgid ""
@@ -80,6 +90,10 @@ msgid ""
 "数据清洗，数据增强等）。而PaddleNLP内置的 :class:`MapDataset` 和 :class:`IterDataset` "
 "正好提供了能实现以上功能的API。"
 msgstr ""
+"Although the PaddlePaddle built in class :class:`Dataset` and :class:`IterableDataset` can directly access :class:`DataLoader` for model training, "
+"we sometimes want to use some data processing more conveniently (for example, convert to feature, data cleaning, and data enhancement)."
+"The PaddleNLP built in class :class:`MapDataset` and :class:`IterDataset` provide the API that can achieve the above functions."
+
 
 #: ../../data_prepare/dataset_self_defined.rst:49
 msgid ""
@@ -87,14 +101,17 @@ msgid ""
 "创建数据集的话。只需要在原来的数据集上套上一层 :class:`MapDataset` 或 :class:`IterDataset` "
 "就可以把原来的数据集对象转换成PaddleNLP的数据集。"
 msgstr ""
+"So, if you are used to create dataset by using :class:`paddle.io.Dataset/IterableDataset`,"
+"just need to put a layer of :class:`MapDataset` or :class:`IterDataset` on the original dataset,"
+"then, you can convert the original dataset object into a PaddleNLP dataset."
 
 #: ../../data_prepare/dataset_self_defined.rst:51
 msgid "下面举一个简单的小例子。:class:`IterDataset` 的用法基本相同。"
-msgstr ""
+msgstr "Let take a look a simple example. The usage of :class:`IterDataset` is basically the same."
 
 #: ../../data_prepare/dataset_self_defined.rst:78
 msgid "从其他python对象创建数据集"
-msgstr ""
+msgstr "Create datasets from other python objects"
 
 #: ../../data_prepare/dataset_self_defined.rst:80
 msgid ""
@@ -102,22 +119,30 @@ msgid ""
 ":class:`MapDataset`。包括 :class:`List` ，:class:`Tuple` ，:class:`DataFrame` "
 "等。只要将符合条件的python对象作为初始化参数传入 :class:`MapDataset` 即可完成创建。"
 msgstr ""
+"Theoretically, we can use any python objects that contains :func:`__getitem__` and :func:`__len__` to create :class:`MapDataset`."
+"Including: :class:`List` ，:class:`Tuple` ，:class:`DataFrame`, etc."
+"'MapDataset can be built as long as pass in the eligible python objects as the initializing parameter."
 
 #: ../../data_prepare/dataset_self_defined.rst:95
 msgid ""
 "同样的，我们也可以使用包含 :func:`__iter__` 方法的python对象创建 :class:`IterDataset` 。例如 "
 ":class:`List`， :class:`Generator` 等。创建方法与 :class:`MapDataset` 相同。"
 msgstr ""
+"Similarly, we can also use python objects that contains function :func:`__iter__` to create :class:`IterDataset`. "
+"For example, :class:`List`， :class:`Generator`, etc. The creation method is the same as :class:`MapDataset`."
+
 
 #: ../../data_prepare/dataset_self_defined.rst:112
 msgid "需要注意，像上例中直接将 **生成器** 对象传入 :class:`IterDataset` 所生成的数据集。其数据只能迭代 **一次** 。"
 msgstr ""
+"Please be aware, as in the above example, pass the **generator** object directly in the :class:`IterDataset` to generate dataset."
+"It's data can only be iterated **once**."
 
 #: ../../data_prepare/dataset_self_defined.rst:114
 msgid "与常规的python对象一样，只要满足以上的条件，我们也可以使用同样的方法从第三方数据集创建PaddleNLP数据集。"
-msgstr ""
+msgstr "Like regular python object, as long as the above conditions are met, we can also use the same method to create PaddleNLP datasets from third-party datasets "
 
 #: ../../data_prepare/dataset_self_defined.rst:116
 msgid "例如HuggingFace Dataset："
-msgstr ""
+msgstr "For example, HuggingFace Dataset："
 

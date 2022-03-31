@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.data.rst:2
 msgid "paddlenlp.data"
-msgstr ""
+msgstr "paddlenlp.data"
 

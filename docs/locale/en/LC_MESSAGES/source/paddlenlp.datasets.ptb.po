@@ -19,21 +19,21 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.ptb.rst:2
 msgid "ptb"
-msgstr ""
+msgstr "ptb"
 
 #: of paddlenlp.datasets.ptb.PTB:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.ptb.META_INFO:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of paddlenlp.datasets.ptb.PTB.META_INFO.file:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of paddlenlp.datasets.ptb.PTB.META_INFO.md5:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 

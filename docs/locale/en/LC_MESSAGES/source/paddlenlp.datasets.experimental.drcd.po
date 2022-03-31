@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.drcd.rst:2
 msgid "drcd"
-msgstr ""
+msgstr "drcd"
 

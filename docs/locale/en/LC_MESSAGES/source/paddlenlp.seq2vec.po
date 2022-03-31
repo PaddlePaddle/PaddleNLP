@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.seq2vec.rst:2
 msgid "paddlenlp.seq2vec"
-msgstr ""
+msgstr "paddlenlp.seq2vec"
 

@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.metrics.chunk.rst:2
 msgid "chunk"
-msgstr ""
+msgstr "chunk"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class: :class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator:1
 msgid ""
@@ -31,21 +31,26 @@ msgid ""
 "detection. It is often used in sequence tagging tasks, such as Named "
 "Entity Recognition(NER)."
 msgstr ""
+"ChunkEvaluator computes the precision, recall and F1-score for chunk "
+"detection. It is often used in sequence tagging tasks, such as Named "
+"Entity Recognition(NER)."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator
 #: paddlenlp.metrics.chunk.ChunkEvaluator.update
 msgid "参数"
-msgstr ""
+msgstr "Parameter"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator:4
 msgid "The label list."
-msgstr ""
+msgstr "The label list."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator:6
 msgid ""
 "if set True, the label ends with '-B', '-I', '-E' or '-S', else the label"
 " starts with them."
 msgstr ""
+"if set True, the label ends with '-B', '-I', '-E' or '-S', else the label"
+" starts with them."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:1
 msgid ""
@@ -54,6 +59,10 @@ msgid ""
 " be defined here, where Paddle OPs is also supported. Outputs of this API"
 " will be the inputs of \"Metric.update\"."
 msgstr ""
+"This API is advanced usage to accelerate metric calculating, calulations "
+"from outputs of model to the states which should be updated by Metric can"
+" be defined here, where Paddle OPs is also supported. Outputs of this API"
+" will be the inputs of \"Metric.update\"."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:6
 msgid ""
@@ -62,6 +71,10 @@ msgid ""
 "be concatenated and flatten and each filed as a separate argument as "
 "follows: :code:`compute(output1, output2, ..., label1, label2,...)`"
 msgstr ""
+"If :code:`compute` is defined, it will be called with **outputs** of "
+"model and **labels** from data as arguments, all outputs and labels will "
+"be concatenated and flatten and each filed as a separate argument as "
+"follows: :code:`compute(output1, output2, ..., label1, label2,...)`"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:12
 msgid ""
@@ -69,10 +82,13 @@ msgid ""
 "output, so output format will be: :code:`return output1, output2, ..., "
 "label1, label2,...`"
 msgstr ""
+"If :code:`compute` is not defined, default behaviour is to pass input to "
+"output, so output format will be: :code:`return output1, output2, ..., "
+"label1, label2,...`"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.compute:16
 msgid "see :code:`Metric.update`"
-msgstr ""
+msgstr "see :code:`Metric.update`"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.update:1
 msgid ""
@@ -80,6 +96,9 @@ msgid ""
 "num_correct_chunks) as input, to accumulate and update the corresponding "
 "status of the ChunkEvaluator object. The update method is as follows:"
 msgstr ""
+"This function takes (num_infer_chunks, num_label_chunks, "
+"num_correct_chunks) as input, to accumulate and update the corresponding "
+"status of the ChunkEvaluator object. The update method is as follows:"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.update:4
 msgid ""
@@ -89,42 +108,49 @@ msgid ""
 "num_correct_chunks }}\\end{array} \\\\\n"
 "\n"
 msgstr ""
+"\\\\ \\begin{array}{l}{\\text { self. num_infer_chunks }+=\\text { "
+"num_infer_chunks }} \\\\ {\\text { self. num_Label_chunks }+=\\text { "
+"num_label_chunks }} \\\\ {\\text { self. num_correct_chunks }+=\\text { "
+"num_correct_chunks }}\\end{array} \\\\\n"
+"\n"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.update:7
 msgid "The number of chunks in Inference on the given minibatch."
-msgstr ""
+msgstr "The number of chunks in Inference on the given minibatch."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.update:9
 msgid "The number of chunks in Label on the given mini-batch."
-msgstr ""
+msgstr "The number of chunks in Label on the given mini-batch."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.update:11
 msgid "The number of chunks both in Inference and Label on the given mini-batch."
-msgstr ""
+msgstr "The number of chunks both in Inference and Label on the given mini-batch."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate:1
 msgid ""
 "This function returns the mean precision, recall and f1 score for all "
 "accumulated minibatches."
 msgstr ""
+"This function returns the mean precision, recall and f1 score for all "
+"accumulated minibatches."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate
 msgid "返回"
-msgstr ""
+msgstr "Retuen"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate:3
 msgid "mean precision, recall and f1 score."
-msgstr ""
+msgstr "mean precision, recall and f1 score."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.accumulate
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.reset:1
 msgid "Reset function empties the evaluation memory for previous mini-batches."
-msgstr ""
+msgstr "Reset function empties the evaluation memory for previous mini-batches."
 
 #: of paddlenlp.metrics.chunk.ChunkEvaluator.name:1
 msgid "Return name of metric instance."
-msgstr ""
+msgstr "Return name of metric instance."
 

@@ -19,33 +19,33 @@ msgstr ""
 
 #: ../../source/paddlenlp.utils.log.rst:2
 msgid "log"
-msgstr ""
+msgstr "log"
 
 #: of paddlenlp.utils.log.Logger:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.utils.log.Logger:1
 msgid "Deafult logger in PaddleNLP"
-msgstr ""
+msgstr "Deafult logger in PaddleNLP"
 
 #: of paddlenlp.utils.log.Logger paddlenlp.utils.log.Logger.processing
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.utils.log.Logger:3
 msgid "Logger name, default is 'PaddleNLP'"
-msgstr ""
+msgstr "Logger name, default is 'PaddleNLP'"
 
 #: of paddlenlp.utils.log.Logger.processing:1
 msgid "Continuously print a progress bar with rotating special effects."
-msgstr ""
+msgstr "Continuously print a progress bar with rotating special effects."
 
 #: of paddlenlp.utils.log.Logger.processing:3
 msgid "Message to be printed."
-msgstr ""
+msgstr "Message to be printed."
 
 #: of paddlenlp.utils.log.Logger.processing:5
 msgid "Rotation interval. Default to 0.1."
-msgstr ""
+msgstr "Rotation interval. Default to 0.1."
 

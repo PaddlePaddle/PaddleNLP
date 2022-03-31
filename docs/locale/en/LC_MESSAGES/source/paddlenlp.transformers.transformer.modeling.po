@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.transformer.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.transformer.modeling.position_encoding_init:1
 msgid "Generate the initial values for the sinusoid position encoding table."
-msgstr ""
+msgstr "Generate the initial values for the sinusoid position encoding table."
 
 #: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:1
 #: paddlenlp.transformers.transformer.modeling.PositionalEmbedding:1
@@ -31,11 +31,11 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerModel:1
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.transformer.modeling.WordEmbedding:1
 msgid "Word Embedding + Scale"
-msgstr ""
+msgstr "Word Embedding + Scale"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:1
@@ -48,6 +48,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward
 #: paddlenlp.transformers.transformer.modeling.InferTransformerModel.forward
@@ -58,7 +60,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerModel.forward
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:4
@@ -68,7 +70,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerModel.forward:4
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:6
@@ -78,16 +80,16 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerModel.forward:6
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.transformer.modeling.PositionalEmbedding:1
 msgid "Positional Embedding"
-msgstr ""
+msgstr "Positional Embedding"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
 msgid "基类：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:1
@@ -99,6 +101,12 @@ msgid ""
 "`t[0], t[0], ..., t[1], t[1], ...` where each minibatch entry is repeated"
 " `beam_size` times."
 msgstr ""
+"Tile the batch dimension of a tensor. Specifically, this function takes a"
+" tensor t shaped `[batch_size, s0, s1, ...]` composed of minibatch "
+"entries `t[0], ..., t[batch_size - 1]` and tiles it to have a shape "
+"`[batch_size * beam_size, s0, s1, ...]` composed of minibatch entries "
+"`t[0], t[0], ..., t[1], t[1], ...` where each minibatch entry is repeated"
+" `beam_size` times."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:8
@@ -106,17 +114,19 @@ msgid ""
 "A tensor with shape `[batch_size, ...]`. The data type should be float32,"
 " float64, int32, int64 or bool."
 msgstr ""
+"A tensor with shape `[batch_size, ...]`. The data type should be float32,"
+" float64, int32, int64 or bool."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:11
 msgid "The beam width used in beam search."
-msgstr ""
+msgstr "The beam width used in beam search."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:14
@@ -124,22 +134,24 @@ msgid ""
 "A tensor with shape `[batch_size * beam_size, ...]`, whose \\     data "
 "type is same as `x`."
 msgstr ""
+"A tensor with shape `[batch_size * beam_size, ...]`, whose \\     data "
+"type is same as `x`."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:16
 msgid "A tensor with shape `[batch_size * beam_size, ...]`, whose \\"
-msgstr ""
+msgstr "A tensor with shape `[batch_size * beam_size, ...]`, whose \\"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch:17
 msgid "data type is same as `x`."
-msgstr ""
+msgstr "data type is same as `x`."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.tile_beam_merge_with_batch
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:1
@@ -148,6 +160,9 @@ msgid ""
 "probabilities, and follows a beam search step to calculate scores and "
 "select candidate token ids."
 msgstr ""
+"Perform a beam search decoding step, which uses `cell` to get "
+"probabilities, and follows a beam search step to calculate scores and "
+"select candidate token ids."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:5
@@ -155,6 +170,8 @@ msgid ""
 "An `int64` tensor with shape `[1]` provided by the caller, representing "
 "the current time step number of decoding."
 msgstr ""
+"An `int64` tensor with shape `[1]` provided by the caller, representing "
+"the current time step number of decoding."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:8
@@ -163,6 +180,9 @@ msgid ""
 "`initialize()` for the first decoding step and `next_inputs` returned by "
 "`step()` for the others."
 msgstr ""
+"A tensor variable. It is same as `initial_inputs` returned by "
+"`initialize()` for the first decoding step and `next_inputs` returned by "
+"`step()` for the others."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:12
@@ -171,11 +191,14 @@ msgid ""
 "returned by `initialize()` for the first decoding step and "
 "`beam_search_state` returned by `step()` for the others."
 msgstr ""
+"A structure of tensor variables. It is same as the `initial_states` "
+"returned by `initialize()` for the first decoding step and "
+"`beam_search_state` returned by `step()` for the others."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:17
 msgid "Additional keyword arguments, provided by the caller."
-msgstr ""
+msgstr "Additional keyword arguments, provided by the caller."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:19
@@ -190,6 +213,15 @@ msgid ""
 "type `float32, int64, int64`. \\     `finished` is a `bool` tensor with "
 "shape `[batch_size, beam_size]`."
 msgstr ""
+"A tuple( :code:`(beam_search_output, beam_search_state, next_inputs, "
+"finished)` ). \\     `beam_search_state` and `next_inputs` have the same "
+"structure, \\     shape and data type as the input arguments `states` and"
+" `inputs` separately. \\     `beam_search_output` is a "
+"namedtuple(including scores, predicted_ids, \\     parent_ids as fields) "
+"of tensor variables, where \\     `scores, predicted_ids, parent_ids` all"
+" has a tensor value shaped \\     `[batch_size, beam_size]` with data "
+"type `float32, int64, int64`. \\     `finished` is a `bool` tensor with "
+"shape `[batch_size, beam_size]`."
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:27
@@ -197,6 +229,8 @@ msgid ""
 "A tuple( :code:`(beam_search_output, beam_search_state, next_inputs, "
 "finished)` ). \\"
 msgstr ""
+"A tuple( :code:`(beam_search_output, beam_search_state, next_inputs, "
+"finished)` ). \\"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder.step:22
@@ -209,12 +243,19 @@ msgid ""
 " beam_size]` with data type `float32, int64, int64`. \\ `finished` is a "
 "`bool` tensor with shape `[batch_size, beam_size]`."
 msgstr ""
+"`beam_search_state` and `next_inputs` have the same structure, \\ shape "
+"and data type as the input arguments `states` and `inputs` separately. \\"
+" `beam_search_output` is a namedtuple(including scores, predicted_ids, \\"
+" parent_ids as fields) of tensor variables, where \\ `scores, "
+"predicted_ids, parent_ids` all has a tensor value shaped \\ `[batch_size,"
+" beam_size]` with data type `float32, int64, int64`. \\ `finished` is a "
+"`bool` tensor with shape `[batch_size, beam_size]`."
 
 #: of paddlenlp.transformers.transformer.modeling.TransformerModel:1
 msgid "model"
-msgstr ""
+msgstr "model"
 
 #: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:1
 msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
 

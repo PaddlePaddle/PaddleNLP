@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/embedding.rst:3
 msgid "词向量"
-msgstr ""
+msgstr "Word Vector"
 

@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../../source/paddlenlp.ext_op.transformer.faster_transformer.rst:2
 msgid "faster\\_transformer"
-msgstr ""
+msgstr "faster\\_transformer"
 
 #: of paddlenlp.ext_op.transformer.faster_transformer.FasterTransformer:1
 msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
 
 #: of
 #: paddlenlp.ext_op.transformer.faster_transformer.FasterTransformer.forward:1
@@ -31,18 +31,20 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.ext_op.transformer.faster_transformer.FasterTransformer.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameter"
 
 #: of
 #: paddlenlp.ext_op.transformer.faster_transformer.FasterTransformer.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of
 #: paddlenlp.ext_op.transformer.faster_transformer.FasterTransformer.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 

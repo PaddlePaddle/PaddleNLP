@@ -19,12 +19,12 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.unified_transformer.tokenizer.rst:2
 msgid "tokenizer"
-msgstr ""
+msgstr "tokenizer"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.vocab_size:1
@@ -32,21 +32,23 @@ msgid ""
 "return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
 "int"
 msgstr ""
+"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
+"int"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.preprocess_text:1
 msgid "preprocess data by removing extra space and normalize data."
-msgstr ""
+msgstr "preprocess data by removing extra space and normalize data."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.clean_text:1
 msgid "Performs invalid character removal and whitespace cleanup on text."
-msgstr ""
+msgstr "Performs invalid character removal and whitespace cleanup on text."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.encode_pieces:1
 msgid "turn sentences into word pieces."
-msgstr ""
+msgstr "turn sentences into word pieces."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.tokenize:1
@@ -54,6 +56,8 @@ msgid ""
 "End-to-end tokenization for BERT models. :param text: The text to be "
 "tokenized. :type text: str"
 msgstr ""
+"End-to-end tokenization for BERT models. :param text: The text to be "
+"tokenized. :type text: str"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens
@@ -65,12 +69,12 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.tokenize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.tokenize:5
 msgid "A list of string representing converted tokens."
-msgstr ""
+msgstr "A list of string representing converted tokens."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens
@@ -81,12 +85,12 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.tokenize
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.merge_subword:1
 msgid "Merge subword."
-msgstr ""
+msgstr "Merge subword."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.convert_tokens_to_string:1
@@ -96,16 +100,20 @@ msgid ""
 "`__` when converting. :param tokens: A list of string representing tokens"
 " to be converted. :type tokens: list"
 msgstr ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `__` to concat subwords, also remove "
+"`__` when converting. :param tokens: A list of string representing tokens"
+" to be converted. :type tokens: list"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.convert_tokens_to_string:7
 msgid "Converted string from tokens."
-msgstr ""
+msgstr "Converted string from tokens."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.convert_ids_to_string:1
 msgid "Convert ids to string."
-msgstr ""
+msgstr "Convert ids to string."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.num_special_tokens_to_add:1
@@ -113,6 +121,8 @@ msgid ""
 "Returns the number of added tokens when encoding a sequence with special "
 "tokens. .. note::"
 msgstr ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens. .. note::"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens
@@ -123,7 +133,7 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.num_special_tokens_to_add:8
@@ -132,11 +142,14 @@ msgid ""
 "to True, returns the number of added tokens in the case of a single "
 "sequence if set to False. Default False."
 msgstr ""
+"Returns the number of added tokens in the case of a sequence pair if set "
+"to True, returns the number of added tokens in the case of a single "
+"sequence if set to False. Default False."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.num_special_tokens_to_add:14
 msgid "Number of tokens added to sequences"
-msgstr ""
+msgstr "Number of tokens added to sequences"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens:1
@@ -145,21 +158,24 @@ msgid ""
 " and adding special tokens. An UnifiedTransformer sequence has the "
 "following format: ::"
 msgstr ""
+"Build model inputs from a sequence or a pair of sequence by concatenating"
+" and adding special tokens. An UnifiedTransformer sequence has the "
+"following format: ::"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens:7
 msgid "List of IDs to which the special tokens will be added."
-msgstr ""
+msgstr "List of IDs to which the special tokens will be added."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens:10
 msgid "Optional second list of IDs for sequence pairs. Default None."
-msgstr ""
+msgstr "Optional second list of IDs for sequence pairs. Default None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_inputs_with_special_tokens:14
 msgid "List of input_ids with the appropriate special tokens."
-msgstr ""
+msgstr "List of input_ids with the appropriate special tokens."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:1
@@ -168,11 +184,14 @@ msgid ""
 "offsets of special tokens. An UnifiedTransformer offset_mapping has the "
 "following format: ::"
 msgstr ""
+"Build offset map from a pair of offset map by concatenating and adding "
+"offsets of special tokens. An UnifiedTransformer offset_mapping has the "
+"following format: ::"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:8
 msgid "List of char offsets to which the special tokens will be added."
-msgstr ""
+msgstr "List of char offsets to which the special tokens will be added."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:11
@@ -180,51 +199,53 @@ msgid ""
 "Optional second list of char offsets for offset mapping pairs. Dafault "
 "None"
 msgstr ""
+"Optional second list of char offsets for offset mapping pairs. Dafault "
+"None"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:15
 msgid "List of char offsets with the appropriate offsets of special     tokens."
-msgstr ""
+msgstr "List of char offsets with the appropriate offsets of special     tokens."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:17
 msgid "List of char offsets with the appropriate offsets of special"
-msgstr ""
+msgstr "List of char offsets with the appropriate offsets of special"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.build_offset_mapping_with_special_tokens:18
 msgid "tokens."
-msgstr ""
+msgstr "tokens."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:1
 msgid "Create the token_type_ids from the two sequences passed for the model."
-msgstr ""
+msgstr "Create the token_type_ids from the two sequences passed for the model."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:3
 msgid "An UnifiedTransformer sequence token_type_ids has the following format: ::"
-msgstr ""
+msgstr "An UnifiedTransformer sequence token_type_ids has the following format: ::"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:9
 msgid "If `token_ids_1` is None, this method only returns the first portion (0s)."
-msgstr ""
+msgstr "If `token_ids_1` is None, this method only returns the first portion (0s)."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:11
 msgid "List of IDs."
-msgstr ""
+msgstr "List of IDs."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:13
 msgid "Optional second list of IDs for sequence pairs. Default None"
-msgstr ""
+msgstr "Optional second list of IDs for sequence pairs. Default None"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.create_token_type_ids_from_sequences:17
 msgid "List of token_type_id according to the given sequence(s)."
-msgstr ""
+msgstr "List of token_type_id according to the given sequence(s)."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:1
@@ -235,11 +256,16 @@ msgid ""
 "token_ids_0: list :param token_ids_1: Optional second list of IDs for "
 "sequence"
 msgstr ""
+"Retrieve sequence ids from a token list that has no special tokens added."
+" This method is called when adding special tokens using the tokenizer "
+"``prepare_for_model`` method. :param token_ids_0: List of IDs. :type "
+"token_ids_0: list :param token_ids_1: Optional second list of IDs for "
+"sequence"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:7
 msgid "pairs. Default None."
-msgstr ""
+msgstr "pairs. Default None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:9
@@ -247,6 +273,8 @@ msgid ""
 "Whether or not the token list is already formatted with special tokens "
 "for the model. Default False."
 msgstr ""
+"Whether or not the token list is already formatted with special tokens "
+"for the model. Default False."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:14
@@ -254,16 +282,18 @@ msgid ""
 "A list of integers in the range [0, 1]. 1 for a special token,     0 for "
 "a sequence token."
 msgstr ""
+"A list of integers in the range [0, 1]. 1 for a special token,     0 for "
+"a sequence token."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:16
 msgid "A list of integers in the range [0, 1]. 1 for a special token,"
-msgstr ""
+msgstr "A list of integers in the range [0, 1]. 1 for a special token,"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.get_special_tokens_mask:17
 msgid "0 for a sequence token."
-msgstr ""
+msgstr "0 for a sequence token."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.save_resources:1
@@ -271,6 +301,8 @@ msgid ""
 "Save tokenizer related resources to files under `save_directory`. :param "
 "save_directory: Directory to save files into. :type save_directory: str"
 msgstr ""
+"Save tokenizer related resources to files under `save_directory`. :param "
+"save_directory: Directory to save files into. :type save_directory: str"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:1
@@ -281,11 +313,16 @@ msgid ""
 "vocabulary. :type filepath: str :param unk_token: special token for "
 "unknown token. If no need, it also"
 msgstr ""
+"Instantiate an instance of `Vocab` from a file reserving all tokens by "
+"using `Vocab.from_dict`. The file contains a token and index of the token"
+" per line, separated by '  '. :param filepath: path of file to construct "
+"vocabulary. :type filepath: str :param unk_token: special token for "
+"unknown token. If no need, it also"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:7
 msgid "could be None. Default: None."
-msgstr ""
+msgstr "could be None. Default: None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:9
@@ -293,6 +330,8 @@ msgid ""
 "special token for padding token. If no need, it also could be None. "
 "Default: None."
 msgstr ""
+"special token for padding token. If no need, it also could be None. "
+"Default: None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:12
@@ -300,6 +339,8 @@ msgid ""
 "special token for bos token. If no need, it also could be None. Default: "
 "None."
 msgstr ""
+"special token for bos token. If no need, it also could be None. Default: "
+"None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:15
@@ -307,16 +348,18 @@ msgid ""
 "special token for eos token. If no need, it also could be None. Default: "
 "None."
 msgstr ""
+"special token for eos token. If no need, it also could be None. Default: "
+"None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:18
 msgid "keyword arguments for `Vocab.from_dict`."
-msgstr ""
+msgstr "keyword arguments for `Vocab.from_dict`."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.load_vocabulary:21
 msgid "An instance of `Vocab`."
-msgstr ""
+msgstr "An instance of `Vocab`."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:1
@@ -327,6 +370,11 @@ msgid ""
 "requirements of the UnifiedTransformer model. See detail at "
 "https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue"
 msgstr ""
+"Main method to encode the single-turn or multi-turn dialogue "
+"conversation. It will return a dictionary containing the encoded sequence"
+" and other relative informations which meets the input format "
+"requirements of the UnifiedTransformer model. See detail at "
+"https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:8
@@ -334,6 +382,8 @@ msgid ""
 "The history of dialogue conversation. It is an utterance or list of "
 "utterances to be encoded. Each utterance is a string."
 msgstr ""
+"The history of dialogue conversation. It is an utterance or list of "
+"utterances to be encoded. Each utterance is a string."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:12
@@ -341,6 +391,8 @@ msgid ""
 "The response of dialogue conversation. It should be set when training the"
 " model. It should not be set when running inference. Default None."
 msgstr ""
+"The response of dialogue conversation. It should be set when training the"
+" model. It should not be set when running inference. Default None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:16
@@ -348,6 +400,8 @@ msgid ""
 "The knowledge information of dialogue conversation. It should be set if "
 "the `task_type` is \"knowledge\" or \"recommend\". Default None."
 msgstr ""
+"The knowledge information of dialogue conversation. It should be set if "
+"the `task_type` is \"knowledge\" or \"recommend\". Default None."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:20
@@ -357,41 +411,45 @@ msgid ""
 "knowledge grounded dialogue and conversational recommendation "
 "respectively. Default \"chitchat\"."
 msgstr ""
+"The type of dialogue conversation. It is one of \"chitchat\", "
+"\"knowledge\" and \"recommend\". They represent the chitchat dialogue, "
+"knowledge grounded dialogue and conversational recommendation "
+"respectively. Default \"chitchat\"."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:25
 msgid "The maximum encoded sequence length. Default 512."
-msgstr ""
+msgstr "The maximum encoded sequence length. Default 512."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:28
 msgid "The maximum encoded sequence length of the input `response`. Default 128."
-msgstr ""
+msgstr "The maximum encoded sequence length of the input `response`. Default 128."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:31
 msgid "The maximum encoded sequence length of the input `knowledge`. Default 128."
-msgstr ""
+msgstr "The maximum encoded sequence length of the input `knowledge`. Default 128."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:34
 msgid "Whether to return the position_ids. Default True."
-msgstr ""
+msgstr "Whether to return the position_ids. Default True."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:37
 msgid "Whether to return the token_type_ids. Default True."
-msgstr ""
+msgstr "Whether to return the token_type_ids. Default True."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:40
 msgid "Whether to return the attention_mask. Default True."
-msgstr ""
+msgstr "Whether to return the attention_mask. Default True."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:43
 msgid "Whether to return the length of the encoded sequence. Default False."
-msgstr ""
+msgstr "Whether to return the length of the encoded sequence. Default False."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:46
@@ -400,6 +458,9 @@ msgid ""
 "begining of the response when running inference to force the model to "
 "start generating response sequence. Default False."
 msgstr ""
+"Whether to add the special token [CLS] at the end of sequence as the "
+"begining of the response when running inference to force the model to "
+"start generating response sequence. Default False."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.tokenizer.UnifiedTransformerTokenizer.dialogue_encode:51
@@ -408,4 +469,7 @@ msgid ""
 " this method, returned sequences will be padded on the left. Default "
 "False."
 msgstr ""
+"Whether to pad the returned sequences to the `max_seq_len`. Note that, in"
+" this method, returned sequences will be padded on the left. Default "
+"False."
 

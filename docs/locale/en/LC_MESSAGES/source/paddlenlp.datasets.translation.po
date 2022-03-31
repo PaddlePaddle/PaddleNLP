@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.translation.rst:2
 msgid "translation"
-msgstr ""
+msgstr "translation"
 

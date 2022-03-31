@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../model_zoo.rst:3
 msgid "模型库"
-msgstr ""
+msgstr "Model Library"
 

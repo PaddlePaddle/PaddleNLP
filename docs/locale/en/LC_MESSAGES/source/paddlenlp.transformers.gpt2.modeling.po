@@ -19,16 +19,16 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.gpt2.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:1
 #: paddlenlp.transformers.gpt2.modeling.GPT2Model:1
 msgid "基类：:class:`paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel`"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2Model:1
 msgid "The base model of gpt2."
-msgstr ""
+msgstr "The base model of gpt2."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:1
 #: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:1
@@ -37,28 +37,30 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward
 #: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward
 #: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameter"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:4
 #: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:4
 #: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:6
 #: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:6
 #: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel:1
 msgid ""
@@ -68,28 +70,33 @@ msgid ""
 "`base_model_prefix` for downloading and loading pretrained models. See "
 "`PretrainedModel` for more details."
 msgstr ""
+"An abstract class for pretrained GPT2 models. It provides GPT2 related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel.init_weights:1
 msgid "Initialization hook"
-msgstr ""
+msgstr "Initialization hook"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:1
 msgid "The pretraining model of GPT2."
-msgstr ""
+msgstr "The pretraining model of GPT2."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:3
 msgid "It returns some logits and cached_kvs."
-msgstr ""
+msgstr "It returns some logits and cached_kvs."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:1
 msgid "Criterion for GPT2."
-msgstr ""
+msgstr "Criterion for GPT2."
 
 #: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:3
 msgid "It calculates the final loss."
-msgstr ""
+msgstr "It calculates the final loss."
 

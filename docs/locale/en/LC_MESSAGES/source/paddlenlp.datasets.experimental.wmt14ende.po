@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.wmt14ende.rst:2
 msgid "wmt14ende"
-msgstr ""
+msgstr "wmt14ende"
 

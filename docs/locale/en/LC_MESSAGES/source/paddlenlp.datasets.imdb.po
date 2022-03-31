@@ -19,17 +19,17 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.imdb.rst:2
 msgid "imdb"
-msgstr ""
+msgstr "imdb"
 
 #: of paddlenlp.datasets.imdb.Imdb:1
 msgid "基类：:class:`paddlenlp.datasets.dataset.DatasetBuilder`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.datasets.dataset.DatasetBuilder`"
 
 #: of paddlenlp.datasets.imdb.Imdb:1
 msgid "Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset."
-msgstr ""
+msgstr "Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset."
 
 #: of paddlenlp.datasets.imdb.Imdb.get_labels:1
 msgid "Return labels of the Imdb object."
-msgstr ""
+msgstr "Return labels of the Imdb object."
 

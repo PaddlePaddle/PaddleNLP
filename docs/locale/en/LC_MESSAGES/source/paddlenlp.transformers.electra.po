@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.electra.rst:2
 msgid "electra"
-msgstr ""
+msgstr "electra"
 

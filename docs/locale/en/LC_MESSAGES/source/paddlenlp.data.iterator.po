@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.data.iterator.rst:2
 msgid "iterator"
-msgstr ""
+msgstr "iterator"
 

@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/reading_comprehension.rst:3
 msgid "阅读理解"
-msgstr ""
+msgstr "Reading Comprehension"
 

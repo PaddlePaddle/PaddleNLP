@@ -19,13 +19,13 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.attention_utils.rst:2
 msgid "attention\\_utils"
-msgstr ""
+msgstr "attention\\_utils"
 
 #: of paddlenlp.transformers.attention_utils.Attention:1
 #: paddlenlp.transformers.attention_utils.Linear3D:1
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.attention_utils.Attention.forward:1
 #: paddlenlp.transformers.attention_utils.DefaultAttention.forward:1
@@ -35,32 +35,34 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.attention_utils.Attention.forward
 #: paddlenlp.transformers.attention_utils.DefaultAttention.forward
 #: paddlenlp.transformers.attention_utils.Linear3D.forward
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.attention_utils.Attention.forward:4
 #: paddlenlp.transformers.attention_utils.DefaultAttention.forward:4
 #: paddlenlp.transformers.attention_utils.Linear3D.forward:4
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.transformers.attention_utils.Attention.forward:6
 #: paddlenlp.transformers.attention_utils.DefaultAttention.forward:6
 #: paddlenlp.transformers.attention_utils.Linear3D.forward:6
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.attention_utils.BigBirdSparseAttention:1
 #: paddlenlp.transformers.attention_utils.DefaultAttention:1
 msgid "基类：:class:`paddlenlp.transformers.attention_utils.Attention`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.attention_utils.Attention`"
 
 #: of paddlenlp.transformers.attention_utils.BigBirdSparseAttention.forward:1
 msgid ""
@@ -69,21 +71,25 @@ msgid ""
 "mask rand_mask_idx: [H, T//bs, bs] Global Attention Random Attention "
 "Window Attention"
 msgstr ""
+"query_matrix: [B, H, T, D] key_matrix: [B, H, T, D] value_matrix: [B, H, "
+"T, D] query_mask: [B, 1, T, 1]  bool mask key_mask: [B, 1, 1, T]    bool "
+"mask rand_mask_idx: [H, T//bs, bs] Global Attention Random Attention "
+"Window Attention"
 
 #: of paddlenlp.transformers.attention_utils.Cache:1
 #: paddlenlp.transformers.attention_utils.StaticCache:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class: :class:`tuple`"
 
 #: ../../docstring of
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.Cache.k:1
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.StaticCache.k:1
 msgid "Alias for field number 0"
-msgstr ""
+msgstr "Alias for field number 0"
 
 #: ../../docstring of
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.Cache.v:1
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.StaticCache.v:1
 msgid "Alias for field number 1"
-msgstr ""
+msgstr "Alias for field number 1"
 

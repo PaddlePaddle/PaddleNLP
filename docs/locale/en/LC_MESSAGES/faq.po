@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../faq.rst:3
 msgid "FAQ"
-msgstr ""
+msgstr "FAQ"
 

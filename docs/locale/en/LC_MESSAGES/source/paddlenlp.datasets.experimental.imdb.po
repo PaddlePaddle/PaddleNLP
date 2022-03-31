@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.imdb.rst:2
 msgid "imdb"
-msgstr ""
+msgstr "imdb"
 

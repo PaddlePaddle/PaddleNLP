@@ -19,7 +19,7 @@ msgstr ""
 
 #: ../../source/paddlenlp.utils.downloader.rst:2
 msgid "downloader"
-msgstr ""
+msgstr "downloader"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url:1
 msgid ""
@@ -27,20 +27,23 @@ msgid ""
 ":param url: download url :type url: str :param md5sum: md5 sum of "
 "download package :type md5sum: str"
 msgstr ""
+"Get weights path from WEIGHT_HOME, if not exists, download it from url. "
+":param url: download url :type url: str :param md5sum: md5 sum of "
+"download package :type md5sum: str"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url:8
 msgid "a local path to save downloaded weights."
-msgstr ""
+msgstr "a local path to save downloaded weights."
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url:12
 msgid "实际案例"
-msgstr ""
+msgstr "Example"
 

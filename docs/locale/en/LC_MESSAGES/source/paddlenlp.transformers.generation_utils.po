@@ -19,20 +19,20 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.generation_utils.rst:2
 msgid "generation\\_utils"
-msgstr ""
+msgstr "generation\\_utils"
 
 #: of paddlenlp.transformers.generation_utils.BeamSearchScorer:1
 #: paddlenlp.transformers.generation_utils.GenerationMixin:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class: :class:`object`"
 
 #: of paddlenlp.transformers.generation_utils.BeamSearchScorer:1
 msgid "implementing standard beam search decoding."
-msgstr ""
+msgstr "implementing standard beam search decoding."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin:1
 msgid "The class which implements the interface for generation task."
-msgstr ""
+msgstr "The class which implements the interface for generation task."
 
 #: of
 #: paddlenlp.transformers.generation_utils.GenerationMixin.update_model_kwargs_for_generation:1
@@ -42,6 +42,10 @@ msgid ""
 "result vectors updated by this method may be different from expected. In "
 "this case, you need to rewrite the method."
 msgstr ""
+"Update the model inputs during generation. Note that If `token_type_ids` "
+"and `attention_mask` in `model_kwargs` and they contain pad value, the "
+"result vectors updated by this method may be different from expected. In "
+"this case, you need to rewrite the method."
 
 #: of
 #: paddlenlp.transformers.generation_utils.GenerationMixin.adjust_logits_during_generation:1
@@ -49,15 +53,17 @@ msgid ""
 "Implement in subclasses for custom behavior to adjust the logits in the "
 "generate method."
 msgstr ""
+"Implement in subclasses for custom behavior to adjust the logits in the "
+"generate method."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:1
 msgid "The interface to generate sequences in generation task."
-msgstr ""
+msgstr "The interface to generate sequences in generation task."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 #: paddlenlp.transformers.generation_utils.MinLengthLogitsProcessor
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:3
 msgid ""
@@ -66,40 +72,50 @@ msgid ""
 "If None, use the function `prepare_input_ids_for_generation` as "
 "initialization. Default None."
 msgstr ""
+"The input sequence ids for the generation. It is a tensor with shape "
+"`[batch_size, sequence_length]`. The data type should be int32 or int64. "
+"If None, use the function `prepare_input_ids_for_generation` as "
+"initialization. Default None."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:8
 msgid "The maximum length of the sequence to be generated. Default 20."
-msgstr ""
+msgstr "The maximum length of the sequence to be generated. Default 20."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:11
 msgid "The minimum length of the sequence to be generated. Default 0."
-msgstr ""
+msgstr "The minimum length of the sequence to be generated. Default 0."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:14
 msgid ""
 "The decode strategy in generation. There has three decode strategies: "
 "'greedy_search', 'sampling', 'beam_search'. Default 'greedy_search'."
 msgstr ""
+"The decode strategy in generation. There has three decode strategies: "
+"'greedy_search', 'sampling', 'beam_search'. Default 'greedy_search'."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:18
 msgid "The value used to module the next token probabilities. Default 1.0."
-msgstr ""
+msgstr "The value used to module the next token probabilities. Default 1.0."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:21
 msgid ""
 "The number of highest probability tokens to keep for top-k-filtering. "
 "Default 0."
 msgstr ""
+"The number of highest probability tokens to keep for top-k-filtering. "
+"Default 0."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:24
 msgid ""
 "The cumulative probability for top-p-filtering. The value should satisfy "
 ":math:`0 <= top_p < 1`. Default 1.0."
 msgstr ""
+"The cumulative probability for top-p-filtering. The value should satisfy "
+":math:`0 <= top_p < 1`. Default 1.0."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:27
 msgid "The number of beams for beam search. Default 1."
-msgstr ""
+msgstr "The number of beams for beam search. Default 1."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:29
 msgid ""
@@ -109,44 +125,55 @@ msgid ""
 ":math:`length_penalty > 1.0`, the model will generate longer sequences. "
 "Default 1.0."
 msgstr ""
+"The exponential penalty to the sequence length for beam search. "
+":math:`length_penalty = 1.0` means no penalty. If :math:`length_penalty <"
+" 1.0`, the model will generate shorter sequences. If "
+":math:`length_penalty > 1.0`, the model will generate longer sequences. "
+"Default 1.0."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:35
 msgid ""
 "Whether to stop the beam search when at least `num_beams` sentences are "
 "finished per batch or not."
 msgstr ""
+"Whether to stop the beam search when at least `num_beams` sentences are "
+"finished per batch or not."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:38
 msgid "The id of the bos_token. Default None."
-msgstr ""
+msgstr "The id of the bos_token. Default None."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:40
 msgid "The id of the eos_token. Default None."
-msgstr ""
+msgstr "The id of the eos_token. Default None."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:42
 msgid "The id of the pad_token. Default None."
-msgstr ""
+msgstr "The id of the pad_token. Default None."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:44
 msgid ""
 "The number of independently computed returned sequences for each element "
 "in the batch. Default 1."
 msgstr ""
+"The number of independently computed returned sequences for each element "
+"in the batch. Default 1."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:48
 msgid ""
 "(bool, optional): Whether or not the model should use the cache to speed "
 "up decoding. Default True."
 msgstr ""
+"(bool, optional): Whether or not the model should use the cache to speed "
+"up decoding. Default True."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:50
 msgid "It can be used to specify additional kwargs passed to the model."
-msgstr ""
+msgstr "It can be used to specify additional kwargs passed to the model."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:54
 msgid ""
@@ -157,10 +184,16 @@ msgid ""
 "num_return_sequences, 1]`. The     data type is float32 or float64, as "
 "same as the parameters of     the model."
 msgstr ""
+"It is a tuple includes generated sequence ids and     scores. The "
+"generated sequence ids is a tensor with shape     `[batch_size * "
+"num_return_sequences, sequence_length]`. The     data type is same as the"
+" input `input_ids`. The scores is a     tensor with shape `[batch_size * "
+"num_return_sequences, 1]`. The     data type is float32 or float64, as "
+"same as the parameters of     the model."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:61
 msgid "It is a tuple includes generated sequence ids and"
-msgstr ""
+msgstr "It is a tuple includes generated sequence ids and"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:57
 msgid ""
@@ -170,38 +203,45 @@ msgid ""
 "num_return_sequences, 1]`. The data type is float32 or float64, as same "
 "as the parameters of the model."
 msgstr ""
+"scores. The generated sequence ids is a tensor with shape `[batch_size * "
+"num_return_sequences, sequence_length]`. The data type is same as the "
+"input `input_ids`. The scores is a tensor with shape `[batch_size * "
+"num_return_sequences, 1]`. The data type is float32 or float64, as same "
+"as the parameters of the model."
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.transformers.generation_utils.LogitsProcessorList:1
 msgid "基类：:class:`List`"
-msgstr ""
+msgstr "Base class: :class:`List`"
 
 #: of paddlenlp.transformers.generation_utils.LogitsProcessor:1
 msgid "基类：:class:`abc.ABC`"
-msgstr ""
+msgstr "Base class: :class:`abc.ABC`"
 
 #: of paddlenlp.transformers.generation_utils.LogitsProcessor:1
 msgid ""
 "Abstract base class for all logit processors that can be applied during "
 "generation."
 msgstr ""
+"Abstract base class for all logit processors that can be applied during "
+"generation."
 
 #: of paddlenlp.transformers.generation_utils.MinLengthLogitsProcessor:1
 msgid "基类：:class:`paddlenlp.transformers.generation_utils.LogitsProcessor`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.generation_utils.LogitsProcessor`"
 
 #: of paddlenlp.transformers.generation_utils.MinLengthLogitsProcessor:1
 msgid "Enforcing a min-length by setting EOS probability to 0."
-msgstr ""
+msgstr "Enforcing a min-length by setting EOS probability to 0."
 
 #: of paddlenlp.transformers.generation_utils.MinLengthLogitsProcessor:3
 msgid "The minimum length of generation sequence."
-msgstr ""
+msgstr "The minimum length of generation sequence."
 
 #: of paddlenlp.transformers.generation_utils.MinLengthLogitsProcessor:5
 msgid "The id of the `end-of-sequence` token."
-msgstr ""
+msgstr "The id of the `end-of-sequence` token."
 

@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../tutorials/semantic_matching.rst:3
 msgid "语义匹配"
-msgstr ""
+msgstr "Semantic Matching"
 

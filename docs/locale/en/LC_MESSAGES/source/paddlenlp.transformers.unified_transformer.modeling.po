@@ -19,12 +19,12 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.unified_transformer.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel:1
@@ -35,17 +35,22 @@ msgid ""
 "`base_model_prefix` for downloading and loading pretrained models. See "
 "`PretrainedModel` for more details."
 msgstr ""
+"An abstract class for pretrained UnifiedTransformer models. It provides "
+"UnifiedTransformer related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel.init_weights:1
 msgid "Initialization hook"
-msgstr ""
+msgstr "Initialization hook"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel:1
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel:1
 msgid "基类：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward:1
@@ -54,24 +59,26 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward:4
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward:6
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.adjust_logits_during_generation:1
@@ -79,4 +86,6 @@ msgid ""
 "Implement in subclasses for custom behavior to adjust the logits in the "
 "generate method."
 msgstr ""
+"Implement in subclasses for custom behavior to adjust the logits in the "
+"generate method."
 

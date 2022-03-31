@@ -19,7 +19,7 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.ernie.modeling.rst:2
 msgid "modeling"
-msgstr ""
+msgstr "modeling"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForPretraining:1
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering:1
@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieForTokenClassification:1
 #: paddlenlp.transformers.ernie.modeling.ErnieModel:1
 msgid "基类：:class:`paddlenlp.transformers.ernie.modeling.ErniePretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.ernie.modeling.ErniePretrainedModel`"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForPretraining.forward:1
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering.forward:1
@@ -39,6 +39,8 @@ msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
 msgstr ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForPretraining.forward
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering.forward
@@ -47,7 +49,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForPretraining.forward:4
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering.forward:4
@@ -56,7 +58,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward:4
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward:4
 msgid "unpacked tuple arguments"
-msgstr ""
+msgstr "unpacked tuple arguments"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForPretraining.forward:6
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering.forward:6
@@ -65,11 +67,11 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward:6
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward:6
 msgid "unpacked dict arguments"
-msgstr ""
+msgstr "unpacked dict arguments"
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class: :class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainedModel:1
 msgid ""
@@ -79,10 +81,15 @@ msgid ""
 "`base_model_prefix` for downloading and loading pretrained models. See "
 "`PretrainedModel` for more details."
 msgstr ""
+"An abstract class for pretrained ERNIE models. It provides ERNIE related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainedModel.init_weights:1
 msgid "Initialization hook"
-msgstr ""
+msgstr "Initialization hook"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForSequenceClassification:1
 msgid ""
@@ -91,14 +98,20 @@ msgid ""
 "The number of classes. Default 2 :type num_classes: int, optional :param "
 "dropout: The dropout probability for output of ERNIE."
 msgstr ""
+"Model for sentence (pair) classification task with ERNIE. :param ernie: "
+"An instance of `ErnieModel`. :type ernie: ErnieModel :param num_classes: "
+"The number of classes. Default 2 :type num_classes: int, optional :param "
+"dropout: The dropout probability for output of ERNIE."
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForSequenceClassification:7
 msgid ""
 "If None, use the same value as `hidden_dropout_prob` of `ErnieModel` "
 "instance `Ernie`. Default None"
 msgstr ""
+"If None, use the same value as `hidden_dropout_prob` of `ErnieModel` "
+"instance `Ernie`. Default None"
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class: :class:`paddle.fluid.dygraph.layers.Layer`"
 

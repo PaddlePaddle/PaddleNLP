@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.datasets.experimental.cmrc2018.rst:2
 msgid "cmrc2018"
-msgstr ""
+msgstr "cmrc2018"
 

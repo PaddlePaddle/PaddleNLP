@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../../source/paddlenlp.transformers.bigbird.rst:2
 msgid "bigbird"
-msgstr ""
+msgstr "bigbird"
 
