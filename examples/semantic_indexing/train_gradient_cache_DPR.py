@@ -21,11 +21,9 @@ global save_direc
 
 global_step = 0
 
+data_path = "./biencoder-nq-train.json"
 
-data_path = "./dev.json"
-
-batch_size = 8
-
+batch_size = 64
 drop_out = 0.1
 
 embedding_output_size = 768
@@ -34,8 +32,9 @@ learning_rate = 1e-5
 
 epoch = 5
 
-def dataLoader_for_DPR(batch_size,source_data:list,epochs):
-    index = np.arange(0,len(source_data))
+
+def dataLoader_for_DPR(batch_size, source_data: list, epochs):
+    index = np.arange(0, len(source_data))
     np.random.shuffle(index)
     batch_data = []
     for i in index:
@@ -72,44 +71,59 @@ LOSS = BiEncoderNllLoss()
 
 batch_data = []
 
+data = NQdataSetForDPR(data_path)
+
+dataset = data.new_data
+
+
 def train():
+    global_step = 0
 
     for _ in range(epoch):
 
         index = np.arange(0, len(dataset))
         np.random.shuffle(index)
 
+        batch_data = []
+
         for i in index:
-            #dataLoader
+            # dataLoader
 
             batch_data.append(dataset[i])
             if (len(batch_data) == batch_size):
 
                 all_questions = []
                 all_contexts = []
-                all_positions = []
+                # all_positions = []
                 all_CUDA_rnd_state = []
 
-                chunked_x = [paddle.split(t, chunk_numbers, axis=0) for t in batch_data]
+                all_batch_input = util.create_biencoder_input(batch_data)
 
-                batch_data = []
+                all_positions = all_batch_input.is_positive
 
-                sub_batchs = [list(s) for s in zip(*chunked_x)]
+                all_inputs_questions_id = all_batch_input.questions_ids
+                all_inputs_questions_segment = all_batch_input.question_segments
 
+                all_inputs_contexts_id = all_batch_input.context_ids
+                all_inputs_contexts_segment = all_batch_input.ctx_segments
 
-                for sub_batch in sub_batchs:
+                sub_q_ids = paddle.split(all_inputs_questions_id, 8, axis=0)
+                sub_c_ids = paddle.split(all_inputs_contexts_id, 8, axis=0)
+                sub_q_segments = paddle.split(all_inputs_questions_segment, 8, axis=0)
+                sub_c_segments = paddle.split(all_inputs_contexts_segment, 8, axis=0)
 
-                    all_questions = []
-                    all_contexts = []
-                    all_positions = []
-                    all_CUDA_rnd_state = []
-                    #这里需要清空
+                # chunked_x = [paddle.split(t, chunk_numbers, axis=0) for t in batch_data]
 
-                    sub_batch_input = util.create_biencoder_input(sub_batch)
+                # sub_batchs = [list(s) for s in zip(*chunked_x)]
 
+                all_questions = []
+                all_contexts = []
+                all_CUDA_rnd_state = []
 
-                    with paddle.no_grad:
-
+                for sub_q_id, sub_c_id, sub_q_segment, sub_c_segment in zip(sub_q_ids, sub_c_ids, sub_q_segments,
+                                                                            sub_c_segments):
+                    # sub_batch_input = util.create_biencoder_input(sub_batch)
+                    with paddle.no_grad():
                         sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state(
                         )
                         # sub_global_rnd_state = paddle.framework.random.get_random_seed_generator(global_random_generator)
@@ -117,16 +131,18 @@ def train():
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
                         # all_global_rnd_state.append(sub_global_rnd_state)
 
-                        sub_question_output = model.get_question_pooled_embedding(sub_batch_input.questions_ids,sub_batch_input.question_segments)
+                        sub_question_output = model.get_question_pooled_embedding(sub_q_id, sub_q_segment)
 
-                        sub_context_ouput = model.get_context_pooled_embedding(sub_batch_input.context_ids,sub_batch_input.ctx_segments)
-
+                        sub_context_ouput = model.get_context_pooled_embedding(sub_c_id, sub_c_segment)
 
                         all_questions.append(sub_question_output)
                         all_contexts.append(sub_context_ouput)
-                        all_positions.append(sub_batch_input.is_positive)
+                        # all_positions.append(sub_batch_input.is_positive)
 
                 model_questions = paddle.concat(all_questions, axis=0)
+                all_questions = []
+
+                model_questions = model_questions.detach()
 
                 model_questions.stop_gradient = False
 
@@ -136,48 +152,71 @@ def train():
 
                 model_contexts = paddle.concat(all_contexts, axis=0)
 
-                model_positions = paddle.concat(all_positions,axis=0)
+                model_contexts = model_contexts.detach()
 
-                loss,_ = LOSS.calc(model_questions, model_contexts,model_positions)
+                model_contexts.stop_gradient = False
+
+                all_contexts = []
+
+                model_positions = all_positions
+
+                loss, _ = LOSS.calc(model_questions, model_contexts, model_positions)
+
+                print("损失是：")
+
+                print(loss)
 
                 loss.backward()
 
-                grads_for_questions = [question.grad for question in model_questions]
-                grads_for_contexts = [context.grad for context in model_contexts]
+                """grads_for_questions = [question for question in model_questions.grad]
+                grads_for_contexts = [context for context in model_contexts.grad]"""
 
-                #all_grads = [repos.grad for repos in model_reps]
-                #all_grads.append(model_reps.grad)
+                grads_for_questions = paddle.split(model_questions.grad, 8, 0)
+                grads_for_contexts = paddle.split(model_contexts.grad, 8, 0)
 
-                for sub_batch_input, CUDA_state, grad_for_each_question,grad_for_each_context in zip(sub_batchs,
-                                                   all_CUDA_rnd_state,
-                                                   grads_for_questions,grads_for_contexts):
+                # all_grads = [repos.grad for repos in model_reps]
+                # all_grads.append(model_reps.grad)
 
+                for sub_q_id, sub_c_id, sub_q_segment, sub_c_segment, CUDA_state, grad_for_each_question, grad_for_each_context in zip(
+                        sub_q_ids,
+                        sub_c_ids,
+                        sub_q_segments,
+                        sub_c_segments,
+                        all_CUDA_rnd_state,
+                        grads_for_questions,
+                        grads_for_contexts
+                ):
                     paddle.framework.random.set_cuda_rng_state(CUDA_state)
+
                     # paddle.framework.random.set_random_seed_generator(global_random_generator,global_rnd_state)
 
-                    sub_question_output = model.get_question_pooled_embedding(sub_batch_input.questions_ids,
-                                                                          sub_batch_input.question_segments)
+                    sub_question_output = model.get_question_pooled_embedding(sub_q_id,
+                                                                              sub_q_segment)
 
-                    sub_context_ouput = model.get_context_pooled_embedding(sub_batch_input.context_ids,
-                                                                       sub_batch_input.ctx_segments)
+                    sub_context_ouput = model.get_context_pooled_embedding(sub_c_id,
+                                                                           sub_c_segment)
 
-                    finally_question_res_for_backward = paddle.dot(sub_question_output,grad_for_each_question)
+                    finally_question_res_for_backward = paddle.dot(sub_question_output, grad_for_each_question)
+                    finally_context_res_for_backward = paddle.dot(sub_context_ouput, grad_for_each_context)
 
-                    finally_context_res_for_backward = paddle.dot(sub_context_ouput,grad_for_each_context)
+                    finally_question_res_for_backward.backward(retain_graph=True)
+                    finally_context_res_for_backward.backward(retain_graph=True)
 
-                    finally_question_res_for_backward.backward()
-                    finally_context_res_for_backward.backward()
+                    """print(finally_question_res_for_backward)
+                    print(finally_context_res_for_backward)"""
 
-                    # 反向传播
 
-                    #梯度积累
 
                 optimizer.step()
                 optimizer.clear_grad()
-                global_step = global_step + 1
-                # 梯度更新
+                all_CUDA_rnd_state = []
 
-                if (global_step % save_steps == 0):
+                global_step = global_step + 1
+
+                batch_data = []
+
+
+"""if (global_step % save_steps == 0):
                     state = model.state_dict()
                     paddle.save()
                     save_dir = os.path.join(save_direc,
@@ -186,14 +225,13 @@ def train():
                         os.makedirs(save_dir)
                     save_param_path = os.path.join(save_dir,
                                                    'model_state.pdparams')
-                    paddle.save(model.state_dict(), save_param_path)
-                    #tokenizer.save_pretrained(save_dir)
-                    pass
-                    #save models
+                    paddle.save(model.state_dict(), save_param_path)"""
+# tokenizer.save_pretrained(save_dir)
+# pass
+# save models
 
 
 if __name__ == '__main__':
-
     train()
 
 

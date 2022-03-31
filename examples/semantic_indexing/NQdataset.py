@@ -44,11 +44,14 @@ class BiEncoderSample(object):
     hard_negative_passages: List[BiEncoderPassage]
 
 class NQdataSetForDPR(Dataset):
-    def __init__(self,dataPath,query_special_suffix):
-        super(NQdataSetForDPR,self).__init__()
+    def __init__(self, dataPath, query_special_suffix=None):
+        super(NQdataSetForDPR, self).__init__()
         self.data = self._read_json_data(dataPath)
         self.tokenizer = BertTokenizer
         self.query_special_suffix = query_special_suffix
+        self.new_data = []
+        for i in range(0, self.lens()):
+            self.new_data.append(self.__getitem__(i))
     def _read_json_data(self,dataPath):
         results = []
         with open(dataPath, "r", encoding="utf-8") as f:
@@ -63,7 +66,7 @@ class NQdataSetForDPR(Dataset):
         r.query = self._porcess_query(json_sample_data["question"])
 
         positive_ctxs = json_sample_data["positive_ctxs"]
-        #positive这里是否exclude_gold
+
         negative_ctxs = json_sample_data["negative_ctxs"] if "negative_ctxs" in json_sample_data else []
         hard_negative_ctxs = json_sample_data["hard_negative_ctxs"] if "hard_negative_ctxs" in json_sample_data else []
 
@@ -180,7 +183,7 @@ class DataUtil():
             ctx_segments,
             positive_ctx_indices,
             hard_neg_ctx_indices,
-            "question",#这个是否有必要？？？因为架构细节可能不一样
+            "question",
         )
 
 
@@ -212,7 +215,7 @@ class BertTensorizer():
                 add_special_tokens=add_special_tokens,
                 max_seq_len=self.max_length if apply_max_len else 10000,
                 pad_to_max_seq_len=False,
-                truncation_strategy=True,#这里需要修改一下
+                truncation_strategy=True,
             )
 
         seq_len = self.max_length
@@ -220,6 +223,6 @@ class BertTensorizer():
             token_ids = token_ids + [self.tokenizer.pad_token_type_id] * (seq_len - len(token_ids))
         if len(token_ids) >= seq_len:
             token_ids = token_ids[0:seq_len] if apply_max_len else token_ids
-            token_ids[-1] = self.tokenizer.pad_token_type_id# 这里可能也需要改一下
+            token_ids[-1] = self.tokenizer.pad_token_type_id
 
         return paddle.to_tensor(token_ids)
