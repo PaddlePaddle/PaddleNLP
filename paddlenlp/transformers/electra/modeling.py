@@ -156,7 +156,7 @@ class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
     def __init__(self, vocab_size, embedding_size, hidden_dropout_prob,
-                 max_position_embeddings, type_vocab_size):
+                 max_position_embeddings, type_vocab_size, layer_norm_eps):
         super(ElectraEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
@@ -164,7 +164,7 @@ class ElectraEmbeddings(nn.Layer):
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
                                                   embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
@@ -319,7 +319,7 @@ class ElectraPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128
         },
-        "ehealth-chinese": {
+        "ernie-health-chinese": {
             "attention_probs_dropout_prob": 0.1,
             "embedding_size": 768,
             "hidden_act": "gelu",
@@ -332,7 +332,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 22608
+            "vocab_size": 22608,
+            "layer_norm_eps": 1e-5
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -348,8 +349,8 @@ class ElectraPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
-            "ehealth-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ehealth_chinese/ehealth-chinese.pdparams"
+            "ernie-health-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/ernie-health-chinese.pdparams"
         }
     }
 
@@ -467,17 +468,28 @@ class ElectraModel(ElectraPretrainedModel):
             The index of padding token in the token vocabulary.
     """
 
-    def __init__(self, vocab_size, embedding_size, hidden_size,
-                 num_hidden_layers, num_attention_heads, intermediate_size,
-                 hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
-                 max_position_embeddings, type_vocab_size, initializer_range,
-                 pad_token_id):
+    def __init__(self,
+                 vocab_size,
+                 embedding_size,
+                 hidden_size,
+                 num_hidden_layers,
+                 num_attention_heads,
+                 intermediate_size,
+                 hidden_act,
+                 hidden_dropout_prob,
+                 attention_probs_dropout_prob,
+                 max_position_embeddings,
+                 type_vocab_size,
+                 initializer_range,
+                 pad_token_id,
+                 layer_norm_eps=1e-12):
         super(ElectraModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        self.layer_norm_eps = layer_norm_eps
         self.embeddings = ElectraEmbeddings(
             vocab_size, embedding_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+            max_position_embeddings, type_vocab_size, layer_norm_eps)
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -801,16 +813,10 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             Defaults to 1e-12.
     """
 
-    def __init__(self,
-                 electra,
-                 num_classes=2,
-                 dropout=None,
-                 activation="gelu",
-                 layer_norm_eps=1e-12):
+    def __init__(self, electra, num_classes=2, dropout=None, activation="gelu"):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
-        self.layer_norm_eps = layer_norm_eps
         self.classifier = ElectraClassificationHead(
             hidden_size=self.electra.config["hidden_size"],
             hidden_dropout_prob=dropout if dropout is not None else
@@ -818,7 +824,6 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             num_classes=self.num_classes,
             activation=activation)
         self.init_weights()
-        self.electra.embeddings.layer_norm._epsilon = layer_norm_eps
 
     def forward(self,
                 input_ids=None,

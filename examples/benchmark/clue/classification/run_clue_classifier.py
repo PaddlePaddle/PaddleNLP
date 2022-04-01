@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import random
 import time
 import math
-import distutils.util
+import json
 from functools import partial
 
 import numpy as np
@@ -31,9 +30,7 @@ from paddle.metric import Accuracy
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -43,12 +40,6 @@ METRIC_CLASSES = {
     "cmnli": Accuracy,
     "cluewsc2020": Accuracy,
     "csl": Accuracy,
-}
-
-MODEL_CLASSES = {
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "roberta": (RobertaForSequenceClassification, RobertaTokenizer)
 }
 
 
@@ -64,23 +55,11 @@ def parse_args():
         help="The name of the task to train selected in the list: " +
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
         "--output_dir",
         default="best_clue_model",
@@ -140,15 +119,11 @@ def parse_args():
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
-        "--do_train",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether do train.")
+        "--do_train", action='store_true', help="Whether do train.")
     parser.add_argument(
-        "--do_eval",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Whether do train.")
+        "--do_eval", action='store_true', help="Whether do train.")
+    parser.add_argument(
+        "--do_predict", action='store_true', help="Whether do predict.")
     parser.add_argument(
         "--max_steps",
         default=-1,
@@ -259,12 +234,10 @@ def do_eval(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         label_list=dev_ds.label_list,
@@ -290,7 +263,7 @@ def do_eval(args):
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
 
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -319,13 +292,11 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     train_ds, dev_ds = load_dataset(
         'clue', args.task_name, splits=('train', 'dev'))
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
@@ -361,7 +332,7 @@ def do_train(args):
         return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -439,6 +410,60 @@ def do_train(args):
     print("best_acc: ", best_acc)
 
 
+def do_predict(args):
+    paddle.set_device(args.device)
+    args.task_name = args.task_name.lower()
+
+    train_ds, test_ds = load_dataset(
+        'clue', args.task_name, splits=('train', 'test'))
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        label_list=train_ds.label_list,
+        max_seq_length=args.max_seq_length,
+        is_test=True)
+
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+    ): fn(samples)
+
+    test_ds = test_ds.map(trans_func, lazy=True)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_ds, batch_size=args.batch_size, shuffle=False)
+    test_data_loader = DataLoader(
+        dataset=test_ds,
+        batch_sampler=test_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
+
+    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    if args.task_name == 'ocnli':
+        args.task_name = 'ocnli_50k'
+    f = open(
+        os.path.join(args.output_dir, args.task_name + "_predict.json"), 'w')
+
+    for step, batch in enumerate(test_data_loader):
+        input_ids, segment_ids = batch
+
+        with paddle.no_grad():
+            logits = model(input_ids, segment_ids)
+
+        preds = paddle.argmax(logits, axis=1)
+        for idx, pred in enumerate(preds):
+            j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
+            f.write(j + "\n")
+
+
 def print_arguments(args):
     """print arguments"""
     print('-----------  Configuration Arguments -----------')
@@ -454,3 +479,5 @@ if __name__ == "__main__":
         do_train(args)
     if args.do_eval:
         do_eval(args)
+    if args.do_predict:
+        do_predict(args)
