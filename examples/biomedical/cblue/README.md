@@ -58,7 +58,7 @@ pip install xlrd==1.2.0
 
 | Task      | epochs | batch_size | learning_rate | max_seq_length |  metric  | results | results (fp16) |
 | --------- | :----: | :--------: | :-----------: | :------------: | :------: | :-----: | :------------: |
-| CHIP-STS  |    4   |     16     |      1e-4     |       96       | Macro-F1 | 0.88550 |    0.85649     |
+| CHIP-STS  |    4   |     16     |      3e-5     |       96       | Macro-F1 | 0.88749 |    0.88555     |
 | CHIP-CTC  |    4   |     32     |      6e-5     |      160       | Macro-F1 | 0.84136 |    0.83514     |
 | CHIP-CDN  |   16   |    256     |      3e-5     |       32       |    F1    | 0.76979 |    0.76489     |
 | KUAKE-QQR |    2   |     32     |      6e-5     |       64       | Accuracy | 0.83865 |    0.84053     |
@@ -75,6 +75,7 @@ pip install xlrd==1.2.0
 * `learning_rate`：可选，Fine-tune的最大学习率；默认为6e-5。
 * `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.01。
 * `epochs`: 训练轮次，默认为3。
+* `max_steps`: 最大训练步数。若训练`epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
 * `valid_steps`: evaluate的间隔steps数，默认100。
 * `save_steps`: 保存checkpoints的间隔steps数，默认100。
 * `logging_steps`: 日志打印的间隔steps数，默认10。

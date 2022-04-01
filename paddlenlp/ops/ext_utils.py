@@ -16,6 +16,7 @@ import os
 import sys
 import subprocess
 import textwrap
+import hashlib
 import inspect
 from pathlib import Path
 from setuptools import setup, Extension
@@ -28,6 +29,7 @@ from paddle.utils.cpp_extension.cpp_extension import (
     CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.file_lock import decorate as file_lock
 
 if CUDA_HOME and not os.path.exists(CUDA_HOME):
     # CUDA_HOME is only None for Windows CPU version in paddle `find_cuda_home`.
@@ -102,11 +104,22 @@ class CMakeExtension(Extension):
             stderr=stdout)
 
     def get_target_filename(self):
+        """
+        The file names of libraries. Currently only support one library for
+        one extension.
+        """
         raise NotImplementedError
+
+    def get_output_filename(self):
+        """
+        The file names of outputs, which mostly is the same with
+        `get_target_filename`.
+        """
+        return self.get_target_filename()
 
 
 class FasterTransformerExtension(CMakeExtension):
-    def __init__(self, name, source_dir=None):
+    def __init__(self, name, source_dir=None, need_parallel=False):
         super(FasterTransformerExtension, self).__init__(name, source_dir)
         self.sources = _get_files(
             os.path.
@@ -116,6 +129,10 @@ class FasterTransformerExtension(CMakeExtension):
         # Env variable may not work as expected, since jit compile by `load`
         # would not re-built if source code is not update.
         # self.sm = os.environ.get("PPNLP_GENERATE_CODE", None)
+        # Whether or not to use model parallel. Note that since the building use
+        # a new process, we shoud find a way to let it know whether to use model
+        # parallel.
+        self.need_parallel = need_parallel
 
     def build_with_command(self, ext_builder):
         if CUDA_HOME is None:  # GPU only
@@ -132,6 +149,8 @@ class FasterTransformerExtension(CMakeExtension):
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
         self.cmake_args += [f"-DWITH_GPT=ON"]
+        if self.need_parallel:
+            self.cmake_args += [f"-DWITH_PARALLEL=ON"]
         try:
             super(FasterTransformerExtension,
                   self).build_with_command(ext_builder)
@@ -142,6 +161,9 @@ class FasterTransformerExtension(CMakeExtension):
             ext_builder.copy_tree(
                 os.path.join(ext_builder.build_temp, "lib"),
                 ext_builder.build_lib)
+            # TODO(guosheng): Maybe we should delete the build dir especially
+            # when it is in the dir of paddlenlp package.
+            # os.remove(ext_builder.build_temp)
         except Exception as e:
             logger.warning(
                 "FasterTransformer is not available due to build errors.")
@@ -150,6 +172,9 @@ class FasterTransformerExtension(CMakeExtension):
     def get_target_filename(self):
         # CMake file has fixed the name of lib, maybe we can copy it as the name
         # returned by `BuildExtension.get_ext_filename` after build.
+        return "libdecoding_op.so"
+
+    def get_output_filename(self):
         return "libdecoding_op.so"
 
 
@@ -175,7 +200,13 @@ class BuildExtension(PaddleBuildExtension):
         self.extensions = custom_exts + no_custom_exts
 
 
-EXTENSIONS = {"FasterTransformer": FasterTransformerExtension}
+EXTENSIONS = {
+    "FasterTransformer": FasterTransformerExtension,
+    # NOTE: Since model parallel code is supported by definitions, to avoid
+    # performance degrading on non-parallel mode, we use a separated lib for
+    # model parallel.
+    "FasterTransformerParallel": FasterTransformerExtension
+}
 
 
 def get_extension_maker(name):
@@ -205,8 +236,8 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         }})""").lstrip()
     kwargs_str = ""
     for key, value in kwargs.items():
-        kwargs_str += key + "=" + (f"'{value}'"
-                                   if isinstance(value, str) else value) + ","
+        kwargs_str += key + "=" + (f"'{value}'" if isinstance(value, str) else
+                                   str(value)) + ","
     content = template.format(
         name=name, kwargs_str=kwargs_str, build_dir=build_dir)
 
@@ -214,6 +245,7 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         f.write(content)
 
 
+@file_lock(os.path.join(PPNLP_HOME, "load_ext.lock"))
 def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     # TODO(guosheng): Need better way to resolve unsupported such as CPU. Currently,
     # raise NotImplementedError and skip `_jit_compile`. Otherwise, `_jit_compile`
@@ -224,13 +256,22 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
                        name)
         raise NotImplementedError
     if name in LOADED_EXT.keys():
+        # TODO(guosheng): Maybe the key should combined with kwargs since the
+        # extension object is created using them.
         return LOADED_EXT[name]
     if build_dir is None:
-        # Maybe under package dir is better to avoid cmake source path conflict
-        # with different source path.
         # build_dir = os.path.join(PPNLP_HOME, 'extenstions')
+        # Maybe under package dir is better to avoid cmake source path conflict
+        # with different source path, like this:
+        # build_dir = os.path.join(
+        #     str(Path(__file__).parent.resolve()), 'extenstions')
+        # However if it is under the package dir, it might make the package hard
+        # to uninstall. Thus we put it in PPNLP_HOME with digest of current path,
+        # like this:
         build_dir = os.path.join(
-            str(Path(__file__).parent.resolve()), 'extenstions')
+            PPNLP_HOME, 'extensions',
+            hashlib.md5(str(Path(__file__).parent.resolve()).encode(
+                'utf-8')).hexdigest())
     build_base_dir = os.path.abspath(
         os.path.expanduser(os.path.join(build_dir, name)))
     if not os.path.exists(build_base_dir):
@@ -243,26 +284,32 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # Maybe move this to CMakeExtension later.
         # TODO(guosheng): flags/args changes may also trigger build, and maybe
         # need version manager like `PaddleBuildExtension`.
-        ext_filename = extension.get_target_filename()
-        ext_filepath = os.path.join(build_base_dir, ext_filename)
+        out_filename = extension.get_output_filename()
+        if isinstance(out_filename, str):
+            out_filename = [out_filename]
+        out_filepath = [os.path.join(build_base_dir, f) for f in out_filename]
+        lib_filename = extension.get_target_filename()
+        lib_filepath = os.path.join(build_base_dir, lib_filename)
         if not force:
             ext_sources = extension.sources
-            if os.path.exists(ext_filepath) and not newer_group(
-                    ext_sources, ext_filepath, 'newer'):
+            if all(
+                    os.path.exists(f) and
+                    not newer_group(ext_sources, f, 'newer')
+                    for f in out_filepath):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)
-                ops = load_op_meta_info_and_register_op(ext_filepath)
+                ops = load_op_meta_info_and_register_op(lib_filepath)
                 LOADED_EXT[name] = ops
                 return LOADED_EXT[name]
 
     # write setup file and jit compile
-    file_path = os.path.join(build_dir, "{}_setup.py".format(name))
+    file_path = os.path.join(build_dir, name, "{}_setup.py".format(name))
     _write_setup_file(name, file_path, build_base_dir, **kwargs)
     _jit_compile(file_path, verbose)
     if isinstance(extension, CMakeExtension):
         # Load a shared library (if exists) only to register op.
-        if os.path.exists(ext_filepath):
-            ops = load_op_meta_info_and_register_op(ext_filepath)
+        if os.path.exists(lib_filepath):
+            ops = load_op_meta_info_and_register_op(lib_filepath)
             LOADED_EXT[name] = ops
             return LOADED_EXT[name]
     else:
