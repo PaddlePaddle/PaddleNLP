@@ -759,7 +759,7 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     # device_index=rank which is not the case for model
     # parallel case
     if paddle.distributed.get_world_size() > 1:
-        if paddle.fluid.framework.in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             paddle.distributed.barrier()
 
     # Load indexed dataset.
