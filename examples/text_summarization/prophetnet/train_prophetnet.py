@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration, ProphetNetModel
+from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
 parser = argparse.ArgumentParser()
@@ -19,7 +19,11 @@ parser.add_argument(
     type=str,
     help="Path to tokenizer vocab file. ")
 parser.add_argument(
-    "--pretrained_model_path", default="./model_state.pdparams", type=str)
+    "--model_name_or_path",
+    default="prophetnet-large-uncased",
+    type=str,
+    required=True,
+    help="Path to pre-trained model. ")
 parser.add_argument("--batch_size", default=24, type=int)
 parser.add_argument("--epochs", default=3, type=int)
 parser.add_argument("--lr", default=0.0001, type=float)
@@ -60,7 +64,7 @@ train_dataset = load_dataset(
 dev_dataset = load_dataset(
     read, data_path=[dev_data_src, dev_data_tgt], lazy=False)
 
-t = ProphetNetTokenizer(vocab_file="prophetnet.tokenizer")
+t = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
 
 
 class InverseSquareRootSchedule(paddle.optimizer.lr.LRScheduler):
@@ -153,9 +157,8 @@ output_dir = args.output_dir
 best_valid_loss = None
 start_epoch = 0
 
-model = ProphetNetModel(
-    **ProphetNetModel.pretrained_init_configuration["prophetnet-large-uncased"])
-model = ProphetNetForConditionalGeneration(model)
+model = ProphetNetForConditionalGeneration.from_pretrained(
+    args.model_name_or_path)
 
 lr_scheduler = InverseSquareRootSchedule(warmup_init_lr, lr, warmup_steps)
 

@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration, ProphetNetModel
+from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
 summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
@@ -22,14 +22,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
+        "--model_name_or_path",
+        default="prophetnet-large-uncased",
+        type=str,
+        required=True,
+        help="Path to pre-trained model. ")
+    parser.add_argument(
         "--dataset",
         default="gigaword",
         choices=["cnndm", "gigaword"],
-        type=str,
-        help="Path to tokenizer vocab file. ")
-    parser.add_argument(
-        "--vocab_file",
-        default="./prophetnet.tokenizer",
         type=str,
         help="Path to tokenizer vocab file. ")
     parser.add_argument(
@@ -255,9 +256,9 @@ def convert_example(is_test=False):
 @paddle.no_grad()
 def generate(args):
     paddle.set_device(args.device)
-    tokenizer = ProphetNetTokenizer(vocab_file=args.vocab_file)
-    model = ProphetNetModel(vocab_size=30522)
-    model = ProphetNetForConditionalGeneration(model)
+    tokenizer = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
+    model = ProphetNetForConditionalGeneration.from_pretrained(
+        args.model_name_or_path)
 
     ckpt = paddle.load("./ckpt/" + args.dataset + "/model_best.pdparams")
 
