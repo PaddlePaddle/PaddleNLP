@@ -68,9 +68,11 @@ def compute_prediction(examples,
         features), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
+    example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
-        features_per_example[feature["example_id"]].append(i)
+        features_per_example[example_id_to_index[feature["example_id"]]].append(
+            i)
 
     # The dictionaries we have to fill.
     all_predictions = collections.OrderedDict()
@@ -81,7 +83,7 @@ def compute_prediction(examples,
     # Let's loop over all the examples!
     for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
-        feature_indices = features_per_example[example['id']]
+        feature_indices = features_per_example[example_index]
 
         min_null_prediction = None
         prelim_predictions = []
@@ -123,8 +125,8 @@ def compute_prediction(examples,
                             end_index >= len(offset_mapping) or
                             offset_mapping[start_index] is None or
                             offset_mapping[end_index] is None or
-                            offset_mapping[start_index] == (0, 0) or
-                            offset_mapping[end_index] == (0, 0)):
+                            len(offset_mapping[start_index]) == 0 or
+                            len(offset_mapping[end_index]) == 0):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
@@ -221,6 +223,22 @@ def make_qid_to_has_ans(examples):
     return qid_to_has_ans
 
 
+def remove_punctuation(in_str):
+    in_str = str(in_str).lower().strip()
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
+    out_segs = []
+    for char in in_str:
+        if char in sp_char:
+            continue
+        else:
+            out_segs.append(char)
+    return ''.join(out_segs)
+
+
 def normalize_answer(s):
     #Lower text and remove punctuation, articles and extra whitespace.
     def remove_articles(text):
@@ -232,7 +250,8 @@ def normalize_answer(s):
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return remove_punctuation(''.join(ch for ch in text
+                                          if ch not in exclude))
 
     def lower(text):
         return text.lower()
@@ -274,7 +293,8 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
     for example in examples:
         qid = example['id']
         gold_answers = [
-            text for text in example['answers'] if normalize_answer(text)
+            text for text in example['answers']['text']
+            if normalize_answer(text)
         ]
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
@@ -365,7 +385,6 @@ def squad_evaluate(examples,
                    is_whitespace_splited=True):
     '''
     Computes and prints the f1 score and em score of input prediction.
-
     Args:
         examples (list): List of raw squad-style data (see `run_squad.py
             <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/
