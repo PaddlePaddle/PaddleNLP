@@ -53,7 +53,7 @@ def load_from_ppnlp(path, *args, **kwargs):
     new_path = os.path.split(path)[-1]
     new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
     if os.path.exists(new_path):
-        return origin_load_dataset(new_path, **kwargs)
+        return origin_load_dataset(new_path, *args, **kwargs)
     else:
         return origin_load_dataset(path, *args, **kwargs)
 
