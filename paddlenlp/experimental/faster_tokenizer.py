@@ -18,7 +18,6 @@ import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
 from paddle.fluid.layer_helper import LayerHelper
-from paddle.fluid.framework import in_dygraph_mode
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
 from paddlenlp.transformers.ppminilm.tokenizer import PPMiniLMTokenizer
@@ -101,7 +100,7 @@ class FasterTokenizer(nn.Layer):
                 text_pair=None,
                 max_seq_len=0,
                 pad_to_max_seq_len=False):
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             if isinstance(text, list) or isinstance(text, tuple):
                 text = to_tensor(list(text))
             if text_pair is not None:
