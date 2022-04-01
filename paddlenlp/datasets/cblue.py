@@ -338,10 +338,13 @@ class CBLUE(DatasetBuilder):
                             ent_label.append(obj)
                             spo_label.append((sub, label_map[rel], obj))
 
-                        if sub_idx is None or obj_idx is None:
-                            print('Error: Can not find entities in tokens.')
-                            print('Tokens:', data['text'])
-                            print('Entities":', sub, obj)
+                        # The samples where subjects and objects have overlap
+                        # will be discarded during training.
+                        #
+                        #if sub_idx is None or obj_idx is None:
+                        #    print('Error: Can not find entities in tokens.')
+                        #    print('Tokens:', data['text'])
+                        #    print('Entities":', sub, obj)
 
                     data['ent_list'] = ent_list
                     data['spo_list'] = spo_list

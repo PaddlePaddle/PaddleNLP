@@ -20,17 +20,17 @@ import distutils.util
 import os.path as osp
 from typing import Optional
 
+from datasets import load_metric
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from datasets import load_metric
 import paddlenlp
+from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification, )
