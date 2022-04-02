@@ -404,7 +404,7 @@ def run(args):
         }): fn(samples)
 
         train_batch_sampler = paddle.io.DistributedBatchSampler(
-            train_ds, batch_size=args.batch_size, shuffle=False)
+            train_ds, batch_size=args.batch_size, shuffle=True)
         train_data_loader = paddle.io.DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
