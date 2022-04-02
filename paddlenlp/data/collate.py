@@ -403,7 +403,9 @@ class DataCollatorWithPadding:
                                    pad_val=self.tokenizer.pad_token_id,
                                    dtype='int64')([d[k] for d in data])
                 else:
-                    batch[k] = Stack()([d[k] for d in data])
+                    dtype = 'int64' if type(v) is int else 'float32'
+                    batch[k] = Stack(dtype=dtype)([d[k] for d in data])
+
         if self.return_tensors:
             for k, v in batch.items():
                 batch[k] = paddle.to_tensor(v)
