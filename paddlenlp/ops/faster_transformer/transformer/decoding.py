@@ -27,7 +27,6 @@ import paddle
 import paddlenlp
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers.utils import fn_args_to_dict
 
 
 def infer_transformer_decoding(
@@ -1357,6 +1356,9 @@ def enable_ft_para(tensor_para_size=1,
     _ft_para_conf = FTParaConf(tensor_para_size, layer_para_size,
                                layer_para_batch_size)
     if _ft_para_conf.no_para: return
+
+    # To avoid recursive import temporarily.
+    from paddlenlp.transformers.utils import fn_args_to_dict
 
     def reset_param(layer, attr, axis):
         param = getattr(layer, attr)
