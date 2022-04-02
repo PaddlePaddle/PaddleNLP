@@ -138,12 +138,12 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def calc_global_pred_results(logits_matrix):
-    logits_matrix = np.array(logits_matrix)
+def calc_global_pred_results(logits):
+    logits = np.array(logits)
     # [num_choices, tag_size]
-    logits_matrix = np.transpose(logits_matrix)
+    logits = np.transpose(logits)
     tmp = []
-    for i, row in enumerate(logits_matrix):
+    for i, row in enumerate(logits):
         for j, col in enumerate(row):
             tmp.append((i, j, col))
     else:
@@ -166,7 +166,6 @@ def evaluate(model, data_loader, do_predict=False):
     model.eval()
     right_num, total_num = 0, 0
     all_results = []
-    results_len = 0
     for step, batch in enumerate(data_loader):
         if do_predict:
             input_ids, segment_ids, example_ids = batch
@@ -186,7 +185,6 @@ def evaluate(model, data_loader, do_predict=False):
         if l <= batch_num - 1:
             batch_results.extend(
                 calc_global_pred_results(logits[l:batch_num, :]))
-        results_len += len(batch_results)
         if do_predict:
             all_results.extend(batch_results)
         else:
