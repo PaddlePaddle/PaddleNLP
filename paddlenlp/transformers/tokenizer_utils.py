@@ -866,7 +866,7 @@ class PretrainedTokenizer(object):
     def prepare_for_tokenization(self, text, **kwargs):
         return text
 
-    def tokenize(self, text, return_word_ids=False, **kwargs):
+    def tokenize(self, text, **kwargs):
         all_special_tokens_extended = dict(
             (t.content, t) for t in self.all_special_tokens_extended
             if isinstance(t, AddedToken))
@@ -893,18 +893,16 @@ class PretrainedTokenizer(object):
                     if left:
                         tokens[i - 1] = left.rstrip()
         tokenized_text = []
-        word_ids = []
-        for idx, token in enumerate(tokens):
+        for token in tokens:
+
             if not token:
                 continue
             if token in no_split_token:
                 tokenized_text.append(token)
-                word_ids.append(idx)
+
             else:
-                sub_tokens = self._tokenize(token, **kwargs)
-                tokenized_text.extend(sub_tokens)
-                word_ids.extend(len(sub_tokens))
-        return tokenized_text, word_ids if return_word_ids else tokenized_text
+                tokenized_text.extend(self._tokenize(token, **kwargs))
+        return tokenized_text
 
     def convert_tokens_to_ids(self, tokens):
         if tokens is None:
