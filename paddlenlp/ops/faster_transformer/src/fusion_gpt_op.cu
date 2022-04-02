@@ -9,12 +9,14 @@
 #include <vector>
 
 // TODO(guosheng): `HOST` conflict exists in float.h of paddle and mpi.h of mpi
-#include "fastertransformer/cuda/cub/cub.cuh"
-#include "fastertransformer/gpt.h"
-#include "fastertransformer/open_decoder.h"
-#include "fastertransformer/utils/common.h"
 #include "fusion_gpt_op.h"
 #include "pd_traits.h"
+#ifdef HOST
+#undef HOST
+#endif
+#include "fastertransformer/cuda/cub/cub.cuh"
+#include "fastertransformer/gpt.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef BUILD_GPT  // consistent with FasterTransformer
 #include <map>
