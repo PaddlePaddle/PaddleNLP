@@ -264,6 +264,19 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "ernie-3.0-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -290,6 +303,8 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_cross_encoder.pdparams",
             "rocketqa-v1-marco-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_cross_encoder.pdparams",
+            "ernie-3.0-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base.pdparams",
         }
     }
     base_model_prefix = "ernie"
