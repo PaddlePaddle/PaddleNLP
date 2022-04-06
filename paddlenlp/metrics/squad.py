@@ -426,3 +426,5 @@ def squad_evaluate(examples,
                              qid_to_has_ans)
 
     print(json.dumps(out_eval, indent=2))
+
+    return out_eval
