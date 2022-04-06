@@ -34,7 +34,6 @@ __all__ = [
 MAPPING_NAMES = OrderedDict([
     # Base model mapping
     ("Albert", "albert"),
-    ("BertJapanese", "bert_japanese"),
     ("BigBird", "bigbird"),
     ("BlenderbotSmall", "blenderbot_small"),
     ("Blenderbot", "blenderbot"),
@@ -130,7 +129,7 @@ class _BaseAutoModelClass:
                          *model_args,
                          **kwargs):
         if task:
-            if cls._task_choice == True:
+            if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print('We only support task choice for AutoModel.')
@@ -154,6 +153,9 @@ class _BaseAutoModelClass:
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
                         model_class = getattr(import_class, init_class)
+                        logger.info(
+                            "We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -181,9 +183,11 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_name = getattr(import_class, init_class)
-                return model_name.from_pretrained(pretrained_model_name_or_path,
-                                                  *model_args, **kwargs)
+                model_class = getattr(import_class, init_class)
+                logger.info("We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
@@ -226,9 +230,11 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_name = getattr(import_class, init_class)
-                return model_name.from_pretrained(pretrained_model_name_or_path,
-                                                  *model_args, **kwargs)
+                model_class = getattr(import_class, init_class)
+                logger.info("We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 class AutoModel(_BaseAutoModelClass):

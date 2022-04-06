@@ -154,6 +154,9 @@ class AutoTokenizer():
             for names, tokenizer_class in cls._tokenizer_mapping.items():
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
+                        logger.info(
+                            "We are using %s to load '%s'." %
+                            (tokenizer_class, pretrained_model_name_or_path))
                         return tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -170,8 +173,11 @@ class AutoTokenizer():
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
-                    tokenizer_name = getattr(import_class, init_class)
-                    return tokenizer_name.from_pretrained(
+                    tokenizer_class = getattr(import_class, init_class)
+                    logger.info(
+                        "We are using %s to load '%s'." %
+                        (tokenizer_class, pretrained_model_name_or_path))
+                    return tokenizer_class.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
                 else:
@@ -184,11 +190,10 @@ class AutoTokenizer():
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
                                 f"paddlenlp.transformers.{class_name}.tokenizer")
-                            tokenizer_name = getattr(import_class, init_class)
-                            print(
-                                f"The 'pretrained_model_name_or_path' is {pretrained_model_name_or_path}, we import {tokenizer_name}."
-                            )
-                            return tokenizer_name.from_pretrained(
+                            tokenizer_class = getattr(import_class, init_class)
+                            logger.info("We are using %s to load '%s'." % (
+                                tokenizer_class, pretrained_model_name_or_path))
+                            return tokenizer_class.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs)
         # Assuming from community-contributed pretrained models
@@ -221,8 +226,11 @@ class AutoTokenizer():
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
-                    tokenizer_name = getattr(import_class, init_class)
-                    return tokenizer_name.from_pretrained(
+                    tokenizer_class = getattr(import_class, init_class)
+                    logger.info(
+                        "We are using %s to load '%s'." %
+                        (tokenizer_class, pretrained_model_name_or_path))
+                    return tokenizer_class.from_pretrained(
                         pretrained_model_name_or_path, *model_args, **kwargs)
                 # If no `init_class`, we use pattern recognition to recognize the Tokenizer class.
                 else:
@@ -235,10 +243,9 @@ class AutoTokenizer():
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
                                 f"paddlenlp.transformers.{class_name}.tokenizer")
-                            tokenizer_name = getattr(import_class, init_class)
-                            print(
-                                f"The 'pretrained_model_name_or_path' is {pretrained_model_name_or_path}, we import {tokenizer_name}."
-                            )
-                            return tokenizer_name.from_pretrained(
+                            tokenizer_class = getattr(import_class, init_class)
+                            logger.info("We are using %s to load '%s'." % (
+                                tokenizer_class, pretrained_model_name_or_path))
+                            return tokenizer_class.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs)
