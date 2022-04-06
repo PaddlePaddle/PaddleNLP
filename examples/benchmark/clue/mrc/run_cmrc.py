@@ -130,7 +130,7 @@ def parse_args():
     parser.add_argument(
         "--max_query_length", type=int, default=64, help="Max query length.")
     parser.add_argument(
-        "--max_answer_length", type=int, default=30, help="Max answer length.")
+        "--max_answer_length", type=int, default=50, help="Max answer length.")
     parser.add_argument(
         "--do_lower_case",
         action='store_false',
