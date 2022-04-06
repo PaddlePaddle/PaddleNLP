@@ -7,7 +7,7 @@
 运行脚本示例如下:
 
 1. 序列分类
-```python
+```shell
 dataset="chnsenticorp_v2"
 python run_seq_cls.py \
     --do_train \
@@ -18,8 +18,8 @@ python run_seq_cls.py \
     --output_dir ./tmp/$dataset
 ```
 
-2. TOKEN分类
-```python
+2. Token分类
+```shell
 dataset="peoples_dayily_ner"
 python run_ner.py \
     --do_train \
@@ -31,7 +31,7 @@ python run_ner.py \
 ```
 
 3. 阅读理解
-```python
+```shell
 dataset="cmrc2018"
 python run_qa.py \
     --do_train \
@@ -57,7 +57,7 @@ python run_qa.py \
 - num_train_epochs 训练epoch数目
 - learning_rate 学习率
 - max_seq_length 最大序列长度
-- weight_decay 训练时参数衰减系数
+- weight_decay 训练时优化器对参数衰减系数
 - logging_steps 打印日志间隔步数
 - eval_steps 评估效果间隔步数
 - max_steps 最大训练步数（可覆盖num_train_epochs）
@@ -67,5 +67,5 @@ python run_qa.py \
 本示例也支持用户在yaml文件中配置参数。用户可以自行修改`config.yaml`文件。
 
 注意：
-- 这些参数会默认重写传入的参数，以yaml文件参数为准。
+- 这些参数会重写传入的默认参数，以yaml文件参数为准。
 - yaml文件中的batch_size同时等价于per_device_train_batch_size，per_device_eval_batch_size
