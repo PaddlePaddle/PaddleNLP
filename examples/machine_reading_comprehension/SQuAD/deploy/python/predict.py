@@ -24,7 +24,7 @@ import paddle
 from paddle import inference
 from paddle.io import DataLoader
 from datasets import load_dataset
-from paddlenlp.data import Pad, Stack, Dict
+from paddlenlp.data import Pad, Stack, Dict, DataCollatorWithPadding
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
 from args import parse_args
@@ -76,8 +76,10 @@ class Predictor(object):
     def predict(self, dataset, raw_dataset, collate_fn, args, do_eval=True):
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=args.batch_size, shuffle=False)
+        dataset_for_model = dataset.remove_columns(
+            ["example_id", "offset_mapping"])
         data_loader = paddle.io.DataLoader(
-            dataset=dataset,
+            dataset=dataset_for_model,
             batch_sampler=batch_sampler,
             collate_fn=collate_fn,
             num_workers=0,
@@ -124,11 +126,8 @@ def main():
                               batched=True,
                               remove_columns=column_names,
                               num_proc=4)
-    batchify_fn = lambda samples, fn=Dict(
-        {
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+
+    batchify_fn = DataCollatorWithPadding(tokenizer)
     predictor = Predictor.create_predictor(args)
     predictor.predict(dataset, raw_dataset, args=args, collate_fn=batchify_fn)
 

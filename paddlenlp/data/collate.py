@@ -513,7 +513,7 @@ class DataCollatorForSeq2Seq:
         assert isinstance(first, dict), 'Input pattern not understood. The input of collatot must be a dict with key of input column name and value of data ' \
                                    'Received input type:' % (type(first))
 
-        labels = [data["labels"]
+        labels = [d["labels"]
                   for d in data] if "labels" in data[0].keys() else None
 
         batch = {}
@@ -542,7 +542,7 @@ class DataCollatorForSeq2Seq:
         if (labels is not None and self.model is not None and
                 hasattr(self.model, "prepare_decoder_input_ids_from_labels")):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(
-                labels=batch["labels"])
+                labels=paddle.to_tensor(batch["labels"]))
             if not return_tensors:
                 batch["decoder_input_ids"] = decoder_input_ids.numpy()
         if self.return_tensors:
