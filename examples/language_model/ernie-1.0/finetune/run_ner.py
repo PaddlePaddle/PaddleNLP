@@ -27,31 +27,34 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddlenlp
 from paddlenlp.datasets import load_dataset
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
+from paddlenlp.trainer.trainer_utils import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification, )
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
-from token_classification import ner_trans_fn, ner_collator
+from token_classification import ner_trans_fn
 from utils import (
     ALL_DATASETS,
     DataTrainingArguments,
     ModelArguments, )
 
 
-def do_train():
+def main():
     parser = PdArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    # Log model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
 
     paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     # Log on each process the small summary:
     logger.warning(
@@ -82,28 +85,29 @@ def do_train():
     if data_args.dataset not in ALL_DATASETS:
         raise ValueError("Not found dataset {}".format(data_args.dataset))
 
-    # Use yaml config to rewrite all args.
-    config = ALL_DATASETS[data_args.dataset]
-    for args in (model_args, data_args, training_args):
-        for arg in vars(args):
-            if arg in config.keys():
-                setattr(args, arg, config[arg])
+    if data_args.dataset in ALL_DATASETS:
+        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
+        config = ALL_DATASETS[data_args.dataset]
+        for args in (model_args, data_args, training_args):
+            for arg in vars(args):
+                if arg in config.keys():
+                    setattr(args, arg, config[arg])
 
-    training_args.per_device_train_batch_size = config["batch_size"]
-    training_args.per_device_eval_batch_size = config["batch_size"]
+        training_args.per_device_train_batch_size = config["batch_size"]
+        training_args.per_device_eval_batch_size = config["batch_size"]
 
     dataset_config = data_args.dataset.split(" ")
-    all_ds = load_dataset(
+    raw_datasets = load_dataset(
         dataset_config[0],
         None if len(dataset_config) <= 1 else dataset_config[1], )
 
-    label_list = getattr(all_ds['train'], "label_list", None)
+    label_list = getattr(raw_datasets['train'], "label_list", None)
     data_args.label_list = label_list
     data_args.ignore_label = -100
     data_args.no_entity_id = len(data_args.label_list) - 1
 
-    num_classes = 1 if all_ds["train"].label_list == None else len(all_ds[
-        'train'].label_list)
+    num_classes = 1 if raw_datasets["train"].label_list == None else len(
+        raw_datasets['train'].label_list)
 
     # Define tokenizer, model, loss function. 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -123,14 +127,16 @@ def do_train():
 
     # Define dataset pre-process function
     trans_fn = partial(ner_trans_fn, tokenizer=tokenizer, args=data_args)
-
     # Define data collector
-    batchify_fn = ner_collator(tokenizer, data_args)
+    data_collator = DataCollatorForTokenClassification(tokenizer)
 
     # Dataset pre-process
-    train_dataset = all_ds["train"].map(trans_fn)
-    eval_dataset = all_ds["dev"].map(trans_fn)
-    test_dataset = all_ds["test"].map(trans_fn)
+    if training_args.do_train:
+        train_dataset = raw_datasets["train"].map(trans_fn)
+    if training_args.do_eval:
+        eval_dataset = raw_datasets["dev"].map(trans_fn)
+    if training_args.do_predict:
+        test_dataset = raw_datasets["test"].map(trans_fn)
 
     # Define the metrics of tasks.
     # Metrics
@@ -162,15 +168,11 @@ def do_train():
         model=model,
         criterion=loss_fct,
         args=training_args,
-        data_collator=batchify_fn,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics, )
-
-    # Log model and data config
-    trainer.print_config(model_args, "Model")
-    trainer.print_config(data_args, "Data")
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -179,36 +181,41 @@ def do_train():
         checkpoint = last_checkpoint
 
     # Training
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    metrics = train_result.metrics
-    trainer.save_model()  # Saves the tokenizer too for easy upload
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
-    trainer.save_state()
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
     # Evaluate and tests model
-    eval_metrics = trainer.evaluate()
-    trainer.log_metrics("eval", eval_metrics)
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
 
-    test_ret = trainer.predict(test_dataset)
-    trainer.log_metrics("test", test_ret.metrics)
-    if test_ret.label_ids is None:
-        paddle.save(
-            test_ret.predictions,
-            os.path.join(training_args.output_dir, "test_results.pdtensor"), )
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_dataset)
+        trainer.log_metrics("test", test_ret.metrics)
+        if test_ret.label_ids is None:
+            paddle.save(
+                test_ret.predictions,
+                os.path.join(training_args.output_dir, "test_results.pdtensor"),
+            )
 
     # export inference model
-    input_spec = [
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64"),  # input_ids
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64")  # segment_ids
-    ]
-    trainer.export_model(
-        input_spec=input_spec,
-        load_best_model=True,
-        output_dir=model_args.export_model_dir)
+    if training_args.do_export:
+        input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
+        ]
+        trainer.export_model(
+            input_spec=input_spec,
+            load_best_model=True,
+            output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":
-    do_train()
+    main()
