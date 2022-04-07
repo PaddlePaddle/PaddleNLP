@@ -135,7 +135,7 @@ python -u ./run_clue_classifier_trainer.py \
     --save_total_limit 3 \
 ```
 大部分参数含义如上文所述，这里简要介绍一些新参数:
-- `dataset`, 同上文`task_name`，此处为小写字母。表示 Fine-tuning 的分类任务，当前支持 afamc、tnews、iflytek、ocnli、cmnli、csl、wsc。
+- `dataset`, 同上文`task_name`，此处为小写字母。表示 Fine-tuning 的分类任务，当前支持 afamc、tnews、iflytek、ocnli、cmnli、csl、cluewsc2020。
 - `per_device_train_batch_size` 同上文`batch_size`。训练时，每次迭代**每张卡**上的样本数目。
 - `per_device_eval_batch_size` 同上文`batch_size`。评估时，每次迭代**每张卡**上的样本数目。
 - `warmup_ratio` 同上文`warmup_proportion`，warmup步数占总步数的比例。
