@@ -132,7 +132,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     np_rng.set_state(savedState)
 
     if paddle.distributed.get_world_size() > 1:
-        if paddle.fluid.framework.in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             paddle.distributed.barrier()
 
     # Load mappings.
