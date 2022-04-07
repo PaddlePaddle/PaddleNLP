@@ -24,7 +24,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 
 3. 阅读理解任务 Grid Search 超参范围：batch_size: 24, 32; learning rates: 1e-5, 2e-5, 3e-5。阅读理解任务均使用多卡训练，其中 Grid Search 中的 batch_size 是指多张卡上的 batch_size 总和。
 
-4. 以上任务的 epoch、max_seq_length、warmup proportion 如下表所示：
+4. 以上每个任务的固定超参配置如下表所示：
 
 | TASK              | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL  | CMRC2018 | CHID | C<sup>3</sup> |
 | ----------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ---- | -------- | ---- | ------------- |
@@ -32,8 +32,8 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | max_seq_length    | 128   | 128   | 128     | 128   | 128   | 128         | 128  | 512      | 64   | 512           |
 | warmup_proportion | 0.1   | 0.1   | 0.1     | 0.1   | 0.1   | 0.1         | 0.1  | 0.1      | 0.06 | 0.1           |
 | num_cards         | 1     | 1     | 1       | 1     | 1     | 1           | 1    | 2        | 4    | 4             |
-
-
+| learning_rate     | 1e-5  | 3e-5  | 3e-5    | 1e-5  | 1e-5  | 1e-5        | 2e-5 | 32       | 24   | 24            |
+| batch_size        | 32    | 32    | 32      | 16    | 16    | 16          | 16   | 3e-5     | 1e-5 | 2e-5          |
 
 
 ## 一键复现模型效果
