@@ -14,8 +14,11 @@
 
 import paddle
 import paddle.nn as nn
-from paddle.fluid.framework import in_dygraph_mode
-from paddle.distributed.fleet import fleet
+try:
+    from paddle.distributed.fleet import fleet
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
 
 __all__ = [
     'guard',
@@ -163,7 +166,7 @@ class ColumnParallelLiner(nn.Layer):
                  name=None):
         super().__init__()
 
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
@@ -263,7 +266,7 @@ class RowParallelLiner(nn.Layer):
                  name=None):
         super().__init__()
 
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:

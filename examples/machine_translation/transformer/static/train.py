@@ -90,7 +90,7 @@ def do_train(args):
     paddle.enable_static()
     if args.is_distributed:
         fleet.init(is_collective=True)
-        assert args.device != "xpu","xpu doesn't support distributed training"
+        assert args.device != "xpu", "xpu doesn't support distributed training"
         places = [paddle.set_device("gpu")] if \
                  args.device == "gpu" else paddle.static.cpu_places()
         trainer_count = len(places)
@@ -99,6 +99,7 @@ def do_train(args):
             places = paddle.static.cuda_places()
         elif args.device == "xpu":
             places = paddle.static.xpu_places()
+            paddle.set_device("xpu")
         else:
             places = paddle.static.cpu_places()
             paddle.set_device("cpu")

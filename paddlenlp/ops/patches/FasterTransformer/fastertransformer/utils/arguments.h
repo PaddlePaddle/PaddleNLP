@@ -124,6 +124,8 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float repeat_penalty_{1.0};
   bool prefix_lm_{false};
   bool is_mbart_{false};
+  // For tensor parallel usage currently.
+  int seed_{-1};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
