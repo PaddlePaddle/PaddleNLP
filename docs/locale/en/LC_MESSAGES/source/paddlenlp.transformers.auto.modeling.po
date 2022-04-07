@@ -1,0 +1,409 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.auto.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder:1
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator:1
+#: paddlenlp.transformers.auto.modeling.AutoEncoder:1
+#: paddlenlp.transformers.auto.modeling.AutoGenerator:1
+#: paddlenlp.transformers.auto.modeling.AutoModel:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification:1
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification:1
+msgid "基类：:class:`paddlenlp.transformers.auto.modeling._BaseAutoModelClass`"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel:1
+msgid ""
+"AutoClass can help you automatically retrieve the relevant model given "
+"the provided pretrained weights/vocabulary. AutoModel is a generic model "
+"class that will be instantiated as one of the base model classes when "
+"created with the from_pretrained() classmethod."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModel`. Model weights are loaded by "
+"specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:5
+msgid ""
+"Name of pretrained model or dir path to load from. The string can be:  - "
+"Name of a built-in pretrained model - Name of a community-contributed "
+"pretrained model. - Local directory path which contains model weights "
+"file(\"model_state.pdparams\")   and model config file "
+"(\"model_config.json\")."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:5
+msgid "Name of pretrained model or dir path to load from. The string can be:"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:8
+msgid "Name of a built-in pretrained model"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:9
+msgid "Name of a community-contributed pretrained model."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:10
+msgid ""
+"Local directory path which contains model weights "
+"file(\"model_state.pdparams\") and model config file "
+"(\"model_config.json\")."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:13
+msgid ""
+"Specify a downstream task. Task can be 'Model', 'ForPretraining', "
+"'ForSequenceClassification', 'ForTokenClassification', "
+"'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', "
+"'ForCausalLM', 'Encoder', 'Decoder', 'Generator', 'Discriminator', "
+"'ForConditionalGeneration'. We only support specify downstream tasks in "
+"AutoModel. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:19
+msgid ""
+"Position arguments for model `__init__`. If provided, use these as "
+"position argument values for model initialization."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:22
+msgid ""
+"Keyword arguments for model `__init__`. If provided, use these to update "
+"pre-defined keyword argument values for model initialization. If the "
+"keyword is in `__init__` argument names of base model, update argument "
+"values of the base model; else update argument values of derived model."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:29
+msgid "An instance of `AutoModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:33
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:16
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:16
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForPretraining:1
+msgid "AutoModelForPretraining."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForPretraining`. Model weights are "
+"loaded by specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:9
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:5
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:7
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:9
+msgid "See :class:`AutoModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForPretraining.from_pretrained:12
+msgid "An instance of `AutoModelForPretraining`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification:1
+msgid "AutoModelForSequenceClassification."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForSequenceClassification`. Model "
+"weights are loaded by specifying name of a built-in pretrained model, or "
+"a community contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:12
+msgid "An instance of `AutoModelForSequenceClassification`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification:1
+msgid "AutoModelForTokenClassification."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForTokenClassification`. Model weights "
+"are loaded by specifying name of a built-in pretrained model, or a "
+"community contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:12
+msgid "An instance of `AutoModelForTokenClassification`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering:1
+msgid "AutoModelForQuestionAnswering."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForQuestionAnswering`. Model weights are"
+" loaded by specifying name of a built-in pretrained model, or a community"
+" contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForQuestionAnswering.from_pretrained:12
+msgid "An instance of `AutoModelForQuestionAnswering`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice:1
+msgid "AutoModelForMultipleChoice."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForMultipleChoice`. Model weights are "
+"loaded by specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForMultipleChoice.from_pretrained:12
+msgid "An instance of `AutoModelForMultipleChoice`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM:1
+msgid "AutoModelForMaskedLM."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForMaskedLM`. Model weights are loaded "
+"by specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForMaskedLM.from_pretrained:12
+msgid "An instance of `AutoModelForMaskedLM`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForCausalLM:1
+msgid "AutoModelForCausalLM."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForCausalLM`. Model weights are loaded "
+"by specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForCausalLM.from_pretrained:12
+msgid "An instance of `AutoModelForCausalLM`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoEncoder:1
+msgid "AutoEncoder."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoEncoder`. Model weights are loaded by "
+"specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoEncoder.from_pretrained:12
+msgid "An instance of `AutoEncoder`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder:1
+msgid "AutoDecoder."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoDecoder`. Model weights are loaded by "
+"specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:12
+msgid "An instance of `AutoDecoder`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoGenerator:1
+msgid "AutoGenerator."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoGenerator`. Model weights are loaded by "
+"specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoGenerator.from_pretrained:12
+msgid "An instance of `AutoGenerator`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDiscriminator:1
+msgid "AutoDiscriminator."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoDiscriminator`. Model weights are loaded by "
+"specifying name of a built-in pretrained model, or a community "
+"contributed model, or a local file directory path."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:12
+msgid "An instance of `AutoDiscriminator`."
+msgstr ""
+
+#: of paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration:1
+msgid "AutoModelForConditionalGeneration."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:1
+msgid ""
+"Creates an instance of `AutoModelForConditionalGeneration`. Model weights"
+" are loaded by specifying name of a built-in pretrained model, or a "
+"community contributed model, or a local file directory path."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.auto.modeling.AutoModelForConditionalGeneration.from_pretrained:12
+msgid "An instance of `AutoModelForConditionalGeneration`."
+msgstr ""
+

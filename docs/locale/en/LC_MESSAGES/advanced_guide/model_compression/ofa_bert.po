@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,11 +17,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:2
+#: ../advanced_guide/model_compression/ofa_bert.rst:2
 msgid "使用DynaBERT中的策略对BERT进行压缩"
 msgstr "Compress BERT with the strategies of DynaBERT"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:4
+#: ../advanced_guide/model_compression/ofa_bert.rst:4
 msgid ""
 "本教程使用的是 `DynaBERT-Dynamic BERT with Adaptive Width and Depth "
 "<https://arxiv.org/abs/2004.04037>`_ 中的训练策略。\\ "
@@ -37,7 +37,7 @@ msgstr ""
 "current round will be selected. Each sub-model contains multiple Sub Transformer Blocks with same size. The Sub Transformer Block is obtained by selecting Transformer Blocks with different widths."
 "A single Transformer Block consists of a Multi-Head Attention and a Feed-Forward Network. To obtain a Sub Transformer Block:"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:10
+#: ../advanced_guide/model_compression/ofa_bert.rst:10
 msgid ""
 "1. 一个 ``Multi-Head Attention`` "
 "层中有多个Head，每次选择不同宽度的子模型时，会同时对Head数量进行等比例减少，\\ "
@@ -47,7 +47,7 @@ msgstr ""
 "1. A single ``Multi-Head Attention`` layer has multiple Head. Each time when sub-models with different widths are selected, the number of Heads will be proportionally reduced at the same time."
 "For example, if there were 12 heads in the original model, the width of the selected sub-model was 75% of the original size, then all Transformer Blocks have 9 number of heads in this round."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:13
+#: ../advanced_guide/model_compression/ofa_bert.rst:13
 msgid ""
 "2. ``Feed-Forward Network`` 层中 ``Linear`` 的参数大小进行等比例减少，例如：如果原始模型中 ``FFN``"
 " 层的特征维度为3072，\\ 本次训练选择的模型是宽度为原始宽度75%的子模型，则本次训练中所有Transformer Block中 "
@@ -56,11 +56,11 @@ msgstr ""
 "2. The parameter size of ``Linear`` in the ``Feed-Forward Network`` layer is reduced proportionally, e.g.: if ``FFN`` layer in the original model"
 "has dimension 3072,\\ and the selected sub-model has 75% width of the original model in this round of training, then all ``FFN`` layers have feature dimension 2304 in the Transformer Block."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:18
+#: ../advanced_guide/model_compression/ofa_bert.rst:18
 msgid "整体原理介绍"
 msgstr "The Overview Of The Entire Princile"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:20
+#: ../advanced_guide/model_compression/ofa_bert.rst:20
 msgid ""
 "1. "
 "首先对预训练模型的参数和head根据其重要性进行重排序，把重要的参数和head排在参数的前侧，保证训练过程中的参数裁剪不会裁剪掉这些重要的参数。\\"
@@ -74,7 +74,7 @@ msgstr ""
 "And then calculating the importance of the current parameter according to the gradient and the overall size of the parameters. The calculation of the importance of head is done by passing in\\"
 "an all-one mask vector for the head and calculate the gradient of this mask, then the importance of heads in each layer of ``Multi-Head Attention`` considered accordingly."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:24
+#: ../advanced_guide/model_compression/ofa_bert.rst:24
 msgid ""
 "2. "
 "使用原本的预训练模型作为蒸馏过程中的教师网络。同时定义一个超网络，这个超网络中最大的子网络的结构和教师网络的结构相同其他小的子网络是对最大网络\\"
@@ -83,7 +83,7 @@ msgstr ""
 "Using the pre-trained model as the teacher model in the process of distillation. Meanwhile, defining a super-network, in this super-network the biggest sub-network has the same architecture of the teacher model. The rest of other smaller networks are decided by"
 " choosing different width against the biggest network, the choice of width refers to the pruning of parameters in the network. All sub-networks share the training parameters."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:27
+#: ../advanced_guide/model_compression/ofa_bert.rst:27
 msgid ""
 "3. "
 "使用重排序之后的预训练模型参数初始化超网络，并把这个超网络作为学生网络。分别为 ``Embedding`` 层，为每个transformer "
@@ -92,62 +92,62 @@ msgstr ""
 "Applying the sorted parameters in the pre-trained model to initialize the super-network, then this super-network is used as student network. Then it provides the loss of distillation for"
 "``Embedding`` layer, all transformer block layers and the last logits."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:29
-msgid "每个batch数据在训练前首先会以当前要训练的子网络配置（子网络配置目前仅包括对整个模型的宽度的选择），参数更新时仅会更新当前子网络计算中用到的那部分参数。"
+#: ../advanced_guide/model_compression/ofa_bert.rst:29
+msgid "每个batch数据在训练前首先会选择当前要训练的子网络配置（子网络配置目前仅包括对整个模型的宽度的选择），参数更新时仅会更新当前子网络计算中用到的那部分参数。"
 msgstr ""
 "Each batch of data will first be configed according to the current target sub-network(the width of the entire model is the only choice for the current sub-network configuration), only the used parameters in the current sub-network will be updated."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:31
+#: ../advanced_guide/model_compression/ofa_bert.rst:31
 msgid "通过以上的方式来优化整个超网络参数，训练完成后选择满足加速要求和精度要求的子模型。"
 msgstr ""
 "Through the method mentioend above to optimize the entire super-network, a sub-network can be picked up after the training according to requirements of speed and accuracy."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:37
+#: ../advanced_guide/model_compression/ofa_bert.rst:37
 msgid "整体流程"
 msgstr "Overall Process"
 
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:39
+#: ../advanced_guide/model_compression/ofa_bert.rst:39
 msgid "基于PaddleSlim进行模型压缩"
 msgstr "Model Compressing by PaddleSlim"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:41
+#: ../advanced_guide/model_compression/ofa_bert.rst:41
 msgid "在本例中，也需要训练基于特定任务的BERT模型，方法同上一篇教程《由BERT到Bi-LSTM的知识蒸馏》。下面重点介绍本例模型压缩的过程。"
 msgstr ""
 "In this demo, a task specific BERT model is trained, the training method is same as mentioned in the previous demo. We will show the process which is how to compress the model."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:44
+#: ../advanced_guide/model_compression/ofa_bert.rst:44
 msgid "1. 定义初始网络"
 msgstr "1. Define the initial network"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:45
+#: ../advanced_guide/model_compression/ofa_bert.rst:45
 msgid ""
 "定义原始BERT-"
 "base模型并定义一个字典保存原始模型参数。普通模型转换为超网络之后，由于其组网OP的改变导致原始模型加载的参数失效，所以需要定义一个字典保存原始模型的参数并用来初始化超网络。"
 msgstr ""
 "Define the original BERT-base model and a dictionary to hold the original parameters. After the conversion to a super-network, due to the changes in the used operators, it failed at loading the parameters, thus we need to define a dictionary to keep the original parameters and use them to initialize the super-network."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:56
+#: ../advanced_guide/model_compression/ofa_bert.rst:56
 msgid "2. 构建超网络"
 msgstr "2. Constructing the Super-Network"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:57
+#: ../advanced_guide/model_compression/ofa_bert.rst:57
 msgid "定义搜索空间，并根据搜索空间把普通网络转换为超网络。"
 msgstr "Defining the search spaces and converting the original model to a super-network."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:69
+#: ../advanced_guide/model_compression/ofa_bert.rst:69
 msgid "3. 定义教师网络"
 msgstr "3. Defining a techer network"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:70
+#: ../advanced_guide/model_compression/ofa_bert.rst:70
 msgid "构造教师网络。"
 msgstr "Constructing the teacher network."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:78
+#: ../advanced_guide/model_compression/ofa_bert.rst:78
 msgid "4. 配置蒸馏相关参数"
 msgstr "4. Configuring the parameters for distillation"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:79
+#: ../advanced_guide/model_compression/ofa_bert.rst:79
 msgid ""
 "需要配置的参数包括教师模型实例；需要添加蒸馏的层，在教师网络和学生网络的 ``Embedding`` 层和每一个 ``Tranformer "
 "Block`` 层\\ 之间添加蒸馏损失，中间层的蒸馏损失使用默认的MSE损失函数；配置 ``lambda_distill`` "
@@ -156,37 +156,37 @@ msgstr ""
 "The parameters that need to be configed include the teacher model; the layer that needs to be added into the distilaation, the distillation loss is added between the ``Embedding`` layer of the techer network and the student network and every ``Transformer"
 " Block``layer \\. Also the default MSE loss function is applied into the intermediate layer in distillation; configuring the ``lambda_distill`` parameters to represent the scaling of the overall distillation loss."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:97
+#: ../advanced_guide/model_compression/ofa_bert.rst:97
 msgid "5. 定义Once-For-All模型"
 msgstr "5. Defining Once-For-All Model"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:98
+#: ../advanced_guide/model_compression/ofa_bert.rst:98
 msgid "普通模型和蒸馏相关配置传给 ``OFA`` 接口，自动添加蒸馏过程并把超网络训练方式转为 ``OFA`` 训练方式。"
 msgstr ""
 "Passing in the original model and the configuration of distillation to ``OFA`` inferface, which automatically adds the distillation process and switch the training method of super network to ``OFA`` mode."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:106
+#: ../advanced_guide/model_compression/ofa_bert.rst:106
 msgid "6. 计算神经元和head的重要性并根据其重要性重排序参数"
 msgstr ""
 "6. Calculating the importance of neurons and heads and sorting them according to their importance"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:120
+#: ../advanced_guide/model_compression/ofa_bert.rst:120
 msgid "7. 传入当前OFA训练所处的阶段"
 msgstr "7. Passing in the result of the current training stage"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:129
+#: ../advanced_guide/model_compression/ofa_bert.rst:129
 msgid "8. 传入网络相关配置，开始训练"
 msgstr "8. passing in the network related configuration and start to train"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:130
+#: ../advanced_guide/model_compression/ofa_bert.rst:130
 msgid "本示例使用DynaBERT的策略进行超网络训练。"
 msgstr "This demo applies DynaBERT strategies to train super-network."
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:150
+#: ../advanced_guide/model_compression/ofa_bert.rst:150
 msgid "**NOTE**"
 msgstr "**NOTE**"
 
-#: ../../advanced_guide/model_compression/ofa_bert.rst:152
+#: ../advanced_guide/model_compression/ofa_bert.rst:152
 msgid ""
 "由于在计算head的重要性时会利用一个mask来收集梯度，所以需要通过monkey patch的方式重新实现一下 ``BERTModel`` 类的"
 " ``forward`` 函数。示例如下:"

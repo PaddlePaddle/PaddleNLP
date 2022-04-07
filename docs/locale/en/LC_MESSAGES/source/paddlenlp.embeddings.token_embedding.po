@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,13 +17,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.embeddings.token_embedding.rst:2
+#: ../source/paddlenlp.embeddings.token_embedding.rst:2
 msgid "token\\_embedding"
 msgstr "token\\_embedding"
 
 #: of paddlenlp.embeddings.token_embedding.list_embedding_name:1
-msgid "List all names of pretrained embedding models paddlenlp provides."
-msgstr "List all names of pretrained embedding models paddlenlp provides."
+msgid "Lists all names of pretrained embedding models paddlenlp provides."
+msgstr "Lists all names of pretrained embedding models paddlenlp provides."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
 msgid "基类：:class:`paddle.nn.layer.common.Embedding`"
@@ -40,127 +40,185 @@ msgstr ""
 "can load extended vocabulary by specifying extended_vocab_path."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable
 msgid "参数"
 msgstr "parameter"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding:5
 msgid ""
-"`str`, optional, default to `w2v.baidu_encyclopedia.target.word-"
-"word.dim300`): The pre-trained embedding model name. Use "
-"`paddlenlp.embeddings.list_embedding_name()` to show which embedding "
-"model we have alreaady provide."
+"The pre-trained embedding model name. Use "
+"`paddlenlp.embeddings.list_embedding_name()` to list the names of all "
+"embedding models that we provide. Defaults to "
+"`w2v.baidu_encyclopedia.target.word-word.dim300`."
 msgstr ""
 "`str`, optional, default to `w2v.baidu_encyclopedia.target.word-"
 "word.dim300`): The pre-trained embedding model name. Use "
 "`paddlenlp.embeddings.list_embedding_name()` to show which embedding "
 "model we have alreaady provide."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:8
-msgid ""
-"`str`, optional, default to `[UNK]`): Specifying unknown token as "
-"unknown_token."
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:9
+msgid "Specifies unknown token. Defaults to `[UNK]`."
 msgstr ""
-"`str`, optional, default to `[UNK]`): Specifying unknown token as "
-"unknown_token."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:10
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:12
 msgid ""
-"list, optional, default to `None`): To initialize the vector of unknown "
-"token. If it's none, use normal distribution to initialize the vector of "
-"unknown token."
+"To initialize the vector of unknown token. If it's none, use normal "
+"distribution to initialize the vector of unknown token. Defaults to "
+"`None`."
 msgstr ""
-"list, optional, default to `None`): To initialize the vector of unknown "
-"token. If it's none, use normal distribution to initialize the vector of "
-"unknown token."
+"To initialize the vector of unknown token. If it's none, use normal "
+"distribution to initialize the vector of unknown token. Defaults to "
+"`None`."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:13
-msgid "`str`, optional, default to `None`): The file path of extended vocabulary."
-msgstr "`str`, optional, default to `None`): The file path of extended vocabulary."
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:16
+msgid "The file path of extended vocabulary. Defaults to `None`."
+msgstr "The file path of extended vocabulary. Defaults to `None`."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:15
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:19
+msgid "Whether the weight of embedding can be trained. Defaults to True."
+msgstr "Whether the weight of embedding can be trained. Defaults to True."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:22
 msgid ""
-"`bool`, optional, default to True): Whether the weight of embedding can "
-"be trained."
+"Whether to keep the extended vocabulary only, will be effective only if "
+"provides extended_vocab_path. Defaults to False."
 msgstr ""
-"`bool`, optional, default to True): Whether the weight of embedding can "
-"be trained."
-
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:17
-msgid ""
-"`bool`, optional, default to True): Whether keep the extended vocabulary "
-"only, will be effective only if provides extended_vocab_path"
-msgstr ""
-"`bool`, optional, default to True): Whether keep the extended vocabulary "
-"only, will be effective only if provides extended_vocab_path"
+"Whether to keep the extended vocabulary only, will be effective only if "
+"provides extended_vocab_path. Defaults to False."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:1
-msgid ""
-"Set the weight of embedding can be trained. :param trainable (object: "
-"`bool`, required):"
+msgid "Whether or not to set the weights of token embedding to be trainable."
 msgstr ""
-"Set the weight of embedding can be trained. :param trainable (object: "
-"`bool`, required):"
+"Whether or not to set the weights of token embedding to be trainable."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:3
-msgid "Whether the weight of embedding can be trained."
-msgstr "Whether the weight of embedding can be trained."
+msgid ""
+"The weights can be trained if trainable is set to True, or the weights "
+"are fixed if trainable is False."
+msgstr ""
+"The weights can be trained if trainable is set to True, or the weights "
+"are fixed if trainable is False."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:1
-msgid ""
-"Get the vectors of specifying words. :param words (object: `list` or "
-"`str` or `int`, required): The words which need to be searched."
+msgid "Gets the vectors of specifying words."
+msgstr "Gets the vectors of specifying words."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:3
+msgid "The words which need to be searched."
 msgstr ""
-"Get the vectors of specifying words. :param words (object: `list` or "
-"`str` or `int`, required): The words which need to be searched."
+"The words which need to be searched."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
 msgid "返回"
 msgstr "Return"
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:4
-msgid "`numpy.array`): The vectors of specifying words."
-msgstr "`numpy.array`): The vectors of specifying words."
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:6
+msgid "The vectors of specifying words."
+msgstr "The vectors of specifying words."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
 msgid "返回类型"
 msgstr "Return Type"
 
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:7
+msgid "`numpy.array`"
+msgstr "`numpy.array`"
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:13
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:14
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:10
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search:10
+msgid "实际案例"
+msgstr "Case Study"
+
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:1
-msgid "Get the index of specifying word by searching word_to_idx dict."
-msgstr "Get the index of specifying word by searching word_to_idx dict."
+msgid "Gets the index of specifying word by searching word_to_idx dict."
+msgstr "Gets the index of specifying word by searching word_to_idx dict."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:3
+msgid "The input token word which we want to get the token index converted from."
+msgstr "The input token word which we want to get the token index converted from."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:6
+msgid "The index of specifying word."
+msgstr "The index of specifying word."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:7
+msgid "`int`"
+msgstr "`int`"
 
 #: of
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:1
-msgid "Get the index list of specifying words by searching word_to_idx dict."
-msgstr "Get the index list of specifying words by searching word_to_idx dict."
+msgid "Gets the index list of specifying words by searching word_to_idx dict."
+msgstr "Gets the index list of specifying words by searching word_to_idx dict."
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:3
+msgid ""
+"The input token words which we want to get the token indices converted "
+"from."
+msgstr ""
+"The input token words which we want to get the token indices converted "
+"from."
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:6
+msgid "The indexes list of specifying words."
+msgstr "The indexes list of specifying words."
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:7
+msgid "`list`"
+msgstr "`list`"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:1
 msgid ""
-"Calculate the scalar product of 2 words. :param word_a (object: `str`, "
-"required): The first word string. :param word_b (object: `str`, "
-"required): The second word string."
+"Calculates the dot product of 2 words. Dot product or scalar product is "
+"an algebraic operation that takes two equal-length sequences of numbers "
+"(usually coordinate vectors), and returns a single number."
 msgstr ""
 "Calculate the scalar product of 2 words. :param word_a (object: `str`, "
 "required): The first word string. :param word_b (object: `str`, "
 "required): The second word string."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:5
-msgid "The scalar product of 2 words."
-msgstr "The scalar product of 2 words."
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:4
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:5
+msgid "The first word string."
+msgstr "The first word string."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:6
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:7
+msgid "The second word string."
+msgstr "The second word string."
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:10
+msgid "The dot product of 2 words."
+msgstr "The dot product of 2 words."
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:1
 msgid ""
-"Calculate the cosine similarity of 2 words. :param word_a (object: `str`,"
-" required): The first word string. :param word_b (object: `str`, "
-"required): The second word string."
+"Calculates the cosine similarity of 2 word vectors. Cosine similarity is "
+"the cosine of the angle between two n-dimensional vectors in an "
+"n-dimensional space."
 msgstr ""
 "Calculate the cosine similarity of 2 words. :param word_a (object: `str`,"
 " required): The first word string. :param word_b (object: `str`, "
 "required): The second word string."
 
-#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:5
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:9
 msgid "The cosine similarity of 2 words."
 msgstr "The cosine similarity of 2 words."
 

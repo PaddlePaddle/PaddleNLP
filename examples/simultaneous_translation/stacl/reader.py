@@ -171,7 +171,7 @@ def prepare_train_input(insts, pad_idx):
     """
     word_pad = Pad(pad_idx)
     src_word = word_pad([inst[0] for inst in insts])
-    trg_word = word_pad(inst[1][:-1] for inst in insts)
+    trg_word = word_pad([inst[1][:-1] for inst in insts])
     lbl_word = word_pad([inst[1][1:] for inst in insts])
     data_inputs = [src_word, trg_word, lbl_word]
 
@@ -183,7 +183,7 @@ def prepare_infer_input(insts, pad_idx):
     Put all padded data needed by beam search decoder into a list.
     """
     word_pad = Pad(pad_idx)
-    src_word = word_pad(inst[0] for inst in insts)
+    src_word = word_pad([inst[0] for inst in insts])
 
     return [src_word, ]
 

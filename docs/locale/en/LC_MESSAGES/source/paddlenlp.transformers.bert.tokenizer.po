@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.bert.tokenizer.rst:2
+#: ../source/paddlenlp.transformers.bert.tokenizer.rst:2
 msgid "tokenizer"
 msgstr "tokenizer"
 
@@ -27,28 +27,34 @@ msgid "基类：:class:`object`"
 msgstr "Base class: :class:`object`"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer:1
-msgid ""
-"Runs basic tokenization (punctuation splitting, lower casing, etc.). "
-":param do_lower_case: Whether the text strips accents and convert to"
-msgstr ""
-"Runs basic tokenization (punctuation splitting, lower casing, etc.). "
-":param do_lower_case: Whether the text strips accents and convert to"
+msgid "Runs basic tokenization (punctuation splitting, lower casing, etc.)."
+msgstr "Runs basic tokenization (punctuation splitting, lower casing, etc.)."
+
+#: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer
+#: paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer
+#: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
+msgid "参数"
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer:3
-msgid ""
-"lower case. If you use the BERT Pretrained model, lower is set to Flase "
-"when using the cased model, otherwise it is set to True. Default: True."
-msgstr ""
-"lower case. If you use the BERT Pretrained model, lower is set to Flase "
-"when using the cased model, otherwise it is set to True. Default: True."
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to `True`."
+msgstr "Whether or not to lowercase the input when tokenizing. Defaults to `True`."
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:1
-msgid ""
-"Tokenizes a piece of text using basic tokenizer. :param text: A piece of "
-"text. :type text: str"
-msgstr ""
-"Tokenizes a piece of text using basic tokenizer. :param text: A piece of "
-"text. :type text: str"
+msgid "Tokenizes a piece of text using basic tokenizer."
+msgstr "Tokenizes a piece of text using basic tokenizer."
+
+#: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:3
+msgid "A piece of text."
+msgstr "A piece of text."
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens
@@ -57,12 +63,12 @@ msgstr ""
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.tokenize
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
 msgid "返回"
 msgstr "Return"
 
-#: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:5
+#: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:6
 msgid "A list of tokens."
 msgstr "A list of tokens."
 
@@ -72,10 +78,18 @@ msgstr "A list of tokens."
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.tokenize
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
 msgid "返回类型"
 msgstr "Return Type"
+
+#: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:10
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer:30
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:12
+#: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:12
+msgid "实际案例"
+msgstr "Case Study"
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
@@ -85,92 +99,94 @@ msgstr "Base class: :class:`paddlenlp.transformers.tokenizer_utils.PretrainedTok
 msgid ""
 "Constructs a BERT tokenizer. It uses a basic tokenizer to do punctuation "
 "splitting, lower casing and so on, and follows a WordPiece tokenizer to "
-"tokenize as subwords. :param vocab_file: file path of the vocabulary "
-":type vocab_file: str :param do_lower_case: Whether the text strips "
-"accents and convert to"
+"tokenize as subwords."
 msgstr ""
 "Constructs a BERT tokenizer. It uses a basic tokenizer to do punctuation "
 "splitting, lower casing and so on, and follows a WordPiece tokenizer to "
-"tokenize as subwords. :param vocab_file: file path of the vocabulary "
-":type vocab_file: str :param do_lower_case: Whether the text strips "
-"accents and convert to"
+"tokenize as subwords."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:7
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:5
 msgid ""
-"lower case. If you use the BERT pretrained model, lower is set to Flase "
-"when using the cased model, otherwise it is set to True. Default: True."
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
 msgstr ""
-"lower case. If you use the BERT pretrained model, lower is set to Flase "
-"when using the cased model, otherwise it is set to True. Default: True."
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add
-msgid "参数"
-msgstr "Parameters"
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:8
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
+msgstr "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:11
-msgid "The special token for unkown words. Default: \"[UNK]\"."
-msgstr "The special token for unkown words. Default: \"[UNK]\"."
-
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:13
-msgid "The special token for separator token . Default: \"[SEP]\"."
-msgstr "The special token for separator token . Default: \"[SEP]\"."
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
+msgstr ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:15
-msgid "The special token for padding. Default: \"[PAD]\"."
-msgstr "The special token for padding. Default: \"[PAD]\"."
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
+msgstr ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:17
-msgid "The special token for cls. Default: \"[CLS]\"."
-msgstr "The special token for cls. Default: \"[CLS]\"."
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:18
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:19
-msgid "The special token for mask. Default: \"[MASK]\"."
-msgstr "The special token for mask. Default: \"[MASK]\"."
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:21
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:23
-msgid "实际案例"
-msgstr "Example"
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:24
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size:1
-msgid ""
-"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
-"int"
-msgstr ""
-"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
-"int"
+msgid "Return the size of vocabulary."
+msgstr "Return the size of vocabulary."
 
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer.tokenize:1
-msgid ""
-"End-to-end tokenization for BERT models. :param text: The text to be "
-"tokenized. :type text: str"
-msgstr ""
-"End-to-end tokenization for BERT models. :param text: The text to be "
-"tokenized. :type text: str"
-
-#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer.tokenize:5
-msgid "A list of string representing converted tokens."
-msgstr "A list of string representing converted tokens."
+#: of paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr "The size of vocabulary."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:1
 msgid ""
-"Converts a sequence of tokens (list of string) in a single string. Since "
-"the usage of WordPiece introducing `##` to concat subwords, also remove "
-"`##` when converting. :param tokens: A list of string representing tokens"
-" to be converted. :type tokens: list"
+"Converts a sequence of tokens (list of string) to a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also removes "
+"`##` when converting."
 msgstr ""
-"Converts a sequence of tokens (list of string) in a single string. Since "
-"the usage of WordPiece introducing `##` to concat subwords, also remove "
-"`##` when converting. :param tokens: A list of string representing tokens"
-" to be converted. :type tokens: list"
+"Converts a sequence of tokens (list of string) to a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also removes "
+"`##` when converting."
 
 #: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:7
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
+msgstr "A list of string representing tokens to be converted."
+
+#: of
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:8
 msgid "Converted string from tokens."
 msgstr "Converted string from tokens."
 
@@ -184,29 +200,18 @@ msgstr ""
 "tokens."
 
 #: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add:5
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add:3
 msgid ""
-"This encodes inputs and checks the number of added tokens, and is "
-"therefore not efficient. Do not put this inside your training loop."
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
 msgstr ""
-"This encodes inputs and checks the number of added tokens, and is "
-"therefore not efficient. Do not put this inside your training loop."
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
 
 #: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add:8
-msgid ""
-"Returns the number of added tokens in the case of a sequence pair if set "
-"to True, returns the number of added tokens in the case of a single "
-"sequence if set to False."
-msgstr ""
-"Returns the number of added tokens in the case of a sequence pair if set "
-"to True, returns the number of added tokens in the case of a single "
-"sequence if set to False."
-
-#: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add:11
-msgid "Number of tokens added to sequences"
-msgstr "Number of tokens added to sequences"
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add:7
+msgid "Number of tokens added to sequences."
+msgstr "Number of tokens added to sequences."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:1
@@ -219,8 +224,18 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:4
-msgid "A BERT sequence has the following format: ::"
-msgstr "A BERT sequence has the following format: ::"
+msgid "A BERT sequence has the following format:"
+msgstr "A BERT sequence has the following format:"
+
+#: of
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      ``[CLS] X [SEP]``"
+msgstr "single sequence:      ``[CLS] X [SEP]``"
+
+#: of
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
+msgstr "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:9
@@ -230,19 +245,14 @@ msgstr "List of IDs to which the special tokens will be added."
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:11
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:13
-msgid "Optional second list of IDs for sequence pairs."
-msgstr "Optional second list of IDs for sequence pairs."
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:6
+msgid "Optional second list of IDs for sequence pairs. Defaults to None."
+msgstr "Optional second list of IDs for sequence pairs. Defaults to None."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:14
 msgid "List of input_id with the appropriate special tokens."
 msgstr "List of input_id with the appropriate special tokens."
-
-#: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_inputs_with_special_tokens:15
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:17
-msgid ":obj:`List[int]`"
-msgstr ":obj:`List[int]`"
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:1
@@ -255,28 +265,41 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:3
-msgid "A BERT offset_mapping has the following format: ::"
-msgstr "A BERT offset_mapping has the following format: ::"
+msgid "A BERT offset_mapping has the following format:"
+msgstr "A BERT offset_mapping has the following format:"
+
+#: of
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:5
+msgid "single sequence:      ``(0,0) X (0,0)``"
+msgstr "single sequence:      ``(0,0) X (0,0)``"
+
+#: of
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "pair of sequences:        ``(0,0) A (0,0) B (0,0)``"
+msgstr "pair of sequences:        ``(0,0) A (0,0) B (0,0)``"
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:8
-msgid "List of char offsets to which the special tokens will be added."
-msgstr "List of char offsets to which the special tokens will be added."
+msgid "List of wordpiece offsets to which the special tokens will be added."
+msgstr "List of wordpiece offsets to which the special tokens will be added."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:10
-msgid "Optional second list of char offsets for offset mapping pairs."
-msgstr "Optional second list of char offsets for offset mapping pairs."
+msgid ""
+"Optional second list of wordpiece offsets for offset mapping pairs. "
+"Defaults to None."
+msgstr ""
+"Optional second list of wordpiece offsets for offset mapping pairs. "
+"Defaults to None."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:13
-msgid "List of char offsets with the appropriate offsets of special tokens."
-msgstr "List of char offsets with the appropriate offsets of special tokens."
-
-#: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens:14
-msgid ":obj:`List[tuple]`"
-msgstr ":obj:`List[tuple]`"
+msgid ""
+"A list of wordpiece offsets with the appropriate offsets of special "
+"tokens."
+msgstr ""
+"A list of wordpiece offsets with the appropriate offsets of special "
+"tokens."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:1
@@ -295,16 +318,17 @@ msgstr "A BERT sequence pair mask has the following format: ::"
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:9
 msgid ""
-"If :obj:`token_ids_1` is :obj:`None`, this method only returns the first "
-"portion of the mask (0s)."
+"If `token_ids_1` is `None`, this method only returns the first portion of"
+" the mask (0s)."
 msgstr ""
-"If :obj:`token_ids_1` is :obj:`None`, this method only returns the first "
-"portion of the mask (0s)."
+"If `token_ids_1` is `None`, this method only returns the first portion of"
+" the mask (0s)."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:11
-msgid "List of IDs."
-msgstr "List of IDs."
+#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:4
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr "A list of `inputs_ids` for the first sequence."
 
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.create_token_type_ids_from_sequences:16
@@ -323,16 +347,6 @@ msgstr ""
 "tokenizer ``encode`` methods."
 
 #: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:4
-msgid "List of ids of the first sequence."
-msgstr "List of ids of the first sequence."
-
-#: of
-#: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:6
-msgid "List of ids of the second sequence."
-msgstr "List of ids of the second sequence."
-
-#: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:8
 msgid ""
 "Whether or not the token list is already formatted with special tokens "
@@ -344,53 +358,51 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.get_special_tokens_mask:12
 msgid ""
-"The list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"The list of integers either be 0 or 1: 1 for a special token, 0 for a "
 "sequence token."
 msgstr ""
-"The list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"The list of integers either be 0 or 1: 1 for a special token, 0 for a "
 "sequence token."
 
 #: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer:1
-msgid ""
-"Runs WordPiece tokenization. :param vocab: Vocab of the word piece "
-"tokenizer. :type vocab: Vocab|dict :param unk_token: A specific token to "
-"replace all unkown tokens. :type unk_token: str :param "
-"max_input_chars_per_word: If a word's length is more than"
-msgstr ""
-"Runs WordPiece tokenization. :param vocab: Vocab of the word piece "
-"tokenizer. :type vocab: Vocab|dict :param unk_token: A specific token to "
-"replace all unkown tokens. :type unk_token: str :param "
-"max_input_chars_per_word: If a word's length is more than"
+msgid "Runs WordPiece tokenization."
+msgstr "Runs WordPiece tokenization."
+
+#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer:3
+msgid "Vocab of the word piece tokenizer."
+msgstr "Vocab of the word piece tokenizer."
+
+#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer:5
+msgid "A specific token to replace all unknown tokens."
+msgstr "A specific token to replace all unknown tokens."
 
 #: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer:7
-msgid "max_input_chars_per_word, it will be dealt as unknown word. Default: 100."
-msgstr "max_input_chars_per_word, it will be dealt as unknown word. Default: 100."
+msgid ""
+"If a word's length is more than max_input_chars_per_word, it will be "
+"dealt as unknown word. Defaults to 100."
+msgstr ""
+"If a word's length is more than max_input_chars_per_word, it will be "
+"dealt as unknown word. Defaults to 100."
 
 #: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:1
 msgid ""
 "Tokenizes a piece of text into its word pieces. This uses a greedy "
 "longest-match-first algorithm to perform tokenization using the given "
-"vocabulary. :param text: A single token or whitespace separated tokens. "
-"This should have"
+"vocabulary."
 msgstr ""
 "Tokenizes a piece of text into its word pieces. This uses a greedy "
 "longest-match-first algorithm to perform tokenization using the given "
-"vocabulary. :param text: A single token or whitespace separated tokens. "
-"This should have"
+"vocabulary."
 
 #: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:5
-msgid "already been passed through `BasicTokenizer`."
-msgstr "already been passed through `BasicTokenizer`."
+msgid ""
+"A single token or whitespace separated tokens. This should have already "
+"been passed through `BasicTokenizer`."
+msgstr ""
+"A single token or whitespace separated tokens. This should have already "
+"been passed through `BasicTokenizer`."
 
-#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:7
+#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:8
 msgid "A list of wordpiece tokens."
 msgstr "A list of wordpiece tokens."
-
-#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:11
-msgid "示例"
-msgstr "Example"
-
-#: of paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:12
-msgid "input = \"unaffable\" output = [\"un\", \"##aff\", \"##able\"]"
-msgstr "input = \"unaffable\" output = [\"un\", \"##aff\", \"##able\"]"
 
