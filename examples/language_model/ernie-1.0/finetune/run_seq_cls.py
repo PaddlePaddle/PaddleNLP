@@ -26,11 +26,13 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.metric import Accuracy
 import paddlenlp
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
+from paddlenlp.trainer.trainer_utils import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification, )
@@ -41,18 +43,19 @@ from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import (
     ALL_DATASETS,
     DataTrainingArguments,
-    ModelArguments,
-    defaut_collator, )
+    ModelArguments, )
 
 
-def do_train():
+def main():
     parser = PdArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    # Log model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
+
     paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     # Log on each process the small summary:
     logger.warning(
@@ -78,20 +81,19 @@ def do_train():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # set_seed(args)
     data_args.dataset = data_args.dataset.strip()
-    if data_args.dataset not in ALL_DATASETS:
-        raise ValueError("Not found dataset {}".format(data_args.dataset))
 
-    # Use yaml config to rewrite all args.
-    config = ALL_DATASETS[data_args.dataset]
-    for args in (model_args, data_args, training_args):
-        for arg in vars(args):
-            if arg in config.keys():
-                setattr(args, arg, config[arg])
+    if data_args.dataset in ALL_DATASETS:
+        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
+        config = ALL_DATASETS[data_args.dataset]
+        logger.info("Over-writing training config by yaml config!")
+        for args in (model_args, data_args, training_args):
+            for arg in vars(args):
+                if arg in config.keys():
+                    setattr(args, arg, config[arg])
 
-    training_args.per_device_train_batch_size = config["batch_size"]
-    training_args.per_device_eval_batch_size = config["batch_size"]
+        training_args.per_device_train_batch_size = config["batch_size"]
+        training_args.per_device_eval_batch_size = config["batch_size"]
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -106,7 +108,7 @@ def do_train():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
-    loss_fct = nn.loss.CrossEntropyLoss(
+    criterion = nn.loss.CrossEntropyLoss(
     ) if data_args.label_list else nn.loss.MSELoss()
 
     # Define dataset pre-process function
@@ -116,12 +118,15 @@ def do_train():
         trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
 
     # Define data collector
-    batchify_fn = defaut_collator(tokenizer, data_args)
+    data_collator = DataCollatorWithPadding(tokenizer)
 
     # Dataset pre-process
-    train_dataset = raw_datasets["train"].map(trans_fn)
-    eval_dataset = raw_datasets["dev"].map(trans_fn)
-    test_dataset = raw_datasets["test"].map(trans_fn)
+    if training_args.do_train:
+        train_dataset = raw_datasets["train"].map(trans_fn)
+    if training_args.do_eval:
+        eval_dataset = raw_datasets["dev"].map(trans_fn)
+    if training_args.do_predict:
+        test_dataset = raw_datasets["test"].map(trans_fn)
 
     # Define the metrics of tasks.
     def compute_metrics(p):
@@ -142,17 +147,13 @@ def do_train():
 
     trainer = Trainer(
         model=model,
-        criterion=loss_fct,
+        criterion=criterion,
         args=training_args,
-        data_collator=batchify_fn,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics, )
-
-    # Log model and data config
-    trainer.print_config(model_args, "Model")
-    trainer.print_config(data_args, "Data")
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -161,36 +162,41 @@ def do_train():
         checkpoint = last_checkpoint
 
     # Training
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    metrics = train_result.metrics
-    trainer.save_model()  # Saves the tokenizer too for easy upload
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
-    trainer.save_state()
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
     # Evaluate and tests model
-    eval_metrics = trainer.evaluate()
-    trainer.log_metrics("eval", eval_metrics)
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
 
-    test_ret = trainer.predict(test_dataset)
-    trainer.log_metrics("test", test_ret.metrics)
-    if test_ret.label_ids is None:
-        paddle.save(
-            test_ret.predictions,
-            os.path.join(training_args.output_dir, "test_results.pdtensor"), )
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_dataset)
+        trainer.log_metrics("test", test_ret.metrics)
+        if test_ret.label_ids is None:
+            paddle.save(
+                test_ret.predictions,
+                os.path.join(training_args.output_dir, "test_results.pdtensor"),
+            )
 
     # export inference model
-    input_spec = [
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64"),  # input_ids
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64")  # segment_ids
-    ]
-    trainer.export_model(
-        input_spec=input_spec,
-        load_best_model=True,
-        output_dir=model_args.export_model_dir)
+    if training_args.do_export:
+        input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
+        ]
+        trainer.export_model(
+            input_spec=input_spec,
+            load_best_model=True,
+            output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":
-    do_train()
+    main()

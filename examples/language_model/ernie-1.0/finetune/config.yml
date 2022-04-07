@@ -8,11 +8,11 @@ DefaultArgs:
     weight_decay: 0.01
     logging_steps: 10
     eval_steps: 200
-    minimum_eval_times: 20
+    minimum_eval_times: -1
     max_steps: -1
     warmup_steps: 0
+    warmup_ratio: 0.0
     metric: "Accuracy"
-    split: "train dev"
 
 # Datasets which used for sequence classfication
 SequenceClassification:
@@ -25,7 +25,6 @@ SequenceClassification:
     clue ocnli:
         num_train_epochs: 8
     clue cmnli: 
-        learning_rate: 1e-4, 5e-5, 1e-5
         num_train_epochs: 3
     clue wsc: 
         num_train_epochs: 50
@@ -46,8 +45,8 @@ SequenceClassification:
 TokenClassification:
     peoples_daily_ner:
         learning_rate: 0.00005
-        num_train_epochs: 8
-        batch_size: 16
+        num_train_epochs: 4
+        batch_size: 128
     msra_ner:
         num_train_epochs: 3
 
@@ -55,9 +54,9 @@ TokenClassification:
 QuestionAnswering:
     cmrc2018:
         learning_rate: 0.00005
-        num_train_epochs: 5
+        num_train_epochs: 1
         batch_size: 32
-        max_seq_length: 512
+        max_seq_length: 384
     dureader_nlp:
         num_train_epochs: 1
         batch_size: 12

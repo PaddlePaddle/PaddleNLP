@@ -73,25 +73,6 @@ class Dict(object):
         return ret
 
 
-def defaut_collator(tokenizer, args):
-    """ Defaut collator for sequences classification
-
-    Args:
-        tokenizer (PretrainedTokenizer): tokenizer of PretrainedModel
-        args : data argument, need label list.
-
-    Returns:
-        batchify_fn (function): collator
-    """
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        "labels": Stack(dtype="int64" if args.label_list else "float32")  # labels
-    }): fn(samples)
-
-    return batchify_fn
-
-
 @dataclass
 class DataTrainingArguments:
     """
